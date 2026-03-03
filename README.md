@@ -1,0 +1,96 @@
+# Wanderly iOS
+
+AI-powered place discovery and trip planning app for iOS.
+
+Save places from Instagram, Threads, Xiaohongshu, or any app — Wanderly's AI extracts place details and pins them on your personal map. Plan trips, optimize routes, and track your adventures.
+
+## Features
+
+- **Map View** — MapKit with custom category-colored pins, clustering, and bottom sheet details
+- **Place List** — Filterable (Want to Go / Visited / All), sortable (Nearest / Recent / Rating), swipe actions
+- **Trip Planner** — City selector, timeline view, drag-to-reorder, AI route optimization
+- **Share Extension** — Accept URLs and images from any app, AI-parse and save to map
+- **Profile** — Stats, world map visualization, collections, subscription management
+- **Onboarding** — 3-step carousel
+- **Place Detail** — Photo carousel, info grid, notes, navigate button, source link
+- **App Clip** — Lightweight version for opening shared trip links
+
+## Tech Stack
+
+- **SwiftUI** + **MapKit** for UI
+- **Privy iOS SDK** for auth (Sign in with Apple / Google / Email + embedded wallet)
+- **Supabase Swift SDK** for backend (DB + Storage)
+- **Claude API** (Anthropic) for AI content parsing
+- **Google Places API** for place matching and details
+- **App Clip** target for shareable trip links
+- **Share Extension** target for cross-app saving
+
+## Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/JhiNResH/wanderly.git
+   cd wanderly
+   ```
+
+2. Copy environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Fill in your API keys in `.env`:
+   - `ANTHROPIC_API_KEY` — from [Anthropic Console](https://console.anthropic.com/)
+   - `GOOGLE_PLACES_API_KEY` — from [Google Cloud Console](https://console.cloud.google.com/)
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY` — from [Supabase Dashboard](https://supabase.com/dashboard)
+   - `PRIVY_APP_ID` — from [Privy Dashboard](https://dashboard.privy.io/)
+
+4. Open the project in Xcode:
+   ```bash
+   open Package.swift
+   ```
+
+5. Build and run on simulator or device.
+
+## Project Structure
+
+```
+Wanderly/
+├── App/                    Main app entry + tab-based root
+├── Views/
+│   ├── Map/                Map view with annotations
+│   ├── List/               Filterable place list with cards
+│   ├── Trips/              Trip planner with timeline
+│   ├── Profile/            User profile and stats
+│   ├── Detail/             Place detail view
+│   ├── Onboarding/         3-step onboarding carousel
+│   └── Shared/             Reusable components
+├── Models/                 Data models (Place, Trip, UserProfile)
+├── ViewModels/             MVVM view models
+├── Services/               API service protocols + stubs
+├── Extensions/             Color theme + utilities
+└── Resources/              Assets
+WanderlyShareExtension/     Share Extension target
+WanderlyClip/               App Clip target
+```
+
+## Design Theme
+
+| Token              | Light           | Dark            |
+|---------------------|-----------------|-----------------|
+| Background          | #FFF8F0 (Cream) | #1C1C1E (Charcoal) |
+| Accent              | #C75B39 (Terracotta) | #E8A87C (Amber) |
+| Secondary           | #A8B5A0 (Sage)  | #A8B5A0 (Sage)  |
+| Text                | #2C2C2E (Charcoal) | #FFFFFF         |
+| Corner Radius       | 16px            | 16px            |
+| Font                | SF Pro (system) | SF Pro (system) |
+
+## Dependencies (Swift Package Manager)
+
+- [privy-io/privy-ios](https://github.com/privy-io/privy-ios) — Authentication
+- [supabase/supabase-swift](https://github.com/supabase/supabase-swift) — Backend
+- Google Places API — REST via URLSession
+- Claude API — REST via URLSession
+
+## License
+
+Private — All rights reserved.
