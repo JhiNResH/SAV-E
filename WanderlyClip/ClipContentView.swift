@@ -120,10 +120,6 @@ struct ClipContentView: View {
                             .background(Color(hex: "C75B39"))
                             .cornerRadius(16)
                     }
-
-                    Link("Get the Full App", destination: URL(string: "https://apps.apple.com/app/wanderly/id000000000")!)
-                        .font(.subheadline)
-                        .foregroundColor(Color(hex: "C75B39"))
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 32)
