@@ -172,25 +172,23 @@ struct ClipContentView: View {
         if let data = SharedTripData.from(url: url) {
             tripData = data
             updateCamera(for: data.stops)
-        } else {
-            // Invalid URL data — fall back to demo
-            tripData = SharedTripData.demo
-            updateCamera(for: SharedTripData.demo.stops)
         }
+        // Invalid URL data → tripData stays nil → errorView shown
         isLoading = false
     }
 
     private func updateCamera(for stops: [SharedTripData.SharedStop]) {
-        guard !stops.isEmpty else { return }
         let lats = stops.map(\.lat)
         let lngs = stops.map(\.lng)
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return }
         let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2
         )
         let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.5, 0.01),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.5, 0.01)
+            latitudeDelta: max((maxLat - minLat) * 1.5, 0.01),
+            longitudeDelta: max((maxLng - minLng) * 1.5, 0.01)
         )
         cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
     }

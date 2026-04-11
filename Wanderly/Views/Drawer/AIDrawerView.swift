@@ -33,7 +33,7 @@ struct AIDrawerView: View {
 
     private var searchBar: some View {
         HStack(spacing: 10) {
-            Image(systemName: isLoading ? "sparkles" : "sparkles")
+            Image(systemName: isLoading ? "hourglass" : "sparkles")
                 .foregroundColor(.wanderlyTerracotta)
                 .font(.subheadline)
                 .symbolEffect(.pulse, isActive: isLoading)

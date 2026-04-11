@@ -45,8 +45,8 @@ final class PrivyAuthService: ObservableObject {
     }
 
     private init() {
-        let appId    = Self.keyFromPlist("PRIVY_APP_ID")     ?? "cmnttqw3q038x0cle8vnlki39"
-        let clientId = Self.keyFromPlist("PRIVY_APP_CLIENT_ID") ?? "cmnttqw3q038x0cle8vnlki39"
+        let appId    = Self.keyFromPlist("PRIVY_APP_ID")     ?? ""
+        let clientId = Self.keyFromPlist("PRIVY_APP_CLIENT_ID") ?? ""
         let config   = PrivyConfig(appId: appId, appClientId: clientId)
         self.privy   = PrivySdk.initialize(config: config)
 
@@ -84,6 +84,7 @@ final class PrivyAuthService: ObservableObject {
     func verifyEmailCode(_ code: String) async throws {
         guard let email = pendingEmail else { throw AuthError.invalidCode }
         let user = try await privy.email.loginWithCode(code, sentTo: email)
+        pendingEmail = nil
         authState = .authenticated(userId: user.id)
     }
 

@@ -37,7 +37,7 @@ enum NavigationService {
         }
 
         let encodedName = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
-        let directionsURL = URL(string: "comgooglemaps://?daddr=\(coordinate.latitude),\(coordinate.longitude)(\(encodedName))&directionsmode=\(mode.googleMapsKey)")!
+        guard let directionsURL = URL(string: "comgooglemaps://?daddr=\(coordinate.latitude),\(coordinate.longitude)(\(encodedName))&directionsmode=\(mode.googleMapsKey)") else { return false }
         UIApplication.shared.open(directionsURL)
         return true
     }

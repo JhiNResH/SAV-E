@@ -112,6 +112,8 @@ struct SignInView: View {
 
                         Button("Send Code") {
                             Task {
+                                isLoading = true
+                                defer { isLoading = false }
                                 do {
                                     try await authService.signInWithEmail(email)
                                     showEmailCode = true
@@ -123,7 +125,7 @@ struct SignInView: View {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.wanderlyTerracotta)
-                        .disabled(email.isEmpty)
+                        .disabled(email.isEmpty || isLoading)
                     }
                     .padding()
                     .background(Color.white)
@@ -162,7 +164,7 @@ struct SignInView: View {
             }
         }
         .background(Color.wanderlyCream)
-        .alert("Sign In Failed", isPresented: .constant(errorMessage != nil)) {
+        .alert("Sign In Failed", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")

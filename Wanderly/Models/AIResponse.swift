@@ -55,12 +55,12 @@ struct ItineraryDay: Identifiable, Equatable {
 }
 
 struct ItineraryStop: Identifiable, Equatable {
+    let id: UUID
     let placeId: String?
     let placeName: String
     let time: String?
     let duration: Int?
     let note: String?
-    var id: String { "\(placeName)-\(time ?? "")" }
 }
 
 // MARK: - Codable DTOs (what Claude actually returns)
@@ -109,6 +109,6 @@ struct ItineraryStopDTO: Codable {
     let note: String?
 
     func toModel() -> ItineraryStop {
-        ItineraryStop(placeId: placeId, placeName: placeName, time: time, duration: duration, note: note)
+        ItineraryStop(id: UUID(), placeId: placeId, placeName: placeName, time: time, duration: duration, note: note)
     }
 }
