@@ -25,11 +25,14 @@ targets:
     dependencies:
       - package: Privy
         product: Privy
+      - target: WanderlyShareExtension
     info:
       path: Wanderly/Info.plist
       properties:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UIApplicationSupportsIndirectInputEvents: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -99,11 +102,6 @@ targets:
         GENERATE_INFOPLIST_FILE: false
         INFOPLIST_FILE: WanderlyShareExtension/Info.plist
         CODE_SIGN_ENTITLEMENTS: WanderlyShareExtension/WanderlyShareExtension.entitlements
-    dependencies:
-      - target: Wanderly
-        embed: false
-        link: false
-
 schemes:
   Wanderly:
     build:
