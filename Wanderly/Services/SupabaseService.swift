@@ -91,15 +91,15 @@ final class SupabaseService: SupabaseServiceProtocol {
     func updatePlace(_ place: Place) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "name": place.name,
             "address": place.address,
             "category": place.category.rawValue,
             "status": place.status.rawValue,
-            "rating": place.rating as Any,
-            "note": place.note as Any,
+            "rating": place.rating,
+            "note": place.note,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
+        let body = try Self.jsonBody(updates)
 
         try await request(path: "/places/\(place.id)", method: "PATCH", body: body)
     }
@@ -131,12 +131,12 @@ final class SupabaseService: SupabaseServiceProtocol {
     func updateTrip(_ trip: Trip) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "name": trip.name,
             "city": trip.city,
             "is_optimized": trip.isOptimized,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
+        let body = try Self.jsonBody(updates)
         try await request(path: "/trips/\(trip.id)", method: "PATCH", body: body)
     }
 
@@ -159,11 +159,11 @@ final class SupabaseService: SupabaseServiceProtocol {
     func updateProfile(_ profile: UserProfile) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "display_name": profile.displayName,
-            "avatar_url": profile.avatarUrl as Any,
+            "avatar_url": profile.avatarUrl,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
+        let body = try Self.jsonBody(updates)
         try await request(path: "/profile", method: "PATCH", body: body)
     }
 
@@ -201,6 +201,11 @@ final class SupabaseService: SupabaseServiceProtocol {
     @MainActor
     private func privyAccessToken() async throws -> String {
         try await PrivyAuthService.shared.accessToken()
+    }
+
+    private static func jsonBody(_ values: [String: Any?]) throws -> Data {
+        let object = values.mapValues { $0 ?? NSNull() }
+        return try JSONSerialization.data(withJSONObject: object)
     }
 }
 
