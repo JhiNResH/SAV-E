@@ -96,6 +96,11 @@ final class PrivyAuthService: ObservableObject {
         authState = .unauthenticated
     }
 
+    func accessToken() async throws -> String {
+        guard let user = await privy.getUser() else { throw AuthError.signInFailed("No authenticated user") }
+        return try await user.getAccessToken()
+    }
+
     // MARK: - Helpers
 
     private func applyPrivyState(_ state: PrivySDK.AuthState) {

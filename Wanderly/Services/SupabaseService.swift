@@ -40,17 +40,18 @@ enum SupabaseError: LocalizedError {
 final class SupabaseService: SupabaseServiceProtocol {
     static let shared = SupabaseService()
 
-    private let baseURL: String?
-    private let anonKey: String?
-
-    /// Set by auth service after login
-    var accessToken: String?
+    private let apiBaseURL: String?
 
     init() {
-        self.baseURL = ProcessInfo.processInfo.environment["SUPABASE_URL"]
-            ?? Self.keyFromPlist("SUPABASE_URL")
-        self.anonKey = ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"]
-            ?? Self.keyFromPlist("SUPABASE_ANON_KEY")
+        if let explicit = ProcessInfo.processInfo.environment["WANDERLY_API_URL"]
+            ?? Self.keyFromPlist("WANDERLY_API_URL") {
+            self.apiBaseURL = explicit
+        } else if let supabaseURL = ProcessInfo.processInfo.environment["SUPABASE_URL"]
+            ?? Self.keyFromPlist("SUPABASE_URL") {
+            self.apiBaseURL = "\(supabaseURL)/functions/v1/wanderly-api"
+        } else {
+            self.apiBaseURL = nil
+        }
     }
 
     private static func keyFromPlist(_ key: String) -> String? {
@@ -64,7 +65,7 @@ final class SupabaseService: SupabaseServiceProtocol {
     }
 
     private var isConfigured: Bool {
-        baseURL != nil && anonKey != nil
+        apiBaseURL != nil
     }
 
     // MARK: - Places
@@ -72,10 +73,7 @@ final class SupabaseService: SupabaseServiceProtocol {
     func fetchPlaces(for userId: String) async throws -> [Place] {
         guard isConfigured else { return Place.mockList }
 
-        let data = try await request(
-            path: "/rest/v1/places",
-            query: "select=*&user_id=eq.\(userId)&order=created_at.desc"
-        )
+        let data = try await request(path: "/places")
 
         let rows = try JSONDecoder.supabase.decode([PlaceRow].self, from: data)
         return rows.map { $0.toPlace() }
@@ -87,37 +85,28 @@ final class SupabaseService: SupabaseServiceProtocol {
         let row = PlaceRow.from(place: place, userId: userId)
         let body = try JSONEncoder.supabase.encode(row)
 
-        try await request(path: "/rest/v1/places", method: "POST", body: body)
+        try await request(path: "/places", method: "POST", body: body)
     }
 
     func updatePlace(_ place: Place) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "name": place.name,
             "address": place.address,
             "category": place.category.rawValue,
             "status": place.status.rawValue,
-            "rating": place.rating as Any,
-            "note": place.note as Any,
+            "rating": place.rating,
+            "note": place.note,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
+        let body = try Self.jsonBody(updates)
 
-        try await request(
-            path: "/rest/v1/places",
-            query: "id=eq.\(place.id)",
-            method: "PATCH",
-            body: body
-        )
+        try await request(path: "/places/\(place.id)", method: "PATCH", body: body)
     }
 
     func deletePlace(_ placeId: UUID) async throws {
         guard isConfigured else { return }
-        try await request(
-            path: "/rest/v1/places",
-            query: "id=eq.\(placeId)",
-            method: "DELETE"
-        )
+        try await request(path: "/places/\(placeId)", method: "DELETE")
     }
 
     // MARK: - Trips
@@ -125,10 +114,7 @@ final class SupabaseService: SupabaseServiceProtocol {
     func fetchTrips(for userId: String) async throws -> [Trip] {
         guard isConfigured else { return Trip.mockList }
 
-        let tripsData = try await request(
-            path: "/rest/v1/trips",
-            query: "select=*,trip_stops(*)&user_id=eq.\(userId)&order=created_at.desc"
-        )
+        let tripsData = try await request(path: "/trips")
 
         let rows = try JSONDecoder.supabase.decode([TripRow].self, from: tripsData)
         return rows.map { $0.toTrip() }
@@ -137,42 +123,26 @@ final class SupabaseService: SupabaseServiceProtocol {
     func saveTrip(_ trip: Trip, userId: String) async throws {
         guard isConfigured else { return }
 
-        let row = TripRow.from(trip: trip, userId: userId)
+        let row = TripRow.from(trip: trip, userId: userId, includeStops: true)
         let body = try JSONEncoder.supabase.encode(row)
-        try await request(path: "/rest/v1/trips", method: "POST", body: body)
-
-        // Insert stops
-        if !trip.places.isEmpty {
-            let stopRows = trip.places.map { TripStopRow.from(stop: $0, tripId: trip.id) }
-            let stopsBody = try JSONEncoder.supabase.encode(stopRows)
-            try await request(path: "/rest/v1/trip_stops", method: "POST", body: stopsBody)
-        }
+        try await request(path: "/trips", method: "POST", body: body)
     }
 
     func updateTrip(_ trip: Trip) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "name": trip.name,
             "city": trip.city,
             "is_optimized": trip.isOptimized,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
-        try await request(
-            path: "/rest/v1/trips",
-            query: "id=eq.\(trip.id)",
-            method: "PATCH",
-            body: body
-        )
+        let body = try Self.jsonBody(updates)
+        try await request(path: "/trips/\(trip.id)", method: "PATCH", body: body)
     }
 
     func deleteTrip(_ tripId: UUID) async throws {
         guard isConfigured else { return }
-        try await request(
-            path: "/rest/v1/trips",
-            query: "id=eq.\(tripId)",
-            method: "DELETE"
-        )
+        try await request(path: "/trips/\(tripId)", method: "DELETE")
     }
 
     // MARK: - Profile
@@ -180,48 +150,21 @@ final class SupabaseService: SupabaseServiceProtocol {
     func fetchProfile(for userId: String) async throws -> UserProfile? {
         guard isConfigured else { return .mock }
 
-        let data = try await request(
-            path: "/rest/v1/profiles",
-            query: "select=*&id=eq.\(userId)"
-        )
+        let data = try await request(path: "/profile")
 
-        let rows = try JSONDecoder.supabase.decode([ProfileRow].self, from: data)
-        guard let row = rows.first else { return nil }
-
-        // Count places
-        let placesData = try await request(
-            path: "/rest/v1/places",
-            query: "select=id,status&user_id=eq.\(userId)"
-        )
-        let placeRows = try JSONDecoder.supabase.decode([[String: String]].self, from: placesData)
-        let savedCount = placeRows.count
-        let visitedCount = placeRows.filter { $0["status"] == "visited" }.count
-
-        // Count cities from trips
-        let tripsData = try await request(
-            path: "/rest/v1/trips",
-            query: "select=city&user_id=eq.\(userId)"
-        )
-        let tripRows = try JSONDecoder.supabase.decode([[String: String]].self, from: tripsData)
-        let cities = Set(tripRows.compactMap { $0["city"] }).count
-
-        return row.toProfile(savedCount: savedCount, visitedCount: visitedCount, citiesCount: cities)
+        let row = try JSONDecoder.supabase.decode(ProfileRow.self, from: data)
+        return row.toProfile()
     }
 
     func updateProfile(_ profile: UserProfile) async throws {
         guard isConfigured else { return }
 
-        let updates: [String: Any] = [
+        let updates: [String: Any?] = [
             "display_name": profile.displayName,
-            "avatar_url": profile.avatarUrl as Any,
+            "avatar_url": profile.avatarUrl,
         ]
-        let body = try JSONSerialization.data(withJSONObject: updates)
-        try await request(
-            path: "/rest/v1/profiles",
-            query: "id=eq.\(profile.id)",
-            method: "PATCH",
-            body: body
-        )
+        let body = try Self.jsonBody(updates)
+        try await request(path: "/profile", method: "PATCH", body: body)
     }
 
     // MARK: - HTTP
@@ -229,26 +172,19 @@ final class SupabaseService: SupabaseServiceProtocol {
     @discardableResult
     private func request(
         path: String,
-        query: String = "",
         method: String = "GET",
         body: Data? = nil
     ) async throws -> Data {
-        guard let baseURL, let anonKey else { throw SupabaseError.notConfigured }
+        guard let apiBaseURL else { throw SupabaseError.notConfigured }
 
-        let separator = query.isEmpty ? "" : "?\(query)"
-        guard let url = URL(string: "\(baseURL)\(path)\(separator)") else {
+        guard let url = URL(string: "\(apiBaseURL)\(path)") else {
             throw SupabaseError.notConfigured
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
-
-        // Use access token if available, otherwise anon key
-        let token = accessToken ?? anonKey
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(try await privyAccessToken())", forHTTPHeaderField: "Authorization")
 
         if let body { request.httpBody = body }
 
@@ -260,6 +196,16 @@ final class SupabaseService: SupabaseServiceProtocol {
         }
 
         return data
+    }
+
+    @MainActor
+    private func privyAccessToken() async throws -> String {
+        try await PrivyAuthService.shared.accessToken()
+    }
+
+    private static func jsonBody(_ values: [String: Any?]) throws -> Data {
+        let object = values.mapValues { $0 ?? NSNull() }
+        return try JSONSerialization.data(withJSONObject: object)
     }
 }
 
@@ -367,7 +313,7 @@ private struct TripRow: Codable {
         )
     }
 
-    static func from(trip: Trip, userId: String) -> TripRow {
+    static func from(trip: Trip, userId: String, includeStops: Bool = false) -> TripRow {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
 
@@ -380,7 +326,7 @@ private struct TripRow: Codable {
             end_date: trip.endDate.map { df.string(from: $0) },
             is_optimized: trip.isOptimized,
             created_at: ISO8601DateFormatter().string(from: trip.createdAt),
-            trip_stops: nil
+            trip_stops: includeStops ? trip.places.map { TripStopRow.from(stop: $0, tripId: trip.id) } : nil
         )
     }
 }
@@ -425,22 +371,25 @@ private struct TripStopRow: Codable {
 }
 
 private struct ProfileRow: Codable {
-    let id: UUID
+    let id: String
     let display_name: String
     let email: String?
     let avatar_url: String?
     let is_premium: Bool
     let created_at: String
+    let saved_count: Int?
+    let visited_count: Int?
+    let cities_count: Int?
 
-    func toProfile(savedCount: Int, visitedCount: Int, citiesCount: Int) -> UserProfile {
+    func toProfile() -> UserProfile {
         UserProfile(
             id: id,
             displayName: display_name,
             email: email,
             avatarUrl: avatar_url,
-            savedCount: savedCount,
-            visitedCount: visitedCount,
-            citiesCount: citiesCount,
+            savedCount: saved_count ?? 0,
+            visitedCount: visited_count ?? 0,
+            citiesCount: cities_count ?? 0,
             isPremium: is_premium,
             collections: [],
             createdAt: ISO8601DateFormatter().date(from: created_at) ?? Date()

@@ -5,10 +5,10 @@
 create extension if not exists "uuid-ossp";
 
 -- ============================================================
--- Users (extends Supabase Auth)
+-- Users (Privy-owned profiles)
 -- ============================================================
 create table public.profiles (
-    id uuid references auth.users on delete cascade primary key,
+    id text primary key, -- verified Privy access token sub claim
     display_name text not null default '',
     email text,
     avatar_url text,
@@ -19,38 +19,15 @@ create table public.profiles (
 );
 
 alter table public.profiles enable row level security;
-
-create policy "Users can read own profile"
-    on public.profiles for select using (auth.uid() = id);
-create policy "Users can update own profile"
-    on public.profiles for update using (auth.uid() = id);
-create policy "Users can insert own profile"
-    on public.profiles for insert with check (auth.uid() = id);
-
--- Auto-create profile on signup
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-    insert into public.profiles (id, display_name, email)
-    values (
-        new.id,
-        coalesce(new.raw_user_meta_data->>'full_name', 'Wanderly User'),
-        new.email
-    );
-    return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger on_auth_user_created
-    after insert on auth.users
-    for each row execute procedure public.handle_new_user();
+-- No anon-key table policies. `wanderly-api` uses service role and enforces
+-- ownership with the verified Privy subject.
 
 -- ============================================================
 -- Places
 -- ============================================================
 create table public.places (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references public.profiles(id) on delete cascade not null,
+    user_id text references public.profiles(id) on delete cascade not null,
     name text not null,
     address text not null default '',
     latitude double precision not null,
@@ -75,15 +52,6 @@ create table public.places (
 
 alter table public.places enable row level security;
 
-create policy "Users can read own places"
-    on public.places for select using (auth.uid() = user_id);
-create policy "Users can insert own places"
-    on public.places for insert with check (auth.uid() = user_id);
-create policy "Users can update own places"
-    on public.places for update using (auth.uid() = user_id);
-create policy "Users can delete own places"
-    on public.places for delete using (auth.uid() = user_id);
-
 create index idx_places_user_id on public.places(user_id);
 create index idx_places_category on public.places(category);
 
@@ -92,7 +60,7 @@ create index idx_places_category on public.places(category);
 -- ============================================================
 create table public.trips (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references public.profiles(id) on delete cascade not null,
+    user_id text references public.profiles(id) on delete cascade not null,
     name text not null,
     city text not null default '',
     start_date date,
@@ -103,15 +71,6 @@ create table public.trips (
 );
 
 alter table public.trips enable row level security;
-
-create policy "Users can read own trips"
-    on public.trips for select using (auth.uid() = user_id);
-create policy "Users can insert own trips"
-    on public.trips for insert with check (auth.uid() = user_id);
-create policy "Users can update own trips"
-    on public.trips for update using (auth.uid() = user_id);
-create policy "Users can delete own trips"
-    on public.trips for delete using (auth.uid() = user_id);
 
 create index idx_trips_user_id on public.trips(user_id);
 
@@ -133,19 +92,6 @@ create table public.trip_stops (
 
 alter table public.trip_stops enable row level security;
 
-create policy "Users can read own trip stops"
-    on public.trip_stops for select
-    using (exists (select 1 from public.trips where trips.id = trip_stops.trip_id and trips.user_id = auth.uid()));
-create policy "Users can insert own trip stops"
-    on public.trip_stops for insert
-    with check (exists (select 1 from public.trips where trips.id = trip_stops.trip_id and trips.user_id = auth.uid()));
-create policy "Users can update own trip stops"
-    on public.trip_stops for update
-    using (exists (select 1 from public.trips where trips.id = trip_stops.trip_id and trips.user_id = auth.uid()));
-create policy "Users can delete own trip stops"
-    on public.trip_stops for delete
-    using (exists (select 1 from public.trips where trips.id = trip_stops.trip_id and trips.user_id = auth.uid()));
-
 create index idx_trip_stops_trip_id on public.trip_stops(trip_id);
 
 -- ============================================================
@@ -153,7 +99,7 @@ create index idx_trip_stops_trip_id on public.trip_stops(trip_id);
 -- ============================================================
 create table public.collections (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references public.profiles(id) on delete cascade not null,
+    user_id text references public.profiles(id) on delete cascade not null,
     name text not null,
     emoji text not null default '📍',
     created_at timestamptz not null default now()
@@ -167,12 +113,6 @@ create table public.collection_places (
 
 alter table public.collections enable row level security;
 alter table public.collection_places enable row level security;
-
-create policy "Users can manage own collections"
-    on public.collections for all using (auth.uid() = user_id);
-create policy "Users can manage own collection places"
-    on public.collection_places for all
-    using (exists (select 1 from public.collections where collections.id = collection_places.collection_id and collections.user_id = auth.uid()));
 
 -- ============================================================
 -- Updated_at trigger
@@ -197,7 +137,7 @@ create trigger update_trips_updated_at before update on public.trips
 -- ============================================================
 create table public.ig_bot_links (
     id uuid primary key default uuid_generate_v4(),
-    user_id uuid references public.profiles(id) on delete cascade not null,
+    user_id text references public.profiles(id) on delete cascade not null,
     ig_user_id text not null unique,      -- Instagram user ID from webhook
     ig_username text,
     verified boolean not null default false,
@@ -207,11 +147,6 @@ create table public.ig_bot_links (
 );
 
 alter table public.ig_bot_links enable row level security;
-
-create policy "Users can read own ig links"
-    on public.ig_bot_links for select using (auth.uid() = user_id);
-create policy "Users can delete own ig links"
-    on public.ig_bot_links for delete using (auth.uid() = user_id);
 -- Insert/update done by backend service role only (webhook handler)
 
 create index idx_ig_bot_links_ig_user_id on public.ig_bot_links(ig_user_id);
