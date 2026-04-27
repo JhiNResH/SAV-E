@@ -1,0 +1,14 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:jose@5.9.6": "5.9.6"
+  },
+  "npm": {
+    "jose@5.9.6": {
+      "integrity": "sha512-AMlnetc9+CV9asI19zHmrgS/WYsWUwCn2R7RzlbJWD7F9eWYUTGyBmU9o6PxngtLGOiDGPRu+Uc4fhKzbpteZQ=="
+    }
+  },
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.49.8": "fd72c6e822ed41d5fe7ad3bbe3a48420abbb21a579c73d532b36a6467f5b5f7d"
+  }
+}

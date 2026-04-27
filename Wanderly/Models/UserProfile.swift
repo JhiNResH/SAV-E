@@ -1,7 +1,7 @@
 import Foundation
 
 struct UserProfile: Identifiable, Codable {
-    let id: UUID
+    let id: String
     var displayName: String
     var email: String?
     var avatarUrl: String?
@@ -24,7 +24,7 @@ struct PlaceCollection: Identifiable, Codable, Hashable {
 
 extension UserProfile {
     static let mock = UserProfile(
-        id: UUID(),
+        id: "mock-user",
         displayName: "Wanderly User",
         email: "user@example.com",
         avatarUrl: nil,

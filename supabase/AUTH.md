@@ -6,32 +6,30 @@ Date: 2026-04-27
 
 - The iOS app authenticates users with Privy.
 - `PrivyAuthService.currentUserId` exposes `user.id` from Privy.
-- `SupabaseService` sends the Supabase anon key as `apikey`.
-- `SupabaseService.accessToken` exists but is not set anywhere in the app.
-- `supabase/schema.sql` uses Supabase Auth RLS policies with `auth.uid()`.
-- User-owned tables use `uuid` owner columns, for example `profiles.id uuid` and `places.user_id uuid`.
+- `SupabaseService` calls the `wanderly-api` Edge Function.
+- The iOS app retrieves a Privy access token with `PrivyUser.getAccessToken()`.
+- `supabase/schema.sql` uses Privy string owner ids.
+- User-owned tables use text owner columns, for example `profiles.id text` and `places.user_id text`.
 
 ## Blocker
 
-The app and database auth models do not currently line up.
+The original app and database auth models did not line up.
 
-With the current code, Supabase REST requests fall back to:
+Before the service-role API, Supabase REST requests fell back to:
 
 ```http
 Authorization: Bearer <SUPABASE_ANON_KEY>
 ```
 
-Under the schema RLS policies, `auth.uid()` will not equal the Privy user id. For normal anon-key requests it will be null, so owner-scoped reads and writes such as `places`, `trips`, and `profiles` are expected to fail once real Supabase configuration is enabled.
+Under Supabase Auth RLS policies, `auth.uid()` did not equal the Privy user id. For normal anon-key requests it was null, so owner-scoped reads and writes such as `places`, `trips`, and `profiles` were expected to fail once real Supabase configuration was enabled.
 
-There is a second likely mismatch: Privy `user.id` is treated as a Swift `String`, while the schema expects Supabase user ids to be `uuid`. If Privy ids are not UUID strings that correspond to `auth.users.id`, inserts into owner columns will fail before RLS policy checks.
+There was a second likely mismatch: Privy `user.id` is treated as a Swift `String`, while the original schema expected Supabase user ids to be `uuid`.
 
-## Required Decision
+## Decision
 
-Pick one auth bridge before relying on Supabase persistence:
+Keep Privy as the authority, move database access behind the `wanderly-api` Supabase Edge Function, and enforce ownership in that backend.
 
-1. Use Supabase Auth as the database authority, and map Privy login into a Supabase-compatible JWT/session before calling PostgREST.
-2. Keep Privy as the authority, move database writes behind a backend/service-role API, and enforce ownership in that backend.
-3. Change schema/RLS to validate a Privy-compatible JWT claim, if Supabase accepts the chosen JWT issuer/audience configuration.
+The app sends the current Privy access token as `Authorization: Bearer <token>`. The function verifies the token with `PRIVY_VERIFICATION_KEY`, derives the owner id from the verified `sub` claim, and uses `SUPABASE_SERVICE_ROLE_KEY` for database operations.
 
 Do not disable RLS as the MVP shortcut unless the app is strictly local/demo only.
 
