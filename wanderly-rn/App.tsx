@@ -384,9 +384,11 @@ function WanderlyApp() {
                       : "Privy web auth is not configured yet. Local bookmarks stay in this browser only."}
               </Text>
             </View>
-            <Pressable onPress={handleAuthAction} style={styles.authButton}>
-              <Text style={styles.authButtonText}>{authenticated ? "Sign out" : "Sign in"}</Text>
-            </Pressable>
+            {privyEnabled ? (
+              <Pressable onPress={handleAuthAction} style={styles.authButton}>
+                <Text style={styles.authButtonText}>{authenticated ? "Sign out" : "Sign in"}</Text>
+              </Pressable>
+            ) : null}
           </View>
           {isSyncing ? <Text style={styles.syncText}>Syncing account data...</Text> : null}
         </View>
