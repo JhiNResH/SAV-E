@@ -150,7 +150,7 @@ async function handleTrips(
   userId: string,
 ): Promise<void> {
   if (request.method === "GET" && !tripId) {
-    const { rows } = await pool.query(tripsSelect("where t.user_id = $1 order by t.created_at desc"), [userId]);
+    const { rows } = await pool.query(tripsSelect("where t.user_id = $1", "order by t.created_at desc"), [userId]);
     return sendJson(response, rows.map(formatTrip));
   }
 
@@ -362,7 +362,7 @@ function buildUpdate(
   };
 }
 
-function tripsSelect(whereClause: string): string {
+function tripsSelect(whereClause: string, orderClause = ""): string {
   return `
     select
       t.*,
@@ -374,6 +374,7 @@ function tripsSelect(whereClause: string): string {
     left join trip_stops ts on ts.trip_id = t.id
     ${whereClause}
     group by t.id
+    ${orderClause}
   `;
 }
 
