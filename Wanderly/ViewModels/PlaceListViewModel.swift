@@ -24,10 +24,16 @@ final class PlaceListViewModel: ObservableObject {
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
+    private let pendingImportService: PendingPlaceImportService
+    private var importedPendingKeys: Set<String> = []
 
-    init(supabaseService: SupabaseServiceProtocol = SupabaseService.shared) {
+    init(
+        supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
+        pendingImportService: PendingPlaceImportService = .shared
+    ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
+        self.pendingImportService = pendingImportService
     }
 
     var filteredPlaces: [Place] {
@@ -64,15 +70,77 @@ final class PlaceListViewModel: ObservableObject {
     }
 
     func loadPlaces() async {
-        guard let userId = authService.currentUserId else { return }
         isLoading = true
         defer { isLoading = false }
 
+        guard let userId = authService.currentUserId else {
+            importPendingPlacesForLocalUse()
+            return
+        }
+
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
+            try await importPendingPlaces(for: userId)
         } catch {
             print("Failed to load places: \(error)")
+            importPendingPlacesForLocalUse()
         }
+    }
+
+    func importPendingPlacesForLocalUse() {
+        let pending = pendingImportService.consumePendingPlaces()
+        guard !pending.isEmpty else { return }
+
+        let importedPlaces = pending.compactMap { pendingPlace -> Place? in
+            let key = pendingPlace.deduplicationKey
+            guard !importedPendingKeys.contains(key),
+                  !places.contains(where: { $0.matches(pendingPlace) }) else {
+                return nil
+            }
+            importedPendingKeys.insert(key)
+            return Place.from(pendingPlace)
+        }
+
+        if !importedPlaces.isEmpty {
+            places = importedPlaces + places
+        }
+
+        pendingImportService.restorePendingPlaces(pending)
+    }
+
+    private func importPendingPlaces(for userId: String) async throws {
+        let pending = pendingImportService.consumePendingPlaces()
+        guard !pending.isEmpty else { return }
+
+        var importedPlaces: [Place] = []
+        var failedImports: [PendingSharedPlace] = []
+
+        for pendingPlace in pending {
+            let place = Place.from(pendingPlace)
+
+            do {
+                try await supabaseService.savePlace(place, userId: userId)
+                importedPlaces.append(place)
+            } catch {
+                failedImports.append(pendingPlace)
+                importedPlaces.append(place)
+                print("PlaceListViewModel: failed to import shared place \(pendingPlace.name): \(error)")
+            }
+        }
+
+        if !importedPlaces.isEmpty {
+            let newImports = importedPlaces.filter { place in
+                let key = place.pendingDeduplicationKey
+                guard !importedPendingKeys.contains(key),
+                      !places.contains(where: { $0.matches(place) }) else {
+                    return false
+                }
+                importedPendingKeys.insert(key)
+                return true
+            }
+            places = newImports + places
+        }
+        pendingImportService.restorePendingPlaces(failedImports)
     }
 
     func markVisited(_ place: Place) async {

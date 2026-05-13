@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlaceListView: View {
     @StateObject private var viewModel = PlaceListViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -110,6 +111,10 @@ struct PlaceListView: View {
         }
         .task {
             await viewModel.loadPlaces()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel.loadPlaces() }
         }
     }
 }
