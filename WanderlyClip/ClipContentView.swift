@@ -177,9 +177,16 @@ struct ClipContentView: View {
     }
 
     private func isTripLink(_ url: URL) -> Bool {
-        url.scheme == "https" &&
+        guard url.scheme == "https" &&
             url.host == "wanderly.app" &&
-            url.path == "/trip"
+            url.path == "/trip",
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+
+        return components.queryItems?.contains { item in
+            item.name == "d" && item.value?.isEmpty == false
+        } == true
     }
 
     private func updateCamera(for stops: [SharedTripData.SharedStop]) {

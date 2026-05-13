@@ -62,7 +62,8 @@ function copyPublicAssets() {
 }
 
 function writeAppleAppSiteAssociation() {
-  const teamId = process.env.APPLE_TEAM_ID;
+  const rawTeamId = process.env.APPLE_TEAM_ID;
+  const teamId = normalizedAppleTeamId(rawTeamId);
   if (!fs.existsSync(distRoot)) return;
 
   const wellKnownDir = path.join(distRoot, ".well-known");
@@ -81,9 +82,21 @@ function writeAppleAppSiteAssociation() {
   );
   if (teamId) {
     console.log(`Wrote apple-app-site-association for ${associatedDomain}`);
-  } else {
+  } else if (!rawTeamId) {
     console.warn("APPLE_TEAM_ID is not set; wrote disabled apple-app-site-association placeholder");
   }
+}
+
+function normalizedAppleTeamId(value) {
+  if (!value) return "";
+
+  const teamId = value.trim().toUpperCase();
+  if (/^[A-Z0-9]{10}$/.test(teamId)) {
+    return teamId;
+  }
+
+  console.warn("APPLE_TEAM_ID is invalid; wrote disabled apple-app-site-association placeholder");
+  return "";
 }
 
 function buildEnabledAssociation(teamId) {
