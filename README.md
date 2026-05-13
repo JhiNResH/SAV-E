@@ -70,7 +70,43 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
    open Wanderly.xcodeproj
    ```
 
-6. Build and run on simulator or device.
+6. Build and run on simulator or device. Simulator builds do not need signing; device builds and archives require either passing `APPLE_TEAM_ID` through the CLI or selecting your Apple Developer Team in Xcode locally.
+
+## TestFlight Archive
+
+Set `APPLE_TEAM_ID` to the 10-character Apple Developer Team ID for the account that owns the App IDs. XcodeGen passes it into all iOS targets as `DEVELOPMENT_TEAM`.
+
+```bash
+export APPLE_TEAM_ID=ABCDE12345
+xcodegen generate
+xcodebuild \
+  -project Wanderly.xcodeproj \
+  -scheme Wanderly \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$PWD/build/Wanderly.xcarchive" \
+  -allowProvisioningUpdates \
+  APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+  archive
+```
+
+Prepare an App Store Connect upload options plist. The generated options mark the upload as internal TestFlight only, so use this for early internal review builds rather than external testers or App Store release candidates.
+
+```bash
+APPLE_TEAM_ID="$APPLE_TEAM_ID" scripts/prepare-testflight-export-options.sh
+```
+
+Upload the archive to App Store Connect for TestFlight processing:
+
+```bash
+xcodebuild \
+  -exportArchive \
+  -archivePath "$PWD/build/Wanderly.xcarchive" \
+  -exportPath "$PWD/build/TestFlightUpload" \
+  -exportOptionsPlist "$PWD/build/ExportOptions.TestFlight.plist" \
+  -allowProvisioningUpdates \
+  APPLE_TEAM_ID="$APPLE_TEAM_ID"
+```
 
 ## First TestFlight Boundary
 
