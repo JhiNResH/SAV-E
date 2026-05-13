@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var mapVM = MapViewModel()
     @StateObject private var drawerVM = AIDrawerViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var drawerDetent: PresentationDetent = .height(72)
 
     var body: some View {
@@ -20,6 +21,10 @@ struct ContentView: View {
             }
             .onChange(of: mapVM.selectedPlace) { _, place in
                 if let place { drawerVM.showPlace(place) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                mapVM.importPendingPlacesForLocalUse()
             }
     }
 }

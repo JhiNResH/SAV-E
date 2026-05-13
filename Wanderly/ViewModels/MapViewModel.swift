@@ -19,6 +19,7 @@ final class MapViewModel: ObservableObject {
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
     private let pendingImportService: PendingPlaceImportService
+    private var importedPendingKeys: Set<String> = []
 
     init(
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
@@ -54,15 +55,42 @@ final class MapViewModel: ObservableObject {
     // MARK: - Actions
 
     func loadPlaces() async {
-        guard let userId = authService.currentUserId else { return }
         isLoading = true
         defer { isLoading = false }
+
+        guard let userId = authService.currentUserId else {
+            importPendingPlacesForLocalUse()
+            return
+        }
+
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
             try await importPendingPlaces(for: userId)
         } catch {
             print("MapViewModel: failed to load places: \(error)")
+            importPendingPlacesForLocalUse()
         }
+    }
+
+    func importPendingPlacesForLocalUse() {
+        let pending = pendingImportService.consumePendingPlaces()
+        guard !pending.isEmpty else { return }
+
+        let importedPlaces = pending.compactMap { pendingPlace -> Place? in
+            let key = pendingPlace.deduplicationKey
+            guard !importedPendingKeys.contains(key),
+                  !places.contains(where: { $0.matches(pendingPlace) }) else {
+                return nil
+            }
+            importedPendingKeys.insert(key)
+            return Place.from(pendingPlace)
+        }
+
+        if !importedPlaces.isEmpty {
+            places = importedPlaces + places
+        }
+
+        pendingImportService.restorePendingPlaces(pending)
     }
 
     private func importPendingPlaces(for userId: String) async throws {
@@ -73,41 +101,29 @@ final class MapViewModel: ObservableObject {
         var failedImports: [PendingSharedPlace] = []
 
         for pendingPlace in pending {
-            let place = Place(
-                id: UUID(),
-                name: pendingPlace.name,
-                address: pendingPlace.address,
-                latitude: pendingPlace.latitude,
-                longitude: pendingPlace.longitude,
-                googlePlaceId: nil,
-                category: PlaceCategory(rawValue: pendingPlace.category) ?? .food,
-                status: .wantToGo,
-                rating: nil,
-                note: pendingPlace.sourceText,
-                sourceUrl: pendingPlace.sourceURL,
-                sourcePlatform: sourcePlatform(from: pendingPlace.sourceURL),
-                sourceImageUrl: nil,
-                extractedDishes: pendingPlace.dishes,
-                priceRange: pendingPlace.priceRange,
-                recommender: nil,
-                googleRating: nil,
-                googlePriceLevel: nil,
-                openingHours: nil,
-                createdAt: pendingPlace.savedAt
-            )
+            let place = Place.from(pendingPlace)
 
             do {
                 try await supabaseService.savePlace(place, userId: userId)
                 importedPlaces.append(place)
             } catch {
                 failedImports.append(pendingPlace)
+                importedPlaces.append(place)
                 print("MapViewModel: failed to import shared place \(pendingPlace.name): \(error)")
             }
         }
 
         if !importedPlaces.isEmpty {
-            let importedIds = Set(importedPlaces.map(\.id))
-            places = importedPlaces + places.filter { !importedIds.contains($0.id) }
+            let newImports = importedPlaces.filter { place in
+                let key = place.pendingDeduplicationKey
+                guard !importedPendingKeys.contains(key),
+                      !places.contains(where: { $0.matches(place) }) else {
+                    return false
+                }
+                importedPendingKeys.insert(key)
+                return true
+            }
+            places = newImports + places
         }
         pendingImportService.restorePendingPlaces(failedImports)
     }
@@ -216,6 +232,74 @@ final class MapViewModel: ObservableObject {
     }
 
     private func sourcePlatform(from urlString: String?) -> SourcePlatform {
+        guard let host = urlString.flatMap(URL.init(string:))?.host()?.lowercased() else {
+            return .other
+        }
+        if host.contains("instagram") { return .instagram }
+        if host.contains("threads") { return .threads }
+        if host.contains("xiaohongshu") || host.contains("xhslink") { return .xiaohongshu }
+        if host.contains("google") || host.contains("maps") { return .googleMaps }
+        return .other
+    }
+}
+
+private extension Place {
+    static func from(_ pendingPlace: PendingSharedPlace) -> Place {
+        Place(
+            id: UUID(),
+            name: pendingPlace.name,
+            address: pendingPlace.address,
+            latitude: pendingPlace.latitude,
+            longitude: pendingPlace.longitude,
+            googlePlaceId: nil,
+            category: PlaceCategory(rawValue: pendingPlace.category) ?? .food,
+            status: .wantToGo,
+            rating: nil,
+            note: pendingPlace.sourceText,
+            sourceUrl: pendingPlace.sourceURL,
+            sourcePlatform: SourcePlatform.from(urlString: pendingPlace.sourceURL),
+            sourceImageUrl: nil,
+            extractedDishes: pendingPlace.dishes,
+            priceRange: pendingPlace.priceRange,
+            recommender: nil,
+            googleRating: nil,
+            googlePriceLevel: nil,
+            openingHours: nil,
+            createdAt: pendingPlace.savedAt
+        )
+    }
+
+    var pendingDeduplicationKey: String {
+        if let sourceUrl, !sourceUrl.isEmpty { return sourceUrl }
+        return "\(name)|\(address)|\(createdAt.timeIntervalSince1970)"
+    }
+
+    func matches(_ pendingPlace: PendingSharedPlace) -> Bool {
+        pendingDeduplicationKey == pendingPlace.deduplicationKey || (
+            name == pendingPlace.name &&
+            address == pendingPlace.address &&
+            sourceUrl == pendingPlace.sourceURL
+        )
+    }
+
+    func matches(_ other: Place) -> Bool {
+        pendingDeduplicationKey == other.pendingDeduplicationKey || (
+            name == other.name &&
+            address == other.address &&
+            sourceUrl == other.sourceUrl
+        )
+    }
+}
+
+private extension PendingSharedPlace {
+    var deduplicationKey: String {
+        if let sourceURL, !sourceURL.isEmpty { return sourceURL }
+        return "\(name)|\(address)|\(savedAt.timeIntervalSince1970)"
+    }
+}
+
+private extension SourcePlatform {
+    static func from(urlString: String?) -> SourcePlatform {
         guard let host = urlString.flatMap(URL.init(string:))?.host()?.lowercased() else {
             return .other
         }
