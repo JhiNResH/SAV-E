@@ -82,7 +82,9 @@ extension Place {
     }
 
     var pendingDeduplicationKey: String {
-        if let sourceUrl, !sourceUrl.isEmpty { return sourceUrl }
+        if let normalizedSourceURL = sourceUrl?.normalizedDeduplicationURLString() {
+            return normalizedSourceURL
+        }
         return "\(name)|\(address)|\(createdAt.timeIntervalSince1970)"
     }
 
@@ -105,7 +107,9 @@ extension Place {
 
 extension PendingSharedPlace {
     var deduplicationKey: String {
-        if let sourceURL, !sourceURL.isEmpty { return sourceURL }
+        if let normalizedSourceURL = sourceURL?.normalizedDeduplicationURLString() {
+            return normalizedSourceURL
+        }
         return "\(name)|\(address)|\(savedAt.timeIntervalSince1970)"
     }
 }
@@ -119,25 +123,79 @@ extension SourcePlatform {
         if host.matchesDomain("instagram.com") { return .instagram }
         if host.matchesDomain("threads.net") || host.matchesDomain("threads.com") { return .threads }
         if host.matchesDomain("xiaohongshu.com") || host.matchesDomain("xhslink.com") { return .xiaohongshu }
-        if host.isGoogleMapsHost(path: url.path.lowercased()) { return .googleMaps }
+        if host.isGoogleMapsHost(path: url.path, queryItems: URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems) {
+            return .googleMaps
+        }
         return .other
     }
 }
 
 private extension String {
+    func normalizedDeduplicationURLString() -> String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              var components = URLComponents(string: trimmed),
+              components.scheme != nil,
+              components.host != nil else {
+            return nil
+        }
+
+        components.scheme = components.scheme?.lowercased()
+        components.host = components.host?.lowercased()
+
+        while components.path.count > 1, components.path.hasSuffix("/") {
+            components.path.removeLast()
+        }
+        if components.path == "/" {
+            components.path = ""
+        }
+
+        components.queryItems = components.queryItems?
+            .filter { item in
+                let name = item.name.lowercased()
+                return !name.hasPrefix("utm_") && name != "fbclid"
+            }
+            .sorted { lhs, rhs in
+                let lhsName = lhs.name.lowercased()
+                let rhsName = rhs.name.lowercased()
+                if lhsName != rhsName {
+                    return lhsName < rhsName
+                }
+                return (lhs.value ?? "") < (rhs.value ?? "")
+            }
+
+        if components.queryItems?.isEmpty == true {
+            components.queryItems = nil
+        }
+
+        return components.string
+    }
+
     func matchesDomain(_ domain: String) -> Bool {
         self == domain || hasSuffix(".\(domain)")
     }
 
-    func isGoogleMapsHost(path: String) -> Bool {
+    func isGoogleMapsHost(path: String, queryItems: [URLQueryItem]?) -> Bool {
         if self == "maps.google.com" {
             return true
         }
 
-        if matchesDomain("google.com"), path.hasPrefix("/maps") {
+        let lowercasedPath = path.lowercased()
+        if matchesDomain("google.com"), lowercasedPath.hasPrefix("/maps") {
             return true
         }
 
-        return matchesDomain("maps.app.goo.gl") || matchesDomain("goo.gl") || matchesDomain("g.co")
+        if matchesDomain("maps.app.goo.gl") {
+            return true
+        }
+
+        guard self == "goo.gl" || self == "g.co" else {
+            return false
+        }
+
+        return lowercasedPath.contains("maps") || (queryItems ?? []).contains { item in
+            let name = item.name.lowercased()
+            return name == "q" || name == "ll"
+        }
     }
 }
