@@ -13,7 +13,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 - **Profile** — Stats, world map visualization, collections, subscription management
 - **Onboarding** — 3-step carousel
 - **Place Detail** — Photo carousel, info grid, notes, navigate button, source link
-- **App Clip** — Target exists for shared trip links, but first TestFlight/App Store submission should ship native iOS + Share Extension first
+- **App Clip** — Lightweight shared trip preview for `https://wanderly.app/trip?d=...`
 
 ## Tech Stack
 
@@ -22,7 +22,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 - **Railway Node API + Railway Postgres** for backend persistence
 - **Gemini API** for AI content parsing
 - **Google Places API** for place matching and details
-- **App Clip** target for shareable trip links, deferred until Associated Domains, AASA, and App Clip Experience setup are complete
+- **App Clip** target for shareable trip links, including Associated Domains and full-app handoff
 - **Share Extension** target for cross-app saving
 
 ## Setup
@@ -110,15 +110,18 @@ xcodebuild \
 
 ## First TestFlight Boundary
 
-Ship the native iOS app and Share Extension first. The App Clip target is kept in the project, but should not be treated as review-ready until `wanderly.app` associated domains, the Apple App Site Association file, and an App Clip Experience are configured in App Store Connect.
+Ship the native iOS app, Share Extension, and App Clip together. App Clip readiness requires Apple Developer and App Store Connect setup in addition to the repo configuration:
 
 Before uploading a build:
 
-- register App IDs for `com.wanderly.app`, `com.wanderly.app.ShareExtension`, and later `com.wanderly.app.Clip`
+- register App IDs for `com.wanderly.app`, `com.wanderly.app.ShareExtension`, and `com.wanderly.app.Clip`
 - enable the App Group `group.com.wanderly.app` for the app and Share Extension
+- enable Associated Domains on `com.wanderly.app` and `com.wanderly.app.Clip`
+- enable the App Clip association capability on `com.wanderly.app`
 - configure signing team/profiles in Xcode or release xcconfig
 - confirm the App Store icon and privacy manifest are included
 - keep real API keys out of commits and restrict bundled keys where provider dashboards allow it
+- create the App Clip Experience in App Store Connect for `https://wanderly.app/trip`
 
 ## App Clip Trip Links
 
