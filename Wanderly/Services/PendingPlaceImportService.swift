@@ -112,13 +112,32 @@ extension PendingSharedPlace {
 
 extension SourcePlatform {
     static func from(urlString: String?) -> SourcePlatform {
-        guard let host = urlString.flatMap(URL.init(string:))?.host()?.lowercased() else {
+        guard let url = urlString.flatMap(URL.init(string:)),
+              let host = url.host()?.lowercased() else {
             return .other
         }
-        if host.contains("instagram") { return .instagram }
-        if host.contains("threads") { return .threads }
-        if host.contains("xiaohongshu") || host.contains("xhslink") { return .xiaohongshu }
-        if host.contains("google") || host.contains("maps") { return .googleMaps }
+        if host.matchesDomain("instagram.com") { return .instagram }
+        if host.matchesDomain("threads.net") || host.matchesDomain("threads.com") { return .threads }
+        if host.matchesDomain("xiaohongshu.com") || host.matchesDomain("xhslink.com") { return .xiaohongshu }
+        if host.isGoogleMapsHost(path: url.path.lowercased()) { return .googleMaps }
         return .other
+    }
+}
+
+private extension String {
+    func matchesDomain(_ domain: String) -> Bool {
+        self == domain || hasSuffix(".\(domain)")
+    }
+
+    func isGoogleMapsHost(path: String) -> Bool {
+        if self == "maps.google.com" {
+            return true
+        }
+
+        if matchesDomain("google.com"), path.hasPrefix("/maps") {
+            return true
+        }
+
+        return matchesDomain("maps.app.goo.gl") || matchesDomain("goo.gl") || matchesDomain("g.co")
     }
 }

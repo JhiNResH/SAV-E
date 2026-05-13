@@ -3,6 +3,7 @@ import SwiftUI
 struct PlaceListView: View {
     @StateObject private var viewModel = PlaceListViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var loadPlacesTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -110,11 +111,22 @@ struct PlaceListView: View {
             }
         }
         .task {
-            await viewModel.loadPlaces()
+            startLoadPlacesTask()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
-            Task { await viewModel.loadPlaces() }
+            startLoadPlacesTask()
+        }
+        .onDisappear {
+            loadPlacesTask?.cancel()
+            loadPlacesTask = nil
+        }
+    }
+
+    private func startLoadPlacesTask() {
+        loadPlacesTask?.cancel()
+        loadPlacesTask = Task {
+            await viewModel.loadPlaces()
         }
     }
 }

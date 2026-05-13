@@ -114,12 +114,22 @@ final class PlaceListViewModel: ObservableObject {
 
         var importedPlaces: [Place] = []
         var failedImports: [PendingSharedPlace] = []
+        var processedPendingKeys: Set<String> = []
 
         for pendingPlace in pending {
             let place = Place.from(pendingPlace)
+            let key = place.pendingDeduplicationKey
+
+            guard !processedPendingKeys.contains(key),
+                  !places.contains(where: { $0.matches(place) }) else {
+                continue
+            }
+
+            processedPendingKeys.insert(key)
 
             do {
                 try await supabaseService.savePlace(place, userId: userId)
+                importedPendingKeys.insert(key)
                 importedPlaces.append(place)
             } catch {
                 failedImports.append(pendingPlace)
@@ -129,16 +139,7 @@ final class PlaceListViewModel: ObservableObject {
         }
 
         if !importedPlaces.isEmpty {
-            let newImports = importedPlaces.filter { place in
-                let key = place.pendingDeduplicationKey
-                guard !importedPendingKeys.contains(key),
-                      !places.contains(where: { $0.matches(place) }) else {
-                    return false
-                }
-                importedPendingKeys.insert(key)
-                return true
-            }
-            places = newImports + places
+            places = importedPlaces + places
         }
         pendingImportService.restorePendingPlaces(failedImports)
     }
