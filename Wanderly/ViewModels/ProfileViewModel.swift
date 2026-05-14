@@ -4,6 +4,8 @@ import Foundation
 final class ProfileViewModel: ObservableObject {
     @Published var profile: UserProfile = .mock
     @Published var isLoading = false
+    @Published var isSaving = false
+    @Published var errorMessage: String?
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
@@ -16,6 +18,7 @@ final class ProfileViewModel: ObservableObject {
     func loadProfile() async {
         guard let userId = authService.currentUserId else { return }
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -23,7 +26,33 @@ final class ProfileViewModel: ObservableObject {
                 self.profile = profile
             }
         } catch {
+            errorMessage = error.localizedDescription
             print("Failed to load profile: \(error)")
+        }
+    }
+
+    func updateDisplayName(_ displayName: String) async -> Bool {
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Name cannot be empty."
+            return false
+        }
+
+        let previousProfile = profile
+        profile.displayName = trimmedName
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        do {
+            try await supabaseService.updateProfile(profile)
+            await loadProfile()
+            return true
+        } catch {
+            profile = previousProfile
+            errorMessage = error.localizedDescription
+            print("Failed to update profile: \(error)")
+            return false
         }
     }
 
