@@ -59,7 +59,7 @@ function requestHeaders({ accessToken, guestId }: WanderlyAuth): HeadersInit {
 
   if (!accessToken) {
     if (!guestId) {
-      throw new Error("Missing Wanderly auth context");
+      throw new Error("Missing SAV-E auth context");
     }
 
     return {

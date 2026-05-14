@@ -2,7 +2,7 @@
 
 ## Goal
 
-Ship a React Native version of Wanderly that is usable as a product-facing build for small-group testing on 2026-05-04.
+Ship a React Native version of SAV-E that is usable as a product-facing build for small-group testing on 2026-05-04.
 
 This is still not full parity with the native iOS product, but it should feel product-ready enough to share as a live web build.
 
@@ -14,8 +14,8 @@ This is still not full parity with the native iOS product, but it should feel pr
   - import a place or event link into saved bookmarks
   - browse saved places
   - build a trip from saved bookmarks
-  - generate a Wanderly trip link and hand off the next stop to Tesla
-- Reuse the existing shared-trip payload shape so links stay compatible with Wanderly's `?d=<base64>` format.
+  - generate a SAV-E trip link and hand off the next stop to Tesla
+- Reuse the existing shared-trip payload shape so links stay compatible with SAV-E's `?d=<base64>` format.
 
 ## Non-Goals
 
@@ -43,7 +43,7 @@ The RN product build should have three tabs:
    - reorder not required for v1
    - create trip link using the same base64 JSON structure as `SharedTripData`
    - share trip link
-   - trip planning starts from saved bookmarks, matching the native Wanderly model
+   - trip planning starts from saved bookmarks, matching the native SAV-E model
 
 3. `Share`
    - show a more polished handoff summary for the current trip
@@ -58,7 +58,7 @@ The RN product build should have three tabs:
 - Use clipboard import for fast mobile testing.
 - Support Expo Web static export for deployment.
 - Keep code self-contained and readable.
-- Use a clean mobile-first UI with a Wanderly-like warm palette.
+- Use a clean mobile-first UI with a SAV-E-like warm palette.
 
 ## Acceptance Criteria
 
@@ -74,7 +74,7 @@ The RN product build should have three tabs:
   - create a trip link
   - share the next stop to Tesla via Apple Maps URL
   - open the same build in a deployed web URL
-- Trip payload matches Wanderly's existing `SharedTripData` fields:
+- Trip payload matches SAV-E's existing `SharedTripData` fields:
   - `name`
   - `city`
   - `stops[]` with `id`, `name`, `address`, `lat`, `lng`, `time`, `note`

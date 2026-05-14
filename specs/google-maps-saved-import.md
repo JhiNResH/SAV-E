@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let a user bring their existing Google Maps saved places into Wanderly so the app starts with real personal places instead of one-by-one sharing.
+Let a user bring their existing Google Maps saved places into SAV-E so the app starts with real personal places instead of one-by-one sharing.
 
 ## Product Decision
 
@@ -12,13 +12,13 @@ Google Maps exposes saved lists in the Maps product and supports exporting saved
 
 ## User Flow
 
-1. User opens Wanderly import.
-2. Wanderly shows a short instruction: export Google Maps saved places from Google Takeout with `Saved` selected.
+1. User opens SAV-E import.
+2. SAV-E shows a short instruction: export Google Maps saved places from Google Takeout with `Saved` selected.
 3. User selects the downloaded Takeout `.zip` or extracted file.
-4. Wanderly previews parsed lists and places.
+4. SAV-E previews parsed lists and places.
 5. User chooses lists to import.
-6. Wanderly deduplicates against existing `sourceUrl`, Google Place ID, coordinates, name, and address.
-7. Wanderly saves selected places to the user's account.
+6. SAV-E deduplicates against existing `sourceUrl`, Google Place ID, coordinates, name, and address.
+7. SAV-E saves selected places to the user's account.
 
 ## Data Sources
 

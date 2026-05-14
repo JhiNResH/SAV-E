@@ -70,7 +70,7 @@ struct AuthLoadingView: View {
         VStack(spacing: 14) {
             ProgressView()
                 .tint(.wanderlyTerracotta)
-            Text("Opening Wanderly")
+            Text("Opening SAV-E")
                 .font(.headline)
                 .foregroundColor(.wanderlyCharcoal)
         }
@@ -100,7 +100,7 @@ struct SignInView: View {
                     .font(.system(size: 56))
                     .foregroundColor(.wanderlyTerracotta)
 
-                Text("Wanderly")
+                Text("SAV-E")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.wanderlyCharcoal)
@@ -225,7 +225,7 @@ struct SignInView: View {
 
     private func presentAuthError(_ error: Error) {
         let rawMessage = error.localizedDescription
-        print("Wanderly sign-in failed: \(rawMessage)")
+        print("SAV-E sign-in failed: \(rawMessage)")
 
         if rawMessage.contains("disallowed_login_method") || rawMessage.contains("not allowed") {
             errorTitle = "Google Isn't Enabled"

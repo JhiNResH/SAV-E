@@ -1,6 +1,6 @@
 # wanderly-api
 
-Supabase Edge Function that proxies Wanderly mobile persistence through a service-role backend.
+Supabase Edge Function that proxies SAV-E mobile persistence through a service-role backend.
 
 Required secrets:
 

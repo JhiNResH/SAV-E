@@ -1,8 +1,8 @@
-# Wanderly iOS
+# SAV-E iOS
 
 AI-powered place discovery and trip planning app for iOS.
 
-Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the web — Wanderly extracts place details and pins them on your personal map. Plan trips, optimize routes, and track your adventures.
+Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the web — SAV-E extracts place details and pins them on your personal map. Plan trips, optimize routes, and track your adventures.
 
 ## Features
 
@@ -131,7 +131,7 @@ Before uploading a build:
 
 ## App Clip Trip Links
 
-Wanderly trip links use this shape:
+SAV-E trip links use this shape:
 
 ```text
 https://wanderly.app/trip?d=<base64-url-encoded SharedTripData JSON>

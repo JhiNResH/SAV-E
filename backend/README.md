@@ -1,6 +1,6 @@
-# Wanderly Railway Backend
+# SAV-E Railway Backend
 
-Railway-hosted API for Wanderly mobile persistence. It replaces the previous Supabase Edge Function while preserving the iOS API contract.
+Railway-hosted API for SAV-E mobile persistence. It replaces the previous Supabase Edge Function while preserving the iOS API contract.
 
 ## Environment
 

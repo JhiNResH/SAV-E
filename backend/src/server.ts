@@ -93,7 +93,7 @@ createServer(async (request, response) => {
     return sendJson(response, { error: message }, status);
   }
 }).listen(Number(process.env.PORT ?? 3000), () => {
-  console.log(`Wanderly backend listening on ${process.env.PORT ?? 3000}`);
+  console.log(`SAV-E backend listening on ${process.env.PORT ?? 3000}`);
 });
 
 async function handlePlaces(
@@ -246,7 +246,7 @@ async function handleProfile(
 async function ensureProfile(userId: string): Promise<void> {
   await pool.query(
     `insert into profiles (id, display_name)
-     values ($1, 'Wanderly User')
+     values ($1, 'SAV-E User')
      on conflict (id) do nothing`,
     [userId],
   );

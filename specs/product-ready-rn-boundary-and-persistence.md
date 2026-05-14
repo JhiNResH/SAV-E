@@ -2,13 +2,13 @@
 
 ## Goal
 
-Move Wanderly from a demo-style RN web surface to a product-ready small-group product with persistent backend storage.
+Move SAV-E from a demo-style RN web surface to a product-ready small-group product with persistent backend storage.
 
 ## Product Boundary
 
 ### Native iOS
 
-Native iOS remains the full personal Wanderly app:
+Native iOS remains the full personal SAV-E app:
 
 - Privy-authenticated
 - Railway-backed personal places / trips / profile
@@ -17,7 +17,7 @@ Native iOS remains the full personal Wanderly app:
 
 ### RN Web
 
-RN Web becomes the lightweight collaborative and low-friction Wanderly surface:
+RN Web becomes the lightweight collaborative and low-friction SAV-E surface:
 
 - no Privy requirement for first-use
 - persistent backend storage for guest bookmarks and trips
