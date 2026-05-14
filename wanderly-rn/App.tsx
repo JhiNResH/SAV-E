@@ -341,7 +341,7 @@ function WanderlyApp() {
 
   async function shareTripLink() {
     await Share.share({
-      message: `Wanderly trip: ${tripLink}`,
+      message: `SAV-E trip: ${tripLink}`,
       url: tripLink,
     });
   }
@@ -354,7 +354,7 @@ function WanderlyApp() {
 
     const appleMapsUrl = buildAppleMapsUrl(nextStop);
     const summary = [
-      `Wanderly trip: ${tripName}`,
+      `SAV-E trip: ${tripName}`,
       `Next stop: ${nextStop.name}`,
       nextStop.address,
       appleMapsUrl,
@@ -389,7 +389,7 @@ function WanderlyApp() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="small" color="#CB623D" />
-          <Text style={styles.loadingText}>Loading Wanderly...</Text>
+          <Text style={styles.loadingText}>Loading SAV-E...</Text>
         </View>
       </SafeAreaView>
     );
@@ -400,7 +400,7 @@ function WanderlyApp() {
       <StatusBar style="dark" />
       <View style={styles.appShell}>
         <View style={styles.header}>
-          <Text style={styles.brand}>Wanderly</Text>
+          <Text style={styles.brand}>SAV-E</Text>
           <Text style={styles.subtitle}>
             Save places, refine event stops, and turn bookmarks into a trip you can share or hand off.
           </Text>
@@ -546,7 +546,7 @@ function WanderlyApp() {
                 <LabeledInput label="City" value={tripCity} onChangeText={setTripCity} />
                 <Text style={styles.helperText}>
                   {authenticated
-                    ? "Signed in mode saves bookmarks and trips to your Wanderly account."
+                    ? "Signed in mode saves bookmarks and trips to your SAV-E account."
                     : apiEnabled
                       ? "Guest mode saves bookmarks and trips for this browser. Sign in to sync across devices."
                       : "Local mode works in this browser only. Configure the backend to persist."}
@@ -581,7 +581,7 @@ function WanderlyApp() {
                   label={authenticated ? "Save Trip to Account" : "Save Trip as Guest"}
                   onPress={saveTripToAccount}
                 />
-                <ActionButton label="Share Wanderly Trip Link" onPress={shareTripLink} tone="secondary" />
+                <ActionButton label="Share SAV-E Trip Link" onPress={shareTripLink} tone="secondary" />
                 <ActionButton label="Open Trip Link" onPress={openTripLink} tone="secondary" />
               </View>
 

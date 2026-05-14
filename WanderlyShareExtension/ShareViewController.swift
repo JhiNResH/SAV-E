@@ -94,7 +94,7 @@ struct ShareExtensionView: View {
                             .font(.system(size: 56))
                             .foregroundColor(Color(hex: "A8B5A0"))
 
-                        Text("Saved to Wanderly!")
+                        Text("Saved to SAV-E!")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(Color(hex: "2C2C2E"))
@@ -293,7 +293,7 @@ struct ShareExtensionView: View {
         // Parse with Gemini only when the shared URL does not contain usable map coordinates.
         do {
             guard hasMeaningfulPlaceContext(aiContent, sourceURLString: parseContent) else {
-                throw NSError(domain: "wanderly", code: 4, userInfo: [NSLocalizedDescriptionKey: "Share a map link or a post with a visible place name so Wanderly does not guess the wrong city."])
+                throw NSError(domain: "wanderly", code: 4, userInfo: [NSLocalizedDescriptionKey: "Share a map link or a post with a visible place name so SAV-E does not guess the wrong city."])
             }
             parsedPlace = try await parseWithGemini(content: aiContent, sourceURLString: parseContent)
             selectedCategory = parsedPlace?.category ?? "food"
@@ -382,7 +382,7 @@ struct ShareExtensionView: View {
         }
 
         if dict["needsReview"] as? Bool == true {
-            throw NSError(domain: "wanderly", code: 5, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not identify one exact place from this post. Share the map link or include the place name."])
+            throw NSError(domain: "wanderly", code: 5, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not identify one exact place from this post. Share the map link or include the place name."])
         }
 
         let place = ParsedPlace(
@@ -485,7 +485,7 @@ struct ShareExtensionView: View {
 
     private func validateAIPlace(_ place: ParsedPlace, against content: String, sourceURLString: String) throws {
         guard isValidCoordinate(latitude: place.latitude, longitude: place.longitude) else {
-            throw NSError(domain: "wanderly", code: 6, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not find reliable coordinates for this post. Share the map link to save it accurately."])
+            throw NSError(domain: "wanderly", code: 6, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not find reliable coordinates for this post. Share the map link to save it accurately."])
         }
 
         let combinedPlace = "\(place.name) \(place.address)".lowercased()
@@ -504,7 +504,7 @@ struct ShareExtensionView: View {
         }
 
         if let url = URL(string: sourceURLString), isSocialURL(url), place.name == "Unknown Place" {
-            throw NSError(domain: "wanderly", code: 8, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not identify one exact place from this social post."])
+            throw NSError(domain: "wanderly", code: 8, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not identify one exact place from this social post."])
         }
     }
 

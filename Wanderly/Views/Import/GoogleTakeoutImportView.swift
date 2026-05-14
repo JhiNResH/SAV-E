@@ -66,7 +66,7 @@ struct GoogleTakeoutImportView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.wanderlyCharcoal)
 
-                Text("Choose a Google Takeout export. Wanderly previews everything first and only saves places with real coordinates.")
+                Text("Choose a Google Takeout export. SAV-E previews everything first and only saves places with real coordinates.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -134,7 +134,7 @@ struct GoogleTakeoutImportView: View {
                     } header: {
                         Text("Needs review")
                     } footer: {
-                        Text("These stay as review drafts because the export did not include reliable coordinates. Wanderly will not create fake pins.")
+                        Text("These stay as review drafts because the export did not include reliable coordinates. SAV-E will not create fake pins.")
                     }
                 }
             }

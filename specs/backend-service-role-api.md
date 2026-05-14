@@ -6,7 +6,7 @@ Date: 2026-04-27
 
 ## Goal
 
-Move Wanderly persistence behind a backend API so the iOS app no longer relies on Supabase Auth `auth.uid()` matching Privy user ids.
+Move SAV-E persistence behind a backend API so the iOS app no longer relies on Supabase Auth `auth.uid()` matching Privy user ids.
 
 ## Decision
 

@@ -8,7 +8,7 @@ struct OnboardingView: View {
         OnboardingPage(
             icon: "mappin.and.ellipse",
             title: "Save Places from Anywhere",
-            subtitle: "Share a link from Instagram, Threads, or any app — Wanderly's AI extracts the place details and pins it on your map.",
+            subtitle: "Share a link from Instagram, Threads, or any app — SAV-E's AI extracts the place details and pins it on your map.",
             color: .wanderlyTerracotta
         ),
         OnboardingPage(

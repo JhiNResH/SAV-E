@@ -178,7 +178,7 @@ final class WanderlyAIService {
         }.joined(separator: ",\n")
 
         return """
-        You are Wanderly's AI assistant. You help users explore their saved places and plan trips.
+        You are SAV-E's AI assistant. You help users explore their saved places and plan trips.
 
         USER'S SAVED PLACES:
         [\(placesJSON)]

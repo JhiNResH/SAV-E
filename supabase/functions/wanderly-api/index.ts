@@ -244,7 +244,7 @@ async function ensureProfile(userId: string): Promise<void> {
 
   const { error: insertError } = await supabase.from("profiles").insert({
     id: userId,
-    display_name: "Wanderly User",
+    display_name: "SAV-E User",
   });
   if (insertError) throw new ApiError(500, insertError.message);
 }

@@ -61,6 +61,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleDisplayName: SAV-E
         UIApplicationSupportsIndirectInputEvents: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -70,7 +71,7 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSLocationWhenInUseUsageDescription: "Wanderly needs your location to show nearby places on the map."
+        NSLocationWhenInUseUsageDescription: "SAV-E needs your location to show nearby places on the map."
         LSApplicationQueriesSchemes:
           - comgooglemaps
         CFBundleURLTypes:
@@ -106,6 +107,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: WanderlyClip/WanderlyClip.entitlements
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_CFBundleIconName: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: SAV-E
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations:

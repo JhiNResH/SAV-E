@@ -1,7 +1,7 @@
-# Wanderly iOS - Swift Project Scaffold
+# SAV-E iOS - Swift Project Scaffold
 
 ## What to Build
-Scaffold a complete iOS app project for "Wanderly" — an AI-powered place discovery and trip planning app.
+Scaffold a complete iOS app project for "SAV-E" — an AI-powered place discovery and trip planning app.
 
 ## Project Structure Required
 
@@ -48,7 +48,7 @@ Wanderly/
 │   │   ├── TripViewModel.swift
 │   │   └── ProfileViewModel.swift
 │   ├── Extensions/
-│   │   └── Color+Theme.swift       (Wanderly color theme)
+│   │   └── Color+Theme.swift       (SAV-E color theme)
 │   └── Resources/
 │       └── Assets.xcassets
 ├── WanderlyShareExtension/
@@ -144,4 +144,4 @@ enum SourcePlatform: String, Codable {
 - Push to remote: https://github.com/JhiNResH/wanderly (force push OK, it's a fresh start)
 
 When completely finished, run this command to notify me:
-openclaw system event --text "Done: Wanderly iOS Swift project scaffolded with Privy + App Clip + Share Extension. Pushed to github.com/JhiNResH/wanderly" --mode now
+openclaw system event --text "Done: SAV-E iOS Swift project scaffolded with Privy + App Clip + Share Extension. Pushed to github.com/JhiNResH/wanderly" --mode now

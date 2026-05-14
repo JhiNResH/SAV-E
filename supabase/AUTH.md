@@ -1,4 +1,4 @@
-# Wanderly Supabase Auth Notes
+# SAV-E Supabase Auth Notes
 
 > Superseded on 2026-04-27 by the Railway backend migration. Keep this file only as legacy context for why direct Supabase Auth/RLS access was removed.
 
@@ -51,4 +51,4 @@ Git history previously contained values that looked like real Privy and Supabase
 - Privy app id/client id configuration, if applicable
 - Any Gemini or Google Places keys that were ever committed locally outside the current redacted history check
 
-Supabase CLI v2.72.7 is logged in and the Wanderly project is linked, but `supabase db lint --linked` could not run without `SUPABASE_DB_PASSWORD`.
+Supabase CLI v2.72.7 is logged in and the SAV-E project is linked, but `supabase db lint --linked` could not run without `SUPABASE_DB_PASSWORD`.

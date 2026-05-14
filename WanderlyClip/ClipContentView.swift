@@ -109,7 +109,7 @@ struct ClipContentView: View {
 
                 VStack(spacing: 12) {
                     Button(action: openInFullApp) {
-                        Text("Open in Wanderly")
+                        Text("Open in SAV-E")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)

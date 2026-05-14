@@ -110,7 +110,7 @@ function buildEnabledAssociation(teamId) {
           components: [
             {
               "/": "/trip",
-              comment: "Wanderly shared trip preview links",
+              comment: "SAV-E shared trip preview links",
             },
           ],
         },

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move Wanderly persistence from Supabase Edge Functions/PostgREST to a Railway-hosted backend with Railway Postgres, because the current project has no production data and Supabase deployment is blocked on provider-specific secrets.
+Move SAV-E persistence from Supabase Edge Functions/PostgREST to a Railway-hosted backend with Railway Postgres, because the current project has no production data and Supabase deployment is blocked on provider-specific secrets.
 
 ## Non-goals
 

@@ -68,7 +68,7 @@ private struct PreviewClipStop: Identifiable {
 
                 VStack(spacing: 12) {
                     Button(action: {}) {
-                        Text("Open in Wanderly")
+                        Text("Open in SAV-E")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)

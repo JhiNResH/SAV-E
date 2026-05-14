@@ -26,11 +26,11 @@ enum SupabaseError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notConfigured: return "Wanderly API not configured"
+        case .notConfigured: return "SAV-E API not configured"
         case .notAuthenticated: return "User not authenticated"
         case .recordNotFound: return "Record not found"
         case .networkError(let error): return "Network error: \(error.localizedDescription)"
-        case .apiError(let code, let msg): return "Wanderly API error \(code): \(msg)"
+        case .apiError(let code, let msg): return "SAV-E API error \(code): \(msg)"
         }
     }
 }
