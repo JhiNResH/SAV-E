@@ -68,7 +68,7 @@ final class SupabaseService: SupabaseServiceProtocol {
     // MARK: - Places
 
     func fetchPlaces(for userId: String) async throws -> [Place] {
-        guard isConfigured else { return Place.mockList }
+        guard isConfigured else { return [] }
 
         let data = try await request(path: "/places")
 
@@ -109,7 +109,7 @@ final class SupabaseService: SupabaseServiceProtocol {
     // MARK: - Trips
 
     func fetchTrips(for userId: String) async throws -> [Trip] {
-        guard isConfigured else { return Trip.mockList }
+        guard isConfigured else { return [] }
 
         let tripsData = try await request(path: "/trips")
 

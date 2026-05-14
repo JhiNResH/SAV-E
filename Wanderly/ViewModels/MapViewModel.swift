@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 final class MapViewModel: ObservableObject {
-    @Published var places: [Place] = Place.mockList
+    @Published var places: [Place] = []
     @Published var selectedPlace: Place?
     @Published var cameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
