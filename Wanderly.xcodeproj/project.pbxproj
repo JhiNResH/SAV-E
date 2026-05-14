@@ -427,6 +427,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1E85095316CB310A976DDA9F /* Build configuration list for PBXNativeTarget "WanderlyShareExtension" */;
 			buildPhases = (
+				4AD4D2AEA58CD374F8CCB06E /* Create Local Secrets.plist */,
 				4A62812F23F8E51197482623 /* Sources */,
 				244EEF0FD063942BD3E410BB /* Resources */,
 			);
@@ -445,6 +446,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3ADEC6F85D8EC51D5FBF311E /* Build configuration list for PBXNativeTarget "Wanderly" */;
 			buildPhases = (
+				1512A3FBDE688EE00A8A2BF1 /* Create Local Secrets.plist */,
 				5F6C575670A099365C547BEA /* Sources */,
 				68C237C0965124415B58F445 /* Resources */,
 				A1B43C02DFFC85212E33C051 /* Frameworks */,
@@ -560,6 +562,49 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1512A3FBDE688EE00A8A2BF1 /* Create Local Secrets.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Wanderly/Resources/Secrets.plist.template",
+			);
+			name = "Create Local Secrets.plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Wanderly/Resources/Secrets.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nsecrets=\"${SRCROOT}/Wanderly/Resources/Secrets.plist\"\ntemplate=\"${SRCROOT}/Wanderly/Resources/Secrets.plist.template\"\nif [ ! -f \"$secrets\" ]; then\n  cp \"$template\" \"$secrets\"\nfi\n";
+		};
+		4AD4D2AEA58CD374F8CCB06E /* Create Local Secrets.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/WanderlyShareExtension/Secrets.plist.template",
+			);
+			name = "Create Local Secrets.plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/WanderlyShareExtension/Secrets.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nsecrets=\"${SRCROOT}/WanderlyShareExtension/Secrets.plist\"\ntemplate=\"${SRCROOT}/WanderlyShareExtension/Secrets.plist.template\"\nif [ ! -f \"$secrets\" ]; then\n  cp \"$template\" \"$secrets\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4A62812F23F8E51197482623 /* Sources */ = {
@@ -844,7 +889,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
@@ -902,7 +947,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
