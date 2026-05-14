@@ -3,7 +3,7 @@ import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg from "pg";
 
 type JsonBody = Record<string, unknown>;
-type QueryValue = string | number | boolean | Date | string[] | null;
+type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
 
 const { Pool } = pg;
 
@@ -66,6 +66,40 @@ const tripStopFields = [
 
 const profileFields = ["display_name", "avatar_url"] as const;
 
+const captureFields = [
+  "id",
+  "source_type",
+  "source_url",
+  "raw_text",
+  "title",
+  "status",
+  "created_at",
+] as const;
+
+const placeCandidateFields = [
+  "id",
+  "capture_id",
+  "place_id",
+  "name",
+  "address",
+  "city",
+  "latitude",
+  "longitude",
+  "evidence",
+  "confidence",
+  "missing_info",
+  "status",
+  "created_at",
+] as const;
+
+const agentDecisionFields = [
+  "id",
+  "candidate_id",
+  "action",
+  "reason",
+  "created_at",
+] as const;
+
 createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     return sendJson(response, null, 204);
@@ -85,6 +119,9 @@ createServer(async (request, response) => {
     if (resource === "places") return await handlePlaces(request, response, id, userId);
     if (resource === "trips") return await handleTrips(request, response, id, userId);
     if (resource === "profile") return await handleProfile(request, response, userId);
+    if (resource === "memory") {
+      return await handleMemory(request, response, url.pathname.split("/").filter(Boolean).slice(1), url, userId);
+    }
 
     return sendJson(response, { error: "Not found" }, 404);
   } catch (error) {
@@ -241,6 +278,190 @@ async function handleProfile(
   }
 
   return sendJson(response, { error: "Unsupported profile route" }, 405);
+}
+
+async function handleMemory(
+  request: IncomingMessage,
+  response: ServerResponse,
+  segments: string[],
+  url: URL,
+  userId: string,
+): Promise<void> {
+  const [kind, id] = segments;
+
+  if (kind === "captures") return await handleMemoryCaptures(request, response, id, userId);
+  if (kind === "candidates") return await handleMemoryCandidates(request, response, id, url, userId);
+  if (kind === "decisions") return await handleMemoryDecisions(request, response, url, userId);
+
+  return sendJson(response, { error: "Unsupported memory route" }, 405);
+}
+
+async function handleMemoryCaptures(
+  request: IncomingMessage,
+  response: ServerResponse,
+  captureId: string | undefined,
+  userId: string,
+): Promise<void> {
+  if (request.method === "GET" && !captureId) {
+    const { rows } = await pool.query(
+      "select * from captures where user_id = $1 order by created_at desc",
+      [userId],
+    );
+    return sendJson(response, rows.map(formatCapture));
+  }
+
+  if (request.method === "GET" && captureId) {
+    const { rows } = await pool.query(
+      "select * from captures where id = $1 and user_id = $2",
+      [captureId, userId],
+    );
+    if (!rows[0]) return sendJson(response, { error: "Capture not found" }, 404);
+    return sendJson(response, formatCapture(rows[0]));
+  }
+
+  if (request.method === "POST" && !captureId) {
+    const body = withOwner(await readJson(request), userId);
+    const insert = buildInsert("captures", body, [...captureFields, "user_id"]);
+    const { rows } = await pool.query(`${insert.sql} returning *`, insert.values);
+    return sendJson(response, formatCapture(rows[0]), 201);
+  }
+
+  if (request.method === "PATCH" && captureId) {
+    const body = writableFields(await readJson(request), ["id", "user_id", "created_at", "updated_at"]);
+    const update = buildUpdate("captures", body, captureFields);
+    if (!update) return sendJson(response, { error: "No writable fields" }, 400);
+
+    const values = [...update.values, captureId, userId];
+    const { rows } = await pool.query(
+      `${update.sql} where id = $${values.length - 1} and user_id = $${values.length} returning *`,
+      values,
+    );
+    if (!rows[0]) return sendJson(response, { error: "Capture not found" }, 404);
+    return sendJson(response, formatCapture(rows[0]));
+  }
+
+  return sendJson(response, { error: "Unsupported memory captures route" }, 405);
+}
+
+async function handleMemoryCandidates(
+  request: IncomingMessage,
+  response: ServerResponse,
+  candidateId: string | undefined,
+  url: URL,
+  userId: string,
+): Promise<void> {
+  if (request.method === "GET" && !candidateId) {
+    const captureId = url.searchParams.get("capture_id");
+    const where = captureId
+      ? "where c.user_id = $1 and pc.capture_id = $2"
+      : "where c.user_id = $1";
+    const values = captureId ? [userId, captureId] : [userId];
+    const { rows } = await pool.query(
+      `select pc.*
+       from place_candidates pc
+       join captures c on c.id = pc.capture_id
+       ${where}
+       order by pc.created_at desc`,
+      values,
+    );
+    return sendJson(response, rows.map(formatPlaceCandidate));
+  }
+
+  if (request.method === "POST" && !candidateId) {
+    const body = await readJson(request);
+    const captureId = typeof body.capture_id === "string" ? body.capture_id : undefined;
+    if (!captureId) return sendJson(response, { error: "capture_id is required" }, 400);
+    await ensureCaptureOwner(captureId, userId);
+    await ensureOwnedPlaceReference(body.place_id, userId);
+
+    const insert = buildInsert("place_candidates", body, placeCandidateFields);
+    const { rows } = await pool.query(`${insert.sql} returning *`, insert.values);
+    return sendJson(response, formatPlaceCandidate(rows[0]), 201);
+  }
+
+  if (request.method === "PATCH" && candidateId) {
+    const body = writableFields(await readJson(request), ["id", "capture_id", "created_at", "updated_at"]);
+    await ensureOwnedPlaceReference(body.place_id, userId);
+    const update = buildUpdate("place_candidates", body, placeCandidateFields);
+    if (!update) return sendJson(response, { error: "No writable fields" }, 400);
+
+    const values = [...update.values, candidateId, userId];
+    const { rows } = await pool.query(
+      `${update.sql}
+       from captures c
+       where place_candidates.capture_id = c.id
+         and place_candidates.id = $${values.length - 1}
+         and c.user_id = $${values.length}
+       returning place_candidates.*`,
+      values,
+    );
+    if (!rows[0]) return sendJson(response, { error: "Candidate not found" }, 404);
+    return sendJson(response, formatPlaceCandidate(rows[0]));
+  }
+
+  return sendJson(response, { error: "Unsupported memory candidates route" }, 405);
+}
+
+async function handleMemoryDecisions(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL,
+  userId: string,
+): Promise<void> {
+  if (request.method === "GET") {
+    const candidateId = url.searchParams.get("candidate_id");
+    const where = candidateId
+      ? "where c.user_id = $1 and ad.candidate_id = $2"
+      : "where c.user_id = $1";
+    const values = candidateId ? [userId, candidateId] : [userId];
+    const { rows } = await pool.query(
+      `select ad.*
+       from agent_decisions ad
+       join place_candidates pc on pc.id = ad.candidate_id
+       join captures c on c.id = pc.capture_id
+       ${where}
+       order by ad.created_at desc`,
+      values,
+    );
+    return sendJson(response, rows.map(formatAgentDecision));
+  }
+
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const candidateId = typeof body.candidate_id === "string" ? body.candidate_id : undefined;
+    if (!candidateId) return sendJson(response, { error: "candidate_id is required" }, 400);
+    await ensureCandidateOwner(candidateId, userId);
+
+    const insert = buildInsert("agent_decisions", body, agentDecisionFields);
+    const { rows } = await pool.query(`${insert.sql} returning *`, insert.values);
+    return sendJson(response, formatAgentDecision(rows[0]), 201);
+  }
+
+  return sendJson(response, { error: "Unsupported memory decisions route" }, 405);
+}
+
+async function ensureCaptureOwner(captureId: string, userId: string): Promise<void> {
+  const { rows } = await pool.query("select id from captures where id = $1 and user_id = $2", [captureId, userId]);
+  if (!rows[0]) throw new ApiError(404, "Capture not found");
+}
+
+async function ensureCandidateOwner(candidateId: string, userId: string): Promise<void> {
+  const { rows } = await pool.query(
+    `select pc.id
+     from place_candidates pc
+     join captures c on c.id = pc.capture_id
+     where pc.id = $1 and c.user_id = $2`,
+    [candidateId, userId],
+  );
+  if (!rows[0]) throw new ApiError(404, "Candidate not found");
+}
+
+async function ensureOwnedPlaceReference(placeId: unknown, userId: string): Promise<void> {
+  if (placeId === undefined || placeId === null) return;
+  if (typeof placeId !== "string") throw new ApiError(400, "place_id must be a string");
+
+  const { rows } = await pool.query("select id from places where id = $1 and user_id = $2", [placeId, userId]);
+  if (!rows[0]) throw new ApiError(404, "Place not found");
 }
 
 async function ensureProfile(userId: string): Promise<void> {
@@ -402,6 +623,18 @@ function formatTrip(row: JsonBody): JsonBody {
 }
 
 function formatProfile(row: JsonBody): JsonBody {
+  return formatDates(row);
+}
+
+function formatCapture(row: JsonBody): JsonBody {
+  return formatDates(row);
+}
+
+function formatPlaceCandidate(row: JsonBody): JsonBody {
+  return formatDates(row);
+}
+
+function formatAgentDecision(row: JsonBody): JsonBody {
   return formatDates(row);
 }
 
