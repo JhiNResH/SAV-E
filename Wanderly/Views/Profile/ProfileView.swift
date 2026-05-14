@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
+    @State private var showEditProfile = false
+    @State private var draftDisplayName = ""
 
     var body: some View {
         NavigationStack {
@@ -17,6 +19,17 @@ struct ProfileView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.wanderlyCharcoal)
+
+                        Button {
+                            draftDisplayName = viewModel.profile.displayName
+                            showEditProfile = true
+                        } label: {
+                            Label("Edit Profile", systemImage: "pencil")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.wanderlyTerracotta)
+                        }
+                        .buttonStyle(.plain)
 
                         if let email = viewModel.profile.email {
                             Text(email)
@@ -44,27 +57,22 @@ struct ProfileView: View {
                     // Stats
                     StatsView(profile: viewModel.profile)
 
-                    // World map placeholder
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Your World Map")
-                            .font(.headline)
-                            .foregroundColor(.wanderlyCharcoal)
-
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.wanderlySage.opacity(0.15))
-                            .frame(height: 180)
-                            .overlay(
-                                VStack(spacing: 8) {
-                                    Image(systemName: "globe.americas.fill")
-                                        .font(.largeTitle)
-                                        .foregroundColor(.wanderlySage)
-                                    Text("\(viewModel.profile.citiesCount) cities explored")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            )
+                    if let errorMessage = viewModel.errorMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                            Text(errorMessage)
+                                .lineLimit(2)
+                            Spacer()
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(12)
+                        .background(Color.red.opacity(0.08))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
+
+                    ProfileSummaryCard(profile: viewModel.profile)
 
                     // Collections
                     VStack(alignment: .leading, spacing: 12) {
@@ -117,9 +125,154 @@ struct ProfileView: View {
             }
             .background(Color.wanderlyCream)
             .navigationTitle("Profile")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        draftDisplayName = viewModel.profile.displayName
+                        showEditProfile = true
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+            }
         }
         .task {
             await viewModel.loadProfile()
+        }
+        .sheet(isPresented: $showEditProfile) {
+            EditProfileSheet(
+                displayName: $draftDisplayName,
+                isSaving: viewModel.isSaving,
+                errorMessage: viewModel.errorMessage,
+                onCancel: { showEditProfile = false },
+                onSave: {
+                    let saved = await viewModel.updateDisplayName(draftDisplayName)
+                    if saved { showEditProfile = false }
+                }
+            )
+        }
+    }
+}
+
+// MARK: - Edit Profile
+
+private struct EditProfileSheet: View {
+    @Binding var displayName: String
+    let isSaving: Bool
+    let errorMessage: String?
+    let onCancel: () -> Void
+    let onSave: () async -> Void
+    @FocusState private var isNameFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Profile") {
+                    TextField("Name", text: $displayName)
+                        .textInputAutocapitalization(.words)
+                        .focused($isNameFocused)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+
+                Section {
+                    Text("This name appears on your SAV-E profile. Email and sign-in provider are managed by your login account.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .disabled(isSaving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "Saving..." : "Save") {
+                        Task { await onSave() }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+        .onAppear {
+            isNameFocused = true
+        }
+    }
+}
+
+// MARK: - Profile Summary
+
+private struct ProfileSummaryCard: View {
+    let profile: UserProfile
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Account")
+                .font(.headline)
+                .foregroundColor(.wanderlyCharcoal)
+
+            VStack(spacing: 12) {
+                ProfileInfoRow(
+                    icon: "person.crop.circle",
+                    title: "Name",
+                    value: profile.displayName
+                )
+
+                ProfileInfoRow(
+                    icon: "envelope",
+                    title: "Email",
+                    value: profile.email ?? "Not available"
+                )
+
+                ProfileInfoRow(
+                    icon: "calendar",
+                    title: "Joined",
+                    value: profile.createdAt.formatted(date: .abbreviated, time: .omitted)
+                )
+
+                ProfileInfoRow(
+                    icon: "checkmark.seal",
+                    title: "Plan",
+                    value: profile.isPremium ? "Premium" : "Standard"
+                )
+            }
+        }
+        .padding()
+        .wanderlyCard()
+        .padding(.horizontal)
+    }
+}
+
+private struct ProfileInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.wanderlyTerracotta)
+                .frame(width: 24)
+
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.wanderlyCharcoal)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
