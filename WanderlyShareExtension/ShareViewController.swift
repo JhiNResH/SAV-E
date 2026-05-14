@@ -53,6 +53,12 @@ private struct PendingSharedPlace: Codable {
     var savedAt: Date
 }
 
+private struct ShareMetadata {
+    var resolvedURL: String?
+    var title: String?
+    var description: String?
+}
+
 // MARK: - Share Extension SwiftUI View
 
 struct ShareExtensionView: View {
@@ -268,7 +274,8 @@ struct ShareExtensionView: View {
             return
         }
 
-        let parseContent = await resolvedMapURLString(from: sharedURL).flatMap { $0.isEmpty ? nil : $0 } ?? content
+        let metadata = await shareMetadata(from: sharedURL)
+        let parseContent = metadata.resolvedURL.flatMap { $0.isEmpty ? nil : $0 } ?? content
 
         if let mapPlace = deterministicMapPlace(from: parseContent, title: sharedTitle, text: sharedText) {
             parsedPlace = mapPlace
@@ -277,14 +284,18 @@ struct ShareExtensionView: View {
             return
         }
 
-        let aiContent = [sharedTitle, sharedText, parseContent]
+        let aiContent = [sharedTitle, sharedText, metadata.title, metadata.description, parseContent]
+            .compactMap { $0 }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
 
         // Parse with Gemini only when the shared URL does not contain usable map coordinates.
         do {
-            parsedPlace = try await parseWithGemini(content: aiContent)
+            guard hasMeaningfulPlaceContext(aiContent, sourceURLString: parseContent) else {
+                throw NSError(domain: "wanderly", code: 4, userInfo: [NSLocalizedDescriptionKey: "Share a map link or a post with a visible place name so Wanderly does not guess the wrong city."])
+            }
+            parsedPlace = try await parseWithGemini(content: aiContent, sourceURLString: parseContent)
             selectedCategory = parsedPlace?.category ?? "food"
         } catch {
             if let fallback = fallbackPlace(from: parseContent, title: sharedTitle, text: sharedText) {
@@ -299,7 +310,7 @@ struct ShareExtensionView: View {
 
     // MARK: - Gemini Parsing
 
-    private func parseWithGemini(content: String) async throws -> ParsedPlace {
+    private func parseWithGemini(content: String, sourceURLString: String) async throws -> ParsedPlace {
         guard let apiKey = geminiAPIKey(), !apiKey.isEmpty else {
             throw NSError(domain: "wanderly", code: 1, userInfo: [NSLocalizedDescriptionKey: "GEMINI_API_KEY not configured"])
         }
@@ -323,14 +334,17 @@ struct ShareExtensionView: View {
           "latitude": 0.0,
           "longitude": 0.0,
           "dishes": ["dish1", "dish2"],
-          "priceRange": "$$"
+          "priceRange": "$$",
+          "needsReview": false
         }
 
         Rules:
-        - Extract the place name, address, and category from the URL or text
+        - Extract the place name, address, and category only from explicit text, metadata, or map URL data
         - If it's a restaurant/food URL, extract recommended dishes
-        - Estimate lat/lng from the address
-        - If you can't determine something, use reasonable defaults
+        - Do not guess a city, address, or coordinates from a social URL alone
+        - If the source says Beijing/北京, do not return a Shanghai/上海 place, and vice versa
+        - If you cannot identify one exact place, set needsReview to true and use latitude 0.0, longitude 0.0
+        - Never use a popular default city or a plausible replacement place
         - category must be one of: food, cafe, bar, attraction, stay, shopping
         """
 
@@ -349,8 +363,8 @@ struct ShareExtensionView: View {
 
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let candidates = json?["candidates"] as? [[String: Any]],
-              let content = candidates.first?["content"] as? [String: Any],
-              let parts = content["parts"] as? [[String: Any]],
+              let responseContent = candidates.first?["content"] as? [String: Any],
+              let parts = responseContent["parts"] as? [[String: Any]],
               let text = parts.first?["text"] as? String else {
             throw NSError(domain: "wanderly", code: 2, userInfo: [NSLocalizedDescriptionKey: "Empty AI response"])
         }
@@ -367,7 +381,11 @@ struct ShareExtensionView: View {
             throw NSError(domain: "wanderly", code: 3, userInfo: [NSLocalizedDescriptionKey: "Couldn't parse AI response"])
         }
 
-        return ParsedPlace(
+        if dict["needsReview"] as? Bool == true {
+            throw NSError(domain: "wanderly", code: 5, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not identify one exact place from this post. Share the map link or include the place name."])
+        }
+
+        let place = ParsedPlace(
             name: dict["name"] as? String ?? "Unknown Place",
             address: dict["address"] as? String ?? "",
             category: dict["category"] as? String ?? "food",
@@ -377,12 +395,13 @@ struct ShareExtensionView: View {
             dishes: dict["dishes"] as? [String] ?? [],
             priceRange: dict["priceRange"] as? String
         )
+        try validateAIPlace(place, against: content, sourceURLString: sourceURLString)
+        return place
     }
 
-    private func resolvedMapURLString(from urlString: String) async -> String? {
-        guard let url = URL(string: urlString),
-              isMapURL(url) else {
-            return nil
+    private func shareMetadata(from urlString: String) async -> ShareMetadata {
+        guard let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true else {
+            return ShareMetadata()
         }
 
         var request = URLRequest(url: url)
@@ -391,11 +410,113 @@ struct ShareExtensionView: View {
         request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
 
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            return response.url?.absoluteString ?? url.absoluteString
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let resolvedURL = response.url?.absoluteString ?? url.absoluteString
+            let html = String(data: data.prefix(200_000), encoding: .utf8) ?? ""
+            return ShareMetadata(
+                resolvedURL: resolvedURL,
+                title: metadataValue(in: html, keys: ["og:title", "twitter:title", "title"]),
+                description: metadataValue(in: html, keys: ["og:description", "twitter:description", "description"])
+            )
         } catch {
-            return url.absoluteString
+            return ShareMetadata(resolvedURL: url.absoluteString, title: nil, description: nil)
         }
+    }
+
+    private func metadataValue(in html: String, keys: [String]) -> String? {
+        guard !html.isEmpty else { return nil }
+
+        for key in keys {
+            if key == "title",
+               let start = html.range(of: "<title", options: [.caseInsensitive]),
+               let openEnd = html[start.upperBound...].range(of: ">"),
+               let close = html[openEnd.upperBound...].range(of: "</title>", options: [.caseInsensitive]) {
+                return cleanHTMLText(String(html[openEnd.upperBound..<close.lowerBound]))
+            }
+
+            let escapedKey = NSRegularExpression.escapedPattern(for: key)
+            let patterns = [
+                #"<meta[^>]+(?:property|name)=["']\#(escapedKey)["'][^>]+content=["']([^"']+)["'][^>]*>"#,
+                #"<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']\#(escapedKey)["'][^>]*>"#
+            ]
+
+            for pattern in patterns {
+                guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+                let range = NSRange(html.startIndex..<html.endIndex, in: html)
+                guard let match = regex.firstMatch(in: html, range: range),
+                      match.numberOfRanges > 1,
+                      let valueRange = Range(match.range(at: 1), in: html) else {
+                    continue
+                }
+                let value = cleanHTMLText(String(html[valueRange]))
+                if !value.isEmpty { return value }
+            }
+        }
+
+        return nil
+    }
+
+    private func cleanHTMLText(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func hasMeaningfulPlaceContext(_ content: String, sourceURLString: String) -> Bool {
+        guard let url = URL(string: sourceURLString),
+              isSocialURL(url) else {
+            return true
+        }
+
+        let withoutURLs = content
+            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\b[a-z0-9.-]+\.(com|net|cn|link)\S*"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let hasCityOrAddress = withoutURLs.range(of: #"(北京|上海|广州|深圳|成都|杭州|Tokyo|Beijing|Shanghai|Los Angeles|New York|San Francisco|\d{1,5}\s+\S+)"#, options: [.regularExpression, .caseInsensitive]) != nil
+        let hasEnoughText = withoutURLs.count >= 8
+        return hasCityOrAddress || hasEnoughText
+    }
+
+    private func validateAIPlace(_ place: ParsedPlace, against content: String, sourceURLString: String) throws {
+        guard isValidCoordinate(latitude: place.latitude, longitude: place.longitude) else {
+            throw NSError(domain: "wanderly", code: 6, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not find reliable coordinates for this post. Share the map link to save it accurately."])
+        }
+
+        let combinedPlace = "\(place.name) \(place.address)".lowercased()
+        let source = content.lowercased()
+        let conflicts = [
+            ("北京", "beijing", "上海", "shanghai"),
+            ("上海", "shanghai", "北京", "beijing")
+        ]
+
+        for (sourceChinese, sourceEnglish, wrongChinese, wrongEnglish) in conflicts {
+            let sourceMentionsCity = source.contains(sourceChinese) || source.contains(sourceEnglish)
+            let placeMentionsWrongCity = combinedPlace.contains(wrongChinese) || combinedPlace.contains(wrongEnglish)
+            if sourceMentionsCity && placeMentionsWrongCity {
+                throw NSError(domain: "wanderly", code: 7, userInfo: [NSLocalizedDescriptionKey: "The parsed place conflicts with the city in the post. Share the exact map link to avoid saving the wrong place."])
+            }
+        }
+
+        if let url = URL(string: sourceURLString), isSocialURL(url), place.name == "Unknown Place" {
+            throw NSError(domain: "wanderly", code: 8, userInfo: [NSLocalizedDescriptionKey: "Wanderly could not identify one exact place from this social post."])
+        }
+    }
+
+    private func isSocialURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "xhslink.com" ||
+            host.hasSuffix("xiaohongshu.com") ||
+            host.hasSuffix("instagram.com") ||
+            host.hasSuffix("threads.net") ||
+            host.hasSuffix("threads.com") ||
+            host.hasSuffix("tiktok.com") ||
+            host.hasSuffix("douyin.com")
     }
 
     private func deterministicMapPlace(from content: String, title: String, text: String) -> ParsedPlace? {
