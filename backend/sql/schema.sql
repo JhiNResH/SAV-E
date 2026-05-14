@@ -72,6 +72,56 @@ create table if not exists trip_stops (
 
 create index if not exists idx_trip_stops_trip_id on trip_stops(trip_id);
 
+create table if not exists captures (
+    id uuid primary key default gen_random_uuid(),
+    user_id text references profiles(id) on delete cascade not null,
+    source_type text not null default 'url',
+    source_url text,
+    raw_text text,
+    title text,
+    status text not null default 'review',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint captures_source_type_check check (source_type in ('url', 'note', 'screenshot', 'video', 'file', 'manual')),
+    constraint captures_status_check check (status in ('review', 'investigating', 'resolved', 'archived'))
+);
+
+create index if not exists idx_captures_user_id on captures(user_id, created_at desc);
+create index if not exists idx_captures_status on captures(user_id, status);
+
+create table if not exists place_candidates (
+    id uuid primary key default gen_random_uuid(),
+    capture_id uuid references captures(id) on delete cascade not null,
+    place_id uuid references places(id) on delete set null,
+    name text not null,
+    address text not null default '',
+    city text not null default '',
+    latitude double precision,
+    longitude double precision,
+    evidence jsonb not null default '[]'::jsonb,
+    confidence double precision not null default 0,
+    missing_info text[] not null default '{}',
+    status text not null default 'review',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint place_candidates_confidence_check check (confidence >= 0 and confidence <= 1),
+    constraint place_candidates_status_check check (status in ('review', 'confirmed', 'rejected', 'saved', 'needs_more_evidence'))
+);
+
+create index if not exists idx_place_candidates_capture_id on place_candidates(capture_id);
+create index if not exists idx_place_candidates_status on place_candidates(status);
+
+create table if not exists agent_decisions (
+    id uuid primary key default gen_random_uuid(),
+    candidate_id uuid references place_candidates(id) on delete cascade not null,
+    action text not null,
+    reason text,
+    created_at timestamptz not null default now(),
+    constraint agent_decisions_action_check check (action in ('confirmed', 'rejected', 'saved_place', 'added_to_trip', 'needs_more_evidence'))
+);
+
+create index if not exists idx_agent_decisions_candidate_id on agent_decisions(candidate_id);
+
 create table if not exists collections (
     id uuid primary key default gen_random_uuid(),
     user_id text references profiles(id) on delete cascade not null,
@@ -118,4 +168,12 @@ create trigger update_places_updated_at before update on places
 
 drop trigger if exists update_trips_updated_at on trips;
 create trigger update_trips_updated_at before update on trips
+    for each row execute procedure update_updated_at();
+
+drop trigger if exists update_captures_updated_at on captures;
+create trigger update_captures_updated_at before update on captures
+    for each row execute procedure update_updated_at();
+
+drop trigger if exists update_place_candidates_updated_at on place_candidates;
+create trigger update_place_candidates_updated_at before update on place_candidates
     for each row execute procedure update_updated_at();
