@@ -374,12 +374,12 @@ struct AIDrawerView: View {
                 }
 
                 AddSpotCard(
-                    icon: "photo.on.rectangle.angled",
-                    title: "Screenshots",
-                    subtitle: "Extract visible place text",
+                    icon: "doc.viewfinder",
+                    title: "Media Evidence",
+                    subtitle: "Investigate video or screenshots",
                     tone: .blue
                 ) {
-                    showScreenshotGuide()
+                    focusMediaEvidencePrompt()
                 }
 
                 AddSpotCard(
@@ -428,12 +428,16 @@ struct AIDrawerView: View {
         )
     }
 
-    private func showScreenshotGuide() {
-        addSpotStatus = nil
-        viewModel.showMessage(
-            title: "Screenshots",
-            message: "Screenshot import should stay in review until SAV-E can read visible place text and confirm a real location. For now, share the original link or paste the place name into the agent."
-        )
+    private func focusMediaEvidencePrompt() {
+        addSpotStatus = "Media evidence results stay as review candidates until you choose a place."
+        focusAgentPrompt("""
+        Investigate this video or screenshot and return candidate places with evidence.
+
+        Use only evidence from the shared media, pasted caption/link, and reliable cross-checks.
+        Return likely place candidates, evidence for each candidate, confidence, what is missing, and whether it is safe to save.
+
+        Do not save anything automatically.
+        """)
     }
 
     private func importClipboardURL() {
