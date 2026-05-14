@@ -155,6 +155,45 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    func saveImportedPlaces(_ drafts: [ImportedPlaceDraft]) async throws -> GoogleTakeoutSaveSummary {
+        guard let userId = authService.currentUserId else {
+            throw SupabaseError.notAuthenticated
+        }
+
+        let existingKeys = Set(places.map(\.importDeduplicationKey))
+        var batchKeys: Set<String> = []
+        var savedPlaces: [Place] = []
+        var skippedDuplicates = 0
+        var reviewDrafts = 0
+
+        for draft in drafts {
+            guard let place = draft.toPlace() else {
+                reviewDrafts += 1
+                continue
+            }
+
+            let key = draft.deduplicationKey
+            guard !existingKeys.contains(key), !batchKeys.contains(key) else {
+                skippedDuplicates += 1
+                continue
+            }
+
+            try await supabaseService.savePlace(place, userId: userId)
+            batchKeys.insert(key)
+            savedPlaces.append(place)
+        }
+
+        if !savedPlaces.isEmpty {
+            places = savedPlaces + places
+        }
+
+        return GoogleTakeoutSaveSummary(
+            saved: savedPlaces.count,
+            skippedDuplicates: skippedDuplicates,
+            reviewDrafts: reviewDrafts
+        )
+    }
+
     // MARK: - Apply AI map action
 
     func apply(_ action: MapActionData) {
