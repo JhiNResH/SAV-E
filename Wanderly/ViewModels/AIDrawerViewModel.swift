@@ -23,7 +23,7 @@ final class AIDrawerViewModel: ObservableObject {
         let timestamp: Date
     }
 
-    @Published var places: [Place] = Place.mockList
+    @Published var places: [Place] = []
 
     private let aiService: WanderlyAIService
 

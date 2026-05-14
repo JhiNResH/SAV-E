@@ -35,6 +35,20 @@ final class WanderlyAIService {
     }
 
     func query(_ userMessage: String, places: [Place], conversationHistory: [ConversationTurn] = []) async throws -> WanderlyAIResponse {
+        guard !places.isEmpty else {
+            return WanderlyAIResponse(
+                componentType: .message,
+                title: nil,
+                placeIds: [],
+                navigationPlaceId: nil,
+                transportMode: .walking,
+                itineraryDays: [],
+                messageText: "No saved places are loaded yet. Save or import places first, then ask me to plan.",
+                mapAction: nil,
+                aiMessage: nil
+            )
+        }
+
         if let localResponse = localIntentResponse(for: userMessage, places: places) {
             return localResponse
         }
@@ -175,6 +189,8 @@ final class WanderlyAIService {
         - On the FIRST request, take action immediately. Generate itineraries, lists, or navigation using the saved places. Do NOT ask clarifying questions on the first message.
         - On FOLLOW-UP messages, refine the previous result. For example: "add more food spots", "swap day 1 and 2", "make it 3 days instead". Build on the previous JSON response.
         - When refining, output the COMPLETE updated JSON (not just the diff).
+        - Do NOT assume the user is in San Francisco or any default city. Infer the trip region only from the user's message plus saved place names, addresses, latitudes, and longitudes.
+        - Saved places may be in any city. Disneyland, Universal Studios, Los Angeles, Anaheim, Tokyo, or any other region are valid planning targets if they appear in SAVED PLACES.
 
         RESPONSE SCHEMA:
         {
@@ -203,6 +219,8 @@ final class WanderlyAIService {
 
         RULES:
         - For itinerary requests: use saved places to build a realistic schedule with smart times and geographic order.
+        - For destination-specific requests, choose saved places whose name/address matches the destination or whose coordinates are geographically near the matching anchor places.
+        - If the saved places are far apart, still plan them honestly with realistic travel notes instead of rejecting them as "not in San Francisco".
         - placeList: set placeIds + mapAction.filterPins with same ids
         - navigationCard: set navigationPlaceId + transportMode + mapAction.focusRegion to that place's lat/lng
         - tripItinerary: set itineraryDays + placeIds (all stop ids) + mapAction.showRoute
