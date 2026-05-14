@@ -39,7 +39,7 @@ final class GoogleTakeoutImportService {
         let ext = url.pathExtension.lowercased()
 
         if ext == "zip" {
-            guard let archive = try? Archive(url: url, accessMode: .read) else {
+            guard let archive = try? Archive(url: url, accessMode: .read, pathEncoding: nil) else {
                 throw GoogleTakeoutImportError.unreadableFile
             }
 
