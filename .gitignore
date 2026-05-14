@@ -57,6 +57,7 @@ Thumbs.db
 .idea/
 *.hmap
 *.ipa
+*.xcarchive
 *.dSYM.zip
 *.dSYM
 .vercel

@@ -268,12 +268,26 @@ struct ShareExtensionView: View {
             return
         }
 
-        // Parse with Gemini
+        let parseContent = await resolvedMapURLString(from: sharedURL).flatMap { $0.isEmpty ? nil : $0 } ?? content
+
+        if let mapPlace = deterministicMapPlace(from: parseContent, title: sharedTitle, text: sharedText) {
+            parsedPlace = mapPlace
+            selectedCategory = mapPlace.category
+            isParsing = false
+            return
+        }
+
+        let aiContent = [sharedTitle, sharedText, parseContent]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+        // Parse with Gemini only when the shared URL does not contain usable map coordinates.
         do {
-            parsedPlace = try await parseWithGemini(content: content)
+            parsedPlace = try await parseWithGemini(content: aiContent)
             selectedCategory = parsedPlace?.category ?? "food"
         } catch {
-            if let fallback = fallbackPlace(from: content, title: sharedTitle, text: sharedText) {
+            if let fallback = fallbackPlace(from: parseContent, title: sharedTitle, text: sharedText) {
                 parsedPlace = fallback
                 selectedCategory = fallback.category
             } else {
@@ -363,6 +377,132 @@ struct ShareExtensionView: View {
             dishes: dict["dishes"] as? [String] ?? [],
             priceRange: dict["priceRange"] as? String
         )
+    }
+
+    private func resolvedMapURLString(from urlString: String) async -> String? {
+        guard let url = URL(string: urlString),
+              isMapURL(url) else {
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return response.url?.absoluteString ?? url.absoluteString
+        } catch {
+            return url.absoluteString
+        }
+    }
+
+    private func deterministicMapPlace(from content: String, title: String, text: String) -> ParsedPlace? {
+        guard let url = URL(string: content),
+              isMapURL(url),
+              let coordinates = mapCoordinates(from: url) else {
+            return nil
+        }
+
+        let name = bestMapName(from: url, title: title, text: text)
+        guard !name.isEmpty else { return nil }
+
+        let address = mapAddress(from: url, text: text)
+        let category = fallbackCategory(from: [name, address, text].joined(separator: " "))
+
+        return ParsedPlace(
+            name: name,
+            address: address,
+            category: category,
+            iconName: iconForCategory(category),
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude,
+            dishes: [],
+            priceRange: nil
+        )
+    }
+
+    private func isMapURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        if host == "maps.apple.com" { return true }
+        if host == "maps.app.goo.gl" || host == "goo.gl" || host == "g.co" { return true }
+        if host == "maps.google.com" { return true }
+        return (host == "google.com" || host.hasSuffix(".google.com")) && url.path.lowercased().hasPrefix("/maps")
+    }
+
+    private func mapCoordinates(from url: URL) -> (latitude: Double, longitude: Double)? {
+        let full = [url.path, url.query ?? "", url.fragment ?? ""].joined(separator: "?")
+
+        if let match = full.firstMatch(of: #/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/#),
+           let lat = Double(match.1),
+           let lng = Double(match.2),
+           isValidCoordinate(latitude: lat, longitude: lng) {
+            return (lat, lng)
+        }
+
+        if let match = full.firstMatch(of: #/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/#),
+           let lat = Double(match.1),
+           let lng = Double(match.2),
+           isValidCoordinate(latitude: lat, longitude: lng) {
+            return (lat, lng)
+        }
+
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        for key in ["ll", "sll", "center"] {
+            if let value = components?.queryItems?.first(where: { $0.name == key })?.value,
+               let coordinate = coordinatePair(from: value) {
+                return coordinate
+            }
+        }
+
+        if let q = components?.queryItems?.first(where: { $0.name == "q" })?.value,
+           let coordinate = coordinatePair(from: q) {
+            return coordinate
+        }
+
+        return nil
+    }
+
+    private func coordinatePair(from value: String) -> (latitude: Double, longitude: Double)? {
+        let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = cleaned.split(separator: ",", maxSplits: 1).map { String($0) }
+        guard parts.count == 2,
+              let lat = Double(parts[0]),
+              let lng = Double(parts[1]),
+              isValidCoordinate(latitude: lat, longitude: lng) else {
+            return nil
+        }
+        return (lat, lng)
+    }
+
+    private func isValidCoordinate(latitude: Double, longitude: Double) -> Bool {
+        latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 && !(latitude == 0 && longitude == 0)
+    }
+
+    private func bestMapName(from url: URL, title: String, text: String) -> String {
+        for candidate in [cleanFallbackName(title), queryName(from: url.absoluteString), cleanFallbackName(text)] {
+            let cleaned = cleanFallbackName(candidate)
+            if !cleaned.isEmpty,
+               !cleaned.hasPrefix("http://"),
+               !cleaned.hasPrefix("https://"),
+               !cleaned.contains("@") {
+                return cleaned
+            }
+        }
+        return ""
+    }
+
+    private func mapAddress(from url: URL, text: String) -> String {
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        for key in ["address", "daddr", "destination"] {
+            if let value = components?.queryItems?.first(where: { $0.name == key })?.value,
+               coordinatePair(from: value) == nil,
+               !value.isEmpty {
+                return value
+            }
+        }
+        return fallbackAddress(from: text)
     }
 
     private func fallbackPlace(from content: String, title: String, text: String) -> ParsedPlace? {
