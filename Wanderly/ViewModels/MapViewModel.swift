@@ -14,20 +14,25 @@ final class MapViewModel: ObservableObject {
     @Published var activeFilter: Set<UUID>?       // nil = show all
     @Published var routeCoordinates: [CLLocationCoordinate2D] = []
     @Published var isLoading = false
+    @Published var isLocatingUser = false
     @Published var calculatedRoute: MKPolyline?
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
     private let pendingImportService: PendingPlaceImportService
+    private let locationService: LocationService
     private var importedPendingKeys: Set<String> = []
+    private var didRequestInitialLocation = false
 
     init(
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
-        pendingImportService: PendingPlaceImportService = .shared
+        pendingImportService: PendingPlaceImportService = .shared,
+        locationService: LocationService? = nil
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
         self.pendingImportService = pendingImportService
+        self.locationService = locationService ?? .shared
     }
 
     // MARK: - Computed
@@ -145,6 +150,25 @@ final class MapViewModel: ObservableObject {
 
     func selectPlace(_ place: Place) {
         selectedPlace = place
+    }
+
+    func focusOnUserLocationOnLaunch() async {
+        guard !didRequestInitialLocation else { return }
+        didRequestInitialLocation = true
+        await focusOnUserLocation()
+    }
+
+    func focusOnUserLocation() async {
+        guard !isLocatingUser else { return }
+        isLocatingUser = true
+        defer { isLocatingUser = false }
+
+        guard let location = await locationService.requestCurrentLocation() else { return }
+
+        cameraPosition = .region(MKCoordinateRegion(
+            center: location.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+        ))
     }
 
     func toggleCategory(_ category: PlaceCategory) {
