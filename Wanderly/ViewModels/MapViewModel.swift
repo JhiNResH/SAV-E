@@ -2,6 +2,17 @@ import Foundation
 import MapKit
 import SwiftUI
 
+enum ReviewCandidateError: LocalizedError {
+    case needsReliableCoordinates
+
+    var errorDescription: String? {
+        switch self {
+        case .needsReliableCoordinates:
+            return "This candidate needs Google Places refinement or a map link before it can be saved."
+        }
+    }
+}
+
 @MainActor
 final class MapViewModel: ObservableObject {
     @Published var places: [Place] = []
@@ -16,23 +27,27 @@ final class MapViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isLocatingUser = false
     @Published var calculatedRoute: MKPolyline?
+    @Published var reviewCandidates: [PlaceReviewCandidate] = []
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
     private let pendingImportService: PendingPlaceImportService
     private let locationService: LocationService
+    private let googlePlacesService: GooglePlacesServiceProtocol
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
 
     init(
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
         pendingImportService: PendingPlaceImportService = .shared,
-        locationService: LocationService? = nil
+        locationService: LocationService? = nil,
+        googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
         self.pendingImportService = pendingImportService
         self.locationService = locationService ?? .shared
+        self.googlePlacesService = googlePlacesService
     }
 
     // MARK: - Computed
@@ -65,12 +80,18 @@ final class MapViewModel: ObservableObject {
 
         guard let userId = authService.currentUserId else {
             importPendingPlacesForLocalUse()
+            reviewCandidates = []
             return
         }
 
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
             try await importPendingReviewCandidates(for: userId)
+            do {
+                try await refreshReviewCandidates()
+            } catch {
+                print("MapViewModel: failed to fetch review candidates: \(error)")
+            }
             try await importPendingPlaces(for: userId)
         } catch {
             print("MapViewModel: failed to load places: \(error)")
@@ -153,6 +174,61 @@ final class MapViewModel: ObservableObject {
         }
 
         pendingImportService.restorePendingReviewCandidates(failedCandidates)
+    }
+
+    func refreshReviewCandidates() async throws {
+        let candidates = try await supabaseService.fetchReviewCandidates()
+        reviewCandidates = candidates.filter { candidate in
+            candidate.status == "review" || candidate.status == "confirmed"
+        }
+    }
+
+    func confirmReviewCandidate(_ candidate: PlaceReviewCandidate) async throws {
+        try await supabaseService.updatePlaceCandidateStatus(candidate.id, status: "confirmed", placeId: nil)
+        updateLocalCandidate(candidate.id, status: "confirmed")
+    }
+
+    func rejectReviewCandidate(_ candidate: PlaceReviewCandidate) async throws {
+        try await supabaseService.updatePlaceCandidateStatus(candidate.id, status: "rejected", placeId: nil)
+        reviewCandidates.removeAll { $0.id == candidate.id }
+    }
+
+    func saveReviewCandidateAsPlace(_ candidate: PlaceReviewCandidate) async throws {
+        guard let userId = authService.currentUserId else {
+            throw SupabaseError.notAuthenticated
+        }
+
+        let refinedMatch = try await refinedMatchIfNeeded(for: candidate)
+        let place = Place.from(candidate, refinedMatch: refinedMatch)
+
+        guard place.latitude != 0 || place.longitude != 0 else {
+            throw ReviewCandidateError.needsReliableCoordinates
+        }
+
+        try await supabaseService.savePlace(place, userId: userId)
+        try await supabaseService.updatePlaceCandidateStatus(candidate.id, status: "saved", placeId: place.id)
+        places = [place] + places
+        reviewCandidates.removeAll { $0.id == candidate.id }
+        revealImportedPlaces([place])
+    }
+
+    private func refinedMatchIfNeeded(for candidate: PlaceReviewCandidate) async throws -> GooglePlaceMatch? {
+        guard !candidate.hasReliableCoordinates else { return nil }
+
+        let query = candidate.refinementQuery
+        guard !query.isEmpty else {
+            throw ReviewCandidateError.needsReliableCoordinates
+        }
+
+        guard let match = try await googlePlacesService.searchPlace(query: query, near: nil).first else {
+            throw ReviewCandidateError.needsReliableCoordinates
+        }
+        return match
+    }
+
+    private func updateLocalCandidate(_ candidateId: UUID, status: String) {
+        guard let index = reviewCandidates.firstIndex(where: { $0.id == candidateId }) else { return }
+        reviewCandidates[index].status = status
     }
 
     private func revealImportedPlaces(_ importedPlaces: [Place]) {

@@ -31,6 +31,35 @@ struct PendingReviewCandidate: Codable {
     var savedAt: Date
 }
 
+struct PlaceReviewCandidate: Identifiable, Codable, Hashable {
+    var id: UUID
+    var captureId: UUID?
+    var name: String
+    var address: String
+    var city: String?
+    var latitude: Double?
+    var longitude: Double?
+    var evidence: [String]
+    var confidence: Double?
+    var missingInfo: [String]
+    var status: String
+    var createdAt: Date
+
+    var hasReliableCoordinates: Bool {
+        guard let latitude, let longitude else { return false }
+        return latitude != 0 || longitude != 0
+    }
+
+    var refinementQuery: String {
+        [name, address, city]
+            .compactMap { value in
+                let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed?.isEmpty == false ? trimmed : nil
+            }
+            .joined(separator: " ")
+    }
+}
+
 final class PendingPlaceImportService {
     static let shared = PendingPlaceImportService()
 
@@ -121,6 +150,31 @@ extension Place {
         )
     }
 
+    static func from(_ candidate: PlaceReviewCandidate, refinedMatch: GooglePlaceMatch? = nil) -> Place {
+        Place(
+            id: UUID(),
+            name: refinedMatch?.name ?? candidate.name,
+            address: refinedMatch?.address ?? candidate.address,
+            latitude: refinedMatch?.latitude ?? candidate.latitude ?? 0,
+            longitude: refinedMatch?.longitude ?? candidate.longitude ?? 0,
+            googlePlaceId: refinedMatch?.id,
+            category: PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)"),
+            status: .wantToGo,
+            rating: nil,
+            note: candidate.evidence.joined(separator: "\n"),
+            sourceUrl: nil,
+            sourcePlatform: .other,
+            sourceImageUrl: nil,
+            extractedDishes: nil,
+            priceRange: nil,
+            recommender: nil,
+            googleRating: refinedMatch?.rating,
+            googlePriceLevel: refinedMatch?.priceLevel,
+            openingHours: nil,
+            createdAt: Date()
+        )
+    }
+
     var pendingDeduplicationKey: String {
         if let normalizedSourceURL = sourceUrl?.normalizedDeduplicationURLString() {
             return normalizedSourceURL
@@ -142,6 +196,28 @@ extension Place {
             address == other.address &&
             sourceUrl == other.sourceUrl
         )
+    }
+}
+
+extension PlaceCategory {
+    static func inferred(from content: String) -> PlaceCategory {
+        let lowercased = content.lowercased()
+        if lowercased.range(of: #"cafe|coffee|bakery|tea|boba"#, options: .regularExpression) != nil {
+            return .cafe
+        }
+        if lowercased.range(of: #"bar|cocktail|wine|brew"#, options: .regularExpression) != nil {
+            return .bar
+        }
+        if lowercased.range(of: #"hotel|stay|resort|villa"#, options: .regularExpression) != nil {
+            return .stay
+        }
+        if lowercased.range(of: #"shop|store|market"#, options: .regularExpression) != nil {
+            return .shopping
+        }
+        if lowercased.range(of: #"museum|park|event|gallery|festival|summit|conference|resort"#, options: .regularExpression) != nil {
+            return .attraction
+        }
+        return .food
     }
 }
 

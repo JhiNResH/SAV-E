@@ -13,11 +13,21 @@ struct ContentView: View {
                     viewModel: drawerVM,
                     drawerDetent: $drawerDetent,
                     existingPlacesForImport: mapVM.places,
+                    reviewCandidates: mapVM.reviewCandidates,
                     onSaveGoogleTakeoutImport: { drafts in
                         try await mapVM.saveImportedPlaces(drafts)
                     },
                     onDeletePlace: { place in
                         try await mapVM.deletePlace(place)
+                    },
+                    onConfirmCandidate: { candidate in
+                        try await mapVM.confirmReviewCandidate(candidate)
+                    },
+                    onRejectCandidate: { candidate in
+                        try await mapVM.rejectReviewCandidate(candidate)
+                    },
+                    onSaveCandidate: { candidate in
+                        try await mapVM.saveReviewCandidateAsPlace(candidate)
                     }
                 )
                     .presentationDetents([.height(72), .medium, .large], selection: $drawerDetent)
@@ -41,6 +51,7 @@ struct ContentView: View {
             }
             .task {
                 drawerVM.places = mapVM.places
+                await mapVM.loadPlaces()
             }
     }
 }
