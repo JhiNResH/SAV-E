@@ -9,6 +9,8 @@ protocol SupabaseServiceProtocol {
     func deletePlace(_ placeId: UUID) async throws
     func createMemoryCapture(from candidate: PendingReviewCandidate, userId: String) async throws -> UUID
     func createPlaceCandidate(_ candidate: PendingReviewCandidate, captureId: UUID, userId: String) async throws
+    func fetchReviewCandidates() async throws -> [PlaceReviewCandidate]
+    func updatePlaceCandidateStatus(_ candidateId: UUID, status: String, placeId: UUID?) async throws
     func fetchTrips(for userId: String) async throws -> [Trip]
     func saveTrip(_ trip: Trip, userId: String) async throws
     func updateTrip(_ trip: Trip) async throws
@@ -140,6 +142,25 @@ final class SupabaseService: SupabaseServiceProtocol {
             "status": "review",
         ])
         try await request(path: "/memory/candidates", method: "POST", body: body)
+    }
+
+    func fetchReviewCandidates() async throws -> [PlaceReviewCandidate] {
+        guard isConfigured else { return [] }
+
+        let data = try await request(path: "/memory/candidates")
+        let rows = try JSONDecoder.supabase.decode([PlaceCandidateRow].self, from: data)
+        return rows.map { $0.toCandidate() }
+    }
+
+    func updatePlaceCandidateStatus(_ candidateId: UUID, status: String, placeId: UUID? = nil) async throws {
+        guard isConfigured else { return }
+
+        var values: [String: Any?] = ["status": status]
+        if let placeId {
+            values["place_id"] = placeId.uuidString
+        }
+        let body = try Self.jsonBody(values)
+        try await request(path: "/memory/candidates/\(candidateId)", method: "PATCH", body: body)
     }
 
     // MARK: - Trips
@@ -321,6 +342,42 @@ private struct PlaceRow: Codable {
 
 private struct MemoryCaptureRow: Codable {
     let id: UUID
+}
+
+private struct PlaceCandidateRow: Codable {
+    let id: UUID
+    let capture_id: UUID?
+    let name: String
+    let address: String?
+    let city: String?
+    let latitude: Double?
+    let longitude: Double?
+    let evidence: [PlaceCandidateEvidenceRow]?
+    let confidence: Double?
+    let missing_info: [String]?
+    let status: String
+    let created_at: String
+
+    func toCandidate() -> PlaceReviewCandidate {
+        PlaceReviewCandidate(
+            id: id,
+            captureId: capture_id,
+            name: name,
+            address: address ?? "",
+            city: city,
+            latitude: latitude,
+            longitude: longitude,
+            evidence: (evidence ?? []).compactMap(\.text),
+            confidence: confidence,
+            missingInfo: missing_info ?? [],
+            status: status,
+            createdAt: ISO8601DateFormatter().date(from: created_at) ?? Date()
+        )
+    }
+}
+
+private struct PlaceCandidateEvidenceRow: Codable {
+    let text: String?
 }
 
 private struct TripRow: Codable {

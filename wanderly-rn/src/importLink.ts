@@ -1,6 +1,7 @@
 import { Place, PlaceCategory, SourcePlatform } from "./models";
 
 const coordinatePattern = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const unresolvedCoordinates: [number, number] = [0, 0];
 
 export function parseSharedLink(input: string): Place | null {
   const normalized = normalizeInput(input);
@@ -61,11 +62,12 @@ function buildGoogleMapsPlace(url: URL): Place {
       "Shared Google Maps Place"
   );
   const [latitude, longitude] = extractCoordinates(url);
+  const hasResolvedCoordinates = hasUsableCoordinates(latitude, longitude);
   const address = decodeSegment(
     url.searchParams.get("daddr") ||
       url.searchParams.get("destination") ||
       extractAddressCandidate(url) ||
-      "Imported from Google Maps"
+      "Review candidate from Google Maps"
   );
 
   return buildPlace({
@@ -76,8 +78,10 @@ function buildGoogleMapsPlace(url: URL): Place {
     category: inferCategory(`${name} ${address}`),
     sourcePlatform: "googleMaps",
     sourceUrl: url.toString(),
-    note: "Imported from a Google Maps link.",
-    importKind: "place",
+    note: hasResolvedCoordinates
+      ? "Imported from a Google Maps link."
+      : "Google Maps link did not include reliable coordinates. Confirm the map result before saving.",
+    importKind: hasResolvedCoordinates ? "place" : "draft",
   });
 }
 
@@ -90,6 +94,7 @@ function buildAppleMapsPlace(url: URL): Place {
       "Imported from Apple Maps"
   );
   const [latitude, longitude] = extractCoordinates(url);
+  const hasResolvedCoordinates = hasUsableCoordinates(latitude, longitude);
 
   return buildPlace({
     name: cleanName(decodeSegment(query || "Shared Apple Maps Place")),
@@ -99,8 +104,10 @@ function buildAppleMapsPlace(url: URL): Place {
     category: inferCategory(`${query ?? ""} ${address}`),
     sourcePlatform: "appleMaps",
     sourceUrl: url.toString(),
-    note: "Imported from an Apple Maps link.",
-    importKind: "place",
+    note: hasResolvedCoordinates
+      ? "Imported from an Apple Maps link."
+      : "Apple Maps link did not include reliable coordinates. Confirm the map result before saving.",
+    importKind: hasResolvedCoordinates ? "place" : "draft",
   });
 }
 
@@ -112,9 +119,9 @@ function buildEventPlace(url: URL, sourcePlatform: SourcePlatform): Place {
 
   return buildPlace({
     name: venueName,
-    address: city ? `${city} event` : "Imported event link",
-    latitude: 37.7749,
-    longitude: -122.4194,
+    address: city ? `Review candidate from ${city} event link` : "Review candidate from event link",
+    latitude: unresolvedCoordinates[0],
+    longitude: unresolvedCoordinates[1],
     category: "attraction",
     sourcePlatform,
     sourceUrl: url.toString(),
@@ -130,9 +137,9 @@ function buildGenericPlace(url: URL): Place {
 
   return buildPlace({
     name,
-    address: url.hostname,
-    latitude: 37.7749,
-    longitude: -122.4194,
+    address: `Review candidate from ${url.hostname}`,
+    latitude: unresolvedCoordinates[0],
+    longitude: unresolvedCoordinates[1],
     category: inferCategory(name),
     sourcePlatform: "other",
     sourceUrl: url.toString(),
@@ -148,8 +155,8 @@ function buildSocialPlace(url: URL, sourcePlatform: SourcePlatform): Place {
   return buildPlace({
     name: cleanName(name),
     address: `Review candidate from ${sourcePlatformLabel(sourcePlatform)}`,
-    latitude: 0,
-    longitude: 0,
+    latitude: unresolvedCoordinates[0],
+    longitude: unresolvedCoordinates[1],
     category: inferCategory(name),
     sourcePlatform,
     sourceUrl: url.toString(),
@@ -187,7 +194,11 @@ function extractCoordinates(url: URL): [number, number] {
     if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
   }
 
-  return [37.7749, -122.4194];
+  return unresolvedCoordinates;
+}
+
+function hasUsableCoordinates(latitude: number, longitude: number): boolean {
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && (latitude !== 0 || longitude !== 0);
 }
 
 function extractPlaceSegment(pathname: string): string | null {

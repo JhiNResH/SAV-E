@@ -5,13 +5,18 @@ struct AIDrawerView: View {
     @ObservedObject var viewModel: AIDrawerViewModel
     @Binding var drawerDetent: PresentationDetent
     var existingPlacesForImport: [Place] = []
+    var reviewCandidates: [PlaceReviewCandidate] = []
     var onSaveGoogleTakeoutImport: ([ImportedPlaceDraft]) async throws -> GoogleTakeoutSaveSummary = { _ in
         GoogleTakeoutSaveSummary(saved: 0, skippedDuplicates: 0, reviewDrafts: 0)
     }
     var onDeletePlace: (Place) async throws -> Void = { _ in }
+    var onConfirmCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
+    var onRejectCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
+    var onSaveCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     @FocusState private var searchFocused: Bool
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
+    @State private var candidateActionInFlight: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -430,7 +435,25 @@ struct AIDrawerView: View {
                 }
             }
 
-            ReviewCandidatesEmptyState()
+            ReviewCandidatesSection(
+                candidates: reviewCandidates,
+                actionInFlight: candidateActionInFlight,
+                onConfirm: { candidate in
+                    performCandidateAction(candidate, successMessage: "Candidate confirmed. Save it once the coordinates are reliable.") {
+                        try await onConfirmCandidate(candidate)
+                    }
+                },
+                onReject: { candidate in
+                    performCandidateAction(candidate, successMessage: "Candidate rejected.") {
+                        try await onRejectCandidate(candidate)
+                    }
+                },
+                onSave: { candidate in
+                    performCandidateAction(candidate, successMessage: "Saved as a place.") {
+                        try await onSaveCandidate(candidate)
+                    }
+                }
+            )
 
             if let addSpotStatus {
                 Text(addSpotStatus)
@@ -501,6 +524,23 @@ struct AIDrawerView: View {
         """)
     }
 
+    private func performCandidateAction(
+        _ candidate: PlaceReviewCandidate,
+        successMessage: String,
+        action: @escaping () async throws -> Void
+    ) {
+        candidateActionInFlight = candidate.id
+        Task {
+            do {
+                try await action()
+                addSpotStatus = successMessage
+            } catch {
+                addSpotStatus = error.localizedDescription
+            }
+            candidateActionInFlight = nil
+        }
+    }
+
     private func focusAgentPrompt(_ prompt: String) {
         viewModel.startNewConversation()
         viewModel.query = prompt
@@ -521,6 +561,46 @@ struct AIDrawerView: View {
     }
 }
 
+private struct ReviewCandidatesSection: View {
+    var candidates: [PlaceReviewCandidate]
+    var actionInFlight: UUID?
+    var onConfirm: (PlaceReviewCandidate) -> Void
+    var onReject: (PlaceReviewCandidate) -> Void
+    var onSave: (PlaceReviewCandidate) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Review candidates", systemImage: "checklist.unchecked")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.wanderlyCharcoal)
+
+                Spacer()
+
+                Text("\(candidates.count)")
+                    .font(.caption.monospacedDigit())
+                    .fontWeight(.semibold)
+                    .foregroundColor(.wanderlyTerracotta)
+            }
+
+            if candidates.isEmpty {
+                ReviewCandidatesEmptyState()
+            } else {
+                ForEach(candidates.prefix(4)) { candidate in
+                    ReviewCandidateCard(
+                        candidate: candidate,
+                        isWorking: actionInFlight == candidate.id,
+                        onConfirm: { onConfirm(candidate) },
+                        onReject: { onReject(candidate) },
+                        onSave: { onSave(candidate) }
+                    )
+                }
+            }
+        }
+    }
+}
+
 private struct ReviewCandidatesEmptyState: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -532,12 +612,12 @@ private struct ReviewCandidatesEmptyState: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Review candidates")
+                Text("No pending candidates")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.wanderlyCharcoal)
 
-                Text("Investigations land here conceptually first: evidence, confidence, missing details, then a user-confirmed save.")
+                Text("Shared links, media evidence, and unresolved imports will land here for confirmation before they become saved places.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -554,6 +634,102 @@ private struct ReviewCandidatesEmptyState: View {
                         .stroke(Color.wanderlyCharcoal.opacity(0.07), style: StrokeStyle(lineWidth: 1, dash: [5]))
                 )
         )
+    }
+}
+
+private struct ReviewCandidateCard: View {
+    var candidate: PlaceReviewCandidate
+    var isWorking: Bool
+    var onConfirm: () -> Void
+    var onReject: () -> Void
+    var onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: candidate.hasReliableCoordinates ? "mappin.and.ellipse" : "location.slash")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(candidate.hasReliableCoordinates ? .wanderlySage : .wanderlyAmber)
+                    .frame(width: 34, height: 34)
+                    .background((candidate.hasReliableCoordinates ? Color.wanderlySage : Color.wanderlyAmber).opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(candidate.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.wanderlyCharcoal)
+                        .lineLimit(2)
+
+                    Text(candidate.address.isEmpty ? "Needs address or map link" : candidate.address)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+
+                    if let confidence = candidate.confidence {
+                        Text("Confidence \(Int(confidence * 100))% · \(candidate.status)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if let evidence = candidate.evidence.first {
+                Text(evidence)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            if !candidate.hasReliableCoordinates {
+                Text("Saving requires Google Places refinement or a map link.")
+                    .font(.caption2)
+                    .foregroundColor(.wanderlyTerracotta)
+            }
+
+            HStack(spacing: 8) {
+                CandidateActionButton(title: "Confirm", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
+                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Save" : "Refine + Save", systemImage: "tray.and.arrow.down", disabled: isWorking, action: onSave)
+                CandidateActionButton(title: "Reject", systemImage: "xmark", disabled: isWorking, action: onReject)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.68))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.wanderlyCharcoal.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .opacity(isWorking ? 0.65 : 1)
+    }
+}
+
+private struct CandidateActionButton: View {
+    var title: String
+    var systemImage: String
+    var disabled: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.wanderlyTerracotta)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .background(Color.wanderlyTerracotta.opacity(0.09))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 }
 
