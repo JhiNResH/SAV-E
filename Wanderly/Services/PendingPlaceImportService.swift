@@ -3,6 +3,7 @@ import Foundation
 enum WanderlySharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
     static let pendingPlacesKey = "pendingPlaces"
+    static let pendingReviewCandidatesKey = "pendingReviewCandidates"
 }
 
 struct PendingSharedPlace: Codable {
@@ -15,6 +16,18 @@ struct PendingSharedPlace: Codable {
     var priceRange: String?
     var sourceURL: String?
     var sourceText: String?
+    var savedAt: Date
+}
+
+struct PendingReviewCandidate: Codable {
+    var candidateName: String
+    var address: String
+    var category: String
+    var sourceURL: String?
+    var sourceText: String?
+    var evidence: [String]
+    var confidence: Double
+    var missingInfo: [String]
     var savedAt: Date
 }
 
@@ -40,6 +53,19 @@ final class PendingPlaceImportService {
         save(existing + places)
     }
 
+    func consumePendingReviewCandidates() -> [PendingReviewCandidate] {
+        guard let defaults else { return [] }
+        let pending = loadPendingReviewCandidates()
+        defaults.removeObject(forKey: WanderlySharedStorage.pendingReviewCandidatesKey)
+        return pending
+    }
+
+    func restorePendingReviewCandidates(_ candidates: [PendingReviewCandidate]) {
+        guard !candidates.isEmpty else { return }
+        let existing = loadPendingReviewCandidates()
+        saveReviewCandidates(existing + candidates)
+    }
+
     private func loadPendingPlaces() -> [PendingSharedPlace] {
         guard let defaults else { return [] }
         guard let data = defaults.data(forKey: WanderlySharedStorage.pendingPlacesKey) else {
@@ -52,6 +78,20 @@ final class PendingPlaceImportService {
         guard let defaults else { return }
         guard let data = try? JSONEncoder().encode(places) else { return }
         defaults.set(data, forKey: WanderlySharedStorage.pendingPlacesKey)
+    }
+
+    private func loadPendingReviewCandidates() -> [PendingReviewCandidate] {
+        guard let defaults else { return [] }
+        guard let data = defaults.data(forKey: WanderlySharedStorage.pendingReviewCandidatesKey) else {
+            return []
+        }
+        return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
+    }
+
+    private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
+        guard let defaults else { return }
+        guard let data = try? JSONEncoder().encode(candidates) else { return }
+        defaults.set(data, forKey: WanderlySharedStorage.pendingReviewCandidatesKey)
     }
 }
 

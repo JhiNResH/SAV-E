@@ -147,13 +147,13 @@ function buildSocialPlace(url: URL, sourcePlatform: SourcePlatform): Place {
 
   return buildPlace({
     name: cleanName(name),
-    address: sourcePlatformLabel(sourcePlatform),
-    latitude: 37.7749,
-    longitude: -122.4194,
+    address: `Review candidate from ${sourcePlatformLabel(sourcePlatform)}`,
+    latitude: 0,
+    longitude: 0,
     category: inferCategory(name),
     sourcePlatform,
     sourceUrl: url.toString(),
-    note: `Draft imported from ${sourcePlatformLabel(sourcePlatform)}. Confirm the real place before planning a route.`,
+    note: `Draft imported from ${sourcePlatformLabel(sourcePlatform)}. SAV-E needs a confirmed map link, address, or candidate investigation before this can become a saved place.`,
     importKind: "draft",
   });
 }

@@ -70,6 +70,7 @@ final class MapViewModel: ObservableObject {
 
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
+            try await importPendingReviewCandidates(for: userId)
             try await importPendingPlaces(for: userId)
         } catch {
             print("MapViewModel: failed to load places: \(error)")
@@ -133,6 +134,25 @@ final class MapViewModel: ObservableObject {
             revealImportedPlaces(newImports)
         }
         pendingImportService.restorePendingPlaces(failedImports)
+    }
+
+    private func importPendingReviewCandidates(for userId: String) async throws {
+        let pending = pendingImportService.consumePendingReviewCandidates()
+        guard !pending.isEmpty else { return }
+
+        var failedCandidates: [PendingReviewCandidate] = []
+
+        for candidate in pending {
+            do {
+                let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
+                try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)
+            } catch {
+                failedCandidates.append(candidate)
+                print("MapViewModel: failed to import review candidate \(candidate.candidateName): \(error)")
+            }
+        }
+
+        pendingImportService.restorePendingReviewCandidates(failedCandidates)
     }
 
     private func revealImportedPlaces(_ importedPlaces: [Place]) {
