@@ -39,6 +39,7 @@ struct ParsedPlace {
 private enum WanderlySharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
     static let pendingPlacesKey = "pendingPlaces"
+    static let pendingReviewCandidatesKey = "pendingReviewCandidates"
 }
 
 private struct PendingSharedPlace: Codable {
@@ -60,6 +61,18 @@ private struct ShareMetadata {
     var description: String?
 }
 
+private struct PendingReviewCandidate: Codable {
+    var candidateName: String
+    var address: String
+    var category: String
+    var sourceURL: String?
+    var sourceText: String?
+    var evidence: [String]
+    var confidence: Double
+    var missingInfo: [String]
+    var savedAt: Date
+}
+
 // MARK: - Share Extension SwiftUI View
 
 struct ShareExtensionView: View {
@@ -68,6 +81,7 @@ struct ShareExtensionView: View {
     @State private var sharedText: String = ""
     @State private var sharedTitle: String = ""
     @State private var parsedPlace: ParsedPlace?
+    @State private var reviewCandidate: PendingReviewCandidate?
     @State private var isParsing = true
     @State private var isSaved = false
     @State private var parseError: String?
@@ -120,6 +134,8 @@ struct ShareExtensionView: View {
                     }
                     .frame(maxHeight: .infinity)
                     .padding()
+                } else if let candidate = reviewCandidate {
+                    reviewCandidatePreview(candidate)
                 } else if let place = parsedPlace {
                     placePreview(place)
                 }
@@ -236,6 +252,70 @@ struct ShareExtensionView: View {
         .padding()
     }
 
+    private func reviewCandidatePreview(_ candidate: PendingReviewCandidate) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Review Candidate")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color(hex: "C75B39"))
+                        .cornerRadius(10)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(candidate.candidateName)
+                            .font(.headline)
+                            .foregroundColor(Color(hex: "2C2C2E"))
+                        Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+                }
+
+                Text("SAV-E found a likely place signal, but it needs review before it can become a saved place.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding()
+            .background(Color(hex: "FFF8F0"))
+            .cornerRadius(16)
+
+            if !candidate.evidence.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Evidence")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    ForEach(candidate.evidence.prefix(3), id: \.self) { item in
+                        Text(item)
+                            .font(.caption)
+                            .foregroundColor(Color(hex: "2C2C2E"))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Button(action: saveReviewCandidate) {
+                Text("Add to Review")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color(hex: "C75B39"))
+                    .cornerRadius(16)
+            }
+        }
+        .padding()
+    }
+
     // MARK: - Extract & Parse
 
     private func extractAndParse() async {
@@ -294,6 +374,20 @@ struct ShareExtensionView: View {
            ) {
             parsedPlace = metadataPlace
             selectedCategory = metadataPlace.category
+            isParsing = false
+            return
+        }
+
+        if let sourceURL = URL(string: parseContent),
+           isSocialURL(sourceURL),
+           let candidate = socialReviewCandidate(
+            from: metadata,
+            sharedTitle: sharedTitle,
+            sharedText: sharedText,
+            sourceURLString: parseContent
+           ) {
+            reviewCandidate = candidate
+            selectedCategory = candidate.category
             isParsing = false
             return
         }
@@ -516,6 +610,44 @@ struct ShareExtensionView: View {
         )
     }
 
+    private func socialReviewCandidate(
+        from metadata: ShareMetadata,
+        sharedTitle: String,
+        sharedText: String,
+        sourceURLString: String
+    ) -> PendingReviewCandidate? {
+        let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
+
+        let address = firstAddress(in: evidenceText) ?? ""
+        let candidateName = displayName(fromSocialHandle: handle)
+        let category = fallbackCategory(from: evidenceText)
+        var evidence = ["Instagram handle @\(handle)"]
+        if !sourceURLString.isEmpty {
+            evidence.append("Source URL: \(sourceURLString)")
+        }
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(300)))
+        }
+
+        var missingInfo = ["Confirm official address", "Confirm coordinates"]
+        if address.isEmpty {
+            missingInfo.append("No structured location metadata")
+        }
+
+        return PendingReviewCandidate(
+            candidateName: candidateName,
+            address: address,
+            category: category,
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: 0.58,
+            missingInfo: Array(Set(missingInfo)).sorted(),
+            savedAt: Date()
+        )
+    }
+
     private func publicMetadataEvidence(from metadata: ShareMetadata, sharedTitle: String, sharedText: String) -> String {
         [sharedTitle, sharedText, metadata.title, metadata.description]
             .compactMap { $0 }
@@ -552,6 +684,46 @@ struct ShareExtensionView: View {
             }
         }
         return nil
+    }
+
+    private func firstSocialHandle(in content: String) -> String? {
+        let ignoredHandles: Set<String> = [
+            "instagram", "reels", "reel", "explore", "threads", "tiktok", "xiaohongshu", "wanderly", "save"
+        ]
+        guard let regex = try? NSRegularExpression(pattern: #"@([A-Za-z0-9._]{3,30})"#) else { return nil }
+        let range = NSRange(content.startIndex..<content.endIndex, in: content)
+        let matches = regex.matches(in: content, range: range)
+
+        for match in matches {
+            guard match.numberOfRanges > 1,
+                  let handleRange = Range(match.range(at: 1), in: content) else { continue }
+            let handle = String(content[handleRange]).lowercased()
+            guard !ignoredHandles.contains(handle),
+                  !handle.contains("instagram"),
+                  handle.range(of: #"\d{5,}"#, options: .regularExpression) == nil else {
+                continue
+            }
+            return handle
+        }
+        return nil
+    }
+
+    private func displayName(fromSocialHandle handle: String) -> String {
+        let citySuffixes = ["bali", "tokyo", "paris", "london", "nyc", "la", "sf", "hk", "sg", "seoul"]
+        var normalized = handle
+            .replacingOccurrences(of: ".", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+
+        for suffix in citySuffixes where normalized.count > suffix.count + 2 && normalized.hasSuffix(suffix) {
+            let splitIndex = normalized.index(normalized.endIndex, offsetBy: -suffix.count)
+            normalized = "\(normalized[..<splitIndex]) \(suffix)"
+            break
+        }
+
+        return normalized
+            .split(separator: " ")
+            .map { $0.uppercased() == "nyc" ? "NYC" : $0.capitalized }
+            .joined(separator: " ")
     }
 
     private func geocodeAddress(_ address: String) async -> (latitude: Double, longitude: Double)? {
@@ -868,7 +1040,7 @@ struct ShareExtensionView: View {
         let value = content.lowercased()
         if value.contains("cafe") || value.contains("coffee") { return "cafe" }
         if value.contains("bar") || value.contains("cocktail") { return "bar" }
-        if value.contains("hotel") || value.contains("stay") { return "stay" }
+        if value.contains("hotel") || value.contains("stay") || value.contains("resort") { return "stay" }
         if value.contains("shop") || value.contains("store") { return "shopping" }
         if value.contains("bakery") || value.contains("restaurant") || value.contains("food") { return "food" }
         return "attraction"
@@ -945,11 +1117,40 @@ struct ShareExtensionView: View {
         }
     }
 
+    private func saveReviewCandidate() {
+        guard let candidate = reviewCandidate else { return }
+        guard let defaults = UserDefaults(suiteName: WanderlySharedStorage.appGroupSuiteName) else {
+            parseError = "Shared app storage is unavailable"
+            return
+        }
+
+        var pending = loadPendingReviewCandidates(from: defaults)
+        pending.append(candidate)
+        if let data = try? JSONEncoder().encode(pending) {
+            defaults.set(data, forKey: WanderlySharedStorage.pendingReviewCandidatesKey)
+        } else {
+            parseError = "Couldn't save this review candidate"
+            return
+        }
+
+        isSaved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            extensionContext?.completeRequest(returningItems: nil)
+        }
+    }
+
     private func loadPendingPlaces(from defaults: UserDefaults) -> [PendingSharedPlace] {
         guard let data = defaults.data(forKey: WanderlySharedStorage.pendingPlacesKey) else {
             return []
         }
         return (try? JSONDecoder().decode([PendingSharedPlace].self, from: data)) ?? []
+    }
+
+    private func loadPendingReviewCandidates(from defaults: UserDefaults) -> [PendingReviewCandidate] {
+        guard let data = defaults.data(forKey: WanderlySharedStorage.pendingReviewCandidatesKey) else {
+            return []
+        }
+        return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
     }
 
     // MARK: - Helpers

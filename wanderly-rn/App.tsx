@@ -304,6 +304,13 @@ function WanderlyApp() {
 
   async function saveRefinedImport() {
     if (!pendingImport) return;
+    if (pendingImport.importKind !== "place" && pendingImport.latitude === 0 && pendingImport.longitude === 0) {
+      Alert.alert(
+        "Needs confirmed location",
+        "Add a map link or confirmed coordinates before saving this social draft as a bookmark."
+      );
+      return;
+    }
     await saveBookmark(pendingImport, `Saved refined stop: ${pendingImport.name}`);
   }
 

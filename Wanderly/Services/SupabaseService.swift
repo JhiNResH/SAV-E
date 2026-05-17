@@ -7,6 +7,8 @@ protocol SupabaseServiceProtocol {
     func savePlace(_ place: Place, userId: String) async throws
     func updatePlace(_ place: Place) async throws
     func deletePlace(_ placeId: UUID) async throws
+    func createMemoryCapture(from candidate: PendingReviewCandidate, userId: String) async throws -> UUID
+    func createPlaceCandidate(_ candidate: PendingReviewCandidate, captureId: UUID, userId: String) async throws
     func fetchTrips(for userId: String) async throws -> [Trip]
     func saveTrip(_ trip: Trip, userId: String) async throws
     func updateTrip(_ trip: Trip) async throws
@@ -104,6 +106,40 @@ final class SupabaseService: SupabaseServiceProtocol {
     func deletePlace(_ placeId: UUID) async throws {
         guard isConfigured else { return }
         try await request(path: "/places/\(placeId)", method: "DELETE")
+    }
+
+    // MARK: - Memory Candidates
+
+    func createMemoryCapture(from candidate: PendingReviewCandidate, userId: String) async throws -> UUID {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let body = try Self.jsonBody([
+            "source_type": "url",
+            "source_url": candidate.sourceURL,
+            "raw_text": candidate.sourceText,
+            "title": candidate.candidateName,
+            "status": "review",
+        ])
+        let data = try await request(path: "/memory/captures", method: "POST", body: body)
+        let row = try JSONDecoder.supabase.decode(MemoryCaptureRow.self, from: data)
+        return row.id
+    }
+
+    func createPlaceCandidate(_ candidate: PendingReviewCandidate, captureId: UUID, userId: String) async throws {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let evidence = candidate.evidence.map { ["text": $0] }
+        let body = try Self.jsonBody([
+            "capture_id": captureId.uuidString,
+            "name": candidate.candidateName,
+            "address": candidate.address,
+            "city": "",
+            "evidence": evidence,
+            "confidence": candidate.confidence,
+            "missing_info": candidate.missingInfo,
+            "status": "review",
+        ])
+        try await request(path: "/memory/candidates", method: "POST", body: body)
     }
 
     // MARK: - Trips
@@ -281,6 +317,10 @@ private struct PlaceRow: Codable {
             created_at: ISO8601DateFormatter().string(from: place.createdAt)
         )
     }
+}
+
+private struct MemoryCaptureRow: Codable {
+    let id: UUID
 }
 
 private struct TripRow: Codable {
