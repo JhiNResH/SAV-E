@@ -76,11 +76,16 @@ struct AIDrawerView: View {
                 }
 
             if isLoading {
-                ProgressView().tint(.wanderlyTerracotta).scaleEffect(0.8)
+                Button(action: {
+                    viewModel.cancelCurrentRequest()
+                    withAnimation { drawerDetent = .medium }
+                    searchFocused = false
+                }) {
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                }
             } else if !viewModel.query.isEmpty {
                 Button(action: {
-                    viewModel.query = ""
-                    viewModel.drawerState = .idle
+                    viewModel.returnToCommands()
                     searchFocused = true
                     withAnimation { drawerDetent = .medium }
                 }) {
@@ -96,6 +101,18 @@ struct AIDrawerView: View {
 
     @ViewBuilder
     private var contentArea: some View {
+        VStack(spacing: 0) {
+            if showsNavigationHeader {
+                navigationHeader
+                Divider().opacity(0.45)
+            }
+
+            contentBody
+        }
+    }
+
+    @ViewBuilder
+    private var contentBody: some View {
         switch viewModel.drawerState {
         case .idle:
             suggestionsView
@@ -105,6 +122,20 @@ struct AIDrawerView: View {
                 Spacer()
                 ProgressView().tint(.wanderlyTerracotta)
                 Text("Thinking...").font(.subheadline).foregroundColor(.secondary)
+                Button(action: {
+                    viewModel.cancelCurrentRequest()
+                    searchFocused = false
+                    withAnimation { drawerDetent = .medium }
+                }) {
+                    Label("Cancel", systemImage: "xmark")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.wanderlyTerracotta)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Color.wanderlyTerracotta.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity)
@@ -188,11 +219,111 @@ struct AIDrawerView: View {
                 Text(msg)
                     .font(.caption).foregroundColor(.secondary)
                     .multilineTextAlignment(.center).padding(.horizontal)
-                Button("Try again") { Task { await viewModel.submit() } }
-                    .font(.caption).fontWeight(.semibold).foregroundColor(.wanderlyTerracotta)
+                HStack(spacing: 12) {
+                    Button("Back") {
+                        viewModel.returnToCommands()
+                        withAnimation { drawerDetent = .medium }
+                    }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                    Button("Try again") { Task { await viewModel.submit() } }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.wanderlyTerracotta)
+                }
                 Spacer()
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var navigationHeader: some View {
+        HStack(spacing: 10) {
+            Button(action: {
+                viewModel.returnToCommands()
+                searchFocused = false
+                withAnimation { drawerDetent = .medium }
+            }) {
+                Image(systemName: "chevron.left")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.wanderlyCharcoal)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.62))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel("Back to commands")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(navigationTitle)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.wanderlyCharcoal)
+                    .lineLimit(1)
+                Text(navigationSubtitle)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button(action: {
+                viewModel.reset()
+                searchFocused = false
+                withAnimation { drawerDetent = .height(72) }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(Color.white.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel("Close drawer content")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.wanderlyCream)
+    }
+
+    private var showsNavigationHeader: Bool {
+        switch viewModel.drawerState {
+        case .idle:
+            return false
+        case .loading, .displaying, .placeDetail, .error:
+            return true
+        }
+    }
+
+    private var navigationTitle: String {
+        switch viewModel.drawerState {
+        case .idle:
+            return "SAV-E"
+        case .loading:
+            return "Thinking"
+        case .displaying(let response):
+            return response.title ?? "Answer"
+        case .placeDetail(let place):
+            return place.name
+        case .error:
+            return "Couldn’t finish"
+        }
+    }
+
+    private var navigationSubtitle: String {
+        switch viewModel.drawerState {
+        case .idle:
+            return "Commands"
+        case .loading:
+            return "You can cancel and keep using SAV-E."
+        case .displaying:
+            return "Back returns to commands."
+        case .placeDetail:
+            return "Back returns to your command drawer."
+        case .error:
+            return "Try again or return to commands."
         }
     }
 
