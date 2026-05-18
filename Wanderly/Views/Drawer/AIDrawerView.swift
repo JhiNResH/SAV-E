@@ -13,11 +13,13 @@ struct AIDrawerView: View {
     var onConfirmCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onRejectCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onSaveCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
+    var onImportURLAsReviewCandidates: (URL) async throws -> Int = { _ in 0 }
     @FocusState private var searchFocused: Bool
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
     @State private var candidateActionInFlight: UUID?
     @State private var showReviewInbox = false
+    @State private var isImportingURL = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,13 +73,14 @@ struct AIDrawerView: View {
                 .foregroundColor(.wanderlyCharcoal)
                 .focused($searchFocused)
                 .submitLabel(.search)
-                .onSubmit { Task { await viewModel.submit() } }
+                .onSubmit { submitSearchField() }
                 .onTapGesture {
                     withAnimation { drawerDetent = .medium }
                 }
 
             if isLoading {
                 Button(action: {
+                    guard !isImportingURL else { return }
                     viewModel.cancelCurrentRequest()
                     withAnimation { drawerDetent = .medium }
                     searchFocused = false
@@ -363,6 +366,7 @@ struct AIDrawerView: View {
     }
 
     private var isLoading: Bool {
+        if isImportingURL { return true }
         if case .loading = viewModel.drawerState { return true }
         return false
     }
@@ -721,8 +725,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         if let clipboardText = UIPasteboard.general.string,
            let url = firstURL(in: clipboardText) {
-            addSpotStatus = "Social link loaded. SAV-E will return candidates for review, not save automatically."
-            focusAgentPrompt(socialInvestigationPrompt(for: url.absoluteString))
+            importURLToReviewCandidates(url)
         } else {
             addSpotStatus = "Paste a public social/video link after the prompt, or share it into SAV-E."
             focusAgentPrompt(socialInvestigationPrompt(for: ""))
@@ -761,13 +764,7 @@ struct AIDrawerView: View {
         }
 
         addSpotStatus = "Clipboard link loaded. SAV-E will ask before saving."
-        focusAgentPrompt("""
-        Import this public place link only if it has reliable metadata.
-
-        Return the candidate place, evidence, confidence, missing fields, and whether it is safe to save. Do not save automatically.
-
-        Link: \(url.absoluteString)
-        """)
+        importURLToReviewCandidates(url)
     }
 
     private func performCandidateAction(
@@ -812,6 +809,36 @@ struct AIDrawerView: View {
         showReviewInbox = true
         searchFocused = false
         withAnimation { drawerDetent = .large }
+    }
+
+    private func submitSearchField() {
+        if let url = firstURL(in: viewModel.query) {
+            importURLToReviewCandidates(url)
+        } else {
+            Task { await viewModel.submit() }
+        }
+    }
+
+    private func importURLToReviewCandidates(_ url: URL) {
+        guard !isImportingURL else { return }
+        showReviewInbox = false
+        searchFocused = false
+        isImportingURL = true
+        addSpotStatus = "Analyzing public metadata and adding candidates for review..."
+        viewModel.returnToCommands()
+        withAnimation { drawerDetent = .medium }
+
+        Task {
+            do {
+                let count = try await onImportURLAsReviewCandidates(url)
+                addSpotStatus = count == 1 ? "Added 1 review candidate." : "Added \(count) review candidates."
+                openReviewInbox()
+            } catch {
+                addSpotStatus = error.localizedDescription
+                viewModel.showMessage(title: "Couldn’t add review candidate", message: error.localizedDescription)
+            }
+            isImportingURL = false
+        }
     }
 }
 
