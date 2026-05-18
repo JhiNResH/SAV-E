@@ -29,6 +29,7 @@ final class AIDrawerViewModel: ObservableObject {
 
     /// Multi-turn conversation context for the current session.
     private var conversationTurns: [ConversationTurn] = []
+    private var activeRequestID: UUID?
 
     init(aiService: WanderlyAIService = .shared) {
         self.aiService = aiService
@@ -37,6 +38,8 @@ final class AIDrawerViewModel: ObservableObject {
     func submit() async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        let requestID = UUID()
+        activeRequestID = requestID
         drawerState = .loading
         mapAction = nil
 
@@ -48,6 +51,8 @@ final class AIDrawerViewModel: ObservableObject {
 
         do {
             let response = try await aiService.query(trimmed, places: places, conversationHistory: conversationTurns)
+            guard activeRequestID == requestID else { return }
+            activeRequestID = nil
             drawerState = .displaying(response)
             mapAction = response.mapAction
 
@@ -60,6 +65,8 @@ final class AIDrawerViewModel: ObservableObject {
                 conversationTurns.removeFirst()
             }
         } catch {
+            guard activeRequestID == requestID else { return }
+            activeRequestID = nil
             drawerState = .error(error.localizedDescription)
         }
     }
@@ -79,6 +86,7 @@ final class AIDrawerViewModel: ObservableObject {
     }
 
     func reset() {
+        activeRequestID = nil
         drawerState = .idle
         query = ""
         conversationTurns = []
@@ -86,9 +94,22 @@ final class AIDrawerViewModel: ObservableObject {
     }
 
     func startNewConversation() {
+        activeRequestID = nil
         drawerState = .idle
         query = ""
         conversationTurns = []
+    }
+
+    func returnToCommands() {
+        activeRequestID = nil
+        drawerState = .idle
+        query = ""
+    }
+
+    func cancelCurrentRequest() {
+        activeRequestID = nil
+        drawerState = .idle
+        query = ""
     }
 
     func showMessage(title: String, message: String) {
