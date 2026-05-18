@@ -28,6 +28,9 @@ struct ContentView: View {
                     },
                     onSaveCandidate: { candidate in
                         try await mapVM.saveReviewCandidateAsPlace(candidate)
+                    },
+                    onImportURLAsReviewCandidates: { url in
+                        try await mapVM.importURLAsReviewCandidates(url)
                     }
                 )
                     .presentationDetents([.height(72), .medium, .large], selection: $drawerDetent)

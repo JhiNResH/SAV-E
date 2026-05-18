@@ -34,6 +34,7 @@ final class MapViewModel: ObservableObject {
     private let pendingImportService: PendingPlaceImportService
     private let locationService: LocationService
     private let googlePlacesService: GooglePlacesServiceProtocol
+    private let socialLinkReviewCandidateService: SocialLinkReviewCandidateService
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
 
@@ -41,13 +42,15 @@ final class MapViewModel: ObservableObject {
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
         pendingImportService: PendingPlaceImportService = .shared,
         locationService: LocationService? = nil,
-        googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared
+        googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
+        socialLinkReviewCandidateService: SocialLinkReviewCandidateService = .shared
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
         self.pendingImportService = pendingImportService
         self.locationService = locationService ?? .shared
         self.googlePlacesService = googlePlacesService
+        self.socialLinkReviewCandidateService = socialLinkReviewCandidateService
     }
 
     // MARK: - Computed
@@ -181,6 +184,20 @@ final class MapViewModel: ObservableObject {
         reviewCandidates = candidates.filter { candidate in
             candidate.status == "review" || candidate.status == "confirmed"
         }
+    }
+
+    func importURLAsReviewCandidates(_ url: URL) async throws -> Int {
+        guard let userId = authService.currentUserId else {
+            throw SupabaseError.notAuthenticated
+        }
+
+        let candidates = try await socialLinkReviewCandidateService.reviewCandidates(from: url)
+        for candidate in candidates {
+            let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
+            try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)
+        }
+        try await refreshReviewCandidates()
+        return candidates.count
     }
 
     func confirmReviewCandidate(_ candidate: PlaceReviewCandidate) async throws {
