@@ -568,7 +568,7 @@ struct ShareExtensionView: View {
     }
 
     private func cleanHTMLText(_ value: String) -> String {
-        value
+        decodeNumericHTMLEntities(in: value)
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&#034;", with: "\"")
@@ -580,6 +580,41 @@ struct ShareExtensionView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func decodeNumericHTMLEntities(in value: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"&#(x[0-9A-Fa-f]+|\d+);"#) else {
+            return value
+        }
+
+        let nsValue = value as NSString
+        let matches = regex.matches(in: value, range: NSRange(location: 0, length: nsValue.length))
+        var decoded = value
+
+        for match in matches.reversed() {
+            guard match.numberOfRanges > 1,
+                  let entityRange = Range(match.range(at: 1), in: value),
+                  let fullRange = Range(match.range, in: decoded) else {
+                continue
+            }
+
+            let entity = String(value[entityRange])
+            let codePoint: UInt32?
+            if entity.lowercased().hasPrefix("x") {
+                codePoint = UInt32(entity.dropFirst(), radix: 16)
+            } else {
+                codePoint = UInt32(entity)
+            }
+
+            guard let codePoint,
+                  let scalar = UnicodeScalar(codePoint) else {
+                continue
+            }
+
+            decoded.replaceSubrange(fullRange, with: String(Character(scalar)))
+        }
+
+        return decoded
     }
 
     private func deterministicSocialMetadataPlace(
