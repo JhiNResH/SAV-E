@@ -41,6 +41,16 @@ const fixtures = [
     },
   },
   {
+    name: "instagram reel with base64-style igsh stays review draft",
+    url: "https://www.instagram.com/reel/DU3WPMpE1zE/?igsh=NTc4MTIwNjQ2YQ==",
+    expected: {
+      sourcePlatform: "instagram",
+      importKind: "draft",
+      latitude: 0,
+      longitude: 0,
+    },
+  },
+  {
     name: "google maps with explicit coordinates can save as place",
     url: "https://www.google.com/maps/place/Ulaman+Bali/@-8.5929653,115.1305649,17z",
     expected: {
