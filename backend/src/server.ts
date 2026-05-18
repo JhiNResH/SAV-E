@@ -149,6 +149,15 @@ const recommendationItemFields = [
   "created_at",
 ] as const;
 
+const jsonbFields = new Set([
+  "context",
+  "evidence",
+  "input",
+  "input_schema",
+  "output",
+  "output_schema",
+]);
+
 createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     return sendJson(response, null, 204);
@@ -789,7 +798,7 @@ function buildInsert(table: string, body: JsonBody, allowed: readonly string[]):
   const columns = Object.keys(pickFields(body, allowed)).filter((column) => body[column] !== undefined);
   if (columns.length === 0) throw new ApiError(400, "No writable fields");
 
-  const values = columns.map((column) => body[column] as QueryValue);
+  const values = columns.map((column) => queryValue(column, body[column]));
   const params = columns.map((_, index) => `$${index + 1}`);
   return {
     sql: `insert into ${table} (${columns.join(", ")}) values (${params.join(", ")})`,
@@ -805,12 +814,19 @@ function buildUpdate(
   const columns = Object.keys(pickFields(body, allowed)).filter((column) => body[column] !== undefined);
   if (columns.length === 0) return undefined;
 
-  const values = columns.map((column) => body[column] as QueryValue);
+  const values = columns.map((column) => queryValue(column, body[column]));
   const assignments = columns.map((column, index) => `${column} = $${index + 1}`);
   return {
     sql: `update ${table} set ${assignments.join(", ")}`,
     values,
   };
+}
+
+function queryValue(column: string, value: unknown): QueryValue {
+  if (jsonbFields.has(column) && value !== null && value !== undefined) {
+    return JSON.stringify(value);
+  }
+  return value as QueryValue;
 }
 
 function tripsSelect(whereClause: string, orderClause = ""): string {
