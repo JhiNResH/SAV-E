@@ -17,6 +17,7 @@ struct AIDrawerView: View {
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
     @State private var candidateActionInFlight: UUID?
+    @State private var showReviewInbox = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -86,11 +87,26 @@ struct AIDrawerView: View {
             } else if !viewModel.query.isEmpty {
                 Button(action: {
                     viewModel.returnToCommands()
+                    showReviewInbox = false
                     searchFocused = true
                     withAnimation { drawerDetent = .medium }
                 }) {
                     Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
                 }
+            } else if !reviewCandidates.isEmpty {
+                Button(action: openReviewInbox) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checklist.unchecked")
+                        Text("\(reviewCandidates.count)")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.wanderlyTerracotta)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(Color.wanderlyTerracotta.opacity(0.1))
+                    .clipShape(Capsule())
+                }
+                .accessibilityLabel("Open review candidates")
             }
         }
         .padding(.horizontal, 16)
@@ -115,7 +131,11 @@ struct AIDrawerView: View {
     private var contentBody: some View {
         switch viewModel.drawerState {
         case .idle:
-            suggestionsView
+            if showReviewInbox {
+                reviewInboxView
+            } else {
+                suggestionsView
+            }
 
         case .loading:
             VStack(spacing: 12) {
@@ -243,6 +263,7 @@ struct AIDrawerView: View {
         HStack(spacing: 10) {
             Button(action: {
                 viewModel.returnToCommands()
+                showReviewInbox = false
                 searchFocused = false
                 withAnimation { drawerDetent = .medium }
             }) {
@@ -271,6 +292,7 @@ struct AIDrawerView: View {
 
             Button(action: {
                 viewModel.reset()
+                showReviewInbox = false
                 searchFocused = false
                 withAnimation { drawerDetent = .height(72) }
             }) {
@@ -346,7 +368,7 @@ struct AIDrawerView: View {
     }
 
     private var showsContentArea: Bool {
-        if case .idle = viewModel.drawerState, drawerDetent == .height(72) { return false }
+        if case .idle = viewModel.drawerState, drawerDetent == .height(72), !showReviewInbox { return false }
         return true
     }
 
@@ -374,6 +396,29 @@ struct AIDrawerView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "tray.and.arrow.down")
                             Text("Import")
+                        }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.wanderlyTerracotta)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.wanderlyTerracotta.opacity(0.1))
+                        .cornerRadius(16)
+                    }
+
+                    Button(action: openReviewInbox) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checklist.unchecked")
+                            Text("Review")
+                            if !reviewCandidates.isEmpty {
+                                Text("\(reviewCandidates.count)")
+                                    .font(.caption2.monospacedDigit())
+                                    .fontWeight(.bold)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.wanderlyTerracotta.opacity(0.16))
+                                    .clipShape(Capsule())
+                            }
                         }
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -568,6 +613,7 @@ struct AIDrawerView: View {
 
             ReviewCandidatesSection(
                 candidates: reviewCandidates,
+                limit: 2,
                 actionInFlight: candidateActionInFlight,
                 onConfirm: { candidate in
                     performCandidateAction(candidate, successMessage: "Candidate confirmed. Save it once the coordinates are reliable.") {
@@ -598,6 +644,72 @@ struct AIDrawerView: View {
         .padding(.top, 14)
     }
 
+    private var reviewInboxView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Review inbox")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.wanderlyCharcoal)
+                        Text("Candidates wait here until you confirm, reject, or refine them into saved places.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        showReviewInbox = false
+                        withAnimation { drawerDetent = .medium }
+                    }) {
+                        Label("Commands", systemImage: "sparkles")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.wanderlyTerracotta)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Color.wanderlyTerracotta.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                }
+
+                ReviewCandidatesSection(
+                    candidates: reviewCandidates,
+                    limit: nil,
+                    actionInFlight: candidateActionInFlight,
+                    onConfirm: { candidate in
+                        performCandidateAction(candidate, successMessage: "Candidate confirmed. Save it once the coordinates are reliable.") {
+                            try await onConfirmCandidate(candidate)
+                        }
+                    },
+                    onReject: { candidate in
+                        performCandidateAction(candidate, successMessage: "Candidate rejected.") {
+                            try await onRejectCandidate(candidate)
+                        }
+                    },
+                    onSave: { candidate in
+                        performCandidateAction(candidate, successMessage: "Saved as a place.") {
+                            try await onSaveCandidate(candidate)
+                        }
+                    }
+                )
+
+                if let addSpotStatus {
+                    Text(addSpotStatus)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 24)
+        }
+    }
+
     private var addSpotColumns: [GridItem] {
         [
             GridItem(.flexible(), spacing: 10),
@@ -606,6 +718,7 @@ struct AIDrawerView: View {
     }
 
     private func focusSocialInvestigationPrompt() {
+        showReviewInbox = false
         if let clipboardText = UIPasteboard.general.string,
            let url = firstURL(in: clipboardText) {
             addSpotStatus = "Social link loaded. SAV-E will return candidates for review, not save automatically."
@@ -627,6 +740,7 @@ struct AIDrawerView: View {
     }
 
     private func focusMediaEvidencePrompt() {
+        showReviewInbox = false
         addSpotStatus = "Media evidence results stay as review candidates until you choose a place."
         focusAgentPrompt("""
         Investigate this video or screenshot and return candidate places with evidence.
@@ -639,6 +753,7 @@ struct AIDrawerView: View {
     }
 
     private func importClipboardURL() {
+        showReviewInbox = false
         guard let clipboardText = UIPasteboard.general.string,
               let url = firstURL(in: clipboardText) else {
             addSpotStatus = "Clipboard does not contain a URL yet. Copy a place or social link, then tap Import clipboard again."
@@ -673,6 +788,7 @@ struct AIDrawerView: View {
     }
 
     private func focusAgentPrompt(_ prompt: String) {
+        showReviewInbox = false
         viewModel.startNewConversation()
         viewModel.query = prompt
         withAnimation { drawerDetent = .medium }
@@ -690,10 +806,18 @@ struct AIDrawerView: View {
                 return scheme == "http" || scheme == "https"
             }
     }
+
+    private func openReviewInbox() {
+        viewModel.returnToCommands()
+        showReviewInbox = true
+        searchFocused = false
+        withAnimation { drawerDetent = .large }
+    }
 }
 
 private struct ReviewCandidatesSection: View {
     var candidates: [PlaceReviewCandidate]
+    var limit: Int? = 4
     var actionInFlight: UUID?
     var onConfirm: (PlaceReviewCandidate) -> Void
     var onReject: (PlaceReviewCandidate) -> Void
@@ -718,7 +842,7 @@ private struct ReviewCandidatesSection: View {
             if candidates.isEmpty {
                 ReviewCandidatesEmptyState()
             } else {
-                ForEach(candidates.prefix(4)) { candidate in
+                ForEach(displayedCandidates) { candidate in
                     ReviewCandidateCard(
                         candidate: candidate,
                         isWorking: actionInFlight == candidate.id,
@@ -729,6 +853,11 @@ private struct ReviewCandidatesSection: View {
                 }
             }
         }
+    }
+
+    private var displayedCandidates: [PlaceReviewCandidate] {
+        guard let limit else { return candidates }
+        return Array(candidates.prefix(limit))
     }
 }
 
