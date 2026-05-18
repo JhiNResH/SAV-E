@@ -85,6 +85,7 @@ struct ShareExtensionView: View {
     @State private var reviewCandidates: [PendingReviewCandidate] = []
     @State private var isParsing = true
     @State private var isSaved = false
+    @State private var savedReviewCandidateCount: Int?
     @State private var parseError: String?
     @State private var selectedCategory: String = "food"
 
@@ -110,14 +111,20 @@ struct ShareExtensionView: View {
                             .font(.system(size: 56))
                             .foregroundColor(Color(hex: "A8B5A0"))
 
-                        Text("Saved to SAV-E!")
+                        Text(savedReviewCandidateCount == nil ? "Saved to SAV-E!" : "Added to Review")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(Color(hex: "2C2C2E"))
 
-                        Text("Open the app to see it on your map.")
+                        Text(savedReviewCandidateCount.map { count in
+                            count == 1
+                                ? "Open SAV-E to finish importing this candidate into Review."
+                                : "Open SAV-E to finish importing these \(count) candidates into Review."
+                        } ?? "Open the app to see it on your map.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
                     }
                     .frame(maxHeight: .infinity)
                 } else if let error = parseError {
@@ -402,22 +409,19 @@ struct ShareExtensionView: View {
         }
 
         if let sourceURL = URL(string: parseContent),
-           isSocialURL(sourceURL),
-           !socialReviewCandidates(
-            from: metadata,
-            sharedTitle: sharedTitle,
-            sharedText: sharedText,
-            sourceURLString: parseContent
-           ).isEmpty {
-            reviewCandidates = socialReviewCandidates(
+           isSocialURL(sourceURL) {
+            let candidates = socialReviewCandidates(
                 from: metadata,
                 sharedTitle: sharedTitle,
                 sharedText: sharedText,
                 sourceURLString: parseContent
             )
-            selectedCategory = reviewCandidates.first?.category ?? "stay"
-            isParsing = false
-            return
+            if !candidates.isEmpty {
+                reviewCandidates = candidates
+                selectedCategory = reviewCandidates.first?.category ?? "stay"
+                isParsing = false
+                return
+            }
         }
 
         if let sourceURL = URL(string: parseContent),
@@ -619,8 +623,11 @@ struct ShareExtensionView: View {
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "\n", with: " ")
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: #"[ \t\f]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\n\s+"#, with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -1285,6 +1292,7 @@ struct ShareExtensionView: View {
             return
         }
 
+        savedReviewCandidateCount = nil
         isSaved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             extensionContext?.completeRequest(returningItems: nil)
@@ -1308,6 +1316,7 @@ struct ShareExtensionView: View {
             return
         }
 
+        savedReviewCandidateCount = candidates.count
         isSaved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             extensionContext?.completeRequest(returningItems: nil)
