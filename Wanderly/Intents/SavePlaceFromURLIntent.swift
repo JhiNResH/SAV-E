@@ -13,10 +13,19 @@ struct SavePlaceFromURLIntent: AppIntent {
     var note: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let record = try SaveLocalVaultService.shared.saveSourceOnly(
-            url: url,
-            note: note.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
-        return .result(dialog: "Saved \(record.displayTitle) to SAV-E memory for review.")
+        do {
+            let candidates = try await SocialLinkReviewCandidateService.shared.reviewCandidates(from: url)
+            for candidate in candidates {
+                _ = try SaveLocalVaultService.shared.saveReviewCandidate(candidate)
+            }
+            let countLabel = candidates.count == 1 ? "1 review candidate" : "\(candidates.count) review candidates"
+            return .result(dialog: "Saved \(countLabel) to SAV-E Review.")
+        } catch {
+            let record = try SaveLocalVaultService.shared.saveSourceOnly(
+                url: url,
+                note: note.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            return .result(dialog: "Saved \(record.displayTitle) to SAV-E memory as source-only. Open SAV-E to review it.")
+        }
     }
 }

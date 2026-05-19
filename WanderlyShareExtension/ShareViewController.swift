@@ -438,6 +438,34 @@ struct ShareExtensionView: View {
 
         if let sourceURL = URL(string: parseContent),
            isSocialURL(sourceURL),
+           let candidate = captionNamedSocialReviewCandidate(
+            from: metadata,
+            sharedTitle: sharedTitle,
+            sharedText: sharedText,
+            sourceURLString: parseContent
+           ) {
+            reviewCandidate = candidate
+            selectedCategory = candidate.category
+            isParsing = false
+            return
+        }
+
+        if let sourceURL = URL(string: parseContent),
+           isSocialURL(sourceURL),
+           let candidate = captionLineSocialReviewCandidate(
+            from: metadata,
+            sharedTitle: sharedTitle,
+            sharedText: sharedText,
+            sourceURLString: parseContent
+           ) {
+            reviewCandidate = candidate
+            selectedCategory = candidate.category
+            isParsing = false
+            return
+        }
+
+        if let sourceURL = URL(string: parseContent),
+           isSocialURL(sourceURL),
            let candidate = socialReviewCandidate(
             from: metadata,
             sharedTitle: sharedTitle,
@@ -745,6 +773,78 @@ struct ShareExtensionView: View {
         )
     }
 
+    private func captionNamedSocialReviewCandidate(
+        from metadata: ShareMetadata,
+        sharedTitle: String,
+        sharedText: String,
+        sourceURLString: String
+    ) -> PendingReviewCandidate? {
+        let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
+        let category = fallbackCategory(from: "\(name) \(evidenceText)")
+        var evidence = [
+            "Source URL: \(sourceURLString)",
+            "Public metadata named place: \(name)"
+        ]
+        if !address.isEmpty {
+            evidence.append("Location clue: \(address)")
+        }
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(300)))
+        }
+
+        var missingInfo = ["Confirm official address", "Confirm coordinates", "Cross-check official source or map listing"]
+        if address.isEmpty {
+            missingInfo.append("No structured location metadata")
+        }
+
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: address,
+            category: category,
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: address.isEmpty ? 0.5 : 0.62,
+            missingInfo: Array(Set(missingInfo)).sorted(),
+            savedAt: Date()
+        )
+    }
+
+    private func captionLineSocialReviewCandidate(
+        from metadata: ShareMetadata,
+        sharedTitle: String,
+        sharedText: String,
+        sourceURLString: String
+    ) -> PendingReviewCandidate? {
+        let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        guard let inferred = inferredPlaceLineBeforeAddress(in: evidenceText) else { return nil }
+        let category = fallbackCategory(from: "\(inferred.name) \(evidenceText)")
+        var evidence = [
+            "Source URL: \(sourceURLString)",
+            "Public metadata place line: \(inferred.name)",
+            "Location clue: \(inferred.address)"
+        ]
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(300)))
+        }
+
+        let missingInfo = ["Confirm official address", "Confirm coordinates", "Cross-check official source or map listing"]
+
+        return PendingReviewCandidate(
+            candidateName: inferred.name,
+            address: inferred.address,
+            category: category,
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: 0.6,
+            missingInfo: Array(Set(missingInfo)).sorted(),
+            savedAt: Date()
+        )
+    }
+
     private func socialReviewCandidates(
         from metadata: ShareMetadata,
         sharedTitle: String,
@@ -780,7 +880,7 @@ struct ShareExtensionView: View {
             let name = cleanPlaceName(section.name)
             guard isUsablePlaceName(name) else { return nil }
             let detailsText = section.details.joined(separator: "\n")
-            let address = firstLocationPin(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
+            let address = firstLocationPin(in: detailsText) ?? streetAddressLine(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
             var evidence = [
                 "Source URL: \(sourceURLString)",
                 "Public metadata candidate: \(name)"
@@ -823,6 +923,22 @@ struct ShareExtensionView: View {
         firstRegexCapture(in: line, pattern: #"^\s*(?:\d{1,2}[\.)]|[①②③④⑤⑥⑦⑧⑨])\s*([^\n\r]+)"#)
     }
 
+    private func bracketedPlaceName(in content: String) -> String? {
+        let patterns = [
+            #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
+            #"(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
+        ]
+        for pattern in patterns {
+            if let match = firstRegexCapture(in: content, pattern: pattern) {
+                let cleaned = cleanPlaceName(match)
+                if isUsablePlaceName(cleaned) {
+                    return cleaned
+                }
+            }
+        }
+        return nil
+    }
+
     private func firstLocationPin(in content: String) -> String? {
         let patterns = [
             #"📍\s*([^\n\r\.]+)"#,
@@ -837,8 +953,66 @@ struct ShareExtensionView: View {
         return nil
     }
 
+    private func inferredPlaceLineBeforeAddress(in content: String) -> (name: String, address: String)? {
+        let lines = content
+            .components(separatedBy: .newlines)
+            .map(cleanHTMLText)
+            .filter { !$0.isEmpty }
+
+        guard lines.count >= 2 else { return nil }
+
+        for (index, line) in lines.enumerated() where looksLikeAddressLine(line) {
+            var previousIndex = index - 1
+            while previousIndex >= 0 {
+                let candidate = cleanPlaceName(lines[previousIndex])
+                if isLikelyCaptionPlaceName(candidate) {
+                    return (candidate, line)
+                }
+                previousIndex -= 1
+            }
+        }
+        return nil
+    }
+
+    private func streetAddressLine(in content: String) -> String? {
+        let lines = content
+            .components(separatedBy: .newlines)
+            .map(cleanHTMLText)
+            .filter { !$0.isEmpty }
+        return lines.first(where: looksLikeAddressLine)
+    }
+
+    private func looksLikeAddressLine(_ line: String) -> Bool {
+        let patterns = [
+            #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
+            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
+            #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
+            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|号|號)"#
+        ]
+        return patterns.contains { pattern in
+            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    private func isLikelyCaptionPlaceName(_ value: String) -> Bool {
+        guard isUsablePlaceName(value) else { return false }
+        let lowered = value.lowercased()
+        guard !looksLikeAddressLine(value),
+              !lowered.contains("likes"),
+              !lowered.contains("comments"),
+              !lowered.contains(" on instagram"),
+              !lowered.contains("casual"),
+              !lowered.contains("dream"),
+              !lowered.contains("follow"),
+              !lowered.contains("save this"),
+              !lowered.contains("located") else {
+            return false
+        }
+        return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
+    }
+
     private func cityAddress(in content: String) -> String? {
-        firstRegexCapture(in: content, pattern: #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia))\b"#)
+        firstRegexCapture(in: content, pattern: #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China))\b"#)
             .map(cleanHTMLText)
     }
 
@@ -1232,7 +1406,7 @@ struct ShareExtensionView: View {
 
     private func fallbackCategory(from content: String) -> String {
         let value = content.lowercased()
-        if value.contains("cafe") || value.contains("coffee") { return "cafe" }
+        if value.contains("cafe") || value.contains("coffee") || value.contains("tea") { return "cafe" }
         if value.contains("bar") || value.contains("cocktail") { return "bar" }
         if value.contains("hotel") || value.contains("stay") || value.contains("resort") { return "stay" }
         if value.contains("shop") || value.contains("store") { return "shopping" }
