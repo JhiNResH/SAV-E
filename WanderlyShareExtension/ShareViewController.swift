@@ -1470,14 +1470,7 @@ struct ShareExtensionView: View {
             parseError = "Shared app storage is unavailable"
             return
         }
-        var pending = loadPendingPlaces(from: fileURL)
-        pending.append(pendingPlace)
-        if let data = try? JSONEncoder().encode(pending) {
-            guard write(data, to: fileURL) else { return }
-        } else {
-            parseError = "Couldn't save this place"
-            return
-        }
+        guard appendPendingItems([pendingPlace], to: fileURL, as: PendingSharedPlace.self) else { return }
 
         savedReviewCandidateCount = nil
         isSaved = true
@@ -1494,34 +1487,13 @@ struct ShareExtensionView: View {
             return
         }
 
-        var pending = loadPendingReviewCandidates(from: fileURL)
-        pending.append(contentsOf: candidates)
-        if let data = try? JSONEncoder().encode(pending) {
-            guard write(data, to: fileURL) else { return }
-        } else {
-            parseError = "Couldn't save review candidates"
-            return
-        }
+        guard appendPendingItems(candidates, to: fileURL, as: PendingReviewCandidate.self) else { return }
 
         savedReviewCandidateCount = candidates.count
         isSaved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             extensionContext?.completeRequest(returningItems: nil)
         }
-    }
-
-    private func loadPendingPlaces(from fileURL: URL) -> [PendingSharedPlace] {
-        guard let data = try? Data(contentsOf: fileURL) else {
-            return []
-        }
-        return (try? JSONDecoder().decode([PendingSharedPlace].self, from: data)) ?? []
-    }
-
-    private func loadPendingReviewCandidates(from fileURL: URL) -> [PendingReviewCandidate] {
-        guard let data = try? Data(contentsOf: fileURL) else {
-            return []
-        }
-        return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
     }
 
     private func saveSourceOnlyMemory(_ source: String, reason: String) {
@@ -1557,6 +1529,42 @@ struct ShareExtensionView: View {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName)?
             .appendingPathComponent(fileName)
+    }
+
+    private func appendPendingItems<Element: Codable>(_ items: [Element], to fileURL: URL, as elementType: Element.Type) -> Bool {
+        guard !items.isEmpty else { return true }
+
+        var success = false
+        let coordinated = coordinate(fileURL, purpose: "append pending queue") {
+            do {
+                let existing = try loadArray([Element].self, from: fileURL)
+                let data = try JSONEncoder().encode(existing + items)
+                success = write(data, to: fileURL)
+            } catch {
+                parseError = "Couldn't read shared app storage"
+                success = false
+            }
+        }
+        return coordinated && success
+    }
+
+    private func loadArray<Element: Decodable>(_ type: [Element].Type, from fileURL: URL) throws -> [Element] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        let data = try Data(contentsOf: fileURL)
+        return try JSONDecoder().decode(type, from: data)
+    }
+
+    private func coordinate(_ fileURL: URL, purpose: String, _ work: () -> Void) -> Bool {
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        coordinator.coordinate(writingItemAt: fileURL, options: [], error: &coordinationError) { _ in
+            work()
+        }
+        if coordinationError != nil {
+            parseError = "Couldn't coordinate shared app storage"
+            return false
+        }
+        return true
     }
 
     private func write(_ data: Data, to fileURL: URL) -> Bool {

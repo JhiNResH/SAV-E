@@ -70,77 +70,66 @@ final class PendingPlaceImportService {
     }
 
     func consumePendingPlaces() -> [PendingSharedPlace] {
-        let pending = loadPendingPlaces()
-        removePendingFile(named: WanderlySharedStorage.pendingPlacesFileName)
-        return pending
+        consumePendingArray(named: WanderlySharedStorage.pendingPlacesFileName, as: PendingSharedPlace.self)
     }
 
     func restorePendingPlaces(_ places: [PendingSharedPlace]) {
-        guard !places.isEmpty else { return }
-        let existing = loadPendingPlaces()
-        save(existing + places)
+        appendPendingArray(places, named: WanderlySharedStorage.pendingPlacesFileName)
     }
 
     func consumePendingReviewCandidates() -> [PendingReviewCandidate] {
-        let pending = loadPendingReviewCandidates()
-        removePendingFile(named: WanderlySharedStorage.pendingReviewCandidatesFileName)
-        return pending
+        consumePendingArray(named: WanderlySharedStorage.pendingReviewCandidatesFileName, as: PendingReviewCandidate.self)
     }
 
     func restorePendingReviewCandidates(_ candidates: [PendingReviewCandidate]) {
-        guard !candidates.isEmpty else { return }
-        let existing = loadPendingReviewCandidates()
-        saveReviewCandidates(existing + candidates)
+        appendPendingArray(candidates, named: WanderlySharedStorage.pendingReviewCandidatesFileName)
     }
 
-    private func loadPendingPlaces() -> [PendingSharedPlace] {
-        guard let data = dataFromPendingFile(named: WanderlySharedStorage.pendingPlacesFileName) else {
-            return []
+    private func consumePendingArray<Element: Decodable>(named fileName: String, as elementType: Element.Type) -> [Element] {
+        guard let url = pendingFileURL(named: fileName) else { return [] }
+        var result: [Element] = []
+        coordinate(url: url, purpose: "consume \(fileName)") {
+            guard fileManager.fileExists(atPath: url.path) else { return }
+            do {
+                result = try loadArray([Element].self, from: url)
+                try fileManager.removeItem(at: url)
+            } catch {
+                print("PendingPlaceImportService: preserving unreadable \(fileName): \(error)")
+                result = []
+            }
         }
-        return (try? JSONDecoder().decode([PendingSharedPlace].self, from: data)) ?? []
+        return result
     }
 
-    private func save(_ places: [PendingSharedPlace]) {
-        guard let data = try? JSONEncoder().encode(places) else { return }
-        write(data, toPendingFileNamed: WanderlySharedStorage.pendingPlacesFileName)
-    }
-
-    private func loadPendingReviewCandidates() -> [PendingReviewCandidate] {
-        guard let data = dataFromPendingFile(named: WanderlySharedStorage.pendingReviewCandidatesFileName) else {
-            return []
-        }
-        return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
-    }
-
-    private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
-        guard let data = try? JSONEncoder().encode(candidates) else { return }
-        write(data, toPendingFileNamed: WanderlySharedStorage.pendingReviewCandidatesFileName)
-    }
-
-    private func dataFromPendingFile(named fileName: String) -> Data? {
-        guard let url = pendingFileURL(named: fileName),
-              fileManager.fileExists(atPath: url.path) else {
-            return nil
-        }
-        return try? Data(contentsOf: url)
-    }
-
-    private func write(_ data: Data, toPendingFileNamed fileName: String) {
-        guard let url = pendingFileURL(named: fileName) else { return }
-        do {
-            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url, options: [.atomic])
-        } catch {
-            print("PendingPlaceImportService: failed to write \(fileName): \(error)")
+    private func appendPendingArray<Element: Codable>(_ items: [Element], named fileName: String) {
+        guard !items.isEmpty, let url = pendingFileURL(named: fileName) else { return }
+        coordinate(url: url, purpose: "append \(fileName)") {
+            do {
+                try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let existing = try loadArray([Element].self, from: url)
+                let data = try JSONEncoder().encode(existing + items)
+                try data.write(to: url, options: [.atomic])
+            } catch {
+                print("PendingPlaceImportService: failed to append \(fileName): \(error)")
+            }
         }
     }
 
-    private func removePendingFile(named fileName: String) {
-        guard let url = pendingFileURL(named: fileName),
-              fileManager.fileExists(atPath: url.path) else {
-            return
+    private func loadArray<Element: Decodable>(_ type: [Element].Type, from url: URL) throws -> [Element] {
+        guard fileManager.fileExists(atPath: url.path) else { return [] }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(type, from: data)
+    }
+
+    private func coordinate(url: URL, purpose: String, _ work: () -> Void) {
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        coordinator.coordinate(writingItemAt: url, options: [], error: &coordinationError) { _ in
+            work()
         }
-        try? fileManager.removeItem(at: url)
+        if let coordinationError {
+            print("PendingPlaceImportService: failed to coordinate \(purpose): \(coordinationError)")
+        }
     }
 
     private func pendingFileURL(named fileName: String) -> URL? {
