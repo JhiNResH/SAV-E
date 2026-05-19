@@ -2,8 +2,8 @@ import Foundation
 
 enum WanderlySharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
-    static let pendingPlacesKey = "pendingPlaces"
-    static let pendingReviewCandidatesKey = "pendingReviewCandidates"
+    static let pendingPlacesFileName = "pending-places.json"
+    static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
 }
 
 struct PendingSharedPlace: Codable {
@@ -63,16 +63,15 @@ struct PlaceReviewCandidate: Identifiable, Codable, Hashable {
 final class PendingPlaceImportService {
     static let shared = PendingPlaceImportService()
 
-    private let defaults: UserDefaults?
+    private let fileManager: FileManager
 
-    init(defaults: UserDefaults? = UserDefaults(suiteName: WanderlySharedStorage.appGroupSuiteName)) {
-        self.defaults = defaults
+    init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
     }
 
     func consumePendingPlaces() -> [PendingSharedPlace] {
-        guard let defaults else { return [] }
         let pending = loadPendingPlaces()
-        defaults.removeObject(forKey: WanderlySharedStorage.pendingPlacesKey)
+        removePendingFile(named: WanderlySharedStorage.pendingPlacesFileName)
         return pending
     }
 
@@ -83,9 +82,8 @@ final class PendingPlaceImportService {
     }
 
     func consumePendingReviewCandidates() -> [PendingReviewCandidate] {
-        guard let defaults else { return [] }
         let pending = loadPendingReviewCandidates()
-        defaults.removeObject(forKey: WanderlySharedStorage.pendingReviewCandidatesKey)
+        removePendingFile(named: WanderlySharedStorage.pendingReviewCandidatesFileName)
         return pending
     }
 
@@ -96,31 +94,60 @@ final class PendingPlaceImportService {
     }
 
     private func loadPendingPlaces() -> [PendingSharedPlace] {
-        guard let defaults else { return [] }
-        guard let data = defaults.data(forKey: WanderlySharedStorage.pendingPlacesKey) else {
+        guard let data = dataFromPendingFile(named: WanderlySharedStorage.pendingPlacesFileName) else {
             return []
         }
         return (try? JSONDecoder().decode([PendingSharedPlace].self, from: data)) ?? []
     }
 
     private func save(_ places: [PendingSharedPlace]) {
-        guard let defaults else { return }
         guard let data = try? JSONEncoder().encode(places) else { return }
-        defaults.set(data, forKey: WanderlySharedStorage.pendingPlacesKey)
+        write(data, toPendingFileNamed: WanderlySharedStorage.pendingPlacesFileName)
     }
 
     private func loadPendingReviewCandidates() -> [PendingReviewCandidate] {
-        guard let defaults else { return [] }
-        guard let data = defaults.data(forKey: WanderlySharedStorage.pendingReviewCandidatesKey) else {
+        guard let data = dataFromPendingFile(named: WanderlySharedStorage.pendingReviewCandidatesFileName) else {
             return []
         }
         return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
     }
 
     private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
-        guard let defaults else { return }
         guard let data = try? JSONEncoder().encode(candidates) else { return }
-        defaults.set(data, forKey: WanderlySharedStorage.pendingReviewCandidatesKey)
+        write(data, toPendingFileNamed: WanderlySharedStorage.pendingReviewCandidatesFileName)
+    }
+
+    private func dataFromPendingFile(named fileName: String) -> Data? {
+        guard let url = pendingFileURL(named: fileName),
+              fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+        return try? Data(contentsOf: url)
+    }
+
+    private func write(_ data: Data, toPendingFileNamed fileName: String) {
+        guard let url = pendingFileURL(named: fileName) else { return }
+        do {
+            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            print("PendingPlaceImportService: failed to write \(fileName): \(error)")
+        }
+    }
+
+    private func removePendingFile(named fileName: String) {
+        guard let url = pendingFileURL(named: fileName),
+              fileManager.fileExists(atPath: url.path) else {
+            return
+        }
+        try? fileManager.removeItem(at: url)
+    }
+
+    private func pendingFileURL(named fileName: String) -> URL? {
+        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) else {
+            return nil
+        }
+        return containerURL.appendingPathComponent(fileName)
     }
 }
 
