@@ -62,6 +62,13 @@ struct ProfileView: View {
 
                     // Settings section
                     VStack(spacing: 0) {
+                        NavigationLink {
+                            SaveMemoryDebugView()
+                        } label: {
+                            SettingsRow(icon: "tray.full", title: "Local Memory", color: .wanderlyTerracotta)
+                        }
+                        .buttonStyle(.plain)
+
                         SettingsRow(icon: "arrow.right.square", title: "Sign Out", color: .red) {
                             Task { await viewModel.signOut() }
                         }

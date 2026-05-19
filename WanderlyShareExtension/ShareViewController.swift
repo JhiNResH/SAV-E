@@ -73,6 +73,18 @@ private struct PendingReviewCandidate: Codable {
     var savedAt: Date
 }
 
+private struct ShareMemoryRecord: Codable {
+    var id: UUID
+    var state: String
+    var sourceURL: String?
+    var sourceText: String?
+    var title: String
+    var placeName: String?
+    var address: String?
+    var evidence: [String]
+    var createdAt: Date
+}
+
 // MARK: - Share Extension SwiftUI View
 
 struct ShareExtensionView: View {
@@ -459,6 +471,7 @@ struct ShareExtensionView: View {
                 parsedPlace = fallback
                 selectedCategory = fallback.category
             } else {
+                saveSourceOnlyMemory(parseContent, reason: error.localizedDescription)
                 parseError = userFacingParseError(from: error)
             }
         }
@@ -1337,6 +1350,37 @@ struct ShareExtensionView: View {
         return (try? JSONDecoder().decode([PendingReviewCandidate].self, from: data)) ?? []
     }
 
+    private func saveSourceOnlyMemory(_ source: String, reason: String) {
+        guard let defaults = UserDefaults(suiteName: WanderlySharedStorage.appGroupSuiteName),
+              let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) else {
+            return
+        }
+
+        let fileURL = containerURL.appendingPathComponent("save-memory-records.json")
+        var records = loadMemoryRecords(from: fileURL)
+        let record = ShareMemoryRecord(
+            id: UUID(),
+            state: "source_only",
+            sourceURL: URL(string: source)?.absoluteString ?? (sharedURL.isEmpty ? nil : sharedURL),
+            sourceText: sharedText.isEmpty ? reason : sharedText,
+            title: sharedTitle.isEmpty ? (URL(string: source)?.host() ?? "Shared source") : sharedTitle,
+            placeName: nil,
+            address: nil,
+            evidence: [reason].filter { !$0.isEmpty },
+            createdAt: Date()
+        )
+        records.insert(record, at: 0)
+
+        guard let data = try? JSONEncoder.shareMemory.encode(records) else { return }
+        try? data.write(to: fileURL, options: [.atomic])
+        defaults.synchronize()
+    }
+
+    private func loadMemoryRecords(from fileURL: URL) -> [ShareMemoryRecord] {
+        guard let data = try? Data(contentsOf: fileURL) else { return [] }
+        return (try? JSONDecoder.shareMemory.decode([ShareMemoryRecord].self, from: data)) ?? []
+    }
+
     // MARK: - Helpers
 
     private func iconForCategory(_ category: String) -> String {
@@ -1349,6 +1393,23 @@ struct ShareExtensionView: View {
         case "shopping": return "bag.fill"
         default: return "mappin"
         }
+    }
+}
+
+private extension JSONEncoder {
+    static var shareMemory: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }
+}
+
+private extension JSONDecoder {
+    static var shareMemory: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }
 
