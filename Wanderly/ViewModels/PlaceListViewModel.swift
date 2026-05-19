@@ -26,15 +26,18 @@ final class PlaceListViewModel: ObservableObject {
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
     private let pendingImportService: PendingPlaceImportService
+    private let saveLocalVaultService: SaveLocalVaultService
     private var importedPendingKeys: Set<String> = []
 
     init(
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
-        pendingImportService: PendingPlaceImportService = .shared
+        pendingImportService: PendingPlaceImportService = .shared,
+        saveLocalVaultService: SaveLocalVaultService = .shared
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
         self.pendingImportService = pendingImportService
+        self.saveLocalVaultService = saveLocalVaultService
     }
 
     var filteredPlaces: [Place] {
@@ -131,6 +134,7 @@ final class PlaceListViewModel: ObservableObject {
 
             do {
                 try await supabaseService.savePlace(place, userId: userId)
+                try? saveLocalVaultService.saveConfirmedPlace(place)
                 importedPendingKeys.insert(key)
                 importedPlaces.append(place)
             } catch {
@@ -153,6 +157,12 @@ final class PlaceListViewModel: ObservableObject {
         var failedCandidates: [PendingReviewCandidate] = []
 
         for candidate in pending {
+            do {
+                _ = try saveLocalVaultService.saveReviewCandidate(candidate)
+            } catch {
+                print("PlaceListViewModel: failed to mirror review candidate to local vault: \(error)")
+            }
+
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)

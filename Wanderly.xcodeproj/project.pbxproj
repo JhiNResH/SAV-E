@@ -28,7 +28,10 @@
 		47655ADFBDE28A5156D9DF2C /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25737D32F2BF5066893998E /* MapView.swift */; };
 		4A01A5213FE68F91763363A0 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DB21AFBADBB002A3C38EC5 /* ShareViewController.swift */; };
 		52DCC474C35F735154417A8D /* AIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5555D27FE182EFE3DDC93C /* AIResponse.swift */; };
+		55744843693323A5DA49375E /* SaveLocalVaultService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C09120C4FFC2D6CA18D10FDF /* SaveLocalVaultService.swift */; };
 		5ABFBF83CDFEF1512B2CD4A8 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48EDA3962FE01B51F63EB1B0 /* SupabaseService.swift */; };
+		64A68F19F5DDD030240FA986 /* SAVEAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE8A86F620D71B6551485114 /* SAVEAppShortcuts.swift */; };
+		64C0E31B837081F1259CE19A /* AskSaveMemoryIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4849E66E6A2A457D90597722 /* AskSaveMemoryIntent.swift */; };
 		66F92C2CA0CE791724D1D71F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E13C1C53E31D45A01D6519F5 /* Assets.xcassets */; };
 		6C2A34FA11F4149D5F1D26EA /* TripItineraryComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90A115430F100F0E9864CF3 /* TripItineraryComponent.swift */; };
 		6C452B24209329AC54B287F1 /* GoogleTakeoutImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA0D1693E6B1F8D87EE88DA /* GoogleTakeoutImportView.swift */; };
@@ -38,7 +41,10 @@
 		7D12FEF322E5753B2E2B1C58 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC8F70BFBB3AC56AADC443E /* Color+Theme.swift */; };
 		83E19CAE97D2B1701467240E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EAFBDA310E860F9B4B83E97F /* PrivacyInfo.xcprivacy */; };
 		8A13B9656469B56F6F99096A /* Place.swift in Sources */ = {isa = PBXBuildFile; fileRef = 077202B483361C14C41E6962 /* Place.swift */; };
+		8F3CBE1758875AD906D45736 /* SaveMemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CAC45BB8058CD2642E2A578 /* SaveMemoryRecord.swift */; };
+		917E129F589B3D0820EB4AAF /* SaveMemoryDebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CFEFFE39C4FB79943231A84 /* SaveMemoryDebugView.swift */; };
 		94A09F6F9A7C50033699A242 /* ClipContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F4C10AEE6E547B29704866 /* ClipContentView.swift */; };
+		95CA35085C85CE5B72DD2279 /* SavePlaceFromURLIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6416B0532D74DC9352BEBF /* SavePlaceFromURLIntent.swift */; };
 		990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C11340722858704F2CE328 /* SocialLinkReviewCandidateService.swift */; };
 		99C08C1AEBD94EC560476469 /* WanderlyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CE4BE52D193035348E4005 /* WanderlyApp.swift */; };
 		9EF348338705836E38E56F54 /* Privy in Frameworks */ = {isa = PBXBuildFile; productRef = 9AEC21E0AA21AA2589449ABB /* Privy */; };
@@ -114,8 +120,10 @@
 		05191C82E70D6C2149B74EB7 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		077202B483361C14C41E6962 /* Place.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Place.swift; sourceTree = "<group>"; };
 		09C48A9EF48A490DB7DD410A /* WanderlyAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanderlyAIService.swift; sourceTree = "<group>"; };
+		0CFEFFE39C4FB79943231A84 /* SaveMemoryDebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveMemoryDebugView.swift; sourceTree = "<group>"; };
 		12A0719A1B2AAA710A23B16F /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		16123E7668CFA95557CB27E0 /* WanderlyShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WanderlyShareExtension.entitlements; sourceTree = "<group>"; };
+		1CAC45BB8058CD2642E2A578 /* SaveMemoryRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveMemoryRecord.swift; sourceTree = "<group>"; };
 		1D14373C25E6C1A46308955A /* PlaceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceListView.swift; sourceTree = "<group>"; };
 		1DC8F70BFBB3AC56AADC443E /* Color+Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
 		28F79CFB6481B8E108DCAF01 /* PlaceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceCard.swift; sourceTree = "<group>"; };
@@ -124,9 +132,11 @@
 		368BBF02C223EF46EFCAD0D9 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		3939451E82A6558254D3250D /* GooglePlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesService.swift; sourceTree = "<group>"; };
 		3AB949B14D33E31CD3A280BB /* GoogleTakeoutImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleTakeoutImport.swift; sourceTree = "<group>"; };
+		3D6416B0532D74DC9352BEBF /* SavePlaceFromURLIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavePlaceFromURLIntent.swift; sourceTree = "<group>"; };
 		3DD7B4457DC96D743D1728AD /* AIDrawerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDrawerViewModel.swift; sourceTree = "<group>"; };
 		42CE4BE52D193035348E4005 /* WanderlyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanderlyApp.swift; sourceTree = "<group>"; };
 		43C8DECCE1214BDC52FE60EB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		4849E66E6A2A457D90597722 /* AskSaveMemoryIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskSaveMemoryIntent.swift; sourceTree = "<group>"; };
 		48EDA3962FE01B51F63EB1B0 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		4BA0D1693E6B1F8D87EE88DA /* GoogleTakeoutImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleTakeoutImportView.swift; sourceTree = "<group>"; };
 		5210F08F016F1E68361D82DB /* AIDrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDrawerView.swift; sourceTree = "<group>"; };
@@ -152,8 +162,10 @@
 		A57E086170BE289FC60E45C5 /* WanderlyClip.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WanderlyClip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A85A7930C0B725F89A6D9CD4 /* PlaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDetailView.swift; sourceTree = "<group>"; };
 		AA5555D27FE182EFE3DDC93C /* AIResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIResponse.swift; sourceTree = "<group>"; };
+		AE8A86F620D71B6551485114 /* SAVEAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAVEAppShortcuts.swift; sourceTree = "<group>"; };
 		B25737D32F2BF5066893998E /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		BA1EE43098CE11980FE39320 /* WanderlyClipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanderlyClipApp.swift; sourceTree = "<group>"; };
+		C09120C4FFC2D6CA18D10FDF /* SaveLocalVaultService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLocalVaultService.swift; sourceTree = "<group>"; };
 		C2F4C10AEE6E547B29704866 /* ClipContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipContentView.swift; sourceTree = "<group>"; };
 		C6332D88A442A562A21E3D73 /* NavigationCardComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCardComponent.swift; sourceTree = "<group>"; };
 		D361AE888D21B3766DD265FD /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
@@ -240,6 +252,7 @@
 			isa = PBXGroup;
 			children = (
 				05191C82E70D6C2149B74EB7 /* ProfileView.swift */,
+				0CFEFFE39C4FB79943231A84 /* SaveMemoryDebugView.swift */,
 				8960D65E893E5FDF9FCFF097 /* StatsView.swift */,
 			);
 			path = Profile;
@@ -252,6 +265,7 @@
 				007FD1658A93016422088CDF /* Wanderly.entitlements */,
 				32E51832748CB63131CE6E95 /* App */,
 				0E0FB99CC5E1C9FE6C389AAB /* Extensions */,
+				7A166E2C5298543E47F74C55 /* Intents */,
 				AB4310B0998D8FA59B28D7F4 /* Models */,
 				2D60648381DC9BE290145238 /* Resources */,
 				AC364BC3AE941D4BCBDAC818 /* Services */,
@@ -299,6 +313,16 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		7A166E2C5298543E47F74C55 /* Intents */ = {
+			isa = PBXGroup;
+			children = (
+				4849E66E6A2A457D90597722 /* AskSaveMemoryIntent.swift */,
+				AE8A86F620D71B6551485114 /* SAVEAppShortcuts.swift */,
+				3D6416B0532D74DC9352BEBF /* SavePlaceFromURLIntent.swift */,
+			);
+			path = Intents;
+			sourceTree = "<group>";
+		};
 		8C75D24BBF81B38093CE57B4 /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -342,6 +366,7 @@
 				AA5555D27FE182EFE3DDC93C /* AIResponse.swift */,
 				3AB949B14D33E31CD3A280BB /* GoogleTakeoutImport.swift */,
 				077202B483361C14C41E6962 /* Place.swift */,
+				1CAC45BB8058CD2642E2A578 /* SaveMemoryRecord.swift */,
 				02E74EF49B8A57D105D2D652 /* SharedTripData.swift */,
 				62A066A6F8F79E541E817AED /* Trip.swift */,
 				89976B73F7C977BD6F35B903 /* UserProfile.swift */,
@@ -359,6 +384,7 @@
 				368BBF02C223EF46EFCAD0D9 /* NavigationService.swift */,
 				DA5800871A09AE09EBFF9C32 /* PendingPlaceImportService.swift */,
 				2EA2DE34F0656884DCAB54CD /* PrivyAuthService.swift */,
+				C09120C4FFC2D6CA18D10FDF /* SaveLocalVaultService.swift */,
 				60C11340722858704F2CE328 /* SocialLinkReviewCandidateService.swift */,
 				48EDA3962FE01B51F63EB1B0 /* SupabaseService.swift */,
 				09C48A9EF48A490DB7DD410A /* WanderlyAIService.swift */,
@@ -636,6 +662,7 @@
 				348DE07F8D4F598B28DE45A6 /* AIDrawerViewModel.swift in Sources */,
 				76068D6F46F6328F2B1D2432 /* AIParsingService.swift in Sources */,
 				52DCC474C35F735154417A8D /* AIResponse.swift in Sources */,
+				64C0E31B837081F1259CE19A /* AskSaveMemoryIntent.swift in Sources */,
 				428BB50934904B5BD89A32E9 /* CategoryPill.swift in Sources */,
 				3C47D91BEEB572F207301996 /* ClipContentPreview.swift in Sources */,
 				7D12FEF322E5753B2E2B1C58 /* Color+Theme.swift in Sources */,
@@ -663,6 +690,11 @@
 				3940D24F410C832173C2A3F7 /* PrivyAuthService.swift in Sources */,
 				19637D9F3EDFF2329A9979DB /* ProfileView.swift in Sources */,
 				A8F6AF476904D7E0D48A302C /* ProfileViewModel.swift in Sources */,
+				64A68F19F5DDD030240FA986 /* SAVEAppShortcuts.swift in Sources */,
+				55744843693323A5DA49375E /* SaveLocalVaultService.swift in Sources */,
+				917E129F589B3D0820EB4AAF /* SaveMemoryDebugView.swift in Sources */,
+				8F3CBE1758875AD906D45736 /* SaveMemoryRecord.swift in Sources */,
+				95CA35085C85CE5B72DD2279 /* SavePlaceFromURLIntent.swift in Sources */,
 				0FEEB8D7A11D001D3AD43F40 /* SharedTripData.swift in Sources */,
 				990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */,
 				F43D54ECBE89485DA5C13A03 /* StatsView.swift in Sources */,

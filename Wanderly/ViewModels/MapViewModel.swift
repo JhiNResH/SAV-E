@@ -35,6 +35,7 @@ final class MapViewModel: ObservableObject {
     private let locationService: LocationService
     private let googlePlacesService: GooglePlacesServiceProtocol
     private let socialLinkReviewCandidateService: SocialLinkReviewCandidateService
+    private let saveLocalVaultService: SaveLocalVaultService
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
 
@@ -43,7 +44,8 @@ final class MapViewModel: ObservableObject {
         pendingImportService: PendingPlaceImportService = .shared,
         locationService: LocationService? = nil,
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
-        socialLinkReviewCandidateService: SocialLinkReviewCandidateService = .shared
+        socialLinkReviewCandidateService: SocialLinkReviewCandidateService = .shared,
+        saveLocalVaultService: SaveLocalVaultService = .shared
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
@@ -51,6 +53,7 @@ final class MapViewModel: ObservableObject {
         self.locationService = locationService ?? .shared
         self.googlePlacesService = googlePlacesService
         self.socialLinkReviewCandidateService = socialLinkReviewCandidateService
+        self.saveLocalVaultService = saveLocalVaultService
     }
 
     // MARK: - Computed
@@ -136,6 +139,7 @@ final class MapViewModel: ObservableObject {
 
             do {
                 try await supabaseService.savePlace(place, userId: userId)
+                mirrorToLocalVault(place)
                 importedPlaces.append(place)
             } catch {
                 failedImports.append(pendingPlace)
@@ -167,6 +171,7 @@ final class MapViewModel: ObservableObject {
         var failedCandidates: [PendingReviewCandidate] = []
 
         for candidate in pending {
+            mirrorToLocalVault(candidate)
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)
@@ -191,8 +196,10 @@ final class MapViewModel: ObservableObject {
             throw SupabaseError.notAuthenticated
         }
 
+        try? saveLocalVaultService.saveSourceOnly(url: url)
         let candidates = try await socialLinkReviewCandidateService.reviewCandidates(from: url)
         for candidate in candidates {
+            mirrorToLocalVault(candidate)
             let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
             try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)
         }
@@ -224,6 +231,7 @@ final class MapViewModel: ObservableObject {
 
         try await supabaseService.savePlace(place, userId: userId)
         try await supabaseService.updatePlaceCandidateStatus(candidate.id, status: "saved", placeId: place.id)
+        mirrorToLocalVault(place)
         places = [place] + places
         reviewCandidates.removeAll { $0.id == candidate.id }
         revealImportedPlaces([place])
@@ -246,6 +254,30 @@ final class MapViewModel: ObservableObject {
     private func updateLocalCandidate(_ candidateId: UUID, status: String) {
         guard let index = reviewCandidates.firstIndex(where: { $0.id == candidateId }) else { return }
         reviewCandidates[index].status = status
+    }
+
+    private func mirrorToLocalVault(_ candidate: PendingReviewCandidate) {
+        do {
+            _ = try saveLocalVaultService.saveReviewCandidate(candidate)
+        } catch {
+            print("MapViewModel: failed to mirror pending candidate to local vault: \(error)")
+        }
+    }
+
+    private func mirrorToLocalVault(_ candidate: PlaceReviewCandidate) {
+        do {
+            _ = try saveLocalVaultService.saveReviewCandidate(candidate)
+        } catch {
+            print("MapViewModel: failed to mirror review candidate to local vault: \(error)")
+        }
+    }
+
+    private func mirrorToLocalVault(_ place: Place) {
+        do {
+            _ = try saveLocalVaultService.saveConfirmedPlace(place)
+        } catch {
+            print("MapViewModel: failed to mirror confirmed place to local vault: \(error)")
+        }
     }
 
     private func revealImportedPlaces(_ importedPlaces: [Place]) {
