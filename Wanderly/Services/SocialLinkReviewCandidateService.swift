@@ -28,8 +28,15 @@ final class SocialLinkReviewCandidateService {
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
 
-        var candidates = numberedCandidates(from: evidenceText, sourceURL: metadata.resolvedURL ?? url.absoluteString)
-        if candidates.isEmpty, let handleCandidate = handleCandidate(from: evidenceText, sourceURL: metadata.resolvedURL ?? url.absoluteString) {
+        let sourceURL = metadata.resolvedURL ?? url.absoluteString
+        var candidates = numberedCandidates(from: evidenceText, sourceURL: sourceURL)
+        if candidates.isEmpty, let captionCandidate = captionNamedCandidate(from: evidenceText, sourceURL: sourceURL) {
+            candidates = [captionCandidate]
+        }
+        if candidates.isEmpty, let lineCandidate = captionLineCandidate(from: evidenceText, sourceURL: sourceURL) {
+            candidates = [lineCandidate]
+        }
+        if candidates.isEmpty, let handleCandidate = handleCandidate(from: evidenceText, sourceURL: sourceURL) {
             candidates = [handleCandidate]
         }
 
@@ -124,6 +131,57 @@ final class SocialLinkReviewCandidateService {
         }
     }
 
+    private func captionNamedCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
+        guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        var evidence = [
+            "Source URL: \(sourceURL)",
+            "Public metadata named place: \(name)"
+        ]
+        if !address.isEmpty {
+            evidence.append("Location clue: \(address)")
+        }
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(500)))
+        }
+
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: address,
+            category: category(from: "\(name) \(evidenceText)"),
+            sourceURL: sourceURL,
+            sourceText: evidenceText,
+            evidence: evidence,
+            confidence: address.isEmpty ? 0.5 : 0.62,
+            missingInfo: missingInfo(hasAddress: !address.isEmpty),
+            savedAt: Date()
+        )
+    }
+
+    private func captionLineCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
+        guard let inferred = inferredPlaceLineBeforeAddress(in: evidenceText) else { return nil }
+        var evidence = [
+            "Source URL: \(sourceURL)",
+            "Public metadata place line: \(inferred.name)",
+            "Location clue: \(inferred.address)"
+        ]
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(500)))
+        }
+
+        return PendingReviewCandidate(
+            candidateName: inferred.name,
+            address: inferred.address,
+            category: category(from: "\(inferred.name) \(evidenceText)"),
+            sourceURL: sourceURL,
+            sourceText: evidenceText,
+            evidence: evidence,
+            confidence: 0.6,
+            missingInfo: missingInfo(hasAddress: true),
+            savedAt: Date()
+        )
+    }
+
     private func handleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
@@ -159,6 +217,22 @@ final class SocialLinkReviewCandidateService {
         return String(line[nameRange])
     }
 
+    private func bracketedPlaceName(in text: String) -> String? {
+        let patterns = [
+            #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
+            #"(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
+        ]
+        for pattern in patterns {
+            if let match = firstCapture(in: text, pattern: pattern) {
+                let cleaned = cleanCandidateName(match)
+                if isUsableCandidateName(cleaned) {
+                    return cleaned
+                }
+            }
+        }
+        return nil
+    }
+
     private func firstLocationPin(in text: String) -> String? {
         let patterns = [
             #"📍\s*([^\n\r\.]+)"#,
@@ -171,6 +245,64 @@ final class SocialLinkReviewCandidateService {
             }
         }
         return nil
+    }
+
+    private func inferredPlaceLineBeforeAddress(in text: String) -> (name: String, address: String)? {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map(cleanHTMLText)
+            .filter { !$0.isEmpty }
+
+        guard lines.count >= 2 else { return nil }
+
+        for (index, line) in lines.enumerated() where looksLikeAddressLine(line) {
+            var previousIndex = index - 1
+            while previousIndex >= 0 {
+                let candidate = cleanCandidateName(lines[previousIndex])
+                if isLikelyCaptionPlaceName(candidate) {
+                    return (candidate, line)
+                }
+                previousIndex -= 1
+            }
+        }
+        return nil
+    }
+
+    private func streetAddressLine(in text: String) -> String? {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map(cleanHTMLText)
+            .filter { !$0.isEmpty }
+        return lines.first(where: looksLikeAddressLine)
+    }
+
+    private func looksLikeAddressLine(_ line: String) -> Bool {
+        let patterns = [
+            #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
+            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
+            #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
+            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|号|號)"#
+        ]
+        return patterns.contains { pattern in
+            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    private func isLikelyCaptionPlaceName(_ value: String) -> Bool {
+        guard isUsableCandidateName(value) else { return false }
+        let lowered = value.lowercased()
+        guard !looksLikeAddressLine(value),
+              !lowered.contains("likes"),
+              !lowered.contains("comments"),
+              !lowered.contains(" on instagram"),
+              !lowered.contains("casual"),
+              !lowered.contains("dream"),
+              !lowered.contains("follow"),
+              !lowered.contains("save this"),
+              !lowered.contains("located") else {
+            return false
+        }
+        return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
     }
 
     private func cityAddress(in text: String) -> String? {
