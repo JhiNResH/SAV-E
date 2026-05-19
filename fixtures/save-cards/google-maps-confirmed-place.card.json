@@ -1,0 +1,43 @@
+{
+  "schema": "save.card.v0",
+  "cardType": "place_card",
+  "id": "save_google_maps_ulaman_confirmed",
+  "title": "Google Maps confirmed place: Ulaman Bali",
+  "createdAt": "2026-05-19T00:10:00Z",
+  "createdBy": "local:jhinresh",
+  "visibility": "private",
+  "source": {
+    "kind": "google_maps",
+    "url": "https://www.google.com/maps/place/Ulaman+Bali/@-8.5929653,115.1305649,17z"
+  },
+  "places": [
+    {
+      "name": "Ulaman Eco Luxury Resort",
+      "address": "Ulaman Road, Buwit, Kediri, Tabanan Regency, Bali 82121",
+      "geo": {
+        "latitude": -8.5929653,
+        "longitude": 115.1305649
+      },
+      "status": "confirmed_place",
+      "confidence": 0.95,
+      "proofLevel": "map_confirmed",
+      "evidence": [
+        "Google Maps URL includes explicit coordinates.",
+        "Address and place name are present in the map source."
+      ],
+      "missingInfo": []
+    }
+  ],
+  "humanSummary": "This private card can be imported as a confirmed place because the map link includes reliable coordinates.",
+  "agentInstructions": [
+    "This card may be saved as a confirmed place.",
+    "Do not expose private notes unless the user explicitly shares the card."
+  ],
+  "redactions": [],
+  "actions": [
+    "save",
+    "open_maps",
+    "ask_agent",
+    "import"
+  ]
+}

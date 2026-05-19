@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export -p web && node scripts/patch-web-bundle.js",
-    "check:import-links": "node scripts/check-import-link-fixtures.js"
+    "check:import-links": "node scripts/check-import-link-fixtures.js",
+    "check:save-cards": "node scripts/check-save-card-fixtures.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
