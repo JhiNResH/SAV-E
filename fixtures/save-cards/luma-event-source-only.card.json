@@ -1,0 +1,48 @@
+{
+  "schema": "save.card.v0",
+  "cardType": "place_card",
+  "id": "save_luma_agent_dinner_source_only",
+  "title": "Luma event source-only card",
+  "createdAt": "2026-05-19T00:05:00Z",
+  "createdBy": "local:jhinresh",
+  "visibility": "private",
+  "source": {
+    "kind": "luma",
+    "url": "https://lu.ma/save-agent-dinner-at-riverside-hall"
+  },
+  "places": [
+    {
+      "name": "Riverside Hall",
+      "address": "",
+      "geo": null,
+      "status": "source_only",
+      "confidence": 0.32,
+      "proofLevel": "source_link",
+      "evidence": [
+        "Event URL suggests a venue name but does not expose a reliable public address in this fixture.",
+        "Exact event address may be hidden until RSVP approval."
+      ],
+      "missingInfo": [
+        "Exact address hidden or unavailable",
+        "Confirm event venue",
+        "Confirm coordinates"
+      ]
+    }
+  ],
+  "humanSummary": "This private card preserves a Luma event source without pretending the hidden address is known.",
+  "agentInstructions": [
+    "Treat this as private source memory.",
+    "Ask the user for RSVP context or a map link before planning route logistics."
+  ],
+  "redactions": [
+    {
+      "field": "places[0].address",
+      "reason": "Exact event address is hidden until user confirms access."
+    }
+  ],
+  "actions": [
+    "save",
+    "ask_agent",
+    "import"
+  ]
+}

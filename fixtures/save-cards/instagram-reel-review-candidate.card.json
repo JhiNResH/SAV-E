@@ -1,0 +1,44 @@
+{
+  "schema": "save.card.v0",
+  "cardType": "place_card",
+  "id": "save_ig_ulaman_review_candidate",
+  "title": "Instagram reel candidate: Ulaman Bali",
+  "createdAt": "2026-05-19T00:00:00Z",
+  "createdBy": "local:jhinresh",
+  "visibility": "private",
+  "source": {
+    "kind": "instagram",
+    "url": "https://www.instagram.com/reel/DWfT8pUpMlv/"
+  },
+  "places": [
+    {
+      "name": "Ulaman Eco Luxury Resort",
+      "address": "",
+      "geo": null,
+      "status": "review_candidate",
+      "confidence": 0.74,
+      "proofLevel": "source_link",
+      "evidence": [
+        "Public reel metadata mentions @ulamanbali.",
+        "Visual/context evidence should be reviewed before saving as a confirmed place."
+      ],
+      "missingInfo": [
+        "Confirm official address",
+        "Confirm coordinates",
+        "Cross-check with map listing"
+      ]
+    }
+  ],
+  "humanSummary": "SAV-E found a likely place signal from an Instagram reel, but it should remain a private review candidate until the address and coordinates are confirmed.",
+  "agentInstructions": [
+    "Do not save as a confirmed place until a map listing or official source corroborates the venue.",
+    "Use this card as review-candidate memory, not as a public recommendation."
+  ],
+  "redactions": [],
+  "actions": [
+    "save",
+    "open_maps",
+    "ask_agent",
+    "import"
+  ]
+}
