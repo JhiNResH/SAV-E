@@ -43,6 +43,19 @@ private enum WanderlySharedStorage {
     static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
 }
 
+private enum SaveTheme {
+    static let blush = Color(hex: "FFF6F8")
+    static let peach = Color(hex: "FFF1D8")
+    static let cream = Color(hex: "FFF8E8")
+    static let mint = Color(hex: "F1FBF5")
+    static let berry = Color(hex: "E8849B")
+    static let cocoa = Color(hex: "6B4E57")
+    static let rose = Color(hex: "9B6B78")
+    static let honey = Color(hex: "F4B860")
+    static let sky = Color(hex: "BEE7F8")
+    static let card = Color.white.opacity(0.82)
+}
+
 private struct PendingSharedPlace: Codable {
     var name: String
     var address: String
@@ -114,18 +127,18 @@ struct ShareExtensionView: View {
                             Circle()
                                 .fill(Color.white.opacity(0.72))
                                 .frame(width: 84, height: 84)
-                                .shadow(color: Color(hex: "F3A6B6").opacity(0.22), radius: 18, y: 8)
+                                .shadow(color: SaveTheme.berry.opacity(0.22), radius: 18, y: 8)
                             Text("🐾")
                                 .font(.system(size: 34))
                             ProgressView()
                                 .scaleEffect(0.9)
-                                .tint(Color(hex: "E8849B"))
+                                .tint(SaveTheme.berry)
                                 .offset(y: 42)
                         }
 
                         Text("SAV-E is sniffing for a place...")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(Color(hex: "6B4E57"))
+                            .foregroundColor(SaveTheme.cocoa)
                     }
                     .frame(maxHeight: .infinity)
                 } else if isSaved {
@@ -149,9 +162,9 @@ struct ShareExtensionView: View {
                             .padding(.horizontal, 24)
                     }
                     .padding(24)
-                    .background(Color.white.opacity(0.78))
+                    .background(SaveTheme.card)
                     .cornerRadius(28)
-                    .shadow(color: Color(hex: "E8849B").opacity(0.16), radius: 20, y: 10)
+                    .shadow(color: SaveTheme.berry.opacity(0.16), radius: 20, y: 10)
                     .frame(maxHeight: .infinity)
                 } else if let error = parseError {
                     VStack(spacing: 16) {
@@ -162,18 +175,18 @@ struct ShareExtensionView: View {
                             .foregroundColor(Color(hex: "2C2C2E"))
                         Text(error)
                             .font(.subheadline)
-                            .foregroundColor(Color(hex: "6B4E57"))
+                            .foregroundColor(SaveTheme.cocoa)
                             .multilineTextAlignment(.center)
                             .lineSpacing(3)
                         Text("Try sharing a map link, a clearer caption, or a frame with the place name 💌")
                             .font(.caption)
-                            .foregroundColor(Color(hex: "9B6B78"))
+                            .foregroundColor(SaveTheme.rose)
                             .multilineTextAlignment(.center)
                     }
                     .padding(24)
-                    .background(Color.white.opacity(0.82))
+                    .background(SaveTheme.card)
                     .cornerRadius(28)
-                    .shadow(color: Color(hex: "E8849B").opacity(0.16), radius: 20, y: 10)
+                    .shadow(color: SaveTheme.berry.opacity(0.16), radius: 20, y: 10)
                     .frame(maxHeight: .infinity)
                     .padding(.horizontal, 20)
                 } else if !reviewCandidates.isEmpty {
@@ -186,7 +199,7 @@ struct ShareExtensionView: View {
             }
             .background(
                 LinearGradient(
-                    colors: [Color(hex: "FFF6F8"), Color(hex: "FFF8E8"), Color(hex: "F1FBF5")],
+                    colors: [SaveTheme.blush, SaveTheme.cream, SaveTheme.mint],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -212,7 +225,7 @@ struct ShareExtensionView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Parsed place card
             VStack(alignment: .leading, spacing: 8) {
-                Text("Detected Place")
+                Text("Ready to save")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -290,7 +303,7 @@ struct ShareExtensionView: View {
 
             // Save button
             Button(action: savePlace) {
-                Text("Save to Map")
+                Text("Save Map Stamp")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -308,13 +321,13 @@ struct ShareExtensionView: View {
                 Text(candidates.count == 1 ? "Tiny clue found" : "Tiny clues found")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(Color(hex: "9B6B78"))
+                    .foregroundColor(SaveTheme.rose)
 
                 HStack {
                     Text("🔎")
                         .font(.system(size: 24))
                         .frame(width: 42, height: 42)
-                        .background(Color(hex: "FFE1EA"))
+                        .background(SaveTheme.blush)
                         .cornerRadius(14)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -329,15 +342,15 @@ struct ShareExtensionView: View {
                     Spacer()
                 }
 
-                Text("SAV-E spotted a likely place signal. Give it a quick Review cuddle before it becomes a saved place.")
+                Text("SAV-E found a tiny place clue. Check the evidence, then hatch it into a saved memory.")
                     .font(.caption)
-                    .foregroundColor(Color(hex: "6B4E57"))
+                    .foregroundColor(SaveTheme.cocoa)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding()
-            .background(Color.white.opacity(0.82))
+            .background(SaveTheme.card)
             .cornerRadius(24)
-            .shadow(color: Color(hex: "E8849B").opacity(0.13), radius: 18, y: 8)
+            .shadow(color: SaveTheme.berry.opacity(0.13), radius: 18, y: 8)
 
             if candidates.count > 1 {
                 ScrollView {
@@ -354,7 +367,7 @@ struct ShareExtensionView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(10)
-                            .background(Color.white.opacity(0.72))
+                            .background(SaveTheme.card)
                             .cornerRadius(14)
                         }
                     }
@@ -381,9 +394,9 @@ struct ShareExtensionView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color(hex: "E8849B"))
+                    .background(SaveTheme.berry)
                     .cornerRadius(20)
-                    .shadow(color: Color(hex: "E8849B").opacity(0.25), radius: 12, y: 6)
+                    .shadow(color: SaveTheme.berry.opacity(0.25), radius: 12, y: 6)
             }
         }
         .padding()

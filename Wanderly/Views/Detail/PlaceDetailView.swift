@@ -13,40 +13,7 @@ struct PlaceDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Photo carousel placeholder
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.wanderlySage.opacity(0.15))
-                        .frame(height: 220)
-
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.largeTitle)
-                            .foregroundColor(.wanderlySage)
-                        Text("Photos from \(place.sourcePlatform.displayName)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal)
-
-                // Name and status
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.wanderlyCharcoal)
-                        Text(place.address)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-
-                    CategoryPill(category: place.category, isSelected: true)
-                }
-                .padding(.horizontal)
+                memoryHeader
 
                 // Info grid
                 VStack(spacing: 12) {
@@ -214,6 +181,70 @@ struct PlaceDetailView: View {
         } message: {
             Text("This removes the saved place from SAV-E.")
         }
+    }
+
+    private var memoryHeader: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: place.category.iconName)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(Color.saveStampForeground(for: place.category))
+                    .frame(width: 64, height: 64)
+                    .background(Color.saveStampColor(for: place.category))
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.white.opacity(0.88), lineWidth: 2)
+                    )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(place.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.wanderlyCharcoal)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        PlatformIcon(platform: place.sourcePlatform, size: 14)
+                        Text("Saved from \(place.sourcePlatform.displayName)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.saveRose)
+                    }
+
+                    HStack(spacing: 8) {
+                        CategoryPill(category: place.category, isSelected: true)
+                        Text(place.status == .visited ? "Visited" : "Memory saved")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(place.status == .visited ? .saveCocoa : .saveBerry)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(place.status == .visited ? Color.saveMint : Color.saveBlush)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+
+            Text(place.address)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.saveBlush, Color.saveCream, Color.saveMint],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+        )
+        .shadow(color: Color.saveCocoa.opacity(0.08), radius: 14, y: 8)
+        .padding(.horizontal)
     }
 
     private func openInMaps() {

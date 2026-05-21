@@ -384,7 +384,7 @@ struct AIDrawerView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         DrawerActionChip(
-                            title: "My Places",
+                            title: "Memories",
                             systemImage: "list.bullet",
                             count: nil,
                             action: { viewModel.showPlaceList = true }
@@ -398,8 +398,8 @@ struct AIDrawerView: View {
                         )
 
                         DrawerActionChip(
-                            title: "Review",
-                            systemImage: "checklist.unchecked",
+                            title: "Nest",
+                            systemImage: "bird",
                             count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
                             action: openReviewInbox
                         )
@@ -484,11 +484,11 @@ struct AIDrawerView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("SAV-E commands")
+                    Text("SAV-E’s Backpack")
                         .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.wanderlyCharcoal)
-                    Text("Give the agent a link, media, or notes. SAV-E investigates first, then asks before saving.")
+                    Text("Drop in a link, screenshot, or note. SAV-E will sniff for the real place before saving.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -496,85 +496,39 @@ struct AIDrawerView: View {
 
                 Spacer()
 
-                Text("\(viewModel.places.count)")
-                    .font(.caption.monospacedDigit())
-                    .fontWeight(.semibold)
-                    .foregroundColor(.wanderlyTerracotta)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.wanderlyTerracotta.opacity(0.1))
-                    .clipShape(Capsule())
+                VStack(alignment: .trailing, spacing: 4) {
+                    CountPill(text: "\(viewModel.places.count) memories", color: .saveBerry)
+                    CountPill(text: "\(reviewCandidates.count) clues waiting", color: .saveHoney)
+                }
             }
 
             LazyVGrid(columns: addSpotColumns, spacing: 10) {
                 AgentCommandCard(
-                    icon: "camera.viewfinder",
-                    title: "Investigate link",
+                    icon: "pawprint.fill",
+                    title: "Sniff a Link 🐾",
                     subtitle: "IG, TikTok, XHS, article, or map URL",
-                    commandLabel: "returns candidates",
+                    commandLabel: "returns clues",
                     tone: .terracotta
                 ) {
                     focusSocialInvestigationPrompt()
                 }
 
                 AgentCommandCard(
-                    icon: "link",
-                    title: "Import clipboard",
-                    subtitle: "Read one copied URL into the agent",
-                    commandLabel: "checks metadata",
-                    tone: .sage
-                ) {
-                    importClipboardURL()
-                }
-
-                AgentCommandCard(
-                    icon: "note.text",
-                    title: "Parse notes",
-                    subtitle: "Turn pasted lists into review candidates",
-                    commandLabel: "no auto-save",
+                    icon: "bird.fill",
+                    title: "Review Clues 🪺",
+                    subtitle: "Check evidence before saving",
+                    commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
                     tone: .amber
                 ) {
-                    focusAgentPrompt("""
-                    Turn these notes into reviewable place candidates.
-
-                    Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
-
-                    Notes:
-                    """)
+                    openReviewInbox()
                 }
 
                 AgentCommandCard(
-                    icon: "doc.viewfinder",
-                    title: "Media Evidence",
-                    subtitle: "Use screenshots or files as evidence",
-                    commandLabel: "investigates",
-                    tone: .blue
-                ) {
-                    focusMediaEvidencePrompt()
-                }
-
-                AgentCommandCard(
-                    icon: "magnifyingglass",
-                    title: "Find venue",
-                    subtitle: "Resolve a fuzzy place into a real spot",
-                    commandLabel: "verifies address",
-                    tone: .charcoal
-                ) {
-                    focusAgentPrompt("""
-                    Find the real venue for this place idea and return review candidates with evidence.
-
-                    Include official name, address, city, source links, confidence, and whether it is safe to save. Do not save automatically.
-
-                    Place idea:
-                    """)
-                }
-
-                AgentCommandCard(
-                    icon: "sparkles.rectangle.stack",
-                    title: "Plan saved spots",
+                    icon: "suitcase.rolling.fill",
+                    title: "Plan Memories 🧳",
                     subtitle: "Build a route from confirmed places",
-                    commandLabel: "uses saved places",
-                    tone: .terracotta
+                    commandLabel: "uses saved spots",
+                    tone: .blue
                 ) {
                     focusAgentPrompt("""
                     Help me organize my saved places into a practical plan.
@@ -584,22 +538,76 @@ struct AIDrawerView: View {
                 }
             }
 
+            LazyVGrid(columns: addSpotColumns, spacing: 10) {
+                AgentCommandCard(
+                    icon: "link",
+                    title: "Clipboard 💌",
+                    subtitle: "Read one copied URL into SAV-E",
+                    commandLabel: "checks metadata",
+                    tone: .sage
+                ) {
+                    importClipboardURL()
+                }
+
+                AgentCommandCard(
+                    icon: "note.text",
+                    title: "Notes 📓",
+                    subtitle: "Turn pasted lists into review clues",
+                    commandLabel: "no auto-save",
+                    tone: .amber
+                ) {
+                    focusAgentPrompt("""
+                    Turn these notes into reviewable place clues.
+
+                    Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
+
+                    Notes:
+                    """)
+                }
+
+                AgentCommandCard(
+                    icon: "doc.viewfinder",
+                    title: "Screenshot 🔎",
+                    subtitle: "Use screenshots or files as evidence",
+                    commandLabel: "investigates",
+                    tone: .blue
+                ) {
+                    focusMediaEvidencePrompt()
+                }
+
+                AgentCommandCard(
+                    icon: "location.magnifyingglass",
+                    title: "Find Venue 🧭",
+                    subtitle: "Resolve a fuzzy place into a real spot",
+                    commandLabel: "verifies address",
+                    tone: .charcoal
+                ) {
+                    focusAgentPrompt("""
+                    Find the real venue for this place idea and return review clues with evidence.
+
+                    Include official name, address, city, source links, confidence, and whether it is safe to save. Do not save automatically.
+
+                    Place idea:
+                    """)
+                }
+            }
+
             ReviewCandidatesSection(
                 candidates: reviewCandidates,
                 limit: 2,
                 actionInFlight: candidateActionInFlight,
                 onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Candidate confirmed. Save it once the coordinates are reliable.") {
+                    performCandidateAction(candidate, successMessage: "Clue marked as looking right. Hatch it once coordinates are reliable.") {
                         try await onConfirmCandidate(candidate)
                     }
                 },
                 onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Candidate rejected.") {
+                    performCandidateAction(candidate, successMessage: "Clue removed from the nest.") {
                         try await onRejectCandidate(candidate)
                     }
                 },
                 onSave: { candidate in
-                    performCandidateAction(candidate, successMessage: "Saved as a place.") {
+                    performCandidateAction(candidate, successMessage: "Hatched into a saved memory.") {
                         try await onSaveCandidate(candidate)
                     }
                 }
@@ -622,11 +630,11 @@ struct AIDrawerView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Review inbox")
+                        Text("Review Nest 🪺")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.wanderlyCharcoal)
-                        Text("Candidates wait here until you confirm, reject, or refine them into saved places.")
+                        Text("Clues wait here until you check the evidence and hatch them into saved memories.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -638,7 +646,7 @@ struct AIDrawerView: View {
                         showReviewInbox = false
                         withAnimation { drawerDetent = .medium }
                     }) {
-                        Label("Commands", systemImage: "sparkles")
+                        Label("Backpack", systemImage: "backpack")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.wanderlyTerracotta)
@@ -654,17 +662,17 @@ struct AIDrawerView: View {
                     limit: nil,
                     actionInFlight: candidateActionInFlight,
                     onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Candidate confirmed. Save it once the coordinates are reliable.") {
+                        performCandidateAction(candidate, successMessage: "Clue marked as looking right. Hatch it once coordinates are reliable.") {
                             try await onConfirmCandidate(candidate)
                         }
                     },
                     onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Candidate rejected.") {
+                        performCandidateAction(candidate, successMessage: "Clue removed from the nest.") {
                             try await onRejectCandidate(candidate)
                         }
                     },
                     onSave: { candidate in
-                        performCandidateAction(candidate, successMessage: "Saved as a place.") {
+                        performCandidateAction(candidate, successMessage: "Hatched into a saved memory.") {
                             try await onSaveCandidate(candidate)
                         }
                     }
@@ -732,7 +740,7 @@ struct AIDrawerView: View {
             return
         }
 
-        addSpotStatus = "Clipboard link loaded. SAV-E will ask before saving."
+        addSpotStatus = "Clipboard link loaded. SAV-E will add clues before saving."
         importURLToReviewCandidates(url)
     }
 
@@ -793,7 +801,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         searchFocused = false
         isImportingURL = true
-        addSpotStatus = "Analyzing public metadata and adding candidates for review..."
+        addSpotStatus = "Sniffing public metadata and tucking clues into Review Nest..."
         viewModel.returnToCommands()
         withAnimation { drawerDetent = .medium }
 
@@ -801,8 +809,8 @@ struct AIDrawerView: View {
             do {
                 let count = try await onImportURLAsReviewCandidates(url)
                 addSpotStatus = count == 1
-                    ? "Added 1 candidate to Review. Confirm it before saving."
-                    : "Added \(count) candidates to Review. Confirm them before saving."
+                    ? "Added 1 clue to Review Nest. Check evidence before hatching it."
+                    : "Added \(count) clues to Review Nest. Check evidence before hatching them."
                 openReviewInbox()
             } catch {
                 addSpotStatus = error.localizedDescription
@@ -824,7 +832,7 @@ private struct ReviewCandidatesSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Review candidates", systemImage: "checklist.unchecked")
+                Label("Review Nest", systemImage: "bird")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.wanderlyCharcoal)
@@ -862,20 +870,20 @@ private struct ReviewCandidatesSection: View {
 private struct ReviewCandidatesEmptyState: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "checklist.unchecked")
+            Image(systemName: "bird")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.wanderlyTerracotta)
+                .foregroundColor(.saveBerry)
                 .frame(width: 34, height: 34)
-                .background(Color.wanderlyTerracotta.opacity(0.1))
+                .background(Color.saveBlush)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("No pending candidates")
+                Text("No clues waiting")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.wanderlyCharcoal)
 
-                Text("Shared links, media evidence, and unresolved imports will land here for confirmation before they become saved places.")
+                Text("Share a post, screenshot, or map link for SAV-E to sniff. Uncertain places land here before they become saved memories.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -905,11 +913,11 @@ private struct ReviewCandidateCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: candidate.hasReliableCoordinates ? "mappin.and.ellipse" : "location.slash")
+                Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "leaf.fill")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(candidate.hasReliableCoordinates ? .wanderlySage : .wanderlyAmber)
+                    .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
                     .frame(width: 34, height: 34)
-                    .background((candidate.hasReliableCoordinates ? Color.wanderlySage : Color.wanderlyAmber).opacity(0.12))
+                    .background(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -919,7 +927,7 @@ private struct ReviewCandidateCard: View {
                         .foregroundColor(.wanderlyCharcoal)
                         .lineLimit(2)
 
-                    Text(candidate.address.isEmpty ? "Needs address or map link" : candidate.address)
+                    Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
@@ -942,27 +950,44 @@ private struct ReviewCandidateCard: View {
             }
 
             if !candidate.hasReliableCoordinates {
-                Text("Saving requires Google Places refinement or a map link.")
+                Text("Hatching needs Google Places refinement or a map link.")
                     .font(.caption2)
                     .foregroundColor(.wanderlyTerracotta)
             }
 
             HStack(spacing: 8) {
-                CandidateActionButton(title: "Confirm", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
-                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Save" : "Refine + Save", systemImage: "tray.and.arrow.down", disabled: isWorking, action: onSave)
-                CandidateActionButton(title: "Reject", systemImage: "xmark", disabled: isWorking, action: onReject)
+                CandidateActionButton(title: "Looks right", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
+                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch Memory" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
+                CandidateActionButton(title: "Not this", systemImage: "xmark", disabled: isWorking, action: onReject)
             }
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.68))
+                .fill(Color.saveCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.wanderlyCharcoal.opacity(0.08), lineWidth: 1)
                 )
         )
         .opacity(isWorking ? 0.65 : 1)
+    }
+}
+
+private struct CountPill: View {
+    var text: String
+    var color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.monospacedDigit().weight(.bold))
+            .foregroundColor(.saveCocoa)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.18))
+            .clipShape(Capsule())
     }
 }
 
@@ -1056,11 +1081,11 @@ private struct AgentCommandCard: View {
 
         var color: Color {
             switch self {
-            case .terracotta: return .wanderlyTerracotta
+            case .terracotta: return .saveBerry
             case .sage: return .wanderlySage
-            case .amber: return .wanderlyAmber
+            case .amber: return .saveHoney
             case .blue: return Color(hex: "5B8FA8")
-            case .charcoal: return .wanderlyCharcoal
+            case .charcoal: return .saveCocoa
             }
         }
     }

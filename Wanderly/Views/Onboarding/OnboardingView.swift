@@ -6,22 +6,22 @@ struct OnboardingView: View {
 
     private let pages: [OnboardingPage] = [
         OnboardingPage(
-            icon: "sparkle.magnifyingglass",
-            title: "Send Any Place Signal",
-            subtitle: "Share links, posts, screenshots, notes, or map URLs. SAV-E investigates the real place before it saves anything.",
-            color: .wanderlyTerracotta
+            icon: "pawprint.fill",
+            title: "Save spots while you scroll",
+            subtitle: "Share an IG post, map link, screenshot, or note. SAV-E will sniff for the real place.",
+            color: .saveBerry
         ),
         OnboardingPage(
-            icon: "checklist.checked",
-            title: "Review Before Saving",
-            subtitle: "Uncertain places become review candidates with evidence, confidence, and missing details instead of fake pins.",
+            icon: "bird.fill",
+            title: "No more fake pins",
+            subtitle: "If SAV-E is unsure, it keeps the clue in Review until you confirm it.",
+            color: .saveHoney
+        ),
+        OnboardingPage(
+            icon: "suitcase.rolling.fill",
+            title: "Turn memories into trips",
+            subtitle: "Your confirmed spots become a private travel memory SAV-E can plan from.",
             color: Color(hex: "5B8FA8")
-        ),
-        OnboardingPage(
-            icon: "map.fill",
-            title: "Plan From Memory",
-            subtitle: "Confirmed places become agent-readable memory SAV-E can use for trips, maps, and future restaurant or flight actions.",
-            color: Color(hex: "8B5E83")
         ),
     ]
 
@@ -34,7 +34,7 @@ struct OnboardingView: View {
 
                         ZStack {
                             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                                .fill(pages[index].color.opacity(0.10))
+                                .fill(pages[index].color.opacity(0.14))
                                 .frame(width: 132, height: 132)
 
                             Image(systemName: pages[index].icon)
@@ -70,7 +70,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(pages.indices, id: \.self) { index in
                         Capsule()
-                            .fill(index == currentPage ? Color.wanderlyTerracotta : Color.wanderlyTerracotta.opacity(0.3))
+                            .fill(index == currentPage ? Color.saveBerry : Color.saveBerry.opacity(0.26))
                             .frame(width: index == currentPage ? 24 : 8, height: 8)
                             .animation(.easeInOut(duration: 0.2), value: currentPage)
                     }
@@ -90,7 +90,7 @@ struct OnboardingView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.wanderlyTerracotta)
+                        .background(Color.saveBerry)
                         .cornerRadius(16)
                 }
                 .padding(.horizontal, 24)
@@ -106,7 +106,13 @@ struct OnboardingView: View {
                 }
             }
         }
-        .background(Color.wanderlyCream)
+        .background(
+            LinearGradient(
+                colors: [Color.saveBlush, Color.saveCream, Color.saveMint],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
     }
 }
 

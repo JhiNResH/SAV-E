@@ -79,20 +79,36 @@ struct PlaceMapPin: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 0) {
-                Image(systemName: place.category.iconName)
-                    .font(.caption)
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Color.categoryColor(for: place.category))
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: place.category.iconName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(Color.saveStampForeground(for: place.category))
+                        .frame(width: 38, height: 38)
+                        .background(Color.saveStampColor(for: place.category))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.white.opacity(0.9), lineWidth: 2)
+                        )
+                        .shadow(color: Color.saveCocoa.opacity(0.20), radius: 5, y: 3)
+
+                    if place.status == .visited {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.saveBerry)
+                            .background(Circle().fill(Color.white))
+                            .offset(x: 5, y: -5)
+                    }
+                }
 
                 Image(systemName: "triangle.fill")
                     .font(.system(size: 8))
-                    .foregroundColor(Color.categoryColor(for: place.category))
+                    .foregroundColor(Color.saveStampColor(for: place.category))
                     .rotationEffect(.degrees(180))
                     .offset(y: -2)
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(place.name) map stamp")
     }
 }

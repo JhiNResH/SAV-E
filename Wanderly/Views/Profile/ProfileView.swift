@@ -11,9 +11,12 @@ struct ProfileView: View {
                 VStack(spacing: 24) {
                     // Avatar & Name
                     VStack(spacing: 12) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 72))
-                            .foregroundColor(.wanderlySage)
+                        Image(systemName: "passport.fill")
+                            .font(.system(size: 48, weight: .semibold))
+                            .foregroundColor(.saveBerry)
+                            .frame(width: 82, height: 82)
+                            .background(Color.saveBlush)
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
 
                         Text(viewModel.profile.displayName)
                             .font(.title2)
@@ -24,7 +27,7 @@ struct ProfileView: View {
                             draftDisplayName = viewModel.profile.displayName
                             showEditProfile = true
                         } label: {
-                            Label("Edit Profile", systemImage: "pencil")
+                            Label("Edit Passport", systemImage: "pencil")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.wanderlyTerracotta)
@@ -78,7 +81,7 @@ struct ProfileView: View {
                 .padding(.bottom, 32)
             }
             .background(Color.wanderlyCream)
-            .navigationTitle("Profile")
+            .navigationTitle("SAV-E Passport")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -122,7 +125,7 @@ private struct EditProfileSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Profile") {
+                Section("SAV-E Passport") {
                     TextField("Name", text: $displayName)
                         .textInputAutocapitalization(.words)
                         .focused($isNameFocused)
@@ -135,12 +138,12 @@ private struct EditProfileSheet: View {
                 }
 
                 Section {
-                    Text("This name appears on your SAV-E profile. Email and sign-in provider are managed by your login account.")
+                    Text("This name appears on your SAV-E passport. Email and sign-in provider are managed by your login account.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("Edit Profile")
+            .navigationTitle("Edit Passport")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -168,7 +171,7 @@ private struct ProfileSummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Account")
+            Text("Travel Memory Passport")
                 .font(.headline)
                 .foregroundColor(.wanderlyCharcoal)
 
