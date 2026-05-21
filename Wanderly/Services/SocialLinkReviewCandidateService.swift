@@ -107,8 +107,10 @@ final class SocialLinkReviewCandidateService {
             let detailsText = section.details.joined(separator: "\n")
             let address = firstLocationPin(in: detailsText) ?? locatedCity(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
             let confidence = address.isEmpty ? 0.48 : 0.58
+            let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
             var evidence = [
                 "Source URL: \(sourceURL)",
+                "Evidence tier: \(tier.rawValue)",
                 "Public metadata candidate: \(name)"
             ]
             if !address.isEmpty {
@@ -126,7 +128,7 @@ final class SocialLinkReviewCandidateService {
                 sourceText: evidenceText,
                 evidence: evidence,
                 confidence: confidence,
-                missingInfo: missingInfo(hasAddress: !address.isEmpty),
+                missingInfo: missingInfo(tier: tier, hasAddress: !address.isEmpty),
                 savedAt: Date()
             )
         }
@@ -143,8 +145,10 @@ final class SocialLinkReviewCandidateService {
     private func captionNamedCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
         let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURL)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata named place: \(name)"
         ]
         if !address.isEmpty {
@@ -162,15 +166,17 @@ final class SocialLinkReviewCandidateService {
             sourceText: evidenceText,
             evidence: evidence,
             confidence: address.isEmpty ? 0.5 : 0.62,
-            missingInfo: missingInfo(hasAddress: !address.isEmpty),
+            missingInfo: missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
 
     private func captionLineCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let inferred = inferredPlaceLineBeforeAddress(in: evidenceText) else { return nil }
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: true)
         var evidence = [
             "Source URL: \(sourceURL)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata place line: \(inferred.name)",
             "Location clue: \(inferred.address)"
         ]
@@ -186,7 +192,7 @@ final class SocialLinkReviewCandidateService {
             sourceText: evidenceText,
             evidence: evidence,
             confidence: 0.6,
-            missingInfo: missingInfo(hasAddress: true),
+            missingInfo: missingInfo(tier: tier, hasAddress: true),
             savedAt: Date()
         )
     }
@@ -194,8 +200,10 @@ final class SocialLinkReviewCandidateService {
     private func chineseSocialTitleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = chineseVenueName(in: evidenceText) else { return nil }
         let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURL)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata named venue: \(name)"
         ]
         if !address.isEmpty {
@@ -213,7 +221,7 @@ final class SocialLinkReviewCandidateService {
             sourceText: evidenceText,
             evidence: evidence,
             confidence: address.isEmpty ? 0.56 : 0.66,
-            missingInfo: missingInfo(hasAddress: !address.isEmpty),
+            missingInfo: missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
@@ -222,20 +230,29 @@ final class SocialLinkReviewCandidateService {
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
         let address = firstLocationPin(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
-        var evidence = ["Social handle @\(handle)", "Source URL: \(sourceURL)"]
+        let resolved = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: handle, evidenceText: evidenceText)
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty, isResolvedHandle: resolved.evidence != nil)
+        var evidence = [
+            "Social handle @\(handle)",
+            "Source URL: \(sourceURL)",
+            "Evidence tier: \(tier.rawValue)"
+        ]
+        if let profileEvidence = resolved.evidence {
+            evidence.append(profileEvidence)
+        }
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(500)))
         }
 
         return PendingReviewCandidate(
-            candidateName: displayName(fromSocialHandle: handle),
+            candidateName: resolved.name,
             address: address,
             category: category(from: evidenceText),
             sourceURL: sourceURL,
             sourceText: evidenceText,
             evidence: evidence,
-            confidence: address.isEmpty ? 0.52 : 0.6,
-            missingInfo: missingInfo(hasAddress: !address.isEmpty),
+            confidence: min((address.isEmpty ? 0.52 : 0.6) + resolved.confidenceBoost, 0.85),
+            missingInfo: missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
@@ -334,36 +351,11 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func looksLikeAddressLine(_ line: String) -> Bool {
-        let patterns = [
-            #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
-            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
-            #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
-            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
-            #"\d{1,6}\s*(?:号|號)"#
-        ]
-        return patterns.contains { pattern in
-            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
-        }
+        SocialPlaceEvidenceScorer.looksLikeAddressLine(line)
     }
 
     private func isLikelyCaptionPlaceName(_ value: String) -> Bool {
-        guard isUsableCandidateName(value) else { return false }
-        let lowered = value.lowercased()
-        guard !looksLikeAddressLine(value),
-              !looksLikeOperatingHoursLine(value),
-              !looksLikeReviewMetricLine(value),
-              !looksLikeMarketingLine(value),
-              !lowered.contains("likes"),
-              !lowered.contains("comments"),
-              !lowered.contains(" on instagram"),
-              !lowered.contains("casual"),
-              !lowered.contains("dream"),
-              !lowered.contains("follow"),
-              !lowered.contains("save this"),
-              !lowered.contains("located") else {
-            return false
-        }
-        return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
+        SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(value)
     }
 
     private func candidateNameFromCaptionLine(_ line: String) -> String? {
@@ -387,7 +379,7 @@ final class SocialLinkReviewCandidateService {
             }
         }
         if let handle = firstCapture(in: line, pattern: #"@([A-Za-z0-9._]{3,30})"#) {
-            let cleaned = displayName(fromSocialHandle: handle)
+            let cleaned = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: handle).name
             if isUsableCandidateName(cleaned), !looksLikeMarketingLine(cleaned) {
                 return cleaned
             }
@@ -396,22 +388,15 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func looksLikeOperatingHoursLine(_ value: String) -> Bool {
-        value.range(of: #"(?i)(營業|营业|hours?|open|closed|週[一二三四五六日天]|周[一二三四五六日天]|星期|\b\d{1,2}:\d{2}\s*[-–—~至]\s*\d{1,2}:\d{2})"#, options: [.regularExpression]) != nil
+        SocialPlaceEvidenceScorer.looksLikeOperatingHoursLine(value)
     }
 
     private func looksLikeReviewMetricLine(_ value: String) -> Bool {
-        value.range(of: #"(美味程度|環境衛生|服务态度|服務態度|再訪意願|再访意愿|評分|评分|rating|review)\s*[：:]"#, options: [.regularExpression, .caseInsensitive]) != nil ||
-        value.range(of: #"^[^\n]{0,16}[：:].*[🌕🌖🌗🌘🌑⭐★]"#, options: [.regularExpression]) != nil
+        SocialPlaceEvidenceScorer.looksLikeReviewMetricLine(value)
     }
 
     private func looksLikeMarketingLine(_ value: String) -> Bool {
-        let patterns = [
-            #"最難訂|更難搶|不是米其林|不是餐廳|文化盛宴|文化大秀|門票|時段|位置交給|短短\d+分鐘|從.+到.+"#,
-            #"(?i)follow|save this|likes|comments|instagram"#
-        ]
-        return patterns.contains { pattern in
-            value.range(of: pattern, options: [.regularExpression]) != nil
-        }
+        SocialPlaceEvidenceScorer.looksLikeMarketingLine(value)
     }
 
     private func cityAddress(in text: String) -> String? {
@@ -447,47 +432,19 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func displayName(fromSocialHandle handle: String) -> String {
-        let citySuffixes = ["bali", "tokyo", "paris", "london", "nyc", "la", "sf", "hk", "sg", "seoul"]
-        var normalized = handle
-            .replacingOccurrences(of: ".", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-
-        for suffix in citySuffixes where normalized.count > suffix.count + 2 && normalized.hasSuffix(suffix) {
-            let splitIndex = normalized.index(normalized.endIndex, offsetBy: -suffix.count)
-            normalized = "\(normalized[..<splitIndex]) \(suffix)"
-            break
-        }
-
-        return normalized
-            .split(separator: " ")
-            .map { $0.uppercased() == "nyc" ? "NYC" : $0.capitalized }
-            .joined(separator: " ")
+        SocialPlaceEvidenceScorer.displayName(fromSocialHandle: handle)
     }
 
     private func cleanCandidateName(_ value: String) -> String {
-        cleanHTMLText(value)
-            .replacingOccurrences(of: #"^[\-\–\—]\s*"#, with: "", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”.,:;! "))
+        SocialPlaceEvidenceScorer.cleanCandidateName(value)
     }
 
     private func isUsableCandidateName(_ value: String) -> Bool {
-        let lowered = value.lowercased()
-        guard value.count >= 2,
-              value.count <= 80,
-              !lowered.contains("comment "),
-              !lowered.contains("instagram"),
-              !lowered.contains("like") else {
-            return false
-        }
-        return true
+        SocialPlaceEvidenceScorer.isUsableCandidateName(value)
     }
 
-    private func missingInfo(hasAddress: Bool) -> [String] {
-        var values = ["Confirm exact address", "Confirm coordinates", "Cross-check official source or map listing"]
-        if !hasAddress {
-            values.append("No structured location metadata")
-        }
-        return values
+    private func missingInfo(tier: SocialPlaceEvidenceTier, hasAddress: Bool) -> [String] {
+        SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: hasAddress)
     }
 
     private func category(from text: String) -> String {

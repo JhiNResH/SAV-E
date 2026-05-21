@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		0BC95BCDBDCEA26A6A3BE1EC /* PlaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85A7930C0B725F89A6D9CD4 /* PlaceDetailView.swift */; };
 		0BD4C6DA5B323497CFAFFE4E /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A066A6F8F79E541E817AED /* Trip.swift */; };
+		0BE657B273F6C933AFA42F53 /* SocialPlaceEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 319592FEE4143DA8414BF1E9 /* SocialPlaceEvidence.swift */; };
 		0D8DD94A2CFC096B7752E6FA /* PlaceBottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA66B7E10DCF1DE875D7E19A /* PlaceBottomSheet.swift */; };
 		0FEEB8D7A11D001D3AD43F40 /* SharedTripData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E74EF49B8A57D105D2D652 /* SharedTripData.swift */; };
 		19637D9F3EDFF2329A9979DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05191C82E70D6C2149B74EB7 /* ProfileView.swift */; };
 		227F30DF4C70A4290E51F93D /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A29B2157900BCDDFE28B627B /* ZIPFoundation */; };
+		230CFEDD9D415489D5AE1E71 /* SocialPlaceEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 319592FEE4143DA8414BF1E9 /* SocialPlaceEvidence.swift */; };
 		25D6800A0C00D8FB12F334E7 /* TripTimelineCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D582904A9679056480966665 /* TripTimelineCard.swift */; };
 		2677F52D743629F377833945 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D361AE888D21B3766DD265FD /* LocationService.swift */; };
 		2BA4D87BB9CF09131F768B8C /* SocialOCRCandidateHeuristics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE61E0A0FD71712CB5155219 /* SocialOCRCandidateHeuristics.swift */; };
@@ -130,6 +132,7 @@
 		1DC8F70BFBB3AC56AADC443E /* Color+Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Theme.swift"; sourceTree = "<group>"; };
 		28F79CFB6481B8E108DCAF01 /* PlaceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceCard.swift; sourceTree = "<group>"; };
 		2EA2DE34F0656884DCAB54CD /* PrivyAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivyAuthService.swift; sourceTree = "<group>"; };
+		319592FEE4143DA8414BF1E9 /* SocialPlaceEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialPlaceEvidence.swift; sourceTree = "<group>"; };
 		3242EA4BEADB508579B41237 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		368BBF02C223EF46EFCAD0D9 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		3939451E82A6558254D3250D /* GooglePlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesService.swift; sourceTree = "<group>"; };
@@ -220,6 +223,7 @@
 			children = (
 				44A03D4CF06B6AEAC1F22E00 /* Wanderly */,
 				EC9E8387A6D6DF481B325DBF /* WanderlyClip */,
+				B080FA919C6D70C31ED546F9 /* WanderlyShared */,
 				D37D8D4B160A8BF7C6F69F94 /* WanderlyShareExtension */,
 				D4876E130669B270D00D1540 /* Products */,
 			);
@@ -395,6 +399,14 @@
 				09C48A9EF48A490DB7DD410A /* WanderlyAIService.swift */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		B080FA919C6D70C31ED546F9 /* WanderlyShared */ = {
+			isa = PBXGroup;
+			children = (
+				319592FEE4143DA8414BF1E9 /* SocialPlaceEvidence.swift */,
+			);
+			path = WanderlyShared;
 			sourceTree = "<group>";
 		};
 		C89713A2F3FDEAC783174A58 /* List */ = {
@@ -648,6 +660,7 @@
 			files = (
 				4A01A5213FE68F91763363A0 /* ShareViewController.swift in Sources */,
 				2BA4D87BB9CF09131F768B8C /* SocialOCRCandidateHeuristics.swift in Sources */,
+				0BE657B273F6C933AFA42F53 /* SocialPlaceEvidence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -705,6 +718,7 @@
 				95CA35085C85CE5B72DD2279 /* SavePlaceFromURLIntent.swift in Sources */,
 				0FEEB8D7A11D001D3AD43F40 /* SharedTripData.swift in Sources */,
 				990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */,
+				230CFEDD9D415489D5AE1E71 /* SocialPlaceEvidence.swift in Sources */,
 				F43D54ECBE89485DA5C13A03 /* StatsView.swift in Sources */,
 				5ABFBF83CDFEF1512B2CD4A8 /* SupabaseService.swift in Sources */,
 				0BD4C6DA5B323497CFAFFE4E /* Trip.swift in Sources */,

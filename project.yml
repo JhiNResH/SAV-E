@@ -30,6 +30,7 @@ targets:
         excludes:
           - Resources/Secrets.plist
           - Resources/Secrets.plist.template
+      - path: WanderlyShared
       - path: Wanderly/Resources/Secrets.plist
         optional: true
         buildPhase: resources
@@ -133,6 +134,7 @@ targets:
         excludes:
           - Secrets.plist
           - Secrets.plist.template
+      - path: WanderlyShared
       - path: WanderlyShareExtension/Secrets.plist
         optional: true
         buildPhase: resources
