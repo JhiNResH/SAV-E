@@ -29,19 +29,28 @@ final class SocialLinkReviewCandidateService {
             .joined(separator: "\n")
 
         let sourceURL = metadata.resolvedURL ?? url.absoluteString
+        let candidates = reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+
+        if candidates.isEmpty {
+            throw SocialLinkReviewCandidateError.noUsableCandidates
+        }
+
+        return candidates
+    }
+
+    func reviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
         var candidates = numberedCandidates(from: evidenceText, sourceURL: sourceURL)
         if candidates.isEmpty, let captionCandidate = captionNamedCandidate(from: evidenceText, sourceURL: sourceURL) {
             candidates = [captionCandidate]
+        }
+        if candidates.isEmpty, let titleCandidate = chineseSocialTitleCandidate(from: evidenceText, sourceURL: sourceURL) {
+            candidates = [titleCandidate]
         }
         if candidates.isEmpty, let lineCandidate = captionLineCandidate(from: evidenceText, sourceURL: sourceURL) {
             candidates = [lineCandidate]
         }
         if candidates.isEmpty, let handleCandidate = handleCandidate(from: evidenceText, sourceURL: sourceURL) {
             candidates = [handleCandidate]
-        }
-
-        if candidates.isEmpty {
-            throw SocialLinkReviewCandidateError.noUsableCandidates
         }
 
         return candidates
@@ -182,6 +191,33 @@ final class SocialLinkReviewCandidateService {
         )
     }
 
+    private func chineseSocialTitleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
+        guard let name = chineseVenueName(in: evidenceText) else { return nil }
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        var evidence = [
+            "Source URL: \(sourceURL)",
+            "Public metadata named venue: \(name)"
+        ]
+        if !address.isEmpty {
+            evidence.append("Location clue: \(address)")
+        }
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(500)))
+        }
+
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: address,
+            category: category(from: "\(name) \(evidenceText)"),
+            sourceURL: sourceURL,
+            sourceText: evidenceText,
+            evidence: evidence,
+            confidence: address.isEmpty ? 0.56 : 0.66,
+            missingInfo: missingInfo(hasAddress: !address.isEmpty),
+            savedAt: Date()
+        )
+    }
+
     private func handleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
@@ -228,6 +264,27 @@ final class SocialLinkReviewCandidateService {
                 if isUsableCandidateName(cleaned) {
                     return cleaned
                 }
+            }
+        }
+        return nil
+    }
+
+    private func chineseVenueName(in text: String) -> String? {
+        let patterns = [
+            #"(?:^|[\n\r])[-\s]*(?:[\u4e00-\u9fff]{0,4})?(?:全新開幕|新開幕|開幕)\s*([^\s新主题主題\-－—–:]{2,16})\s*(?:新主題|主题|主題)\s*[-－—–:]\s*([\u4e00-\u9fffA-Za-z0-9]{2,24})"#,
+            #"([\u4e00-\u9fffA-Za-z0-9]{2,24})\s*[·・‧]\s*([\u4e00-\u9fffA-Za-z0-9]{2,24})"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 2,
+                  let brandRange = Range(match.range(at: 1), in: text),
+                  let themeRange = Range(match.range(at: 2), in: text) else { continue }
+            let brand = cleanCandidateName(String(text[brandRange]))
+            let theme = cleanCandidateName(String(text[themeRange]))
+            let name = "\(brand)·\(theme)"
+            if isUsableCandidateName(name), !looksLikeMarketingLine(name) {
+                return name
             }
         }
         return nil
@@ -281,7 +338,8 @@ final class SocialLinkReviewCandidateService {
             #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
             #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
             #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
-            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|号|號)"#
+            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
+            #"\d{1,6}\s*(?:号|號)"#
         ]
         return patterns.contains { pattern in
             line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
@@ -292,6 +350,7 @@ final class SocialLinkReviewCandidateService {
         guard isUsableCandidateName(value) else { return false }
         let lowered = value.lowercased()
         guard !looksLikeAddressLine(value),
+              !looksLikeMarketingLine(value),
               !lowered.contains("likes"),
               !lowered.contains("comments"),
               !lowered.contains(" on instagram"),
@@ -303,6 +362,16 @@ final class SocialLinkReviewCandidateService {
             return false
         }
         return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
+    }
+
+    private func looksLikeMarketingLine(_ value: String) -> Bool {
+        let patterns = [
+            #"最難訂|更難搶|不是米其林|不是餐廳|文化盛宴|文化大秀|門票|時段|位置交給|短短\d+分鐘|從.+到.+"#,
+            #"(?i)follow|save this|likes|comments|instagram"#
+        ]
+        return patterns.contains { pattern in
+            value.range(of: pattern, options: [.regularExpression]) != nil
+        }
     }
 
     private func cityAddress(in text: String) -> String? {
@@ -382,6 +451,9 @@ final class SocialLinkReviewCandidateService {
             return "stay"
         }
         if lowered.range(of: #"restaurant|food|eat|cafe|coffee|tea|bar"#, options: .regularExpression) != nil {
+            return "food"
+        }
+        if text.range(of: #"晚餐|餐廳|餐厅|美食|咖啡|茶|酒吧|料理|餐"#, options: .regularExpression) != nil {
             return "food"
         }
         return "attraction"

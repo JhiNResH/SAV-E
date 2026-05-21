@@ -452,6 +452,20 @@ struct ShareExtensionView: View {
 
         if let sourceURL = URL(string: parseContent),
            isSocialURL(sourceURL),
+           let candidate = chineseSocialTitleReviewCandidate(
+            from: metadata,
+            sharedTitle: sharedTitle,
+            sharedText: sharedText,
+            sourceURLString: parseContent
+           ) {
+            reviewCandidate = candidate
+            selectedCategory = candidate.category
+            isParsing = false
+            return
+        }
+
+        if let sourceURL = URL(string: parseContent),
+           isSocialURL(sourceURL),
            let candidate = captionLineSocialReviewCandidate(
             from: metadata,
             sharedTitle: sharedTitle,
@@ -812,6 +826,45 @@ struct ShareExtensionView: View {
         )
     }
 
+    private func chineseSocialTitleReviewCandidate(
+        from metadata: ShareMetadata,
+        sharedTitle: String,
+        sharedText: String,
+        sourceURLString: String
+    ) -> PendingReviewCandidate? {
+        let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        guard let name = chineseVenueName(in: evidenceText) else { return nil }
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
+        let category = fallbackCategory(from: "\(name) \(evidenceText)")
+        var evidence = [
+            "Source URL: \(sourceURLString)",
+            "Public metadata named venue: \(name)"
+        ]
+        if !address.isEmpty {
+            evidence.append("Location clue: \(address)")
+        }
+        if !evidenceText.isEmpty {
+            evidence.append(String(evidenceText.prefix(300)))
+        }
+
+        var missingInfo = ["Confirm exact address", "Confirm coordinates", "Cross-check official source or map listing"]
+        if address.isEmpty {
+            missingInfo.append("No structured location metadata")
+        }
+
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: address,
+            category: category,
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: address.isEmpty ? 0.56 : 0.66,
+            missingInfo: Array(Set(missingInfo)).sorted(),
+            savedAt: Date()
+        )
+    }
+
     private func captionLineSocialReviewCandidate(
         from metadata: ShareMetadata,
         sharedTitle: String,
@@ -939,6 +992,27 @@ struct ShareExtensionView: View {
         return nil
     }
 
+    private func chineseVenueName(in content: String) -> String? {
+        let patterns = [
+            #"(?:^|[\n\r])[-\s]*(?:[\u4e00-\u9fff]{0,4})?(?:全新開幕|新開幕|開幕)\s*([^\s新主题主題\-－—–:]{2,16})\s*(?:新主題|主题|主題)\s*[-－—–:]\s*([\u4e00-\u9fffA-Za-z0-9]{2,24})"#,
+            #"([\u4e00-\u9fffA-Za-z0-9]{2,24})\s*[·・‧]\s*([\u4e00-\u9fffA-Za-z0-9]{2,24})"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(content.startIndex..<content.endIndex, in: content)
+            guard let match = regex.firstMatch(in: content, range: range), match.numberOfRanges > 2,
+                  let brandRange = Range(match.range(at: 1), in: content),
+                  let themeRange = Range(match.range(at: 2), in: content) else { continue }
+            let brand = cleanPlaceName(String(content[brandRange]))
+            let theme = cleanPlaceName(String(content[themeRange]))
+            let name = "\(brand)·\(theme)"
+            if isUsablePlaceName(name), !looksLikeMarketingLine(name) {
+                return name
+            }
+        }
+        return nil
+    }
+
     private func firstLocationPin(in content: String) -> String? {
         let patterns = [
             #"📍\s*([^\n\r\.]+)"#,
@@ -987,7 +1061,8 @@ struct ShareExtensionView: View {
             #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
             #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
             #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
-            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|号|號)"#
+            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
+            #"\d{1,6}\s*(?:号|號)"#
         ]
         return patterns.contains { pattern in
             line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
@@ -998,6 +1073,7 @@ struct ShareExtensionView: View {
         guard isUsablePlaceName(value) else { return false }
         let lowered = value.lowercased()
         guard !looksLikeAddressLine(value),
+              !looksLikeMarketingLine(value),
               !lowered.contains("likes"),
               !lowered.contains("comments"),
               !lowered.contains(" on instagram"),
@@ -1009,6 +1085,16 @@ struct ShareExtensionView: View {
             return false
         }
         return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
+    }
+
+    private func looksLikeMarketingLine(_ value: String) -> Bool {
+        let patterns = [
+            #"最難訂|更難搶|不是米其林|不是餐廳|文化盛宴|文化大秀|門票|時段|位置交給|短短\d+分鐘|從.+到.+"#,
+            #"(?i)follow|save this|likes|comments|instagram"#
+        ]
+        return patterns.contains { pattern in
+            value.range(of: pattern, options: [.regularExpression]) != nil
+        }
     }
 
     private func cityAddress(in content: String) -> String? {
@@ -1411,6 +1497,7 @@ struct ShareExtensionView: View {
         if value.contains("hotel") || value.contains("stay") || value.contains("resort") { return "stay" }
         if value.contains("shop") || value.contains("store") { return "shopping" }
         if value.contains("bakery") || value.contains("restaurant") || value.contains("food") { return "food" }
+        if content.range(of: #"晚餐|餐廳|餐厅|美食|咖啡|茶|酒吧|料理|餐"#, options: .regularExpression) != nil { return "food" }
         return "attraction"
     }
 
