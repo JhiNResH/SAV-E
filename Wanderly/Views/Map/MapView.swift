@@ -64,7 +64,6 @@ struct MapView: View {
             ProfileView()
         }
         .task {
-            await viewModel.loadPlaces()
             await viewModel.focusOnUserLocationOnLaunch()
         }
     }
