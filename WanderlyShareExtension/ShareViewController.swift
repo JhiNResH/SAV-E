@@ -1658,9 +1658,10 @@ struct ShareExtensionView: View {
 
     private func fallbackCategory(from content: String) -> String {
         let value = content.lowercased()
+        let stayCategoryPattern = #"\b(inn|guest ?house|ryokan|motel)\b|酒店|飯店|饭店|旅館|旅馆|旅店|旅宿|民宿|客棧|客栈|度假村|ホテル|ゲストハウス|료칸|호텔|리조트|모텔|여관|여인숙|게스트하우스"#
         if value.contains("cafe") || value.contains("coffee") || value.contains("tea") { return "cafe" }
         if value.contains("bar") || value.contains("cocktail") { return "bar" }
-        if value.contains("hotel") || value.contains("stay") || value.contains("resort") || content.range(of: #"酒店|飯店|饭店|旅館|旅馆|旅店|民宿|客棧|客栈|度假村"#, options: .regularExpression) != nil { return "stay" }
+        if value.contains("hotel") || value.contains("stay") || value.contains("resort") || content.range(of: stayCategoryPattern, options: [.regularExpression, .caseInsensitive]) != nil { return "stay" }
         if value.contains("shop") || value.contains("store") { return "shopping" }
         if value.contains("bakery") || value.contains("restaurant") || value.contains("food") || value.contains("dessert") || value.contains("cake") { return "food" }
         if content.range(of: #"晚餐|餐廳|餐厅|美食|咖啡|茶|酒吧|料理|餐|燒肉|烧肉|火鍋|火锅|牛舌|巴斯克|蛋糕|甜點|甜点"#, options: .regularExpression) != nil { return "food" }

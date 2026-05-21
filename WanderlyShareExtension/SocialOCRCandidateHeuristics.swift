@@ -58,9 +58,11 @@ enum SocialOCRCandidateHeuristics {
     }
 
     private static func looksLikeCJKVenueName(_ value: String) -> Bool {
+        let cjkScriptPattern = #"[\p{Han}\u3040-\u30FF\uAC00-\uD7AF]"#
+        let stayKeywordPattern = #"\b(hotel|resort|inn|guest ?house|ryokan|motel)\b|酒店|飯店|饭店|旅館|旅馆|旅店|旅宿|民宿|客棧|客栈|度假村|ホテル|ゲストハウス|료칸|호텔|리조트|모텔|여관|여인숙|게스트하우스"#
         guard !SocialPlaceEvidenceScorer.isRejectedTitle(value) else { return false }
-        guard value.range(of: #"[\p{Han}]"#, options: .regularExpression) != nil else { return false }
-        guard value.range(of: #"酒店|飯店|饭店|旅館|旅馆|旅店|民宿|客棧|客栈|度假村|Hotel|Resort"#, options: [.regularExpression, .caseInsensitive]) != nil else { return false }
+        guard value.range(of: cjkScriptPattern, options: .regularExpression) != nil else { return false }
+        guard value.range(of: stayKeywordPattern, options: [.regularExpression, .caseInsensitive]) != nil else { return false }
 
         let rejectedFragments = [
             #"\d{1,2}:\d{2}"#,
