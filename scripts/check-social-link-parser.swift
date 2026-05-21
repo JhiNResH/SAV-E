@@ -34,6 +34,30 @@ struct SocialLinkParserCheck {
         expect(chinese.candidateName != "不是餐廳，是一場沉浸式文化盛宴。", "Marketing line must not become venue name")
         expect(chinese.address != "從沙漠絲路到盛世敦煌，", "Marketing line must not become address")
 
+        let ushigoroCaption = """
+        #GIRLSTALK美食
+        來自東京的頂級燒肉名店「USHIGORO S.」 @ushigoro.s.tw 正式插旗台北‼️💥
+
+        主打少見的「和牛燒肉割烹」形式，將A5黑毛和牛結合日式割烹料理，從前菜、刺身、燒肉到主食一路精緻上桌。
+
+        肉控必吃的「究極厚切黑牛舌」選用厚切舌根部位，搭配唐辛子味噌與大蒜醬油香氣超濃郁。
+
+        📍中山區樂群三路299號2樓
+        📅 5/8正式開放inline訂位
+        """
+
+        let ushigoroCandidates = SocialLinkReviewCandidateService.shared.reviewCandidates(
+            fromEvidenceText: ushigoroCaption,
+            sourceURL: "https://www.instagram.com/reel/DYG2S_4n3_e/"
+        )
+
+        expect(ushigoroCandidates.count == 1, "USHIGORO caption should produce one review candidate")
+        let ushigoro = ushigoroCandidates[0]
+        expect(ushigoro.candidateName == "USHIGORO S", "USHIGORO caption should extract the quoted venue name")
+        expect(ushigoro.candidateName != "來自東京的頂級燒肉名店「USHIGORO S.」 @ushigoro.s.tw 正式插旗台北‼️💥", "Full caption sentence must not become venue name")
+        expect(ushigoro.address == "中山區樂群三路299號2樓", "USHIGORO caption should preserve explicit location pin")
+        expect(ushigoro.category == "food", "USHIGORO caption should infer food category")
+
         let numberedCaption = """
         1. Ulaman Eco Luxury Resort
         staying at @ulamanbali
