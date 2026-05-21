@@ -29,7 +29,7 @@ cat > "$output_path" <<PLIST
   <key>uploadSymbols</key>
   <true/>
   <key>manageAppVersionAndBuildNumber</key>
-  <true/>
+  <false/>
   <key>testFlightInternalTestingOnly</key>
   <true/>
 </dict>
