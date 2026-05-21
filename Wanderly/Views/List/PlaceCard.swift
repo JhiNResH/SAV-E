@@ -4,16 +4,9 @@ struct PlaceCard: View {
     let place: Place
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Category icon
-            Image(systemName: place.category.iconName)
-                .font(.title3)
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(Color.categoryColor(for: place.category))
-                .cornerRadius(12)
+        HStack(alignment: .top, spacing: 12) {
+            categoryStamp
 
-            // Info
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(place.name)
@@ -24,7 +17,7 @@ struct PlaceCard: View {
 
                     Spacer()
 
-                    PlatformIcon(platform: place.sourcePlatform, size: 14)
+                    sourceBadge
                 }
 
                 Text(place.address)
@@ -52,19 +45,53 @@ struct PlaceCard: View {
 
                     Spacer()
 
-                    Text(place.status.displayName)
+                    Text(statusLabel)
                         .font(.system(size: 10))
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(place.status == .visited ? Color.wanderlySage.opacity(0.3) : Color.wanderlyTerracotta.opacity(0.15))
-                        .foregroundColor(place.status == .visited ? Color.wanderlySage : Color.wanderlyTerracotta)
-                        .cornerRadius(6)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(place.status == .visited ? Color.saveMint : Color.saveBlush)
+                        .foregroundColor(place.status == .visited ? Color.saveCocoa : Color.saveBerry)
+                        .cornerRadius(8)
                 }
             }
         }
         .padding(12)
         .wanderlyCard()
+    }
+
+    private var categoryStamp: some View {
+        Image(systemName: place.category.iconName)
+            .font(.title3.weight(.bold))
+            .foregroundColor(Color.saveStampForeground(for: place.category))
+            .frame(width: 46, height: 46)
+            .background(Color.saveStampColor(for: place.category))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.9), lineWidth: 2)
+            )
+    }
+
+    private var sourceBadge: some View {
+        HStack(spacing: 4) {
+            PlatformIcon(platform: place.sourcePlatform, size: 12)
+            Text(sourceLabel)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.saveRose)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Color.saveBlush)
+        .clipShape(Capsule())
+    }
+
+    private var sourceLabel: String {
+        place.sourcePlatform == .other ? "Memory" : "\(place.sourcePlatform.displayName) memory"
+    }
+
+    private var statusLabel: String {
+        place.status == .visited ? "Visited" : "Memory saved"
     }
 }
 

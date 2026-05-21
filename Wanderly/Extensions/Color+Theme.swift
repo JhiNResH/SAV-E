@@ -17,6 +17,19 @@ extension Color {
     static let wanderlySecondary = Color("WanderlySecondary")
     static let wanderlyText = Color("WanderlyText")
 
+    // MARK: - SAV-E Cute Theme
+    static let saveBlush = Color(hex: "FFF6F8")
+    static let savePeach = Color(hex: "FFF1D8")
+    static let saveCream = Color(hex: "FFF8E8")
+    static let saveMint = Color(hex: "F1FBF5")
+    static let saveBerry = Color(hex: "E8849B")
+    static let saveCocoa = Color(hex: "6B4E57")
+    static let saveRose = Color(hex: "9B6B78")
+    static let saveHoney = Color(hex: "F4B860")
+    static let saveSky = Color(hex: "BEE7F8")
+    static let saveLavender = Color(hex: "DCC8FF")
+    static let saveCard = Color.white.opacity(0.82)
+
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
         switch category {
@@ -26,6 +39,24 @@ extension Color {
         case .attraction: return Color(hex: "5B8FA8")
         case .stay: return .wanderlySage
         case .shopping: return Color(hex: "C4956A")
+        }
+    }
+
+    static func saveStampColor(for category: PlaceCategory) -> Color {
+        switch category {
+        case .food: return .saveBerry
+        case .cafe: return .savePeach
+        case .bar: return .saveLavender
+        case .attraction: return .saveSky
+        case .stay: return .saveMint
+        case .shopping: return .saveHoney
+        }
+    }
+
+    static func saveStampForeground(for category: PlaceCategory) -> Color {
+        switch category {
+        case .cafe, .stay, .attraction, .shopping: return .saveCocoa
+        case .food, .bar: return .white
         }
     }
 
