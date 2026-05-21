@@ -53,6 +53,23 @@ struct SocialLinkParserCheck {
         expect(numberedCandidates[0].candidateName == "Ulaman Eco Luxury Resort", "First numbered candidate should be preserved")
         expect(numberedCandidates[1].candidateName == "Fabel Friet", "Second numbered candidate should be preserved")
 
+        let teaHotPotCaption = """
+        The FIRST AND ONLY US Tea themed hot pot is here!
+        @fourseasonsteahousehotpot is located in Mountain View
+        They have unique tea broths that are light, savory, and perfect for hot pot.
+        """
+
+        let teaHotPotCandidates = SocialLinkReviewCandidateService.shared.reviewCandidates(
+            fromEvidenceText: teaHotPotCaption,
+            sourceURL: "https://www.instagram.com/reel/DXfgsHvj3tW/"
+        )
+
+        expect(teaHotPotCandidates.count == 1, "Tea hot pot caption should produce one review candidate")
+        expect(teaHotPotCandidates[0].candidateName == "Fourseasonsteahousehotpot", "Social handle should become the candidate name")
+        expect(teaHotPotCandidates[0].candidateName != "are light", "Embedded 'that are light' must not be parsed as an at-place match")
+        expect(teaHotPotCandidates[0].address == "Mountain View", "Mountain View should be preserved as the location clue")
+        expect(teaHotPotCandidates[0].category == "food", "Tea hot pot candidate should infer food category")
+
         print("Validated social link parser fixtures.")
     }
 

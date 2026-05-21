@@ -105,7 +105,7 @@ final class SocialLinkReviewCandidateService {
             guard isUsableCandidateName(name) else { return nil }
 
             let detailsText = section.details.joined(separator: "\n")
-            let address = firstLocationPin(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
+            let address = firstLocationPin(in: detailsText) ?? locatedCity(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
             let confidence = address.isEmpty ? 0.48 : 0.58
             var evidence = [
                 "Source URL: \(sourceURL)",
@@ -142,7 +142,7 @@ final class SocialLinkReviewCandidateService {
 
     private func captionNamedCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         var evidence = [
             "Source URL: \(sourceURL)",
             "Public metadata named place: \(name)"
@@ -193,7 +193,7 @@ final class SocialLinkReviewCandidateService {
 
     private func chineseSocialTitleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = chineseVenueName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         var evidence = [
             "Source URL: \(sourceURL)",
             "Public metadata named venue: \(name)"
@@ -221,7 +221,7 @@ final class SocialLinkReviewCandidateService {
     private func handleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
-        let address = firstLocationPin(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = firstLocationPin(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         var evidence = ["Social handle @\(handle)", "Source URL: \(sourceURL)"]
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(500)))
@@ -256,7 +256,7 @@ final class SocialLinkReviewCandidateService {
     private func bracketedPlaceName(in text: String) -> String? {
         let patterns = [
             #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
-            #"(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
+            #"(?i)\b(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
         ]
         for pattern in patterns {
             if let match = firstCapture(in: text, pattern: pattern) {
@@ -376,6 +376,11 @@ final class SocialLinkReviewCandidateService {
 
     private func cityAddress(in text: String) -> String? {
         let pattern = #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia))\b"#
+        return firstCapture(in: text, pattern: pattern).map(cleanHTMLText)
+    }
+
+    private func locatedCity(in text: String) -> String? {
+        let pattern = #"(?i)\b(?:located|based)\s+in\s+([A-Z][A-Za-z .'-]{2,40})(?:[.!?,\n\r]|$)"#
         return firstCapture(in: text, pattern: pattern).map(cleanHTMLText)
     }
 
