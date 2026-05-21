@@ -53,8 +53,8 @@ final class SocialLinkReviewCandidateService {
         guard !query.isEmpty else { return candidate }
 
         do {
-            let matches = try await googlePlacesService.searchPlace(query: query, near: nil)
-            guard let match = matches.first(where: { isAcceptableRefinement($0, for: candidate) }) else {
+            let matches = try await googlePlacesMatches(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
+            guard let match = bestAcceptableRefinement(in: matches, for: candidate) else {
                 return candidate
             }
 
@@ -358,6 +358,10 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func refinementQuery(for candidate: PendingReviewCandidate, evidenceText: String) -> String {
+        refinementQueries(for: candidate, evidenceText: evidenceText).first ?? ""
+    }
+
+    private func refinementQueries(for candidate: PendingReviewCandidate, evidenceText: String) -> [String] {
         let cityClues = [
             firstLocationPin(in: evidenceText),
             locatedCity(in: evidenceText),
@@ -365,10 +369,82 @@ final class SocialLinkReviewCandidateService {
             chineseCityClue(in: evidenceText)
         ]
         let categoryClue = category(from: "\(candidate.category) \(evidenceText)")
-        return ([candidate.candidateName, candidate.address] + cityClues + [categoryClue])
+        let profileName = firstSocialHandle(in: evidenceText).map {
+            SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: $0, evidenceText: evidenceText).name
+        }
+        let cityText = cityClues
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && $0.lowercased() != "attraction" }
+            .filter { !$0.isEmpty }
             .joined(separator: " ")
+        let seeds: [[String?]] = [
+            [candidate.candidateName, candidate.address, cityText, categoryClue],
+            [profileName, cityText, categoryClue],
+            [candidate.candidateName, cityText, categoryClue],
+            [candidate.candidateName, candidate.address],
+            [profileName, candidate.address]
+        ]
+        var seen = Set<String>()
+        return seeds.compactMap { parts in
+            let query = parts
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && $0.lowercased() != "attraction" }
+                .joined(separator: " ")
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            guard !query.isEmpty, !seen.contains(query.lowercased()) else { return nil }
+            seen.insert(query.lowercased())
+            return query
+        }
+    }
+
+    private func googlePlacesMatches(for candidate: PendingReviewCandidate, evidenceText: String) async throws -> [GooglePlaceMatch] {
+        var allMatches: [GooglePlaceMatch] = []
+        var seenIDs = Set<String>()
+        for query in refinementQueries(for: candidate, evidenceText: evidenceText).prefix(4) {
+            let matches = try await googlePlacesService.searchPlace(query: query, near: nil)
+            for match in matches where !seenIDs.contains(match.id) {
+                seenIDs.insert(match.id)
+                allMatches.append(match)
+            }
+        }
+        return allMatches
+    }
+
+    private func bestAcceptableRefinement(in matches: [GooglePlaceMatch], for candidate: PendingReviewCandidate) -> GooglePlaceMatch? {
+        matches
+            .map { (match: $0, score: refinementScore($0, for: candidate)) }
+            .filter { $0.score >= 0.62 }
+            .sorted { $0.score > $1.score }
+            .first?.match
+    }
+
+    private func refinementScore(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Double {
+        guard match.latitude != 0 || match.longitude != 0 else { return 0 }
+        var score = 0.0
+        let candidateName = normalizedName(candidate.candidateName)
+        let matchName = normalizedName(match.name)
+        let candidateAddress = normalizedName(candidate.address)
+        let matchAddress = normalizedName(match.address)
+
+        if !candidateName.isEmpty, !matchName.isEmpty {
+            if matchName == candidateName { score += 0.75 }
+            else if matchName.contains(candidateName) || candidateName.contains(matchName) { score += 0.68 }
+            else { score += tokenOverlap(candidateName, matchName) * 0.62 }
+        }
+        if !candidateAddress.isEmpty, !matchAddress.isEmpty {
+            if matchAddress == candidateAddress { score += 0.45 }
+            else if matchAddress.contains(candidateAddress) || candidateAddress.contains(matchAddress) { score += 0.38 }
+            else { score += tokenOverlap(candidateAddress, matchAddress) * 0.38 }
+        }
+        if match.rating != nil { score += 0.02 }
+        return min(score, 1.0)
+    }
+
+    private func tokenOverlap(_ left: String, _ right: String) -> Double {
+        let minimumTokenLength = 2
+        let leftTokens = Set(left.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+        let rightTokens = Set(right.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+        guard !leftTokens.isEmpty else { return 0 }
+        return Double(leftTokens.intersection(rightTokens).count) / Double(leftTokens.count)
     }
 
     private func isAcceptableRefinement(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Bool {

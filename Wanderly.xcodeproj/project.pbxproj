@@ -73,6 +73,8 @@
 		F2C02CDCA0EB3A3EBAC48016 /* PlaceListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DC5686A4E2F5C59A3092CD /* PlaceListViewModel.swift */; };
 		F43D54ECBE89485DA5C13A03 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8960D65E893E5FDF9FCFF097 /* StatsView.swift */; };
 		F9459E3F07900F355AD069FD /* NavigationCardComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6332D88A442A562A21E3D73 /* NavigationCardComponent.swift */; };
+		B44CFF49B7AA7143C6A9018F /* SocialPlacePipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ECC87C67BFC50F74EAA900E /* SocialPlacePipelineTests.swift */; };
+		4EE648333D5DE1167DF272ED /* SocialOCRCandidateHeuristics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE61E0A0FD71712CB5155219 /* SocialOCRCandidateHeuristics.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +91,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = C15508628E04BBA3344816C6;
 			remoteInfo = WanderlyClip;
+		};
+		68FBA6E897EED0670F6D39B8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E03D93A0B433FED35DCE12F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 70B8A21AF73E33F8B1BE0D31;
+			remoteInfo = Wanderly;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -186,6 +195,8 @@
 		F10954376731AA5088DDEBEA /* TripViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripViewModel.swift; sourceTree = "<group>"; };
 		F4061D8BC422CE2AA6DCEA08 /* PlatformIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformIcon.swift; sourceTree = "<group>"; };
 		FA66B7E10DCF1DE875D7E19A /* PlaceBottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceBottomSheet.swift; sourceTree = "<group>"; };
+		1ECC87C67BFC50F74EAA900E /* SocialPlacePipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialPlacePipelineTests.swift; sourceTree = "<group>"; };
+		40EFA9AA95859A8BC6F1C50E /* WanderlyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WanderlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -196,6 +207,12 @@
 				9EF348338705836E38E56F54 /* Privy in Frameworks */,
 				227F30DF4C70A4290E51F93D /* ZIPFoundation in Frameworks */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2D38F090C3B18A4A61718499 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -225,6 +242,7 @@
 				EC9E8387A6D6DF481B325DBF /* WanderlyClip */,
 				B080FA919C6D70C31ED546F9 /* WanderlyShared */,
 				D37D8D4B160A8BF7C6F69F94 /* WanderlyShareExtension */,
+				EA93D1DA2187722BD98C7025 /* Tests */,
 				D4876E130669B270D00D1540 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -436,6 +454,7 @@
 				03620D4EA81151AB71F38192 /* Wanderly.app */,
 				A57E086170BE289FC60E45C5 /* WanderlyClip.app */,
 				851EFADDC17224C9528169FD /* WanderlyShareExtension.appex */,
+				40EFA9AA95859A8BC6F1C50E /* WanderlyTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -465,6 +484,14 @@
 				BA1EE43098CE11980FE39320 /* WanderlyClipApp.swift */,
 			);
 			path = WanderlyClip;
+			sourceTree = "<group>";
+		};
+		EA93D1DA2187722BD98C7025 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				1ECC87C67BFC50F74EAA900E /* SocialPlacePipelineTests.swift */,
+			);
+			path = Tests/SocialPlacePipelineTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -533,6 +560,24 @@
 			productReference = A57E086170BE289FC60E45C5 /* WanderlyClip.app */;
 			productType = "com.apple.product-type.application.on-demand-install-capable";
 		};
+		D197BC7877E37D6F068C228A /* WanderlyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90D304D48E4FFD34AE905AA9 /* Build configuration list for PBXNativeTarget "WanderlyTests" */;
+			buildPhases = (
+				D7E055A73CB72BEF1E86273B /* Sources */,
+				40578A2BCDF31F69ECB4DC15 /* Resources */,
+				2D38F090C3B18A4A61718499 /* Frameworks */,
+			);
+			buildRules = ();
+			dependencies = (
+				568D8A6D3B900D25F0832842 /* PBXTargetDependency */,
+			);
+			name = WanderlyTests;
+			packageProductDependencies = ();
+			productName = WanderlyTests;
+			productReference = 40EFA9AA95859A8BC6F1C50E /* WanderlyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -553,6 +598,10 @@
 					C15508628E04BBA3344816C6 = {
 						DevelopmentTeam = JC6858UYM9;
 						ProvisioningStyle = Automatic;
+					};
+					D197BC7877E37D6F068C228A = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 70B8A21AF73E33F8B1BE0D31;
 					};
 				};
 			};
@@ -577,6 +626,7 @@
 				70B8A21AF73E33F8B1BE0D31 /* Wanderly */,
 				C15508628E04BBA3344816C6 /* WanderlyClip */,
 				5E6CCD0BB89E25C77DA2CF32 /* WanderlyShareExtension */,
+				D197BC7877E37D6F068C228A /* WanderlyTests */,
 			);
 		};
 /* End PBXProject section */
@@ -606,6 +656,12 @@
 			files = (
 				3C7C8030AE94DB96C22525E8 /* Assets.xcassets in Resources */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		40578A2BCDF31F69ECB4DC15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -719,6 +775,7 @@
 				0FEEB8D7A11D001D3AD43F40 /* SharedTripData.swift in Sources */,
 				990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */,
 				230CFEDD9D415489D5AE1E71 /* SocialPlaceEvidence.swift in Sources */,
+				4EE648333D5DE1167DF272ED /* SocialOCRCandidateHeuristics.swift in Sources */,
 				F43D54ECBE89485DA5C13A03 /* StatsView.swift in Sources */,
 				5ABFBF83CDFEF1512B2CD4A8 /* SupabaseService.swift in Sources */,
 				0BD4C6DA5B323497CFAFFE4E /* Trip.swift in Sources */,
@@ -729,6 +786,14 @@
 				C19497B630FAA95D35232A48 /* UserProfile.swift in Sources */,
 				D42B36179CADE7932242599D /* WanderlyAIService.swift in Sources */,
 				99C08C1AEBD94EC560476469 /* WanderlyApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7E055A73CB72BEF1E86273B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B44CFF49B7AA7143C6A9018F /* SocialPlacePipelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -744,6 +809,11 @@
 			isa = PBXTargetDependency;
 			target = C15508628E04BBA3344816C6 /* WanderlyClip */;
 			targetProxy = 67A6610BDF9C7946FBF06A49 /* PBXContainerItemProxy */;
+		};
+		568D8A6D3B900D25F0832842 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 70B8A21AF73E33F8B1BE0D31 /* Wanderly */;
+			targetProxy = 68FBA6E897EED0670F6D39B8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1035,6 +1105,52 @@
 			};
 			name = Release;
 		};
+		346EEE18C20A6098A84BD324 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = JC6858UYM9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = WanderlyTests;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.wanderly.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wanderly.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Wanderly";
+			};
+			name = Debug;
+		};
+		E542B5885774B42D74391F76 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = JC6858UYM9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = WanderlyTests;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.wanderly.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wanderly.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Wanderly";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1070,6 +1186,15 @@
 			buildConfigurations = (
 				ADC31ED9F4DA5AC4E75D4A1F /* Debug */,
 				EF405DE3B1A444B1FDECCEBD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		90D304D48E4FFD34AE905AA9 /* Build configuration list for PBXNativeTarget "WanderlyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				346EEE18C20A6098A84BD324 /* Debug */,
+				E542B5885774B42D74391F76 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
