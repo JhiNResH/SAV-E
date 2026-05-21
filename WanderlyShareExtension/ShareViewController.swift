@@ -801,19 +801,19 @@ struct ShareExtensionView: View {
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
         let address = firstAddress(in: evidenceText) ?? locatedCity(in: evidenceText) ?? ""
-        let candidateName = displayName(fromSocialHandle: handle)
+        let resolved = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: handle, evidenceText: evidenceText)
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty, isResolvedHandle: resolved.evidence != nil)
+        let candidateName = resolved.name
         let category = fallbackCategory(from: evidenceText)
-        var evidence = ["Instagram handle @\(handle)"]
+        var evidence = ["Instagram handle @\(handle)", "Evidence tier: \(tier.rawValue)"]
         if !sourceURLString.isEmpty {
             evidence.append("Source URL: \(sourceURLString)")
         }
+        if let profileEvidence = resolved.evidence {
+            evidence.append(profileEvidence)
+        }
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(300)))
-        }
-
-        var missingInfo = ["Confirm official address", "Confirm coordinates"]
-        if address.isEmpty {
-            missingInfo.append("No structured location metadata")
         }
 
         return PendingReviewCandidate(
@@ -823,8 +823,8 @@ struct ShareExtensionView: View {
             sourceURL: sourceURLString,
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
             evidence: evidence,
-            confidence: 0.58,
-            missingInfo: Array(Set(missingInfo)).sorted(),
+            confidence: min(0.58 + resolved.confidenceBoost, 0.85),
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
@@ -845,8 +845,10 @@ struct ShareExtensionView: View {
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
         let category = fallbackCategory(from: ([result.name, captionText, ocrText].joined(separator: "\n")))
+        let tier: SocialPlaceEvidenceTier = .weakCandidate
         var evidence = [
             "Source URL: \(sourceURLString)",
+            "Evidence tier: \(tier.rawValue)",
             "OCR-derived candidate: \(result.name)"
         ]
         if !ocrText.isEmpty {
@@ -861,12 +863,11 @@ struct ShareExtensionView: View {
             sourceText: combinedText,
             evidence: evidence,
             confidence: result.confidence,
-            missingInfo: [
-                "Confirm exact address",
-                "Confirm coordinates",
-                "Cross-check official source or map listing",
-                "OCR-derived candidate; verify venue identity"
-            ],
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(
+                tier: tier,
+                hasAddress: false,
+                source: "OCR-derived candidate; verify venue identity"
+            ),
             savedAt: Date()
         )
     }
@@ -908,8 +909,10 @@ struct ShareExtensionView: View {
         guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
         let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
         let category = fallbackCategory(from: "\(name) \(evidenceText)")
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURLString)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata named place: \(name)"
         ]
         if !address.isEmpty {
@@ -917,11 +920,6 @@ struct ShareExtensionView: View {
         }
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(300)))
-        }
-
-        var missingInfo = ["Confirm official address", "Confirm coordinates", "Cross-check official source or map listing"]
-        if address.isEmpty {
-            missingInfo.append("No structured location metadata")
         }
 
         return PendingReviewCandidate(
@@ -932,7 +930,7 @@ struct ShareExtensionView: View {
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
             evidence: evidence,
             confidence: address.isEmpty ? 0.5 : 0.62,
-            missingInfo: Array(Set(missingInfo)).sorted(),
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
@@ -947,8 +945,10 @@ struct ShareExtensionView: View {
         guard let name = chineseVenueName(in: evidenceText) else { return nil }
         let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
         let category = fallbackCategory(from: "\(name) \(evidenceText)")
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURLString)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata named venue: \(name)"
         ]
         if !address.isEmpty {
@@ -956,11 +956,6 @@ struct ShareExtensionView: View {
         }
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(300)))
-        }
-
-        var missingInfo = ["Confirm exact address", "Confirm coordinates", "Cross-check official source or map listing"]
-        if address.isEmpty {
-            missingInfo.append("No structured location metadata")
         }
 
         return PendingReviewCandidate(
@@ -971,7 +966,7 @@ struct ShareExtensionView: View {
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
             evidence: evidence,
             confidence: address.isEmpty ? 0.56 : 0.66,
-            missingInfo: Array(Set(missingInfo)).sorted(),
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
     }
@@ -985,17 +980,16 @@ struct ShareExtensionView: View {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
         guard let inferred = inferredPlaceLineBeforeAddress(in: evidenceText) else { return nil }
         let category = fallbackCategory(from: "\(inferred.name) \(evidenceText)")
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: true)
         var evidence = [
             "Source URL: \(sourceURLString)",
+            "Evidence tier: \(tier.rawValue)",
             "Public metadata place line: \(inferred.name)",
             "Location clue: \(inferred.address)"
         ]
         if !evidenceText.isEmpty {
             evidence.append(String(evidenceText.prefix(300)))
         }
-
-        let missingInfo = ["Confirm official address", "Confirm coordinates", "Cross-check official source or map listing"]
-
         return PendingReviewCandidate(
             candidateName: inferred.name,
             address: inferred.address,
@@ -1004,7 +998,7 @@ struct ShareExtensionView: View {
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
             evidence: evidence,
             confidence: 0.6,
-            missingInfo: Array(Set(missingInfo)).sorted(),
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: true),
             savedAt: Date()
         )
     }
@@ -1045,8 +1039,10 @@ struct ShareExtensionView: View {
             guard isUsablePlaceName(name) else { return nil }
             let detailsText = section.details.joined(separator: "\n")
             let address = firstLocationPin(in: detailsText) ?? streetAddressLine(in: detailsText) ?? locatedCity(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
+            let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
             var evidence = [
                 "Source URL: \(sourceURLString)",
+                "Evidence tier: \(tier.rawValue)",
                 "Public metadata candidate: \(name)"
             ]
             if !address.isEmpty {
@@ -1054,11 +1050,6 @@ struct ShareExtensionView: View {
             }
             if !detailsText.isEmpty {
                 evidence.append(String(detailsText.prefix(300)))
-            }
-
-            var missingInfo = ["Confirm official address", "Confirm coordinates", "Cross-check official source or map listing"]
-            if address.isEmpty {
-                missingInfo.append("No structured location metadata")
             }
 
             return PendingReviewCandidate(
@@ -1069,7 +1060,7 @@ struct ShareExtensionView: View {
                 sourceText: evidenceText.isEmpty ? nil : evidenceText,
                 evidence: evidence,
                 confidence: address.isEmpty ? 0.48 : 0.58,
-                missingInfo: Array(Set(missingInfo)).sorted(),
+                missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: !address.isEmpty),
                 savedAt: Date()
             )
         }
@@ -1168,36 +1159,11 @@ struct ShareExtensionView: View {
     }
 
     private func looksLikeAddressLine(_ line: String) -> Bool {
-        let patterns = [
-            #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
-            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Old Street|District|County|City)\b"#,
-            #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
-            #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
-            #"\d{1,6}\s*(?:号|號)"#
-        ]
-        return patterns.contains { pattern in
-            line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
-        }
+        SocialPlaceEvidenceScorer.looksLikeAddressLine(line)
     }
 
     private func isLikelyCaptionPlaceName(_ value: String) -> Bool {
-        guard isUsablePlaceName(value) else { return false }
-        let lowered = value.lowercased()
-        guard !looksLikeAddressLine(value),
-              !looksLikeOperatingHoursLine(value),
-              !looksLikeReviewMetricLine(value),
-              !looksLikeMarketingLine(value),
-              !lowered.contains("likes"),
-              !lowered.contains("comments"),
-              !lowered.contains(" on instagram"),
-              !lowered.contains("casual"),
-              !lowered.contains("dream"),
-              !lowered.contains("follow"),
-              !lowered.contains("save this"),
-              !lowered.contains("located") else {
-            return false
-        }
-        return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
+        SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(value)
     }
 
     private func candidateNameFromCaptionLine(_ line: String) -> String? {
@@ -1221,7 +1187,7 @@ struct ShareExtensionView: View {
             }
         }
         if let handle = firstRegexCapture(in: line, pattern: #"@([A-Za-z0-9._]{3,30})"#) {
-            let cleaned = displayName(fromSocialHandle: handle)
+            let cleaned = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: handle).name
             if isUsablePlaceName(cleaned), !looksLikeMarketingLine(cleaned) {
                 return cleaned
             }
@@ -1230,22 +1196,15 @@ struct ShareExtensionView: View {
     }
 
     private func looksLikeOperatingHoursLine(_ value: String) -> Bool {
-        value.range(of: #"(?i)(營業|营业|hours?|open|closed|週[一二三四五六日天]|周[一二三四五六日天]|星期|\b\d{1,2}:\d{2}\s*[-–—~至]\s*\d{1,2}:\d{2})"#, options: [.regularExpression]) != nil
+        SocialPlaceEvidenceScorer.looksLikeOperatingHoursLine(value)
     }
 
     private func looksLikeReviewMetricLine(_ value: String) -> Bool {
-        value.range(of: #"(美味程度|環境衛生|服务态度|服務態度|再訪意願|再访意愿|評分|评分|rating|review)\s*[：:]"#, options: [.regularExpression, .caseInsensitive]) != nil ||
-        value.range(of: #"^[^\n]{0,16}[：:].*[🌕🌖🌗🌘🌑⭐★]"#, options: [.regularExpression]) != nil
+        SocialPlaceEvidenceScorer.looksLikeReviewMetricLine(value)
     }
 
     private func looksLikeMarketingLine(_ value: String) -> Bool {
-        let patterns = [
-            #"最難訂|更難搶|不是米其林|不是餐廳|文化盛宴|文化大秀|門票|時段|位置交給|短短\d+分鐘|從.+到.+"#,
-            #"(?i)follow|save this|likes|comments|instagram"#
-        ]
-        return patterns.contains { pattern in
-            value.range(of: pattern, options: [.regularExpression]) != nil
-        }
+        SocialPlaceEvidenceScorer.looksLikeMarketingLine(value)
     }
 
     private func cityAddress(in content: String) -> String? {
@@ -1319,21 +1278,7 @@ struct ShareExtensionView: View {
     }
 
     private func displayName(fromSocialHandle handle: String) -> String {
-        let citySuffixes = ["bali", "tokyo", "paris", "london", "nyc", "la", "sf", "hk", "sg", "seoul"]
-        var normalized = handle
-            .replacingOccurrences(of: ".", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-
-        for suffix in citySuffixes where normalized.count > suffix.count + 2 && normalized.hasSuffix(suffix) {
-            let splitIndex = normalized.index(normalized.endIndex, offsetBy: -suffix.count)
-            normalized = "\(normalized[..<splitIndex]) \(suffix)"
-            break
-        }
-
-        return normalized
-            .split(separator: " ")
-            .map { $0.uppercased() == "nyc" ? "NYC" : $0.capitalized }
-            .joined(separator: " ")
+        SocialPlaceEvidenceScorer.displayName(fromSocialHandle: handle)
     }
 
     private func geocodeAddress(_ address: String) async -> (latitude: Double, longitude: Double)? {
@@ -1375,24 +1320,11 @@ struct ShareExtensionView: View {
     }
 
     private func cleanPlaceName(_ value: String) -> String {
-        cleanHTMLText(value)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "[]【】\"'“”.,:;! "))
-            .split(separator: "\n")
-            .first
-            .map(String.init) ?? ""
+        SocialPlaceEvidenceScorer.cleanCandidateName(value)
     }
 
     private func isUsablePlaceName(_ value: String) -> Bool {
-        let lowered = value.lowercased()
-        guard value.count >= 2,
-              value.count <= 80,
-              !lowered.contains("instagram"),
-              !lowered.contains("reel"),
-              !lowered.contains("comment"),
-              !lowered.contains("like") else {
-            return false
-        }
-        return true
+        SocialPlaceEvidenceScorer.isUsableCandidateName(value)
     }
 
     private func dishHints(from content: String) -> [String] {

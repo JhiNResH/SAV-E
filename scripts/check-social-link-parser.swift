@@ -65,7 +65,7 @@ struct SocialLinkParserCheck {
         )
 
         expect(teaHotPotCandidates.count == 1, "Tea hot pot caption should produce one review candidate")
-        expect(teaHotPotCandidates[0].candidateName == "Fourseasonsteahousehotpot", "Social handle should become the candidate name")
+        expect(teaHotPotCandidates[0].candidateName == "Four Seasons Tea House Hot Pot", "Social handle should resolve to the public profile/listing name")
         expect(teaHotPotCandidates[0].candidateName != "are light", "Embedded 'that are light' must not be parsed as an at-place match")
         expect(teaHotPotCandidates[0].address == "Mountain View", "Mountain View should be preserved as the location clue")
         expect(teaHotPotCandidates[0].category == "food", "Tea hot pot candidate should infer food category")
