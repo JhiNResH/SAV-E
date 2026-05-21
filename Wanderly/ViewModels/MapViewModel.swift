@@ -38,6 +38,8 @@ final class MapViewModel: ObservableObject {
     private let saveLocalVaultService: SaveLocalVaultService
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
+    private var isLoadingPlaces = false
+    private var hasLoadedPlaces = false
 
     init(
         supabaseService: SupabaseServiceProtocol = SupabaseService.shared,
@@ -80,9 +82,17 @@ final class MapViewModel: ObservableObject {
 
     // MARK: - Actions
 
-    func loadPlaces() async {
+    func loadPlaces(force: Bool = false) async {
+        guard !isLoadingPlaces else { return }
+        guard force || !hasLoadedPlaces else { return }
+
+        isLoadingPlaces = true
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoadingPlaces = false
+            isLoading = false
+            hasLoadedPlaces = true
+        }
 
         guard let userId = authService.currentUserId else {
             importPendingPlacesForLocalUse()
