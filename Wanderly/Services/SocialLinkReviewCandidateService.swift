@@ -14,6 +14,12 @@ enum SocialLinkReviewCandidateError: LocalizedError {
 final class SocialLinkReviewCandidateService {
     static let shared = SocialLinkReviewCandidateService()
 
+    private let googlePlacesService: GooglePlacesServiceProtocol
+
+    init(googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared) {
+        self.googlePlacesService = googlePlacesService
+    }
+
     private struct PublicMetadata {
         var resolvedURL: String?
         var title: String?
@@ -29,13 +35,66 @@ final class SocialLinkReviewCandidateService {
             .joined(separator: "\n")
 
         let sourceURL = metadata.resolvedURL ?? url.absoluteString
-        let candidates = reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+        let candidates = await refineCandidates(
+            reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL),
+            evidenceText: evidenceText
+        )
 
         if candidates.isEmpty {
             throw SocialLinkReviewCandidateError.noUsableCandidates
         }
 
         return candidates
+    }
+
+    func refineCandidate(_ candidate: PendingReviewCandidate, evidenceText: String? = nil) async -> PendingReviewCandidate {
+        guard !candidate.hasReliableCoordinates else { return candidate }
+        let query = refinementQuery(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
+        guard !query.isEmpty else { return candidate }
+
+        do {
+            let matches = try await googlePlacesService.searchPlace(query: query, near: nil)
+            guard let match = matches.first(where: { isAcceptableRefinement($0, for: candidate) }) else {
+                return candidate
+            }
+
+            var refined = candidate
+            refined.candidateName = match.name.isEmpty ? refined.candidateName : match.name
+            refined.address = match.address
+            refined.latitude = match.latitude
+            refined.longitude = match.longitude
+            refined.confidence = max(refined.confidence, 0.74)
+            refined.evidence = appendUnique(
+                refined.evidence,
+                [
+                    "Evidence tier: \(SocialPlaceEvidenceTier.likely.rawValue)",
+                    "Google Places refined match: \(match.name)",
+                    "Google Places address: \(match.address)",
+                    "Google Places coordinates: \(match.latitude), \(match.longitude)"
+                ]
+            )
+            refined.missingInfo = SocialPlaceEvidenceScorer.missingInfo(
+                tier: .likely,
+                hasAddress: !match.address.isEmpty,
+                source: "Google Places refined; user must confirm before saving"
+            )
+            return refined
+        } catch {
+            var unresolved = candidate
+            unresolved.missingInfo = appendUnique(
+                unresolved.missingInfo,
+                ["Google Places refine skipped or failed; confirm exact address/coordinates"]
+            )
+            return unresolved
+        }
+    }
+
+    private func refineCandidates(_ candidates: [PendingReviewCandidate], evidenceText: String) async -> [PendingReviewCandidate] {
+        var refined: [PendingReviewCandidate] = []
+        for candidate in candidates {
+            refined.append(await refineCandidate(candidate, evidenceText: evidenceText))
+        }
+        return refined
     }
 
     func reviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
@@ -255,6 +314,61 @@ final class SocialLinkReviewCandidateService {
             missingInfo: missingInfo(tier: tier, hasAddress: !address.isEmpty),
             savedAt: Date()
         )
+    }
+
+    private func refinementQuery(for candidate: PendingReviewCandidate, evidenceText: String) -> String {
+        let cityClues = [
+            firstLocationPin(in: evidenceText),
+            locatedCity(in: evidenceText),
+            cityAddress(in: evidenceText),
+            chineseCityClue(in: evidenceText)
+        ]
+        let categoryClue = category(from: "\(candidate.category) \(evidenceText)")
+        return ([candidate.candidateName, candidate.address] + cityClues + [categoryClue])
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.lowercased() != "attraction" }
+            .joined(separator: " ")
+    }
+
+    private func isAcceptableRefinement(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Bool {
+        guard match.latitude != 0 || match.longitude != 0 else { return false }
+        if !candidate.address.isEmpty { return true }
+
+        let candidateName = normalizedName(candidate.candidateName)
+        let matchName = normalizedName(match.name)
+        guard candidateName.count >= 3, matchName.count >= 3 else { return false }
+        if matchName.contains(candidateName) || candidateName.contains(matchName) { return true }
+
+        let candidateTokens = Set(candidateName.split(separator: " ").map(String.init).filter { $0.count >= 3 })
+        let matchTokens = Set(matchName.split(separator: " ").map(String.init).filter { $0.count >= 3 })
+        guard !candidateTokens.isEmpty else { return false }
+        let overlap = candidateTokens.intersection(matchTokens).count
+        return Double(overlap) / Double(candidateTokens.count) >= 0.6
+    }
+
+    private func normalizedName(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9\u4e00-\u9fff]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func chineseCityClue(in text: String) -> String? {
+        let cities = ["台北", "臺北", "台中", "臺中", "台南", "臺南", "高雄", "東京", "大阪", "京都", "北京", "上海", "首爾"]
+        return cities.first { text.contains($0) }
+    }
+
+    private func appendUnique(_ values: [String], _ newValues: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values + newValues {
+            guard !value.isEmpty, !seen.contains(value) else { continue }
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
     }
 
     private func numberedName(from line: String) -> String? {
