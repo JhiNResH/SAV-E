@@ -758,7 +758,7 @@ struct ShareExtensionView: View {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
         guard let handle = firstSocialHandle(in: evidenceText) else { return nil }
 
-        let address = firstAddress(in: evidenceText) ?? ""
+        let address = firstAddress(in: evidenceText) ?? locatedCity(in: evidenceText) ?? ""
         let candidateName = displayName(fromSocialHandle: handle)
         let category = fallbackCategory(from: evidenceText)
         var evidence = ["Instagram handle @\(handle)"]
@@ -795,7 +795,7 @@ struct ShareExtensionView: View {
     ) -> PendingReviewCandidate? {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
         guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
         let category = fallbackCategory(from: "\(name) \(evidenceText)")
         var evidence = [
             "Source URL: \(sourceURLString)",
@@ -834,7 +834,7 @@ struct ShareExtensionView: View {
     ) -> PendingReviewCandidate? {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
         guard let name = chineseVenueName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
+        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? firstAddress(in: evidenceText) ?? ""
         let category = fallbackCategory(from: "\(name) \(evidenceText)")
         var evidence = [
             "Source URL: \(sourceURLString)",
@@ -933,7 +933,7 @@ struct ShareExtensionView: View {
             let name = cleanPlaceName(section.name)
             guard isUsablePlaceName(name) else { return nil }
             let detailsText = section.details.joined(separator: "\n")
-            let address = firstLocationPin(in: detailsText) ?? streetAddressLine(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
+            let address = firstLocationPin(in: detailsText) ?? streetAddressLine(in: detailsText) ?? locatedCity(in: detailsText) ?? cityAddress(in: detailsText) ?? ""
             var evidence = [
                 "Source URL: \(sourceURLString)",
                 "Public metadata candidate: \(name)"
@@ -979,7 +979,7 @@ struct ShareExtensionView: View {
     private func bracketedPlaceName(in content: String) -> String? {
         let patterns = [
             #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
-            #"(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
+            #"(?i)\b(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
         ]
         for pattern in patterns {
             if let match = firstRegexCapture(in: content, pattern: pattern) {
@@ -1099,6 +1099,11 @@ struct ShareExtensionView: View {
 
     private func cityAddress(in content: String) -> String? {
         firstRegexCapture(in: content, pattern: #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China))\b"#)
+            .map(cleanHTMLText)
+    }
+
+    private func locatedCity(in content: String) -> String? {
+        firstRegexCapture(in: content, pattern: #"(?i)\b(?:located|based)\s+in\s+([A-Z][A-Za-z .'-]{2,40})(?:[.!?,\n\r]|$)"#)
             .map(cleanHTMLText)
     }
 
