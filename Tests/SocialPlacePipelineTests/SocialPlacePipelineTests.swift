@@ -105,6 +105,19 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(result?.supportingLines.contains("Tula Basque") == true)
     }
 
+    func testOCRFrameFindsCJKHotelVenueFromThumbnailText() {
+        let result = SocialOCRCandidateHeuristics.candidate(from: [
+            "高雄洲際酒店",
+            "早餐吃到下午 2:30",
+            "高空無邊際泳池",
+            "亞灣海景"
+        ])
+
+        XCTAssertEqual(result?.name, "高雄洲際酒店")
+        XCTAssertGreaterThanOrEqual(result?.confidence ?? 0, 0.45)
+        XCTAssertTrue(result?.supportingLines.contains("高雄洲際酒店") == true)
+    }
+
     func testSocialPipelineRegressionCasesStayStable() {
         let service = SocialLinkReviewCandidateService()
 
