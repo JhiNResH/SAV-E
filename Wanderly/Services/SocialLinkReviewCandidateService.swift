@@ -332,18 +332,38 @@ final class SocialLinkReviewCandidateService {
 
     private func isAcceptableRefinement(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Bool {
         guard match.latitude != 0 || match.longitude != 0 else { return false }
-        if !candidate.address.isEmpty { return true }
+
+        // Refinement still requires similarity; address evidence may support a
+        // match, but it must not accept the first non-zero Places result.
+        let minimumComparableLength = 3
+        let minimumTokenLength = 3
+        let nameTokenOverlapThreshold = 0.6
+        let addressTokenOverlapThreshold = 0.6
 
         let candidateName = normalizedName(candidate.candidateName)
         let matchName = normalizedName(match.name)
-        guard candidateName.count >= 3, matchName.count >= 3 else { return false }
-        if matchName.contains(candidateName) || candidateName.contains(matchName) { return true }
+        let candidateAddress = normalizedName(candidate.address)
+        let matchAddress = normalizedName(match.address)
 
-        let candidateTokens = Set(candidateName.split(separator: " ").map(String.init).filter { $0.count >= 3 })
-        let matchTokens = Set(matchName.split(separator: " ").map(String.init).filter { $0.count >= 3 })
-        guard !candidateTokens.isEmpty else { return false }
-        let overlap = candidateTokens.intersection(matchTokens).count
-        return Double(overlap) / Double(candidateTokens.count) >= 0.6
+        if candidateName.count >= minimumComparableLength, matchName.count >= minimumComparableLength {
+            if matchName.contains(candidateName) || candidateName.contains(matchName) { return true }
+
+            let candidateTokens = Set(candidateName.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+            let matchTokens = Set(matchName.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+            if !candidateTokens.isEmpty {
+                let overlap = candidateTokens.intersection(matchTokens).count
+                if Double(overlap) / Double(candidateTokens.count) >= nameTokenOverlapThreshold { return true }
+            }
+        }
+
+        guard candidateAddress.count >= minimumComparableLength, matchAddress.count >= minimumComparableLength else { return false }
+        if matchAddress.contains(candidateAddress) || candidateAddress.contains(matchAddress) { return true }
+
+        let candidateAddressTokens = Set(candidateAddress.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+        let matchAddressTokens = Set(matchAddress.split(separator: " ").map(String.init).filter { $0.count >= minimumTokenLength })
+        guard !candidateAddressTokens.isEmpty else { return false }
+        let addressOverlap = candidateAddressTokens.intersection(matchAddressTokens).count
+        return Double(addressOverlap) / Double(candidateAddressTokens.count) >= addressTokenOverlapThreshold
     }
 
     private func normalizedName(_ value: String) -> String {

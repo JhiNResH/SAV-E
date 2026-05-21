@@ -3,6 +3,28 @@ import CoreLocation
 
 private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
     func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [GooglePlaceMatch] {
+        if query.contains("Known Cafe") {
+            return [
+                GooglePlaceMatch(
+                    id: "stub-wrong",
+                    name: "Wrong Tea House",
+                    address: "999 Wrong Road",
+                    latitude: 25.0,
+                    longitude: 121.0,
+                    rating: 4.8,
+                    priceLevel: 2
+                ),
+                GooglePlaceMatch(
+                    id: "stub-known-cafe",
+                    name: "Known Cafe",
+                    address: "123 Known Street",
+                    latitude: 24.2,
+                    longitude: 120.7,
+                    rating: 4.6,
+                    priceLevel: 2
+                )
+            ]
+        }
         if query.contains("蜜柑") {
             return [
                 GooglePlaceMatch(
@@ -49,6 +71,23 @@ struct SocialPlacesRefineFixtureCheck {
         expect(refined.missingInfo.contains("Evidence tier: likely"), "expected likely tier")
         expect(refined.missingInfo.contains("Google Places refined; user must confirm before saving"), "expected user confirmation guard")
         expect(refined.evidence.contains("Google Places refined match: 蜜柑 關西風壽喜燒"), "expected Places evidence")
+
+        let addressed = PendingReviewCandidate(
+            candidateName: "Known Cafe",
+            address: "123 Known Street",
+            category: "cafe",
+            sourceURL: "https://example.com/known-cafe",
+            sourceText: "Known Cafe at 123 Known Street",
+            evidence: ["Evidence tier: likely"],
+            confidence: 0.6,
+            missingInfo: [],
+            savedAt: Date()
+        )
+        let addressedRefined = await service.refineCandidate(addressed)
+        expect(addressedRefined.candidateName == "Known Cafe", "expected addressed candidate to skip unrelated first match")
+        expect(addressedRefined.address == "123 Known Street", "expected addressed candidate to keep matching address")
+        expect(addressedRefined.latitude == 24.2, "expected addressed candidate to use acceptable match latitude")
+        expect(addressedRefined.longitude == 120.7, "expected addressed candidate to use acceptable match longitude")
 
         print("Validated social Places refine fixtures.")
     }
