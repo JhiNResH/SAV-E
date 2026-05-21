@@ -159,6 +159,11 @@ enum SocialPlaceEvidenceScorer {
 
     static func resolvedDisplayName(fromSocialHandle handle: String, evidenceText: String = "") -> (name: String, evidence: String?, confidenceBoost: Double) {
         let normalized = handle.lowercased()
+        if let profileName = profileDisplayName(for: normalized, in: evidenceText),
+           !isRejectedTitle(profileName) {
+            return (profileName, "Resolved public profile metadata for @\(handle): \(profileName)", 0.18)
+        }
+
         let knownProfiles: [String: String] = [
             "mikantaichung": "蜜柑 關西風壽喜燒",
             "fourseasonsteahousehotpot": "Four Seasons Tea House Hot Pot"
@@ -167,6 +172,47 @@ enum SocialPlaceEvidenceScorer {
             return (name, "Resolved public profile/listing for @\(handle): \(name)", 0.15)
         }
         return (displayName(fromSocialHandle: handle), nil, 0)
+    }
+
+    private static func profileDisplayName(for normalizedHandle: String, in evidenceText: String) -> String? {
+        guard !evidenceText.isEmpty else { return nil }
+        let escaped = NSRegularExpression.escapedPattern(for: normalizedHandle)
+        let patterns = [
+            #"(?i)([^\n\r()|•·]{2,80})\s*\(@"# + escaped + #"\)"#,
+            #"(?i)([^\n\r|•·]{2,80})\s*[|•·]\s*Instagram[^\n\r]*@"# + escaped,
+            #"(?i)([^\n\r]{2,80})\s+@"# + escaped + #"\b"#,
+            #"(?i)@"# + escaped + #"\s*[|•·:-]\s*([^\n\r]{2,80})"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
+            let range = NSRange(evidenceText.startIndex..<evidenceText.endIndex, in: evidenceText)
+            guard let match = regex.firstMatch(in: evidenceText, range: range), match.numberOfRanges > 1,
+                  let captureRange = Range(match.range(at: 1), in: evidenceText) else { continue }
+            let cleaned = cleanProfileName(String(evidenceText[captureRange]), normalizedHandle: normalizedHandle)
+            if isUsableProfileName(cleaned, normalizedHandle: normalizedHandle) {
+                return cleaned
+            }
+        }
+        return nil
+    }
+
+    private static func cleanProfileName(_ value: String, normalizedHandle: String) -> String {
+        value
+            .replacingOccurrences(of: #"(?i)Instagram photos and videos|Instagram|官方|Official"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"@"# + NSRegularExpression.escapedPattern(for: normalizedHandle), with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r|•·:-–—()[]{}\"'“”"))
+    }
+
+    private static func isUsableProfileName(_ value: String, normalizedHandle: String) -> Bool {
+        let lowercased = value.lowercased()
+        return value.count >= 2 &&
+            value.count <= 80 &&
+            !lowercased.contains(normalizedHandle) &&
+            !lowercased.contains("instagram") &&
+            !looksLikeHashtagsOnlyLine(value) &&
+            !looksLikeMarketingLine(value) &&
+            !looksLikeGenericProductOrCityLine(value)
     }
 
     static func displayName(fromSocialHandle handle: String) -> String {

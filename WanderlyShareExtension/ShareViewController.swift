@@ -784,6 +784,9 @@ struct ShareExtensionView: View {
         if !ocrText.isEmpty {
             evidence.append("OCR text: \(String(ocrText.prefix(300)))")
         }
+        if !result.supportingLines.isEmpty {
+            evidence.append("OCR supporting lines: \(result.supportingLines.joined(separator: " | "))")
+        }
 
         return PendingReviewCandidate(
             candidateName: result.name,

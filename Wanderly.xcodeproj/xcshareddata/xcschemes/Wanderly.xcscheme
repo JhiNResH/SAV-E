@@ -39,6 +39,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D197BC7877E37D6F068C228A"
+               BuildableName = "WanderlyTests.xctest"
+               BlueprintName = "WanderlyTests"
+               ReferencedContainer = "container:Wanderly.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
