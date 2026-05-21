@@ -44,7 +44,8 @@ enum GooglePlacesError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .apiKeyMissing: return "Google Places API key not configured"
+        case .apiKeyMissing:
+            return "Google Places key missing. Gemini is configured separately, but Refine + Save requires GOOGLE_PLACES_API_KEY."
         case .noResults: return "No matching places found"
         case .networkError(let error): return "Network error: \(error.localizedDescription)"
         case .apiError(let msg): return "Places API: \(msg)"
@@ -60,19 +61,33 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
     private let apiKey: String?
 
     init(apiKey: String? = nil) {
-        let resolved = apiKey
-            ?? ProcessInfo.processInfo.environment["GOOGLE_PLACES_API_KEY"]
-            ?? Self.keyFromPlist("GOOGLE_PLACES_API_KEY")
-        self.apiKey = resolved
+        self.apiKey = Self.normalizedAPIKey(
+            apiKey
+                ?? ProcessInfo.processInfo.environment["GOOGLE_PLACES_API_KEY"]
+                ?? Self.keyFromPlist("GOOGLE_PLACES_API_KEY")
+        )
     }
 
     private static func keyFromPlist(_ key: String) -> String? {
         guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
               let data = try? Data(contentsOf: url),
               let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
-              let value = dict[key],
-              value != "YOUR_KEY_HERE" else { return nil }
+              let value = dict[key] else { return nil }
         return value
+    }
+
+    private static func normalizedAPIKey(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+
+        let placeholders: Set<String> = [
+            "YOUR_KEY_HERE",
+            "REPLACE_ME",
+            "GOOGLE_PLACES_API_KEY"
+        ]
+        return placeholders.contains(trimmed.uppercased()) ? nil : trimmed
     }
 
     // MARK: - Text Search
