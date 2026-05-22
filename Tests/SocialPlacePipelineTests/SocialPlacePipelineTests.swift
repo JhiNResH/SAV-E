@@ -66,6 +66,25 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidates.first?.evidence.joined(separator: " ").contains("Resolved public profile metadata") == true)
     }
 
+    func testHandleOnlySocialCandidateStaysReviewOnlyWithoutFakeCoordinates() {
+        let service = SocialLinkReviewCandidateService()
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            staying at @ulamanbali
+            bamboo resort in Bali
+            """,
+            sourceURL: "https://www.instagram.com/reel/example/"
+        )
+
+        let candidate = candidates.first
+        XCTAssertEqual(candidate?.candidateName, "Ulaman Bali")
+        XCTAssertNil(candidate?.latitude)
+        XCTAssertNil(candidate?.longitude)
+        XCTAssertEqual(candidate?.hasReliableCoordinates, false)
+        XCTAssertTrue(candidate?.missingInfo.contains("Confirm coordinates") == true)
+        XCTAssertTrue(candidate?.evidence.joined(separator: " ").contains("Evidence tier: weakCandidate") == true)
+    }
+
     func testPlacesRefineRanksAcceptableMatchInsteadOfFirstResult() async {
         let google = StubGooglePlacesService()
         let service = SocialLinkReviewCandidateService(googlePlacesService: google)
