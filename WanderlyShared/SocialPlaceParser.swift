@@ -404,9 +404,11 @@ struct SocialPlaceParser {
     }
 
     private func sourceAccountCanBecomeCandidate(_ context: HandleContext, sourceURL: String) -> Bool {
+        let host = URL(string: sourceURL)?.host?.lowercased()
+        let isInstagramHost = host == "instagram.com" || (host?.hasSuffix(".instagram.com") == true)
         guard context.role == .sourceAccount,
               let url = URL(string: sourceURL),
-              url.host?.hasSuffix("instagram.com") == true else {
+              isInstagramHost else {
             return false
         }
         let components = url.pathComponents
@@ -650,6 +652,11 @@ struct SocialPlaceParser {
             trimmedLine.hasPrefix("店名")
         if hasVenueMarker {
             let markerStripped = trimmedLine
+                .replacingOccurrences(
+                    of: #"^\s*店名\s*[:：\-–—]?\s*"#,
+                    with: "",
+                    options: .regularExpression
+                )
                 .replacingOccurrences(
                     of: #"^[^A-Za-z\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+"#,
                     with: "",

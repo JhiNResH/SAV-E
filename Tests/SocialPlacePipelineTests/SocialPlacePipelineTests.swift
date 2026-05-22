@@ -153,6 +153,40 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.evidence.joined(separator: " ").contains("Venue handle: @citiesmemory") })
     }
 
+    func testVenueMarkerStripsStoreNamePrefixBeforeScoring() {
+        let service = SocialLinkReviewCandidateService()
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            店名：Jo & Dawson 光化門店
+            📍首爾特別市 鐘路區 淸進洞 70
+            """,
+            sourceURL: "https://www.instagram.com/reel/DYmFHrizV3E/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "Jo & Dawson 光化門店")
+        XCTAssertFalse(candidates.first?.candidateName.contains("店名") == true)
+    }
+
+    func testSourceAccountCandidateRejectsInstagramSuffixLookalikeHost() {
+        let candidates = SocialPlaceParser().parse(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://notinstagram.com/newcafe.tw/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: """
+                新咖啡實驗室 (@newcafe.tw) • Instagram photos and videos
+                台北 coffee lab
+                @newcafe.tw
+                """,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
     func testProfileResolverUsesMetadataDisplayNameBeforeRawHandle() {
         let service = SocialLinkReviewCandidateService()
         let candidates = service.reviewCandidates(
