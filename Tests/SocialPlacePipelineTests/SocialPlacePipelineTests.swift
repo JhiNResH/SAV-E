@@ -128,6 +128,65 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidates.isEmpty)
     }
 
+    func testInstagramReelCaptionVenueMarkerBeatsSourceAccountProfile() {
+        let service = SocialLinkReviewCandidateService()
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            城市記憶 LESTER | TANG, CHIH-CHUN (@citiesmemory) • Instagram reel
+            citiesmemory on May 21, 2026: "跑了好幾次才終於吃到了這間法式吐司！
+            -
+            跑了幾次Jo & Dawson的延南洞店，不是號碼牌發完了就是當天賣完了，這次剛好發現了光化門附近的新分店，早早的跑過去，不用等太久終於可以順利吃到。
+            -
+            👉🏻Jo & Dawson 光化門店
+            🍽️07:30-20:00
+            📍首爾特別市 鐘路區 淸進洞 70
+            -
+            #韓國美食 #首爾美食 #法式吐司 #seoul #seoulfood".
+            """,
+            sourceURL: "https://www.instagram.com/reel/DYmFHrizV3E/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "Jo & Dawson 光化門店")
+        XCTAssertEqual(candidates.first?.address, "首爾特別市 鐘路區 淸進洞 70")
+        XCTAssertEqual(candidates.first?.category, "food")
+        XCTAssertNotEqual(candidates.first?.candidateName, "TANG, CHIH-CHUN")
+        XCTAssertFalse(candidates.contains { $0.evidence.joined(separator: " ").contains("Venue handle: @citiesmemory") })
+    }
+
+    func testVenueMarkerStripsStoreNamePrefixBeforeScoring() {
+        let service = SocialLinkReviewCandidateService()
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            店名：Jo & Dawson 光化門店
+            📍首爾特別市 鐘路區 淸進洞 70
+            """,
+            sourceURL: "https://www.instagram.com/reel/DYmFHrizV3E/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "Jo & Dawson 光化門店")
+        XCTAssertFalse(candidates.first?.candidateName.contains("店名") == true)
+    }
+
+    func testSourceAccountCandidateRejectsInstagramSuffixLookalikeHost() {
+        let candidates = SocialPlaceParser().parse(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://notinstagram.com/newcafe.tw/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: """
+                新咖啡實驗室 (@newcafe.tw) • Instagram photos and videos
+                台北 coffee lab
+                @newcafe.tw
+                """,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
     func testProfileResolverUsesMetadataDisplayNameBeforeRawHandle() {
         let service = SocialLinkReviewCandidateService()
         let candidates = service.reviewCandidates(

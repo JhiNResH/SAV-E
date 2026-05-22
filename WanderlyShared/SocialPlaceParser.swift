@@ -371,7 +371,7 @@ struct SocialPlaceParser {
         creatorHandles: Set<String>
     ) -> [SocialPlaceCandidateDraft] {
         contexts.compactMap { context in
-            guard (context.role == .venueHandle || context.role == .sourceAccount),
+            guard (context.role == .venueHandle || sourceAccountCanBecomeCandidate(context, sourceURL: sourceURL)),
                   !creatorHandles.contains(context.handle) else { return nil }
             let resolved = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: context.handle, evidenceText: fullText)
             guard context.role == .venueHandle || resolved.evidence != nil else { return nil }
@@ -401,6 +401,20 @@ struct SocialPlaceParser {
                 tier: tier
             )
         }
+    }
+
+    private func sourceAccountCanBecomeCandidate(_ context: HandleContext, sourceURL: String) -> Bool {
+        let host = URL(string: sourceURL)?.host?.lowercased()
+        let isInstagramHost = host == "instagram.com" || (host?.hasSuffix(".instagram.com") == true)
+        guard context.role == .sourceAccount,
+              let url = URL(string: sourceURL),
+              isInstagramHost else {
+            return false
+        }
+        let components = url.pathComponents
+            .filter { $0 != "/" }
+            .map { $0.lowercased() }
+        return components.count == 1 && components.first == context.handle.lowercased()
     }
 
     private func ocrCandidates(from ocrLines: [String], sourceURL: String, fullText: String) -> [SocialPlaceCandidateDraft] {
@@ -627,6 +641,31 @@ struct SocialPlaceParser {
 
         if line.range(of: #"主打|形式|course|コース|menu|price|餐點|價位"#, options: [.regularExpression, .caseInsensitive]) != nil {
             return nil
+        }
+        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstScalar = trimmedLine.unicodeScalars.first?.value
+        let hasVenueMarker = firstScalar == 0x1F449 ||
+            firstScalar == 0x27A1 ||
+            firstScalar == 0x2192 ||
+            firstScalar == 0x279C ||
+            firstScalar == 0x1F4CC ||
+            trimmedLine.hasPrefix("店名")
+        if hasVenueMarker {
+            let markerStripped = trimmedLine
+                .replacingOccurrences(
+                    of: #"^\s*店名\s*[:：\-–—]?\s*"#,
+                    with: "",
+                    options: .regularExpression
+                )
+                .replacingOccurrences(
+                    of: #"^[^A-Za-z\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]+"#,
+                    with: "",
+                    options: .regularExpression
+                )
+            let cleaned = cleanDisplayName(markerStripped)
+            if SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned) {
+                return cleaned
+            }
         }
         if let quoted = quotedVenueName(in: line) {
             return quoted
