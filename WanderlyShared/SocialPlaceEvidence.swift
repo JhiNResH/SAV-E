@@ -210,6 +210,8 @@ enum SocialPlaceEvidenceScorer {
             value.count <= 80 &&
             !lowercased.contains(normalizedHandle) &&
             !lowercased.contains("instagram") &&
+            lowercased.range(of: #"\b(staying|stay|visited|visiting)\s+at$"#, options: .regularExpression) == nil &&
+            !lowercased.hasSuffix(" at") &&
             !looksLikeHashtagsOnlyLine(value) &&
             !looksLikeMarketingLine(value) &&
             !looksLikeGenericProductOrCityLine(value)

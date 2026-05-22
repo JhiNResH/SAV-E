@@ -31,8 +31,8 @@ struct ParsedPlace {
     var address: String
     var category: String
     var iconName: String
-    var latitude: Double
-    var longitude: Double
+    var latitude: Double?
+    var longitude: Double?
     var dishes: [String]
     var priceRange: String?
 }
@@ -225,7 +225,7 @@ struct ShareExtensionView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Parsed place card
             VStack(alignment: .leading, spacing: 8) {
-                Text("Ready to save")
+                Text("Ready to save Map Stamp")
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -243,6 +243,12 @@ struct ShareExtensionView: View {
                         Text(place.address)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        if let latitude = place.latitude,
+                           let longitude = place.longitude {
+                            Text(String(format: "%.5f, %.5f", latitude, longitude))
+                                .font(.caption2)
+                                .foregroundColor(SaveTheme.rose)
+                        }
                     }
 
                     Spacer()
@@ -491,19 +497,19 @@ struct ShareExtensionView: View {
             guard hasMeaningfulPlaceContext(aiContent, sourceURLString: parseContent) else {
                 throw NSError(domain: "wanderly", code: 4, userInfo: [NSLocalizedDescriptionKey: "Share a map link or a post with a visible place name so SAV-E does not guess the wrong city."])
             }
-            parsedPlace = try await parseWithGemini(content: aiContent, sourceURLString: parseContent)
-            selectedCategory = parsedPlace?.category ?? "food"
-        } catch {
-            let isSocialSource = URL(string: parseContent).map(isSocialURL) ?? false
-            if !isSocialSource,
-               let fallback = fallbackPlace(from: parseContent, title: sharedTitle, text: sharedText),
-               isValidCoordinate(latitude: fallback.latitude, longitude: fallback.longitude) {
-                parsedPlace = fallback
-                selectedCategory = fallback.category
+            let aiPlace = try await parseWithGemini(content: aiContent, sourceURLString: parseContent)
+            if hasReliableCoordinates(aiPlace) {
+                parsedPlace = aiPlace
+                selectedCategory = aiPlace.category
+            } else if let candidate = reviewCandidate(from: aiPlace, sourceURLString: parseContent, sourceText: aiContent) {
+                reviewCandidate = candidate
+                selectedCategory = candidate.category
             } else {
-                saveSourceOnlyMemory(parseContent, reason: error.localizedDescription)
-                parseError = userFacingParseError(from: error)
+                throw NSError(domain: "wanderly", code: 5, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not identify one exact place from this post. Share the map link or include the place name."])
             }
+        } catch {
+            saveSourceOnlyMemory(parseContent, reason: error.localizedDescription)
+            parseError = userFacingParseError(from: error)
         }
         isParsing = false
     }
@@ -531,8 +537,8 @@ struct ShareExtensionView: View {
           "name": "Place Name",
           "address": "Full address",
           "category": "food" | "cafe" | "bar" | "attraction" | "stay" | "shopping",
-          "latitude": 0.0,
-          "longitude": 0.0,
+          "latitude": null,
+          "longitude": null,
           "dishes": ["dish1", "dish2"],
           "priceRange": "$$",
           "needsReview": false
@@ -541,9 +547,11 @@ struct ShareExtensionView: View {
         Rules:
         - Extract the place name, address, and category only from explicit text, metadata, or map URL data
         - If it's a restaurant/food URL, extract recommended dishes
+        - Use null for latitude and longitude unless exact coordinates are explicitly present in the source or map URL
         - Do not guess a city, address, or coordinates from a social URL alone
         - If the source says Beijing/北京, do not return a Shanghai/上海 place, and vice versa
-        - If you cannot identify one exact place, set needsReview to true and use latitude 0.0, longitude 0.0
+        - If you can identify a likely place but exact coordinates are missing, keep the place fields and set latitude/longitude to null with needsReview true
+        - If you cannot identify one exact place, set needsReview to true and use null for missing fields
         - Never use a popular default city or a plausible replacement place
         - category must be one of: food, cafe, bar, attraction, stay, shopping
         """
@@ -581,17 +589,13 @@ struct ShareExtensionView: View {
             throw NSError(domain: "wanderly", code: 3, userInfo: [NSLocalizedDescriptionKey: "Couldn't parse AI response"])
         }
 
-        if dict["needsReview"] as? Bool == true {
-            throw NSError(domain: "wanderly", code: 5, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not identify one exact place from this post. Share the map link or include the place name."])
-        }
-
         let place = ParsedPlace(
             name: dict["name"] as? String ?? "Unknown Place",
             address: dict["address"] as? String ?? "",
             category: dict["category"] as? String ?? "food",
             iconName: iconForCategory(dict["category"] as? String ?? "food"),
-            latitude: dict["latitude"] as? Double ?? 0,
-            longitude: dict["longitude"] as? Double ?? 0,
+            latitude: dict["latitude"] as? Double,
+            longitude: dict["longitude"] as? Double,
             dishes: dict["dishes"] as? [String] ?? [],
             priceRange: dict["priceRange"] as? String
         )
@@ -1450,10 +1454,6 @@ struct ShareExtensionView: View {
     }
 
     private func validateAIPlace(_ place: ParsedPlace, against content: String, sourceURLString: String) throws {
-        guard isValidCoordinate(latitude: place.latitude, longitude: place.longitude) else {
-            throw NSError(domain: "wanderly", code: 6, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not find reliable coordinates for this post. Share the map link to save it accurately."])
-        }
-
         let combinedPlace = "\(place.name) \(place.address)".lowercased()
         let source = content.lowercased()
         let conflicts = [
@@ -1472,6 +1472,50 @@ struct ShareExtensionView: View {
         if let url = URL(string: sourceURLString), isSocialURL(url), place.name == "Unknown Place" {
             throw NSError(domain: "wanderly", code: 8, userInfo: [NSLocalizedDescriptionKey: "SAV-E could not identify one exact place from this social post."])
         }
+    }
+
+    private func hasReliableCoordinates(_ place: ParsedPlace) -> Bool {
+        guard let latitude = place.latitude,
+              let longitude = place.longitude else {
+            return false
+        }
+        return isValidCoordinate(latitude: latitude, longitude: longitude)
+    }
+
+    private func reviewCandidate(from place: ParsedPlace, sourceURLString: String, sourceText: String) -> PendingReviewCandidate? {
+        let name = cleanPlaceName(place.name)
+        guard isUsablePlaceName(name), name != "Unknown Place" else { return nil }
+
+        let hasAddress = !place.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let tier = SocialPlaceEvidenceScorer.tier(hasAddress: hasAddress)
+        var evidence = [
+            "Source URL: \(sourceURLString)",
+            "Evidence tier: \(tier.rawValue)",
+            "AI extracted review candidate: \(name)",
+            "No reliable coordinates in source; kept out of Map Stamp"
+        ]
+        if hasAddress {
+            evidence.append("Location clue: \(place.address)")
+        }
+        if !sourceText.isEmpty {
+            evidence.append(String(sourceText.prefix(300)))
+        }
+
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: place.address,
+            category: place.category,
+            sourceURL: sourceURLString,
+            sourceText: sourceText.isEmpty ? nil : sourceText,
+            evidence: evidence,
+            confidence: hasAddress ? 0.62 : 0.52,
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(
+                tier: tier,
+                hasAddress: hasAddress,
+                source: "Gemini extracted a likely place but did not provide verified coordinates"
+            ),
+            savedAt: Date()
+        )
     }
 
     private func isSocialURL(_ url: URL) -> Bool {
@@ -1592,35 +1636,6 @@ struct ShareExtensionView: View {
         return fallbackAddress(from: text)
     }
 
-    private func fallbackPlace(from content: String, title: String, text: String) -> ParsedPlace? {
-        let candidateName = bestFallbackName(content: content, title: title, text: text)
-        guard let name = candidateName, !name.isEmpty else { return nil }
-
-        let category = fallbackCategory(from: [name, content, text].joined(separator: " "))
-        let coordinates = fallbackCoordinates(from: [name, content, text].joined(separator: " "))
-
-        return ParsedPlace(
-            name: name,
-            address: fallbackAddress(from: text),
-            category: category,
-            iconName: iconForCategory(category),
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
-            dishes: [],
-            priceRange: nil
-        )
-    }
-
-    private func bestFallbackName(content: String, title: String, text: String) -> String? {
-        for candidate in [title, queryName(from: content), text] {
-            let cleaned = cleanFallbackName(candidate)
-            if !cleaned.isEmpty {
-                return cleaned
-            }
-        }
-        return nil
-    }
-
     private func queryName(from content: String) -> String {
         guard let url = URL(string: content),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
@@ -1681,14 +1696,6 @@ struct ShareExtensionView: View {
         return "attraction"
     }
 
-    private func fallbackCoordinates(from content: String) -> (latitude: Double, longitude: Double) {
-        let value = content.lowercased()
-        if value.contains("san francisco") {
-            return (37.7749, -122.4194)
-        }
-        return (0, 0)
-    }
-
     private func userFacingParseError(from error: Error) -> String {
         let nsError = error as NSError
         if nsError.code == 429 {
@@ -1719,13 +1726,28 @@ struct ShareExtensionView: View {
 
     private func savePlace() {
         guard let place = parsedPlace else { return }
+        guard let latitude = place.latitude,
+              let longitude = place.longitude,
+              isValidCoordinate(latitude: latitude, longitude: longitude) else {
+            if let candidate = reviewCandidate(
+                from: place,
+                sourceURLString: sharedURL.isEmpty ? sharedText : sharedURL,
+                sourceText: sharedText
+            ) {
+                reviewCandidate = candidate
+                parsedPlace = nil
+                return
+            }
+            parseError = "SAV-E needs reliable coordinates before saving a Map Stamp."
+            return
+        }
 
         let pendingPlace = PendingSharedPlace(
             name: place.name,
             address: place.address,
             category: selectedCategory,
-            latitude: place.latitude,
-            longitude: place.longitude,
+            latitude: latitude,
+            longitude: longitude,
             dishes: place.dishes,
             priceRange: place.priceRange,
             sourceURL: sharedURL.isEmpty ? nil : sharedURL,
