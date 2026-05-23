@@ -75,6 +75,10 @@ final class SocialLinkReviewCandidateService {
                 hasAddress: !match.address.isEmpty,
                 source: "Google Places refined; user must confirm before saving"
             )
+            refined.evidenceDiagnostic = refinedDiagnosticAfterPlacesMatch(
+                existing: refined.evidenceDiagnostic,
+                match: match
+            )
             return refined
         } catch {
             var unresolved = candidate
@@ -660,6 +664,37 @@ final class SocialLinkReviewCandidateService {
             nextBestClue: candidate.address.isEmpty
                 ? "Confirm the exact address or share a map link before saving this as a Map Stamp."
                 : "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+        )
+    }
+
+    private func refinedDiagnosticAfterPlacesMatch(
+        existing: SocialPlaceEvidenceDiagnostic?,
+        match: GooglePlaceMatch
+    ) -> SocialPlaceEvidenceDiagnostic {
+        let base = existing ?? SocialPlaceEvidenceDiagnostic(found: [], attempts: [], missingFields: [], nextBestClue: "")
+        var newFound = [
+            "Google Places match: \(match.name)",
+            "Verified coordinates: \(match.latitude), \(match.longitude)"
+        ]
+        if !match.address.isEmpty {
+            newFound.insert("Verified address: \(match.address)", at: 1)
+        }
+        let found = appendUnique(base.found, newFound)
+        let attempts = appendUnique(
+            base.attempts,
+            ["Checked Google Places for a matching place record"]
+        )
+        let missing = base.missingFields.filter { field in
+            field != "Verified address" &&
+            field != "Confirm address" &&
+            field != "Verified coordinates" &&
+            field != "Confirm coordinates"
+        }
+        return SocialPlaceEvidenceDiagnostic(
+            found: found,
+            attempts: attempts,
+            missingFields: appendUnique([], missing),
+            nextBestClue: "Confirm this Google Places match before saving it as a Map Stamp."
         )
     }
 

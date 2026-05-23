@@ -16,9 +16,11 @@ final class SaveLocalVaultService {
 
     private let fileManager: FileManager
     private let fileName = "save-memory-records.json"
+    private let overrideVaultURL: URL?
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, overrideVaultURL: URL? = nil) {
         self.fileManager = fileManager
+        self.overrideVaultURL = overrideVaultURL
     }
 
     func append(_ record: SaveMemoryRecord) throws {
@@ -32,12 +34,14 @@ final class SaveLocalVaultService {
     }
 
     func saveSourceOnly(url: URL, note: String? = nil) throws -> SaveMemoryRecord {
+        let diagnostic = sourceOnlyDiagnostic(url: url, note: note)
         let record = SaveMemoryRecord(
             state: .sourceOnly,
             sourceURL: url.absoluteString,
             sourceText: note,
-            title: url.host() ?? url.absoluteString,
-            evidence: note.flatMap { $0.isEmpty ? nil : [$0] } ?? []
+            title: sourceOnlyDisplayName(for: url),
+            evidence: diagnostic.found + diagnostic.attempts,
+            evidenceDiagnostic: diagnostic
         )
         try append(record)
         return record
@@ -102,10 +106,38 @@ final class SaveLocalVaultService {
     }
 
     private func vaultURL() -> URL? {
+        if let overrideVaultURL { return overrideVaultURL }
         if let appGroupURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) {
             return appGroupURL.appendingPathComponent(fileName)
         }
         return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(fileName)
+    }
+
+    private func sourceOnlyDisplayName(for url: URL) -> String {
+        let path = url.path.lowercased()
+        if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
+        if url.host()?.lowercased().contains("instagram") == true { return "Instagram link" }
+        return url.host() ?? url.absoluteString
+    }
+
+    private func sourceOnlyDiagnostic(url: URL, note: String?) -> SocialPlaceEvidenceDiagnostic {
+        var found = ["Source URL: \(url.absoluteString)"]
+        if note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            found.append("Shared text/caption was present but did not contain a verified place candidate")
+        }
+        return SocialPlaceEvidenceDiagnostic(
+            found: found,
+            attempts: [
+                "Saved the original source before place evidence was verified",
+                "Kept this as a source-only clue instead of inventing a place"
+            ],
+            missingFields: [
+                "Verified place name",
+                "Verified address",
+                "Verified coordinates"
+            ],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+        )
     }
 }
 

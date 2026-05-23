@@ -312,6 +312,24 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(decoded.evidenceDiagnostic?.nextBestClue, diagnostic.nextBestClue)
     }
 
+    func testSaveSourceOnlyCreatesEvidenceDiagnosticInsteadOfBareBookmark() throws {
+        let vaultURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("save-memory-records.json")
+        let service = SaveLocalVaultService(overrideVaultURL: vaultURL)
+        let record = try service.saveSourceOnly(
+            url: URL(string: "https://www.instagram.com/reel/DYfallback/")!,
+            note: "Creator post saved before parser evidence arrived"
+        )
+
+        XCTAssertEqual(record.state, .sourceOnly)
+        XCTAssertEqual(record.title, "Instagram reel")
+        XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Source URL: https://www.instagram.com/reel/DYfallback/") == true)
+        XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Shared text/caption was present but did not contain a verified place candidate") == true)
+        XCTAssertTrue(record.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
+        XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+    }
+
     func testPlacesRefineRanksAcceptableMatchInsteadOfFirstResult() async {
         let google = StubGooglePlacesService()
         let service = SocialLinkReviewCandidateService(googlePlacesService: google)
@@ -326,9 +344,14 @@ final class SocialPlacePipelineTests: XCTestCase {
             evidence: ["Evidence tier: likely"],
             confidence: 0.6,
             missingInfo: [],
-            savedAt: Date()
+            savedAt: Date(),
+            evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                found: ["Source URL: https://example.com/known-cafe", "Candidate place name: Known Cafe"],
+                attempts: ["Checked public metadata/caption text for explicit place names"],
+                missingFields: ["Verified coordinates"],
+                nextBestClue: "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+            )
         )
-
         let refined = await service.refineCandidate(candidate)
 
         XCTAssertEqual(refined.candidateName, "Known Cafe")
@@ -336,6 +359,10 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(refined.latitude, 24.2)
         XCTAssertEqual(refined.longitude, 120.7)
         XCTAssertTrue(refined.evidence.contains("Google Places refined match: Known Cafe"))
+        XCTAssertTrue(refined.evidenceDiagnostic?.found.contains("Google Places match: Known Cafe") == true)
+        XCTAssertTrue(refined.evidenceDiagnostic?.found.contains("Verified coordinates: 24.2, 120.7") == true)
+        XCTAssertFalse(refined.evidenceDiagnostic?.missingFields.contains("Verified coordinates") == true)
+        XCTAssertEqual(refined.evidenceDiagnostic?.nextBestClue, "Confirm this Google Places match before saving it as a Map Stamp.")
     }
 
     func testPlacesRefinementQueriesSkipCreatorHandles() async {
