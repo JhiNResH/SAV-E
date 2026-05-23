@@ -24,8 +24,22 @@ struct MapView: View {
                     }
                 }
                 .mapControls {
-                    MapUserLocationButton()
                     MapCompass()
+                }
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        CurrentLocationButton(
+                            isLocating: viewModel.isLocatingUser,
+                            action: {
+                                Task { await viewModel.focusOnUserLocation() }
+                            }
+                        )
+                        .padding(.trailing, 18)
+                        .padding(.bottom, max(geo.safeAreaInsets.bottom + 96, 112))
+                    }
                 }
 
                 HStack(spacing: 0) {
@@ -66,6 +80,39 @@ struct MapView: View {
         .task {
             await viewModel.focusOnUserLocationOnLaunch()
         }
+    }
+}
+
+private struct CurrentLocationButton: View {
+    let isLocating: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.saveCard)
+                    .frame(width: 54, height: 54)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                    )
+                    .shadow(color: Color.saveCocoa.opacity(0.18), radius: 12, y: 6)
+
+                if isLocating {
+                    ProgressView()
+                        .tint(.wanderlyTerracotta)
+                } else {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundColor(.wanderlyTerracotta)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isLocating)
+        .accessibilityLabel("Center map on current location")
+        .accessibilityHint("Moves the map back to where you are now")
     }
 }
 
