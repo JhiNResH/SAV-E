@@ -104,6 +104,28 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.candidateName == "OC Insider" })
     }
 
+    func testInstagramPinnedVenueLineWithZipAddressBeatsOCRText() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            Teresa | LA & OC Lifestyle • Travel Creator on Instagram: "Mediterranean escape in Los Angeles that feels like a mini trip to Greece 🇬🇷
+            Now serving weekend brunch for the summer, it’s the perfect daytime spot to slow down and enjoy the vibe.
+            From fresh oysters and warm pita to Greek salad, seared octopus, lamb chops, and lobster orzo, everything is packed with flavor.
+
+            📍 Alisa Wine & Friends @alisa_wine_friends
+            1009 Abbot Kinney Blvd, Venice, CA 90291
+
+            #losangeles #thingstodoinla #abbotkinney #restaurant #wheretoeat"
+            """,
+            sourceURL: "https://www.instagram.com/reel/DYmsoN0hxdv/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "Alisa Wine & Friends")
+        XCTAssertEqual(candidates.first?.address, "1009 Abbot Kinney Blvd, Venice, CA 90291")
+        XCTAssertFalse(candidates.contains { $0.candidateName == "to slow down and enjoy the vibe" })
+        XCTAssertFalse(candidates.contains { $0.candidateName == "MEDITERRANEAN" })
+    }
+
     func testAgentParserMergesNumberedPlaceEvidence() {
         let analysis = SocialPlaceParser().analyze(
             evidence: SocialPlaceSourceEvidence(

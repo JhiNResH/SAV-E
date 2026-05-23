@@ -75,6 +75,8 @@ private struct ShareMetadata {
     var imageData: Data?
 }
 
+private let shareMetadataHTMLByteLimit = 2_000_000
+
 private struct SocialPlaceEvidenceDiagnostic: Codable {
     var found: [String]
     var attempts: [String]
@@ -722,7 +724,7 @@ struct ShareExtensionView: View {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let resolvedURL = response.url?.absoluteString ?? url.absoluteString
-            let html = String(data: data.prefix(200_000), encoding: .utf8) ?? ""
+            let html = String(data: data.prefix(shareMetadataHTMLByteLimit), encoding: .utf8) ?? ""
             let imageData = await metadataImageData(in: html, baseURL: response.url ?? url)
             print("SAV-E share metadata imageData bytes=\(imageData?.count ?? 0)")
             return ShareMetadata(
