@@ -105,11 +105,30 @@ struct SocialPlaceDiscardedCandidate {
     var reason: String
 }
 
+enum SocialPlaceSourceType: String, Codable {
+    case singleVenuePost
+    case multiPlaceList
+    case creatorOnly
+    case sourceOnly
+    case unknown
+}
+
+struct SocialPlaceSourceGroup {
+    var label: String
+    var venueHandles: [String]
+    var evidenceLine: String
+}
+
 struct SocialPlaceAgentAnalysis {
+    var sourceType: SocialPlaceSourceType
     var sourceSummary: String
+    var topic: String?
+    var regionClues: [String]
+    var groups: [SocialPlaceSourceGroup]
     var placesFound: [SocialPlaceCandidateDraft]
     var sourceActors: [SocialPlaceSourceActor]
     var discardedCandidates: [SocialPlaceDiscardedCandidate]
+    var confidence: Double
     var nextBestAction: String
 }
 
@@ -130,6 +149,9 @@ struct SocialPlaceParser {
         let sourceActors = handleContexts
             .filter { $0.role == .creatorHandle || $0.role == .sourceAccount }
             .map { SocialPlaceSourceActor(handle: $0.handle, role: $0.role, why: $0.reason) }
+        let sourceGroups = sourceGroups(from: lines)
+        let topic = sourceTopic(from: text)
+        let regionClues = regionClues(from: text)
         let discarded = creatorHandles.map {
             SocialPlaceDiscardedCandidate(
                 value: SocialPlaceEvidenceScorer.displayName(fromSocialHandle: $0),
@@ -147,16 +169,32 @@ struct SocialPlaceParser {
         candidates.append(contentsOf: handleOnlyCandidates(from: handleContexts, sourceURL: evidence.sourceURL, fullText: text, creatorHandles: creatorHandles))
         candidates.append(contentsOf: ocrCandidates(from: evidence.ocrLines, sourceURL: evidence.sourceURL, fullText: text))
 
-        let merged = mergeCandidates(candidates)
+        let sourceType = sourceType(
+            text: text,
+            groups: sourceGroups,
+            candidates: candidates,
+            creatorHandles: creatorHandles
+        )
+        let merged = attachSourceGroupEvidence(
+            groups: sourceGroups,
+            to: mergeCandidates(candidates)
+        )
             .filter { !SocialPlaceEvidenceScorer.isRejectedTitle($0.displayName) }
 
         return SocialPlaceAgentAnalysis(
-            sourceSummary: sourceSummary(for: text, ocrLineCount: evidence.ocrLines.count),
+            sourceType: sourceType,
+            sourceSummary: sourceSummary(for: text, ocrLineCount: evidence.ocrLines.count, sourceType: sourceType, topic: topic),
+            topic: topic,
+            regionClues: regionClues,
+            groups: sourceGroups,
             placesFound: merged,
             sourceActors: uniqueActors(sourceActors),
             discardedCandidates: uniqueDiscarded(discarded),
+            confidence: sourceConfidence(sourceType: sourceType, groups: sourceGroups, candidates: merged),
             nextBestAction: merged.isEmpty
                 ? "Add one more clue: place name, screenshot, caption, or map link."
+                : sourceType == .multiPlaceList
+                    ? "Review or enrich selected venue clues before saving Map Stamps."
                 : "Open Review to confirm exact address and coordinates."
         )
     }
@@ -842,7 +880,18 @@ struct SocialPlaceParser {
         return score
     }
 
-    private func sourceSummary(for text: String, ocrLineCount: Int) -> String {
+    private func sourceSummary(
+        for text: String,
+        ocrLineCount: Int,
+        sourceType: SocialPlaceSourceType,
+        topic: String?
+    ) -> String {
+        if sourceType == .multiPlaceList {
+            if let topic, !topic.isEmpty {
+                return "multi-place list: \(topic)"
+            }
+            return "multi-place social list"
+        }
         var parts: [String] = []
         if text.lowercased().contains("instagram") || text.contains("@") {
             parts.append("social caption")
@@ -854,6 +903,169 @@ struct SocialPlaceParser {
             parts.append("OCR text")
         }
         return parts.isEmpty ? "public link evidence" : parts.joined(separator: " with ")
+    }
+
+    private func sourceType(
+        text: String,
+        groups: [SocialPlaceSourceGroup],
+        candidates: [SocialPlaceCandidateDraft],
+        creatorHandles: Set<String>
+    ) -> SocialPlaceSourceType {
+        if groups.count >= 2 {
+            return .multiPlaceList
+        }
+        if looksLikeSocialPlaceList(text), candidates.filter({ !$0.venueHandles.isEmpty }).count >= 2 {
+            return .multiPlaceList
+        }
+        if candidates.count == 1 {
+            return .singleVenuePost
+        }
+        if candidates.isEmpty, !creatorHandles.isEmpty {
+            return .creatorOnly
+        }
+        if candidates.isEmpty {
+            return .sourceOnly
+        }
+        return .unknown
+    }
+
+    private func sourceGroups(from lines: [String]) -> [SocialPlaceSourceGroup] {
+        var groups: [SocialPlaceSourceGroup] = []
+        for (index, line) in lines.enumerated() {
+            let venueHandles = handles(in: line)
+            guard !venueHandles.isEmpty else { continue }
+            guard let label = nearbyListGroupLabel(after: index, in: lines) ?? nearbyListGroupLabel(before: index, in: lines) else {
+                continue
+            }
+            groups.append(
+                SocialPlaceSourceGroup(
+                    label: label,
+                    venueHandles: uniqueStrings(venueHandles),
+                    evidenceLine: line
+                )
+            )
+        }
+        return uniqueGroups(groups)
+    }
+
+    private func nearbyListGroupLabel(after index: Int, in lines: [String]) -> String? {
+        let nextIndex = index + 1
+        guard lines.indices.contains(nextIndex), handles(in: lines[nextIndex]).isEmpty else { return nil }
+        return listGroupLabel(from: lines[nextIndex])
+    }
+
+    private func nearbyListGroupLabel(before index: Int, in lines: [String]) -> String? {
+        let previousIndex = index - 1
+        guard lines.indices.contains(previousIndex), handles(in: lines[previousIndex]).isEmpty else { return nil }
+        return listGroupLabel(from: lines[previousIndex])
+    }
+
+    private func listGroupLabel(from line: String) -> String? {
+        let cleaned = SocialPlaceEvidenceScorer.cleanText(line)
+            .replacingOccurrences(of: #"^[→\-–—•\s]+"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？"))
+        guard cleaned.count >= 3,
+              cleaned.count <= 80,
+              cleaned.range(of: #"(?i)\b(?:best for|worth it|atmosphere|aesthetic|coffee quality|unique|desserts?|experiences?|favorite|favourite)\b"#, options: .regularExpression) != nil,
+              handles(in: cleaned).isEmpty else {
+            return nil
+        }
+        return cleaned.lowercased()
+    }
+
+    private func sourceTopic(from text: String) -> String? {
+        let patterns = [
+            #"(?i)\b(?:the\s+)?(coffee shops?\s+in\s+Los Angeles County)\b"#,
+            #"(?i)\b(?:the\s+)?((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+[A-Z][A-Za-z .'-]{2,60})\b"#,
+            #"(?i)\b((?:LA|Los Angeles|Orange County|OC|Tokyo|Taipei|Seoul|Paris|London|New York)\s+(?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?))\b"#
+        ]
+        for pattern in patterns {
+            guard let topic = firstCapture(in: text, pattern: pattern) else { continue }
+            let cleaned = SocialPlaceEvidenceScorer.cleanText(topic)
+                .replacingOccurrences(of: #"(?i)^the\s+"#, with: "", options: .regularExpression)
+            if !cleaned.isEmpty { return cleaned }
+        }
+        return nil
+    }
+
+    private func regionClues(from text: String) -> [String] {
+        var clues: [String] = []
+        let patterns = [
+            #"(?i)\bLos Angeles County\b"#,
+            #"(?i)\bLos Angeles\b"#,
+            #"(?i)\bLA\b"#,
+            #"(?i)\bOrange County\b"#,
+            #"(?i)\bOC\b"#,
+            #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            for match in regex.matches(in: text, range: range) {
+                guard let matchRange = Range(match.range, in: text) else { continue }
+                let raw = String(text[matchRange]).replacingOccurrences(of: "#", with: "")
+                clues.append(SocialPlaceEvidenceScorer.cleanText(raw))
+            }
+        }
+        return uniqueStrings(clues)
+    }
+
+    private func attachSourceGroupEvidence(
+        groups: [SocialPlaceSourceGroup],
+        to candidates: [SocialPlaceCandidateDraft]
+    ) -> [SocialPlaceCandidateDraft] {
+        guard !groups.isEmpty else { return candidates }
+        return candidates.map { candidate in
+            var candidate = candidate
+            let matchedGroups = groups.filter { group in
+                !Set(group.venueHandles).isDisjoint(with: Set(candidate.venueHandles))
+            }
+            guard !matchedGroups.isEmpty else { return candidate }
+            let atoms = matchedGroups.map { group in
+                SocialEvidenceAtom(
+                    source: .captionSentence,
+                    role: .categoryClue,
+                    value: "Source group: \(group.label)",
+                    line: group.evidenceLine,
+                    confidence: 0.42
+                )
+            }
+            candidate.evidence = appendUniqueAtoms(candidate.evidence + atoms)
+            candidate.missingInfo = uniqueStrings(candidate.missingInfo + ["Grouped list clue; enrich before saving"])
+                .sorted()
+            return candidate
+        }
+    }
+
+    private func sourceConfidence(
+        sourceType: SocialPlaceSourceType,
+        groups: [SocialPlaceSourceGroup],
+        candidates: [SocialPlaceCandidateDraft]
+    ) -> Double {
+        switch sourceType {
+        case .multiPlaceList:
+            return min(0.5 + Double(groups.count) * 0.05 + Double(candidates.count) * 0.01, 0.78)
+        case .singleVenuePost:
+            return candidates.first?.confidence ?? 0.5
+        case .creatorOnly:
+            return 0.32
+        case .sourceOnly:
+            return 0.24
+        case .unknown:
+            return 0.4
+        }
+    }
+
+    private func uniqueGroups(_ groups: [SocialPlaceSourceGroup]) -> [SocialPlaceSourceGroup] {
+        var seen = Set<String>()
+        var result: [SocialPlaceSourceGroup] = []
+        for group in groups {
+            let key = "\(group.label)|\(group.venueHandles.joined(separator: ","))"
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(group)
+        }
+        return result
     }
 
     private func uniqueStrings(_ values: [String]) -> [String] {

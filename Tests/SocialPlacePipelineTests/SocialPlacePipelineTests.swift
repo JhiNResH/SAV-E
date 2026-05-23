@@ -362,6 +362,62 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidates.first { $0.candidateName == "Fasttimescoffee" }?.evidence.joined(separator: " ").contains("Venue handle: @fasttimescoffee") == true)
     }
 
+    func testInstagramCoffeeShopListProducesSourceLevelUnderstanding() {
+        let evidenceText = """
+        Teresa | LA & OC Lifestyle • Travel Creator on Instagram: "The coffee shops in Los Angeles County I always end up returning to ☕️
+
+        @theboyandthebearco @stereoscopecoffee @musocoffeela
+        → best for coffee quality
+
+        @elorea @archives.ofus
+        → unique coffee experiences
+
+        @fasttimescoffee @est.today.cafe
+        → atmosphere & aesthetic
+
+        @moducafe
+        → desserts worth it
+
+        Which one would you go to first?
+
+        #losangeles #hiddengem #coffeeshop #coffeeislife #lacoffee".
+        """
+
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/DYsbskQyclc/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: evidenceText,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertEqual(analysis.sourceType, .multiPlaceList)
+        XCTAssertEqual(analysis.topic, "coffee shops in Los Angeles County")
+        XCTAssertTrue(analysis.sourceSummary.contains("multi-place list"))
+        XCTAssertTrue(analysis.regionClues.contains("Los Angeles County"))
+        XCTAssertEqual(analysis.groups.map(\.label), [
+            "best for coffee quality",
+            "unique coffee experiences",
+            "atmosphere & aesthetic",
+            "desserts worth it"
+        ])
+        XCTAssertEqual(analysis.groups[0].venueHandles, ["theboyandthebearco", "stereoscopecoffee", "musocoffeela"])
+        XCTAssertEqual(analysis.groups[1].venueHandles, ["elorea", "archives.ofus"])
+        XCTAssertEqual(analysis.groups[2].venueHandles, ["fasttimescoffee", "est.today.cafe"])
+        XCTAssertEqual(analysis.groups[3].venueHandles, ["moducafe"])
+        XCTAssertEqual(analysis.placesFound.count, 8)
+        XCTAssertTrue(analysis.placesFound.allSatisfy { $0.locationClues.isEmpty })
+        XCTAssertTrue(analysis.placesFound.first { $0.displayName == "Fasttimescoffee" }?.evidenceChips.contains("Category clue: Source group: atmosphere & aesthetic") == true)
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "unique coffee experiences" })
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "MY FAVORITE" })
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "Teresa" })
+        XCTAssertTrue(analysis.nextBestAction.contains("enrich selected venue clues"))
+    }
+
     func testOCRRejectsGenericCoffeeListLabelsAndFavoriteHeader() {
         let candidates = SocialPlaceParser().parse(
             evidence: SocialPlaceSourceEvidence(
