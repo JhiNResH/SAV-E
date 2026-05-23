@@ -51,6 +51,17 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
 }
 
 final class SocialPlacePipelineTests: XCTestCase {
+    func testInstagramReelPublicMetadataExtractsVenueInsteadOfSourceOnly() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = try await service.reviewCandidates(
+            from: URL(string: "https://www.instagram.com/reel/DWkTzpIibh0/?igsh=NTc4MTIwNjQ2YQ==")!
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "Paseo at Downtown Disney District")
+        XCTAssertFalse(candidates.first?.isSourceOnly == true)
+        XCTAssertTrue(candidates.first?.missingInfo.contains("Instagram metadata title; verify exact venue and address") == true)
+    }
+
     func testAgentParserMergesNumberedPlaceEvidence() {
         let analysis = SocialPlaceParser().analyze(
             evidence: SocialPlaceSourceEvidence(

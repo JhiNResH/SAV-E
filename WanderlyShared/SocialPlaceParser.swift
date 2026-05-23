@@ -143,6 +143,7 @@ struct SocialPlaceParser {
         candidates.append(contentsOf: englishStayCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: inferredAddressCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: chineseVenueCandidates(from: text, sourceURL: evidence.sourceURL))
+        candidates.append(contentsOf: instagramMetadataTitleCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: handleOnlyCandidates(from: handleContexts, sourceURL: evidence.sourceURL, fullText: text, creatorHandles: creatorHandles))
         candidates.append(contentsOf: ocrCandidates(from: evidence.ocrLines, sourceURL: evidence.sourceURL, fullText: text))
 
@@ -361,6 +362,32 @@ struct SocialPlaceParser {
                 ],
                 confidence: location == nil ? 0.58 : 0.68,
                 tier: SocialPlaceEvidenceScorer.tier(hasAddress: location != nil)
+            )
+        }
+    }
+
+    private func instagramMetadataTitleCandidates(from lines: [String], sourceURL: String, fullText: String) -> [SocialPlaceCandidateDraft] {
+        lines.compactMap { line in
+            guard let name = firstCapture(in: line, pattern: #"(?i)^(.{2,80})\s+on\s+Instagram\s*:"#) else {
+                return nil
+            }
+            let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(name)
+            guard SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned), looksLikeVenueTitle(cleaned) else {
+                return nil
+            }
+            let location = firstLocationClue(in: fullText)
+            return draft(
+                name: cleaned,
+                category: category(from: "\(cleaned)\n\(fullText)"),
+                sourceURL: sourceURL,
+                fullText: fullText,
+                locationClues: location.map { [$0] } ?? [],
+                atoms: [
+                    SocialEvidenceAtom(source: .metadataTitle, role: .venueName, value: cleaned, line: line, confidence: 0.62)
+                ],
+                confidence: location == nil ? 0.54 : 0.66,
+                tier: SocialPlaceEvidenceScorer.tier(hasAddress: location != nil),
+                extraMissingInfo: ["Instagram metadata title; verify exact venue and address"]
             )
         }
     }
@@ -608,6 +635,10 @@ struct SocialPlaceParser {
 
     private func looksLikeStayVenue(_ value: String) -> Bool {
         value.range(of: #"(?i)\b(hotel|resort|marriott|hyatt|hilton|villa|cabin|treehouse|spa|lodge|inn|airbnb|glamping|retreat|spyglass|ulaman)\b"#, options: .regularExpression) != nil
+    }
+
+    private func looksLikeVenueTitle(_ value: String) -> Bool {
+        value.range(of: #"(?i)\b(restaurant|cafe|coffee|bar|bakery|bistro|kitchen|grill|pizzeria|taqueria|sushi|ramen|hotel|resort|inn|villa|district|market|mall|museum|gallery|park|beach|garden|paseo|dining)\b"#, options: .regularExpression) != nil
     }
 
     private func looksVenueContext(_ line: String) -> Bool {
