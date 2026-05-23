@@ -13,6 +13,7 @@ SAV-E can now produce search queries for URL-only social links, but those querie
 - Parse public search result titles/snippets into review-only place candidates.
 - Reject generic platform, maps, search/list, and venue-directory results before creating candidates.
 - Keep created candidates without coordinates and with verification missing info.
+- Return a bounded agent receipt for every recovery run: `found`, `tried`, `missing`, `output`, `capabilityLevel`, and `nextBestClue`.
 - Trigger recovery from native iOS when a source-only candidate is persisted.
 
 ## Non-goals
@@ -29,4 +30,5 @@ SAV-E can now produce search queries for URL-only social links, but those querie
 - Generic results such as Instagram landing pages, Google Maps home/directions pages, Yelp search/list pages, Tagvenue/Eventective lists, and generic venue directories remain diagnostic-only and create no candidates.
 - A search result can become a candidate only when it has explicit venue evidence: extracted address or an official venue signal from a non-blocked host.
 - Existing candidate duplicates for the same capture are not reinserted.
+- Recovery responses include an agent receipt that honestly reports whether the run produced a review candidate or only a source-only diagnostic clue.
 - Backend tests, TypeScript build, iOS tests, and iOS generic build pass.
