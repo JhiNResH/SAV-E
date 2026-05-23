@@ -72,6 +72,12 @@ enum SocialPlaceEvidenceScorer {
               !lowered.contains("located") else {
             return false
         }
+        if lowered.range(of: #"^(to|and|or|with|from|for)\s+\w+"#, options: .regularExpression) != nil {
+            return false
+        }
+        if lowered.contains("slow down") || lowered.contains("enjoy the vibe") {
+            return false
+        }
         return value.range(of: #"[A-Za-z\u4e00-\u9fff]"#, options: .regularExpression) != nil
     }
 
@@ -147,7 +153,7 @@ enum SocialPlaceEvidenceScorer {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowercased = trimmed.lowercased()
         let productOnly = lowercased.range(
-            of: #"(?i)^(basque|cake|dessert|hot pot|sukiyaki|ramen|coffee|tea|food|breakfast|lunch|dinner)$"#,
+            of: #"(?i)^(basque|cake|dessert|hot pot|sukiyaki|ramen|coffee|tea|food|breakfast|lunch|dinner|mediterranean|greek|italian|french|japanese|korean|thai|mexican)$"#,
             options: .regularExpression
         ) != nil
         let cityProductOnly = trimmed.range(

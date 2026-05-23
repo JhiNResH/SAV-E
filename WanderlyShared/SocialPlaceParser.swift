@@ -249,7 +249,7 @@ struct SocialPlaceParser {
         return patterns.compactMap { pattern in
             guard let name = firstCapture(in: text, pattern: pattern) else { return nil }
             let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(name)
-            guard SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned) else { return nil }
+            guard SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned) else { return nil }
             let location = firstLocationClue(in: text)
             let tier = SocialPlaceEvidenceScorer.tier(hasAddress: location != nil)
             return draft(
@@ -317,7 +317,7 @@ struct SocialPlaceParser {
             let priorLines = Array(lines.prefix(index))
             for priorLine in priorLines {
                 guard let name = candidateNameFromCaptionLine(priorLine) else { continue }
-                let address = firstLocationClue(in: line) ?? line
+                let address = firstLocationClue(in: line) ?? cleanLocationMarker(from: line)
                 result.append(
                     draft(
                         name: name,
@@ -602,6 +602,12 @@ struct SocialPlaceParser {
     }
 
     private func firstLocationClue(in text: String) -> String? {
+        let addressLine = text
+            .components(separatedBy: .newlines)
+            .map(SocialPlaceEvidenceScorer.cleanText)
+            .first(where: SocialPlaceEvidenceScorer.looksLikeAddressLine)
+        if let addressLine { return cleanLocationMarker(from: addressLine) }
+
         let patterns = [
             #"📍\s*([^\n\r\.]+)"#,
             #"\bLocation:\s*([^\n\r\.]+)"#,
@@ -614,10 +620,12 @@ struct SocialPlaceParser {
                 .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，"))
             if !cleaned.isEmpty { return cleaned }
         }
-        return text
-            .components(separatedBy: .newlines)
-            .map(SocialPlaceEvidenceScorer.cleanText)
-            .first(where: SocialPlaceEvidenceScorer.looksLikeAddressLine)
+        return nil
+    }
+
+    private func cleanLocationMarker(from value: String) -> String {
+        SocialPlaceEvidenceScorer.cleanText(value)
+            .replacingOccurrences(of: #"^[📍🗺]\s*"#, with: "", options: .regularExpression)
     }
 
     private func englishThisIsStayMatch(in line: String) -> (name: String, area: String)? {
