@@ -62,6 +62,18 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidates.first?.missingInfo.contains("Instagram metadata title; verify exact venue and address") == true)
     }
 
+    func testInstagramRestaurantCaptionUsesNamedVenueBeforeAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = try await service.reviewCandidates(
+            from: URL(string: "https://www.instagram.com/reel/DYoDyPWvDkr/?igsh=NTc4MTIwNjQ2YQ==")!
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "元紀·台灣菜")
+        XCTAssertEqual(candidates.first?.address, "🏠臺中市西屯區安和東路5號")
+        XCTAssertFalse(candidates.contains { $0.candidateName == "吃得懂" })
+        XCTAssertFalse(candidates.contains { $0.candidateName == "台中·餐廳" })
+    }
+
     func testAgentParserMergesNumberedPlaceEvidence() {
         let analysis = SocialPlaceParser().analyze(
             evidence: SocialPlaceSourceEvidence(
