@@ -699,14 +699,31 @@ struct SocialPlaceParser {
                 return cleaned
             }
         }
+        if let cjkSeparated = cjkSeparatedVenueName(in: line) {
+            return cjkSeparated
+        }
         if let quoted = quotedVenueName(in: line) {
             return quoted
         }
         return nil
     }
 
+    private func cjkSeparatedVenueName(in line: String) -> String? {
+        guard line.range(of: #"[·・‧]"#, options: .regularExpression) != nil,
+              line.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(line)
+        guard SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned),
+              !SocialPlaceEvidenceScorer.looksLikeGenericProductOrCityLine(cleaned),
+              !SocialPlaceEvidenceScorer.looksLikeMarketingLine(cleaned) else {
+            return nil
+        }
+        return cleaned
+    }
+
     private func quotedVenueName(in text: String) -> String? {
-        let venueIntroPattern = #"名店|餐廳|餐厅|正式插旗|插旗|開幕|新店|店名|restaurant|from\s+tokyo|來自東京|頂級燒肉"#
+        let venueIntroPattern = #"名店|正式插旗|插旗|開幕|新店|店名|from\s+tokyo|來自東京|頂級燒肉"#
         for line in text.components(separatedBy: .newlines)
             where line.range(of: venueIntroPattern, options: [.regularExpression, .caseInsensitive]) != nil {
             if let quoted = firstCapture(in: line, pattern: #"[「『\"]\s*([^」』\"]{2,80})\s*[」』\"]"#) {
@@ -716,9 +733,7 @@ struct SocialPlaceParser {
                 }
             }
         }
-        guard let quoted = firstCapture(in: text, pattern: #"[「『\"]\s*([^」』\"]{2,80})\s*[」』\"]"#) else { return nil }
-        let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(quoted)
-        return SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned) ? cleaned : nil
+        return nil
     }
 
     private func composedChineseVenueName(in text: String) -> String? {
@@ -729,14 +744,17 @@ struct SocialPlaceParser {
         for pattern in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
             let range = NSRange(text.startIndex..<text.endIndex, in: text)
-            guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 2,
-                  let brandRange = Range(match.range(at: 1), in: text),
-                  let themeRange = Range(match.range(at: 2), in: text) else { continue }
-            let brand = SocialPlaceEvidenceScorer.cleanCandidateName(String(text[brandRange]))
-            let theme = SocialPlaceEvidenceScorer.cleanCandidateName(String(text[themeRange]))
-            let name = "\(brand)·\(theme)"
-            if SocialPlaceEvidenceScorer.isUsableCandidateName(name), !SocialPlaceEvidenceScorer.looksLikeMarketingLine(name) {
-                return name
+            for match in regex.matches(in: text, range: range) where match.numberOfRanges > 2 {
+                guard let brandRange = Range(match.range(at: 1), in: text),
+                      let themeRange = Range(match.range(at: 2), in: text) else { continue }
+                let brand = SocialPlaceEvidenceScorer.cleanCandidateName(String(text[brandRange]))
+                let theme = SocialPlaceEvidenceScorer.cleanCandidateName(String(text[themeRange]))
+                let name = "\(brand)·\(theme)"
+                if SocialPlaceEvidenceScorer.isUsableCandidateName(name),
+                   !SocialPlaceEvidenceScorer.looksLikeGenericProductOrCityLine(name),
+                   !SocialPlaceEvidenceScorer.looksLikeMarketingLine(name) {
+                    return name
+                }
             }
         }
         return nil

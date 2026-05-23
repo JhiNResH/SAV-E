@@ -154,7 +154,11 @@ enum SocialPlaceEvidenceScorer {
             of: #"^(台南|台北|臺北|台中|臺中|東京|大阪|北京|上海|首爾|서울)\s*(美食|甜點|甜点|咖啡|蛋糕|火鍋|烧肉|燒肉|壽喜燒)?$"#,
             options: .regularExpression
         ) != nil
-        return productOnly || cityProductOnly
+        let cityCategoryOnly = trimmed.range(
+            of: #"^(台南|台北|臺北|台中|臺中|東京|大阪|北京|上海|首爾|서울)\s*[·・‧]\s*(餐廳|餐厅|美食|咖啡|甜點|甜点|酒吧|住宿|飯店|酒店)$"#,
+            options: .regularExpression
+        ) != nil
+        return productOnly || cityProductOnly || cityCategoryOnly
     }
 
     static func resolvedDisplayName(fromSocialHandle handle: String, evidenceText: String = "") -> (name: String, evidence: String?, confidenceBoost: Double) {
