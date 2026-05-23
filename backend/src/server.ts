@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg from "pg";
+import { runSourceSearchRecovery, type SourceSearchCandidate } from "./sourceSearchWorker.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -350,12 +351,68 @@ async function handleMemory(
 ): Promise<void> {
   const [kind, id] = segments;
 
+  if (kind === "captures" && id && segments[2] === "search-recovery") {
+    return await handleCaptureSearchRecovery(request, response, id, userId);
+  }
   if (kind === "captures") return await handleMemoryCaptures(request, response, id, userId);
   if (kind === "candidates") return await handleMemoryCandidates(request, response, id, url, userId);
   if (kind === "decisions") return await handleMemoryDecisions(request, response, url, userId);
   if (kind === "recommendations") return await handleMemoryRecommendations(request, response, id, userId);
 
   return sendJson(response, { error: "Unsupported memory route" }, 405);
+}
+
+async function handleCaptureSearchRecovery(
+  request: IncomingMessage,
+  response: ServerResponse,
+  captureId: string,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "POST") {
+    return sendJson(response, { error: "Unsupported capture search recovery route" }, 405);
+  }
+
+  await ensureCaptureOwner(captureId, userId);
+  const body = await readJson(request);
+  const requestedQueries = stringArray(body.queries);
+  const maxQueries = typeof body.max_queries === "number" ? Math.max(1, Math.min(6, body.max_queries)) : undefined;
+
+  const { rows } = await pool.query("select * from captures where id = $1 and user_id = $2", [captureId, userId]);
+  const capture = asObject(rows[0]);
+
+  await pool.query("update captures set status = 'investigating' where id = $1 and user_id = $2", [captureId, userId]);
+
+  const recovery = await runSourceSearchRecovery({
+    sourceUrl: stringValue(capture.source_url),
+    rawText: stringValue(capture.raw_text),
+    title: stringValue(capture.title),
+    suggestedSearchQueries: requestedQueries,
+    maxQueries,
+  });
+
+  const existingKeys = await existingCandidateKeys(captureId);
+  const createdCandidates: JsonBody[] = [];
+
+  for (const candidate of recovery.candidates) {
+    const key = candidateKey(candidate.name, candidate.address);
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+
+    const body = sourceSearchCandidateBody(candidate, captureId);
+    const insert = buildInsert("place_candidates", body, placeCandidateFields);
+    const { rows: insertedRows } = await pool.query(`${insert.sql} returning *`, insert.values);
+    createdCandidates.push(formatPlaceCandidate(insertedRows[0]));
+  }
+
+  await pool.query("update captures set status = 'review' where id = $1 and user_id = $2", [captureId, userId]);
+
+  return sendJson(response, {
+    capture_id: captureId,
+    queries: recovery.queries,
+    search_results: recovery.searchResults,
+    created_candidates: createdCandidates,
+    errors: recovery.errors,
+  });
 }
 
 async function handleMemoryCaptures(
@@ -642,6 +699,49 @@ async function handleAgentToolCalls(
   }
 
   return sendJson(response, { error: "Unsupported agent tool calls route" }, 405);
+}
+
+async function existingCandidateKeys(captureId: string): Promise<Set<string>> {
+  const { rows } = await pool.query("select name, address from place_candidates where capture_id = $1", [captureId]);
+  return new Set(rows.map((row) => {
+    const value = asObject(row);
+    return candidateKey(stringValue(value.name) ?? "", stringValue(value.address) ?? "");
+  }));
+}
+
+function sourceSearchCandidateBody(candidate: SourceSearchCandidate, captureId: string): JsonBody {
+  return {
+    capture_id: captureId,
+    name: candidate.name,
+    address: candidate.address,
+    city: "",
+    latitude: null,
+    longitude: null,
+    evidence: candidate.evidence.map((text) => ({ text })),
+    confidence: candidate.confidence,
+    missing_info: candidate.missingInfo,
+    status: "review",
+  };
+}
+
+function candidateKey(name: string, address: string): string {
+  return `${canonicalCandidateValue(name)}|${canonicalCandidateValue(address)}`;
+}
+
+function canonicalCandidateValue(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ").trim();
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
 async function ensureCaptureOwner(captureId: string, userId: string): Promise<void> {

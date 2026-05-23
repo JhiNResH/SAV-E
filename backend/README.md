@@ -41,3 +41,4 @@ Persistence routes accept either `Authorization: Bearer <Privy access token>` or
 - `DELETE /trips/:id`
 - `GET /profile`
 - `PATCH /profile`
+- `POST /memory/captures/:id/search-recovery` — runs public search recovery for source-only captures and writes search-derived results back as review-only place candidates.
