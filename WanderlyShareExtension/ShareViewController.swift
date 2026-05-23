@@ -75,6 +75,13 @@ private struct ShareMetadata {
     var imageData: Data?
 }
 
+private struct SocialPlaceEvidenceDiagnostic: Codable {
+    var found: [String]
+    var attempts: [String]
+    var missingFields: [String]
+    var nextBestClue: String
+}
+
 private struct PendingReviewCandidate: Codable {
     var candidateName: String
     var address: String
@@ -85,6 +92,8 @@ private struct PendingReviewCandidate: Codable {
     var confidence: Double
     var missingInfo: [String]
     var savedAt: Date
+    var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil
+    var isSourceOnly: Bool = false
 }
 
 private struct ShareMemoryRecord: Codable {
@@ -339,7 +348,7 @@ struct ShareExtensionView: View {
                         Text(candidates.count == 1 ? candidates[0].candidateName : "\(candidates.count) possible places")
                             .font(.headline)
                             .foregroundColor(Color(hex: "2C2C2E"))
-                        Text(candidates.count == 1 ? (candidates[0].address.isEmpty ? "Needs address confirmation" : candidates[0].address) : "Review each candidate in SAV-E before saving.")
+                        Text(candidateSubtitle(candidates))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -347,7 +356,7 @@ struct ShareExtensionView: View {
                     Spacer()
                 }
 
-                Text("SAV-E found a tiny place clue. Check the evidence, then hatch it into a saved memory.")
+                Text(candidateIntro(candidates))
                     .font(.caption)
                     .foregroundColor(SaveTheme.cocoa)
                     .fixedSize(horizontal: false, vertical: true)
@@ -377,16 +386,20 @@ struct ShareExtensionView: View {
                         }
                     }
                 }
-            } else if let candidate = candidates.first, !candidate.evidence.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Evidence")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    ForEach(candidate.evidence.prefix(3), id: \.self) { item in
-                        Text(item)
+            } else if let candidate = candidates.first {
+                if let diagnostic = candidate.evidenceDiagnostic {
+                    shareEvidenceDiagnosticView(diagnostic)
+                } else if !candidate.evidence.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Evidence")
                             .font(.caption)
-                            .foregroundColor(Color(hex: "2C2C2E"))
-                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundColor(.secondary)
+                        ForEach(candidate.evidence.prefix(3), id: \.self) { item in
+                            Text(item)
+                                .font(.caption)
+                                .foregroundColor(Color(hex: "2C2C2E"))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
@@ -394,7 +407,7 @@ struct ShareExtensionView: View {
             Spacer()
 
             Button(action: saveReviewCandidates) {
-                Text(candidates.count == 1 ? "Add to Review 💌" : "Add \(candidates.count) to Review 💌")
+                Text(candidates.count == 1 ? candidateActionTitle(candidates[0]) : "Add \(candidates.count) to Review 💌")
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -405,6 +418,62 @@ struct ShareExtensionView: View {
             }
         }
         .padding()
+    }
+
+    private func candidateSubtitle(_ candidates: [PendingReviewCandidate]) -> String {
+        guard candidates.count == 1, let candidate = candidates.first else {
+            return "Review each candidate in SAV-E before saving."
+        }
+        if candidate.isSourceOnly { return "Saved as a source clue, not a map pin yet" }
+        return candidate.address.isEmpty ? "Needs address confirmation" : candidate.address
+    }
+
+    private func candidateIntro(_ candidates: [PendingReviewCandidate]) -> String {
+        guard candidates.count == 1, let candidate = candidates.first else {
+            return "SAV-E found a few tiny place clues. Check the evidence, then hatch them into saved memories."
+        }
+        if candidate.isSourceOnly {
+            return "SAV-E found the source, but not enough place evidence yet. It will keep this as a clue and show exactly what is missing."
+        }
+        return "SAV-E found a tiny place clue. Check the evidence, then hatch it into a saved memory."
+    }
+
+    private func candidateActionTitle(_ candidate: PendingReviewCandidate) -> String {
+        candidate.isSourceOnly ? "Save Source Clue 💌" : "Add to Review 💌"
+    }
+
+    private func shareEvidenceDiagnosticView(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            shareDiagnosticSection("Found", items: diagnostic.found)
+            shareDiagnosticSection("Tried", items: diagnostic.attempts)
+            shareDiagnosticSection("Missing", items: diagnostic.missingFields)
+
+            if !diagnostic.nextBestClue.isEmpty {
+                Text("Next best clue: \(diagnostic.nextBestClue)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(SaveTheme.rose)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .background(SaveTheme.blush.opacity(0.6))
+        .cornerRadius(16)
+    }
+
+    private func shareDiagnosticSection(_ title: String, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            ForEach(items.prefix(3), id: \.self) { item in
+                Text("• \(item)")
+                    .font(.caption)
+                    .foregroundColor(Color(hex: "2C2C2E"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - Extract & Parse
@@ -470,8 +539,9 @@ struct ShareExtensionView: View {
                 isParsing = false
                 return
             }
-            saveSourceOnlyMemory(parseContent, reason: "No reliable social review candidate found")
-            parseError = "SAV-E needs one more clue before it can review this social post. Share a map link, screenshot, or caption with a visible place name."
+            let sourceOnly = sourceOnlyReviewCandidate(sourceURLString: parseContent, evidenceText: publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText))
+            reviewCandidates = [sourceOnly]
+            selectedCategory = sourceOnly.category
             isParsing = false
             return
         }
@@ -1010,6 +1080,40 @@ struct ShareExtensionView: View {
         }
 
         return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
+    }
+
+    private func sourceOnlyReviewCandidate(sourceURLString: String, evidenceText: String) -> PendingReviewCandidate {
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: ["Source URL: \(sourceURLString)"],
+            attempts: [
+                "Checked public metadata/caption text for explicit place names",
+                "Checked social handles without treating creator handles as places",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+        )
+        return PendingReviewCandidate(
+            candidateName: sourceOnlyDisplayName(for: sourceURLString),
+            address: "",
+            category: "attraction",
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + ["Next best clue: \(diagnostic.nextBestClue)"],
+            confidence: 0,
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            isSourceOnly: true
+        )
+    }
+
+    private func sourceOnlyDisplayName(for sourceURLString: String) -> String {
+        guard let url = URL(string: sourceURLString) else { return "Social link" }
+        let path = url.path.lowercased()
+        if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
+        if url.host?.lowercased().contains("instagram") == true { return "Instagram link" }
+        return "Social link"
     }
 
     private func pendingReviewCandidate(

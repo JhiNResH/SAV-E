@@ -244,6 +244,74 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate?.evidence.joined(separator: " ").contains("Evidence tier: weakCandidate") == true)
     }
 
+    func testURLOnlyInstagramReelProducesSourceOnlyEvidenceDebugCandidate() {
+        let service = SocialLinkReviewCandidateService()
+        let sourceURL = "https://www.instagram.com/reel/DYsourceOnly/"
+
+        let candidates = service.reviewCandidatesOrSourceOnly(fromEvidenceText: "", sourceURL: sourceURL)
+
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = candidates[0]
+        XCTAssertTrue(candidate.isSourceOnly)
+        XCTAssertEqual(candidate.candidateName, "Instagram reel")
+        XCTAssertEqual(candidate.sourceURL, sourceURL)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source URL: \(sourceURL)") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Checked public metadata/caption text for explicit place names") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Did not use logged-in Instagram scraping") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
+    }
+
+    func testCaptionVenueWithoutVerifiedAddressStaysReviewCandidateWithoutCoordinates() {
+        let service = SocialLinkReviewCandidateService()
+
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            New brunch spot: Garden Table Cafe
+            Save this cozy patio for next weekend.
+            """,
+            sourceURL: "https://www.instagram.com/reel/venue-no-address/"
+        )
+
+        let candidate = candidates.first
+        XCTAssertEqual(candidate?.candidateName, "Garden Table Cafe")
+        XCTAssertEqual(candidate?.address, "")
+        XCTAssertNil(candidate?.latitude)
+        XCTAssertNil(candidate?.longitude)
+        XCTAssertEqual(candidate?.isSourceOnly, false)
+        XCTAssertTrue(candidate?.missingInfo.contains("Confirm address") == true)
+        XCTAssertTrue(candidate?.missingInfo.contains("Confirm coordinates") == true)
+        XCTAssertTrue(candidate?.evidenceDiagnostic?.found.contains("Candidate place name: Garden Table Cafe") == true)
+        XCTAssertTrue(candidate?.evidenceDiagnostic?.missingFields.contains("Verified address") == true)
+    }
+
+    func testSaveMemoryRecordPreservesEvidenceDiagnosticForSourceOnlyClues() throws {
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: ["Source URL: https://www.instagram.com/reel/DYsourceOnly/"],
+            attempts: ["Checked public metadata/caption text for explicit place names"],
+            missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+        )
+        let record = SaveMemoryRecord(
+            state: .sourceOnly,
+            sourceURL: "https://www.instagram.com/reel/DYsourceOnly/",
+            title: "Instagram reel",
+            evidence: diagnostic.found + diagnostic.attempts,
+            evidenceDiagnostic: diagnostic
+        )
+
+        let encoded = try JSONEncoder().encode(record)
+        let decoded = try JSONDecoder().decode(SaveMemoryRecord.self, from: encoded)
+
+        XCTAssertEqual(decoded.state, .sourceOnly)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.found.first, diagnostic.found.first)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.missingFields, diagnostic.missingFields)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.nextBestClue, diagnostic.nextBestClue)
+    }
+
     func testPlacesRefineRanksAcceptableMatchInsteadOfFirstResult() async {
         let google = StubGooglePlacesService()
         let service = SocialLinkReviewCandidateService(googlePlacesService: google)

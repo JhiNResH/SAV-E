@@ -36,18 +36,15 @@ final class SocialLinkReviewCandidateService {
 
         let sourceURL = metadata.resolvedURL ?? url.absoluteString
         let candidates = await refineCandidates(
-            reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL),
+            reviewCandidatesOrSourceOnly(fromEvidenceText: evidenceText, sourceURL: sourceURL),
             evidenceText: evidenceText
         )
-
-        if candidates.isEmpty {
-            throw SocialLinkReviewCandidateError.noUsableCandidates
-        }
 
         return candidates
     }
 
     func refineCandidate(_ candidate: PendingReviewCandidate, evidenceText: String? = nil) async -> PendingReviewCandidate {
+        guard !candidate.isSourceOnly else { return candidate }
         guard !candidate.hasReliableCoordinates else { return candidate }
         let query = refinementQuery(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
         guard !query.isEmpty else { return candidate }
@@ -95,6 +92,21 @@ final class SocialLinkReviewCandidateService {
             refined.append(await refineCandidate(candidate, evidenceText: evidenceText))
         }
         return refined
+    }
+
+    func reviewCandidatesOrSourceOnly(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
+        let candidates = reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+            .map { candidate in
+                var diagnosed = candidate
+                diagnosed.evidenceDiagnostic = candidateDiagnostic(for: candidate, evidenceText: evidenceText, sourceURL: sourceURL)
+                if diagnosed.address.isEmpty {
+                    diagnosed.missingInfo = appendUnique(diagnosed.missingInfo, ["Confirm address"])
+                }
+                return diagnosed
+            }
+
+        guard candidates.isEmpty else { return candidates }
+        return [sourceOnlyCandidate(evidenceText: evidenceText, sourceURL: sourceURL)]
     }
 
     func reviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
@@ -578,6 +590,85 @@ final class SocialLinkReviewCandidateService {
     private func chineseCityClue(in text: String) -> String? {
         let cities = ["台北", "臺北", "台中", "臺中", "台南", "臺南", "高雄", "東京", "大阪", "京都", "北京", "上海", "首爾"]
         return cities.first { text.contains($0) }
+    }
+
+    private func sourceOnlyCandidate(evidenceText: String, sourceURL: String) -> PendingReviewCandidate {
+        let diagnostic = sourceOnlyDiagnostic(evidenceText: evidenceText, sourceURL: sourceURL)
+        return PendingReviewCandidate(
+            candidateName: sourceOnlyDisplayName(for: sourceURL),
+            address: "",
+            category: "attraction",
+            latitude: nil,
+            longitude: nil,
+            sourceURL: sourceURL,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts,
+            confidence: 0,
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            isSourceOnly: true
+        )
+    }
+
+    private func sourceOnlyDiagnostic(evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {
+        var found = ["Source URL: \(sourceURL)"]
+        if !evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            found.append("Shared text/caption was present but did not contain a verified place candidate")
+        }
+        return SocialPlaceEvidenceDiagnostic(
+            found: found,
+            attempts: [
+                "Checked public metadata/caption text for explicit place names",
+                "Checked social handles without treating creator handles as places",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: [
+                "Verified place name",
+                "Verified address",
+                "Verified coordinates"
+            ],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+        )
+    }
+
+    private func candidateDiagnostic(for candidate: PendingReviewCandidate, evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {
+        var found = [
+            "Source URL: \(sourceURL)",
+            "Candidate place name: \(candidate.candidateName)"
+        ]
+        if !candidate.address.isEmpty {
+            found.append("Address/location clue: \(candidate.address)")
+        }
+        if !candidate.evidence.isEmpty {
+            found.append(contentsOf: candidate.evidence.prefix(3))
+        }
+
+        var missing: [String] = []
+        if candidate.address.isEmpty { missing.append("Verified address") }
+        if !candidate.hasReliableCoordinates { missing.append("Verified coordinates") }
+        missing.append(contentsOf: candidate.missingInfo)
+
+        return SocialPlaceEvidenceDiagnostic(
+            found: appendUnique([], found),
+            attempts: [
+                "Checked public metadata/caption text for explicit place names",
+                "Kept plausible venue evidence in Review instead of inventing map coordinates",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: appendUnique([], missing),
+            nextBestClue: candidate.address.isEmpty
+                ? "Confirm the exact address or share a map link before saving this as a Map Stamp."
+                : "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+        )
+    }
+
+    private func sourceOnlyDisplayName(for sourceURL: String) -> String {
+        guard let url = URL(string: sourceURL) else { return "Social link" }
+        let path = url.path.lowercased()
+        if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
+        if url.host?.lowercased().contains("instagram") == true { return "Instagram link" }
+        return "Social link"
     }
 
     private func appendUnique(_ values: [String], _ newValues: [String]) -> [String] {

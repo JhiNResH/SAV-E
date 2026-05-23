@@ -45,13 +45,14 @@ final class SaveLocalVaultService {
 
     func saveReviewCandidate(_ candidate: PendingReviewCandidate) throws -> SaveMemoryRecord {
         let record = SaveMemoryRecord(
-            state: .reviewCandidate,
+            state: candidate.isSourceOnly ? .sourceOnly : .reviewCandidate,
             sourceURL: candidate.sourceURL,
             sourceText: candidate.sourceText,
             title: candidate.candidateName,
-            placeName: candidate.candidateName,
+            placeName: candidate.isSourceOnly ? nil : candidate.candidateName,
             address: candidate.address.isEmpty ? nil : candidate.address,
             evidence: candidate.evidence,
+            evidenceDiagnostic: candidate.evidenceDiagnostic,
             createdAt: candidate.savedAt
         )
         try append(record)
