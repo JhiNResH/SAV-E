@@ -116,6 +116,8 @@ export function candidatesFromSearchResults(results: SourceSearchResult[]): Sour
   const seen = new Set<string>();
 
   for (const result of results) {
+    if (!isReviewableSearchResult(result)) continue;
+
     const name = candidateNameFromResult(result);
     if (!name) continue;
 
@@ -147,6 +149,19 @@ export function candidatesFromSearchResults(results: SourceSearchResult[]): Sour
   return candidates.slice(0, 5);
 }
 
+function isReviewableSearchResult(result: SourceSearchResult): boolean {
+  const title = cleanText(result.title);
+  const snippet = cleanText(result.snippet ?? "");
+  const url = result.url ? safeURL(result.url) : undefined;
+  const address = addressFromText(`${title}\n${snippet}`);
+  const name = candidateNameFromResult(result);
+
+  if (!name) return false;
+  if (isGenericSearchResult(title, url)) return false;
+  if (address && !looksLikeListPage(title, url)) return true;
+  return hasOfficialVenueSignal(title, url);
+}
+
 function candidateNameFromResult(result: SourceSearchResult): string | undefined {
   let title = cleanText(result.title)
     .replace(/\s+[@#][A-Za-z0-9._-]{3,30}\b/g, "")
@@ -167,12 +182,60 @@ function candidateNameFromResult(result: SourceSearchResult): string | undefined
 function isUsableCandidateName(value: string): boolean {
   const lowered = value.toLowerCase();
   if (value.length < 2 || value.length > 90) return false;
-  if (/\b(instagram|reel|tiktok|facebook|login|explore|hashtag|comments?|likes?)\b/i.test(value)) return false;
+  if (/\b(instagram|reel|reels|tiktok|facebook|login|explore|hashtag|comments?|likes?)\b/i.test(value)) return false;
   if (/^\d+$/.test(value)) return false;
   if (!/[A-Za-z\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(value)) return false;
-  if (/^(restaurant|venue|place|travel|food|coffee|hotel)$/i.test(value)) return false;
+  if (/^(home|help center|restaurant|restaurants?|venue|venues?|place|travel|food|coffee|hotel|google maps|directions)$/i.test(value)) return false;
+  if (lowered.startsWith("the best ") || lowered.startsWith("best ")) return false;
   return !looksLikeAddress(value);
 }
+
+function isGenericSearchResult(title: string, url?: URL): boolean {
+  const loweredTitle = title.toLowerCase();
+  const host = url?.host.toLowerCase().replace(/^www\./, "") ?? "";
+  const path = url?.pathname.toLowerCase() ?? "";
+
+  if (/^(instagram|google maps|help center|directions, traffic & transit)$/i.test(title)) return true;
+  if (/\b(instagram reel size|create & share short videos|popular place reels|reels search|from instagram reel to google maps)\b/i.test(title)) return true;
+  if (looksLikeListPage(title, url)) return true;
+
+  if (host === "instagram.com" && !path.match(/^\/[A-Za-z0-9._-]+\/?$/)) return true;
+  if (host === "maps.google.com" || (host === "google.com" && path.startsWith("/maps"))) return true;
+
+  return false;
+}
+
+function looksLikeListPage(title: string, url?: URL): boolean {
+  const loweredTitle = title.toLowerCase();
+  const host = url?.host.toLowerCase().replace(/^www\./, "") ?? "";
+  const path = url?.pathname.toLowerCase() ?? "";
+
+  if (/\b(the best|best\s+\d+|top\s+\d+|venues? for rent|party venues?|event spaces?|restaurants? in|places to eat)\b/i.test(title)) {
+    return true;
+  }
+  if ((host === "yelp.com" || host.endsWith(".yelp.com")) && (path.startsWith("/search") || loweredTitle.includes("best 10"))) {
+    return true;
+  }
+  if (host.includes("tagvenue") || host.includes("eventective")) return true;
+  return false;
+}
+
+function hasOfficialVenueSignal(title: string, url?: URL): boolean {
+  const host = url?.host.toLowerCase().replace(/^www\./, "") ?? "";
+  if (!host || blockedOfficialHosts.has(host)) return false;
+  if (title.match(/\bOfficial(?:\s+Site)?\b/i) && !looksLikeListPage(title, url)) return true;
+  return false;
+}
+
+const blockedOfficialHosts = new Set([
+  "instagram.com",
+  "facebook.com",
+  "tiktok.com",
+  "maps.google.com",
+  "google.com",
+  "about.instagram.com",
+  "help.instagram.com",
+]);
 
 function addressFromText(text: string): string | undefined {
   const patterns = [
