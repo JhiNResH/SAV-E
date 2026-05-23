@@ -328,6 +328,37 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Shared text/caption was present but did not contain a verified place candidate") == true)
         XCTAssertTrue(record.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
         XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Source clue")
+        XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add caption / screenshot / map link")
+        XCTAssertEqual(record.evidenceDiagnostic?.canSaveAsMapStamp, false)
+    }
+
+    func testEvidenceDiagnosticPromotesToMapMatchReadyAfterRefinement() async {
+        let google = StubGooglePlacesService()
+        let service = SocialLinkReviewCandidateService(googlePlacesService: google)
+        let candidate = PendingReviewCandidate(
+            candidateName: "Known Cafe",
+            address: "",
+            category: "cafe",
+            sourceURL: "https://example.com/known-cafe",
+            sourceText: "Known Cafe",
+            evidence: ["Evidence tier: likely"],
+            confidence: 0.6,
+            missingInfo: [],
+            savedAt: Date(),
+            evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                found: ["Source URL: https://example.com/known-cafe", "Candidate place name: Known Cafe"],
+                attempts: ["Checked public metadata/caption text for explicit place names"],
+                missingFields: ["Verified coordinates"],
+                nextBestClue: "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+            )
+        )
+
+        let refined = await service.refineCandidate(candidate)
+
+        XCTAssertEqual(refined.evidenceDiagnostic?.statusLabel, "Map match ready")
+        XCTAssertEqual(refined.evidenceDiagnostic?.primaryActionLabel, "Confirm map match")
+        XCTAssertEqual(refined.evidenceDiagnostic?.canSaveAsMapStamp, true)
     }
 
     func testPlacesRefineRanksAcceptableMatchInsteadOfFirstResult() async {

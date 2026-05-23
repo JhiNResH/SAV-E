@@ -86,7 +86,23 @@ struct SaveMemoryDebugView: View {
     }
 
     private func evidenceDiagnosticView(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(diagnostic.statusLabel)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.wanderlyTerracotta)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.wanderlyTerracotta.opacity(0.12))
+                    .cornerRadius(999)
+                Text(diagnostic.primaryActionLabel)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+
             diagnosticSection("Found", items: diagnostic.found)
             diagnosticSection("Tried", items: diagnostic.attempts)
             diagnosticSection("Missing", items: diagnostic.missingFields)

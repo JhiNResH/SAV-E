@@ -80,6 +80,31 @@ private struct SocialPlaceEvidenceDiagnostic: Codable {
     var attempts: [String]
     var missingFields: [String]
     var nextBestClue: String
+
+    var statusLabel: String {
+        if canSaveAsMapStamp { return "Map match ready" }
+        if lowercasedMissingFields.contains(where: { $0.contains("place name") }) { return "Source clue" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Needs confirmation" }
+        return "Review candidate"
+    }
+
+    var primaryActionLabel: String {
+        if canSaveAsMapStamp { return "Confirm map match" }
+        if statusLabel == "Source clue" { return "Add caption / screenshot / map link" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Confirm address / coordinates" }
+        return "Review evidence"
+    }
+
+    var canSaveAsMapStamp: Bool {
+        let foundText = found.joined(separator: "\n").lowercased()
+        return foundText.contains("google places match") &&
+            foundText.contains("verified coordinates") &&
+            !lowercasedMissingFields.contains(where: { $0.contains("coordinate") })
+    }
+
+    private var lowercasedMissingFields: [String] {
+        missingFields.map { $0.lowercased() }
+    }
 }
 
 private struct PendingReviewCandidate: Codable {
@@ -105,6 +130,7 @@ private struct ShareMemoryRecord: Codable {
     var placeName: String?
     var address: String?
     var evidence: [String]
+    var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil
     var createdAt: Date
 }
 
@@ -443,7 +469,23 @@ struct ShareExtensionView: View {
     }
 
     private func shareEvidenceDiagnosticView(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(diagnostic.statusLabel)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(SaveTheme.rose)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(SaveTheme.card)
+                    .cornerRadius(999)
+                Text(diagnostic.primaryActionLabel)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(SaveTheme.cocoa)
+                Spacer()
+            }
+
             shareDiagnosticSection("Found", items: diagnostic.found)
             shareDiagnosticSection("Tried", items: diagnostic.attempts)
             shareDiagnosticSection("Missing", items: diagnostic.missingFields)
@@ -1923,6 +1965,12 @@ struct ShareExtensionView: View {
 
         let fileURL = containerURL.appendingPathComponent("save-memory-records.json")
         var records = loadMemoryRecords(from: fileURL)
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: ["Source URL: \(source)"],
+            attempts: [reason, "Kept this as a source-only clue instead of inventing a place"].filter { !$0.isEmpty },
+            missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this source."
+        )
         let record = ShareMemoryRecord(
             id: UUID(),
             state: "source_only",
@@ -1931,7 +1979,8 @@ struct ShareExtensionView: View {
             title: sharedTitle.isEmpty ? (URL(string: source)?.host() ?? "Shared source") : sharedTitle,
             placeName: nil,
             address: nil,
-            evidence: [reason].filter { !$0.isEmpty },
+            evidence: diagnostic.found + diagnostic.attempts,
+            evidenceDiagnostic: diagnostic,
             createdAt: Date()
         )
         records.insert(record, at: 0)

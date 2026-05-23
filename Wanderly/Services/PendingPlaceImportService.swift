@@ -24,6 +24,31 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
     var attempts: [String]
     var missingFields: [String]
     var nextBestClue: String
+
+    var statusLabel: String {
+        if canSaveAsMapStamp { return "Map match ready" }
+        if lowercasedMissingFields.contains(where: { $0.contains("place name") }) { return "Source clue" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Needs confirmation" }
+        return "Review candidate"
+    }
+
+    var primaryActionLabel: String {
+        if canSaveAsMapStamp { return "Confirm map match" }
+        if statusLabel == "Source clue" { return "Add caption / screenshot / map link" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Confirm address / coordinates" }
+        return "Review evidence"
+    }
+
+    var canSaveAsMapStamp: Bool {
+        let foundText = found.joined(separator: "\n").lowercased()
+        return foundText.contains("google places match") &&
+            foundText.contains("verified coordinates") &&
+            !lowercasedMissingFields.contains(where: { $0.contains("coordinate") })
+    }
+
+    private var lowercasedMissingFields: [String] {
+        missingFields.map { $0.lowercased() }
+    }
 }
 
 struct PendingReviewCandidate: Codable {
