@@ -21,11 +21,22 @@ export type SourceSearchCandidate = {
   missingInfo: string[];
 };
 
+export type SourceRecoveryReceipt = {
+  input: "social_url" | "web_url" | "text";
+  capabilityLevel: "metadata_enrichment" | "public_search_recovery";
+  found: string[];
+  tried: string[];
+  missing: string[];
+  output: "review_candidate" | "source_only_clue" | "diagnostic_only";
+  nextBestClue: string;
+};
+
 export type SourceSearchOutput = {
   queries: string[];
   searchResults: SourceSearchResult[];
   candidates: SourceSearchCandidate[];
   errors: string[];
+  receipt: SourceRecoveryReceipt;
 };
 
 type SourceMetadata = {
@@ -59,14 +70,17 @@ export async function runSourceSearchRecovery(
     }
   }
 
+  const candidates = dedupeCandidates([
+    ...candidatesFromSourceMetadata(sourceMetadata),
+    ...candidatesFromSearchResults(searchResults),
+  ]);
+
   return {
     queries,
     searchResults,
-    candidates: dedupeCandidates([
-      ...candidatesFromSourceMetadata(sourceMetadata),
-      ...candidatesFromSearchResults(searchResults),
-    ]),
+    candidates,
     errors,
+    receipt: buildSourceRecoveryReceipt(input, sourceMetadata, queries, searchResults, candidates, errors),
   };
 }
 
@@ -158,6 +172,83 @@ function candidatesFromSourceMetadata(metadata: SourceMetadata | undefined): Sou
       "Source metadata-derived candidate; verify before saving",
     ],
   }];
+}
+
+function buildSourceRecoveryReceipt(
+  input: SourceSearchInput,
+  metadata: SourceMetadata | undefined,
+  queries: string[],
+  searchResults: SourceSearchResult[],
+  candidates: SourceSearchCandidate[],
+  errors: string[],
+): SourceRecoveryReceipt {
+  const found: string[] = [];
+  const tried: string[] = [];
+  const missing = new Set<string>();
+
+  const sourceURL = input.sourceUrl?.trim();
+  const parsedURL = sourceURL ? safeURL(sourceURL) : undefined;
+  const inputKind = parsedURL?.host.match(/\b(instagram|tiktok|xiaohongshu|xhslink)\b/i)
+    ? "social_url"
+    : parsedURL
+      ? "web_url"
+      : "text";
+
+  if (sourceURL) found.push("source_url");
+  if (input.rawText?.trim()) found.push("user_shared_text");
+  if (metadata?.title || metadata?.description) found.push("public_metadata");
+  if (searchResults.length > 0) found.push("search_results");
+  if (candidates.some((candidate) => candidate.address)) found.push("explicit_address");
+  if (candidates.length > 0) found.push("review_candidate");
+
+  if (sourceURL) tried.push("public_source_metadata");
+  if (queries.length > 0) tried.push("public_search");
+  if (candidates.length > 0) tried.push("candidate_quality_gate");
+  if (errors.length > 0) tried.push("error_capture");
+
+  for (const candidate of candidates) {
+    for (const item of candidate.missingInfo) missing.add(item);
+  }
+
+  if (candidates.length === 0) {
+    missing.add("Verified venue name");
+    missing.add("Verified address");
+    missing.add("Verified coordinates");
+  } else if (candidates.every((candidate) => !candidate.address)) {
+    missing.add("Verified address");
+    missing.add("Verified coordinates");
+  }
+
+  return {
+    input: inputKind,
+    capabilityLevel: candidates.some((candidate) =>
+      candidate.evidence.some((item) => item.startsWith("Source metadata contains")),
+    )
+      ? "metadata_enrichment"
+      : "public_search_recovery",
+    found: unique(found),
+    tried: unique(tried),
+    missing: unique([...missing]),
+    output: candidates.length > 0
+      ? "review_candidate"
+      : sourceURL || searchResults.length > 0 || errors.length > 0
+        ? "source_only_clue"
+        : "diagnostic_only",
+    nextBestClue: nextBestClue(candidates),
+  };
+}
+
+function nextBestClue(candidates: SourceSearchCandidate[]): string {
+  if (candidates.length === 0) {
+    return "Share a screenshot, caption text, or map link that shows the venue name or address.";
+  }
+  if (candidates.every((candidate) => !candidate.address)) {
+    return "Confirm with a Google Maps or Apple Maps link before saving this place.";
+  }
+  if (candidates.some((candidate) => candidate.missingInfo.includes("Verified coordinates"))) {
+    return "Review the candidate and run Places refine before turning it into a saved map memory.";
+  }
+  return "Review the evidence before saving.";
 }
 
 export function candidatesFromSearchResults(results: SourceSearchResult[]): SourceSearchCandidate[] {

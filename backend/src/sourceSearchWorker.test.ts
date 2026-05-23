@@ -113,6 +113,12 @@ test("runSourceSearchRecovery uses injected fetcher and returns candidates", asy
   assert.deepEqual(output.queries, ["instagram reel DWmzyodgbuv place"]);
   assert.equal(output.searchResults.length, 1);
   assert.equal(output.candidates[0].name, "The Porch at The Ranch at Laguna Beach");
+  assert.equal(output.receipt.input, "social_url");
+  assert.equal(output.receipt.capabilityLevel, "public_search_recovery");
+  assert.equal(output.receipt.output, "review_candidate");
+  assert.ok(output.receipt.found.includes("review_candidate"));
+  assert.ok(output.receipt.tried.includes("public_search"));
+  assert.ok(output.receipt.missing.includes("Verified coordinates"));
 });
 
 test("runSourceSearchRecovery creates review candidate from explicit source metadata address", async () => {
@@ -144,6 +150,10 @@ test("runSourceSearchRecovery creates review candidate from explicit source meta
   assert.equal(output.candidates[0].address, "31106 Coast Hwy, Laguna Beach");
   assert.equal(output.candidates[0].confidence, 0.62);
   assert.ok(output.candidates[0].evidence.some((item) => item.includes("Source metadata contains explicit place/address evidence")));
+  assert.equal(output.receipt.capabilityLevel, "metadata_enrichment");
+  assert.equal(output.receipt.output, "review_candidate");
+  assert.ok(output.receipt.found.includes("public_metadata"));
+  assert.ok(output.receipt.found.includes("explicit_address"));
 });
 
 test("runSourceSearchRecovery skips hours and uses venue line before non-US address", async () => {
@@ -190,4 +200,10 @@ test("runSourceSearchRecovery keeps generic live search pages diagnostic-only", 
 
   assert.equal(output.searchResults.length, 2);
   assert.equal(output.candidates.length, 0);
+  assert.equal(output.receipt.output, "source_only_clue");
+  assert.ok(output.receipt.found.includes("source_url"));
+  assert.ok(output.receipt.found.includes("search_results"));
+  assert.ok(output.receipt.tried.includes("public_search"));
+  assert.ok(output.receipt.missing.includes("Verified venue name"));
+  assert.match(output.receipt.nextBestClue, /screenshot/);
 });
