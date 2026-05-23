@@ -19,6 +19,38 @@ struct PendingSharedPlace: Codable {
     var savedAt: Date
 }
 
+struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
+    var found: [String]
+    var attempts: [String]
+    var missingFields: [String]
+    var nextBestClue: String
+
+    var statusLabel: String {
+        if canSaveAsMapStamp { return "Map match ready" }
+        if lowercasedMissingFields.contains(where: { $0.contains("place name") }) { return "Source clue" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Needs confirmation" }
+        return "Review candidate"
+    }
+
+    var primaryActionLabel: String {
+        if canSaveAsMapStamp { return "Confirm map match" }
+        if statusLabel == "Source clue" { return "Add caption / screenshot / map link" }
+        if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Confirm address / coordinates" }
+        return "Review evidence"
+    }
+
+    var canSaveAsMapStamp: Bool {
+        let foundText = found.joined(separator: "\n").lowercased()
+        return foundText.contains("google places match") &&
+            foundText.contains("verified coordinates") &&
+            !lowercasedMissingFields.contains(where: { $0.contains("coordinate") })
+    }
+
+    private var lowercasedMissingFields: [String] {
+        missingFields.map { $0.lowercased() }
+    }
+}
+
 struct PendingReviewCandidate: Codable {
     var candidateName: String
     var address: String
@@ -31,6 +63,71 @@ struct PendingReviewCandidate: Codable {
     var confidence: Double
     var missingInfo: [String]
     var savedAt: Date
+    var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil
+    var isSourceOnly: Bool = false
+
+    init(
+        candidateName: String,
+        address: String,
+        category: String,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        sourceURL: String?,
+        sourceText: String?,
+        evidence: [String],
+        confidence: Double,
+        missingInfo: [String],
+        savedAt: Date,
+        evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil,
+        isSourceOnly: Bool = false
+    ) {
+        self.candidateName = candidateName
+        self.address = address
+        self.category = category
+        self.latitude = latitude
+        self.longitude = longitude
+        self.sourceURL = sourceURL
+        self.sourceText = sourceText
+        self.evidence = evidence
+        self.confidence = confidence
+        self.missingInfo = missingInfo
+        self.savedAt = savedAt
+        self.evidenceDiagnostic = evidenceDiagnostic
+        self.isSourceOnly = isSourceOnly
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case candidateName
+        case address
+        case category
+        case latitude
+        case longitude
+        case sourceURL
+        case sourceText
+        case evidence
+        case confidence
+        case missingInfo
+        case savedAt
+        case evidenceDiagnostic
+        case isSourceOnly
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        candidateName = try container.decode(String.self, forKey: .candidateName)
+        address = try container.decode(String.self, forKey: .address)
+        category = try container.decode(String.self, forKey: .category)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        sourceURL = try container.decodeIfPresent(String.self, forKey: .sourceURL)
+        sourceText = try container.decodeIfPresent(String.self, forKey: .sourceText)
+        evidence = try container.decode([String].self, forKey: .evidence)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        missingInfo = try container.decode([String].self, forKey: .missingInfo)
+        savedAt = try container.decode(Date.self, forKey: .savedAt)
+        evidenceDiagnostic = try container.decodeIfPresent(SocialPlaceEvidenceDiagnostic.self, forKey: .evidenceDiagnostic)
+        isSourceOnly = try container.decodeIfPresent(Bool.self, forKey: .isSourceOnly) ?? false
+    }
 
     var hasReliableCoordinates: Bool {
         guard let latitude, let longitude else { return false }

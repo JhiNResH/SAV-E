@@ -23,6 +23,7 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
     var placeName: String?
     var address: String?
     var evidence: [String]
+    var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic?
     var createdAt: Date
 
     init(
@@ -34,6 +35,7 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         placeName: String? = nil,
         address: String? = nil,
         evidence: [String] = [],
+        evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -44,6 +46,7 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         self.placeName = placeName
         self.address = address
         self.evidence = evidence
+        self.evidenceDiagnostic = evidenceDiagnostic
         self.createdAt = createdAt
     }
 

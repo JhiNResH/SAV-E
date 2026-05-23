@@ -46,6 +46,23 @@ struct SaveMemoryDebugView: View {
                             .lineLimit(2)
                     }
 
+                    if let diagnostic = record.evidenceDiagnostic {
+                        evidenceDiagnosticView(diagnostic)
+                    } else if !record.evidence.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Evidence")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            ForEach(record.evidence.prefix(3), id: \.self) { item in
+                                Text("• \(item)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
                     Text(record.createdAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -65,6 +82,56 @@ struct SaveMemoryDebugView: View {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func evidenceDiagnosticView(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(diagnostic.statusLabel)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.wanderlyTerracotta)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.wanderlyTerracotta.opacity(0.12))
+                    .cornerRadius(999)
+                Text(diagnostic.primaryActionLabel)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+
+            diagnosticSection("Found", items: diagnostic.found)
+            diagnosticSection("Tried", items: diagnostic.attempts)
+            diagnosticSection("Missing", items: diagnostic.missingFields)
+
+            if !diagnostic.nextBestClue.isEmpty {
+                Text("Next best clue: \(diagnostic.nextBestClue)")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.wanderlyTerracotta)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
+        .background(Color.wanderlyTerracotta.opacity(0.08))
+        .cornerRadius(12)
+    }
+
+    private func diagnosticSection(_ title: String, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            ForEach(items.prefix(3), id: \.self) { item in
+                Text("• \(item)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

@@ -244,6 +244,123 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate?.evidence.joined(separator: " ").contains("Evidence tier: weakCandidate") == true)
     }
 
+    func testURLOnlyInstagramReelProducesSourceOnlyEvidenceDebugCandidate() {
+        let service = SocialLinkReviewCandidateService()
+        let sourceURL = "https://www.instagram.com/reel/DYsourceOnly/"
+
+        let candidates = service.reviewCandidatesOrSourceOnly(fromEvidenceText: "", sourceURL: sourceURL)
+
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = candidates[0]
+        XCTAssertTrue(candidate.isSourceOnly)
+        XCTAssertEqual(candidate.candidateName, "Instagram reel")
+        XCTAssertEqual(candidate.sourceURL, sourceURL)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source URL: \(sourceURL)") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Checked public metadata/caption text for explicit place names") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Did not use logged-in Instagram scraping") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
+    }
+
+    func testCaptionVenueWithoutVerifiedAddressStaysReviewCandidateWithoutCoordinates() {
+        let service = SocialLinkReviewCandidateService()
+
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            New brunch spot: Garden Table Cafe
+            Save this cozy patio for next weekend.
+            """,
+            sourceURL: "https://www.instagram.com/reel/venue-no-address/"
+        )
+
+        let candidate = candidates.first
+        XCTAssertEqual(candidate?.candidateName, "Garden Table Cafe")
+        XCTAssertEqual(candidate?.address, "")
+        XCTAssertNil(candidate?.latitude)
+        XCTAssertNil(candidate?.longitude)
+        XCTAssertEqual(candidate?.isSourceOnly, false)
+        XCTAssertTrue(candidate?.missingInfo.contains("Confirm address") == true)
+        XCTAssertTrue(candidate?.missingInfo.contains("Confirm coordinates") == true)
+        XCTAssertTrue(candidate?.evidenceDiagnostic?.found.contains("Candidate place name: Garden Table Cafe") == true)
+        XCTAssertTrue(candidate?.evidenceDiagnostic?.missingFields.contains("Verified address") == true)
+    }
+
+    func testSaveMemoryRecordPreservesEvidenceDiagnosticForSourceOnlyClues() throws {
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: ["Source URL: https://www.instagram.com/reel/DYsourceOnly/"],
+            attempts: ["Checked public metadata/caption text for explicit place names"],
+            missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+        )
+        let record = SaveMemoryRecord(
+            state: .sourceOnly,
+            sourceURL: "https://www.instagram.com/reel/DYsourceOnly/",
+            title: "Instagram reel",
+            evidence: diagnostic.found + diagnostic.attempts,
+            evidenceDiagnostic: diagnostic
+        )
+
+        let encoded = try JSONEncoder().encode(record)
+        let decoded = try JSONDecoder().decode(SaveMemoryRecord.self, from: encoded)
+
+        XCTAssertEqual(decoded.state, .sourceOnly)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.found.first, diagnostic.found.first)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.missingFields, diagnostic.missingFields)
+        XCTAssertEqual(decoded.evidenceDiagnostic?.nextBestClue, diagnostic.nextBestClue)
+    }
+
+    func testSaveSourceOnlyCreatesEvidenceDiagnosticInsteadOfBareBookmark() throws {
+        let vaultURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("save-memory-records.json")
+        let service = SaveLocalVaultService(overrideVaultURL: vaultURL)
+        let record = try service.saveSourceOnly(
+            url: URL(string: "https://www.instagram.com/reel/DYfallback/")!,
+            note: "Creator post saved before parser evidence arrived"
+        )
+
+        XCTAssertEqual(record.state, .sourceOnly)
+        XCTAssertEqual(record.title, "Instagram reel")
+        XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Source URL: https://www.instagram.com/reel/DYfallback/") == true)
+        XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Shared text/caption was present but did not contain a verified place candidate") == true)
+        XCTAssertTrue(record.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
+        XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Source clue")
+        XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add caption / screenshot / map link")
+        XCTAssertEqual(record.evidenceDiagnostic?.canSaveAsMapStamp, false)
+    }
+
+    func testEvidenceDiagnosticPromotesToMapMatchReadyAfterRefinement() async {
+        let google = StubGooglePlacesService()
+        let service = SocialLinkReviewCandidateService(googlePlacesService: google)
+        let candidate = PendingReviewCandidate(
+            candidateName: "Known Cafe",
+            address: "",
+            category: "cafe",
+            sourceURL: "https://example.com/known-cafe",
+            sourceText: "Known Cafe",
+            evidence: ["Evidence tier: likely"],
+            confidence: 0.6,
+            missingInfo: [],
+            savedAt: Date(),
+            evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                found: ["Source URL: https://example.com/known-cafe", "Candidate place name: Known Cafe"],
+                attempts: ["Checked public metadata/caption text for explicit place names"],
+                missingFields: ["Verified coordinates"],
+                nextBestClue: "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+            )
+        )
+
+        let refined = await service.refineCandidate(candidate)
+
+        XCTAssertEqual(refined.evidenceDiagnostic?.statusLabel, "Map match ready")
+        XCTAssertEqual(refined.evidenceDiagnostic?.primaryActionLabel, "Confirm map match")
+        XCTAssertEqual(refined.evidenceDiagnostic?.canSaveAsMapStamp, true)
+    }
+
     func testPlacesRefineRanksAcceptableMatchInsteadOfFirstResult() async {
         let google = StubGooglePlacesService()
         let service = SocialLinkReviewCandidateService(googlePlacesService: google)
@@ -258,9 +375,14 @@ final class SocialPlacePipelineTests: XCTestCase {
             evidence: ["Evidence tier: likely"],
             confidence: 0.6,
             missingInfo: [],
-            savedAt: Date()
+            savedAt: Date(),
+            evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                found: ["Source URL: https://example.com/known-cafe", "Candidate place name: Known Cafe"],
+                attempts: ["Checked public metadata/caption text for explicit place names"],
+                missingFields: ["Verified coordinates"],
+                nextBestClue: "Confirm coordinates or choose a Google Places match before saving this as a Map Stamp."
+            )
         )
-
         let refined = await service.refineCandidate(candidate)
 
         XCTAssertEqual(refined.candidateName, "Known Cafe")
@@ -268,6 +390,10 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(refined.latitude, 24.2)
         XCTAssertEqual(refined.longitude, 120.7)
         XCTAssertTrue(refined.evidence.contains("Google Places refined match: Known Cafe"))
+        XCTAssertTrue(refined.evidenceDiagnostic?.found.contains("Google Places match: Known Cafe") == true)
+        XCTAssertTrue(refined.evidenceDiagnostic?.found.contains("Verified coordinates: 24.2, 120.7") == true)
+        XCTAssertFalse(refined.evidenceDiagnostic?.missingFields.contains("Verified coordinates") == true)
+        XCTAssertEqual(refined.evidenceDiagnostic?.nextBestClue, "Confirm this Google Places match before saving it as a Map Stamp.")
     }
 
     func testPlacesRefinementQueriesSkipCreatorHandles() async {
