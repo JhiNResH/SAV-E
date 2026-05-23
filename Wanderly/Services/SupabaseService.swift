@@ -9,6 +9,7 @@ protocol SupabaseServiceProtocol {
     func deletePlace(_ placeId: UUID) async throws
     func createMemoryCapture(from candidate: PendingReviewCandidate, userId: String) async throws -> UUID
     func createPlaceCandidate(_ candidate: PendingReviewCandidate, captureId: UUID, userId: String) async throws
+    func recoverSourceOnlyReviewCandidates(captureId: UUID) async throws -> [PlaceReviewCandidate]
     func fetchReviewCandidates() async throws -> [PlaceReviewCandidate]
     func updatePlaceCandidateStatus(_ candidateId: UUID, status: String, placeId: UUID?) async throws
     func fetchTrips(for userId: String) async throws -> [Trip]
@@ -144,6 +145,19 @@ final class SupabaseService: SupabaseServiceProtocol {
             "status": "review",
         ])
         try await request(path: "/memory/candidates", method: "POST", body: body)
+    }
+
+    func recoverSourceOnlyReviewCandidates(captureId: UUID) async throws -> [PlaceReviewCandidate] {
+        guard isConfigured else { return [] }
+
+        let body = try Self.jsonBody([:])
+        let data = try await request(
+            path: "/memory/captures/\(captureId.uuidString)/search-recovery",
+            method: "POST",
+            body: body
+        )
+        let row = try JSONDecoder.supabase.decode(SourceSearchRecoveryRow.self, from: data)
+        return row.created_candidates.map { $0.toCandidate() }
     }
 
     func fetchReviewCandidates() async throws -> [PlaceReviewCandidate] {
@@ -344,6 +358,10 @@ private struct PlaceRow: Codable {
 
 private struct MemoryCaptureRow: Codable {
     let id: UUID
+}
+
+private struct SourceSearchRecoveryRow: Codable {
+    let created_candidates: [PlaceCandidateRow]
 }
 
 private struct PlaceCandidateRow: Codable {

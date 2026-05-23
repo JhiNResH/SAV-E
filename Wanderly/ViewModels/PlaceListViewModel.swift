@@ -170,6 +170,9 @@ final class PlaceListViewModel: ObservableObject {
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: refinedCandidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(refinedCandidate, captureId: captureId, userId: userId)
+                if refinedCandidate.isSourceOnly {
+                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                }
             } catch {
                 failedCandidates.append(candidate)
                 print("PlaceListViewModel: failed to import review candidate \(candidate.candidateName): \(error)")
