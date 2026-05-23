@@ -186,6 +186,9 @@ final class MapViewModel: ObservableObject {
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: refinedCandidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(refinedCandidate, captureId: captureId, userId: userId)
+                if refinedCandidate.isSourceOnly {
+                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                }
             } catch {
                 failedCandidates.append(candidate)
                 print("MapViewModel: failed to import review candidate \(candidate.candidateName): \(error)")
@@ -209,13 +212,18 @@ final class MapViewModel: ObservableObject {
 
         try? saveLocalVaultService.saveSourceOnly(url: url)
         let candidates = try await socialLinkReviewCandidateService.reviewCandidates(from: url)
+        var importedCount = candidates.count
         for candidate in candidates {
             mirrorToLocalVault(candidate)
             let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
             try await supabaseService.createPlaceCandidate(candidate, captureId: captureId, userId: userId)
+            if candidate.isSourceOnly {
+                let recovered = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                importedCount += recovered?.count ?? 0
+            }
         }
         try await refreshReviewCandidates()
-        return candidates.count
+        return importedCount
     }
 
     func confirmReviewCandidate(_ candidate: PlaceReviewCandidate) async throws {

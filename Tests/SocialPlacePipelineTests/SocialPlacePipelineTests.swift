@@ -313,9 +313,25 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source URL: \(sourceURL)") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Checked public metadata/caption text for explicit place names") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Did not use logged-in Instagram scraping") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Prepared public web search fallback queries for source-only recovery") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
-        XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries?.first, "instagram reel DYsourceOnly place")
+        XCTAssertTrue(candidate.evidence.contains("Suggested public search: instagram reel DYsourceOnly place"))
+        XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.")
         XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
+    }
+
+    func testURLOnlyInstagramReelSearchPlanRemovesTrackingQuery() {
+        let service = SocialLinkReviewCandidateService()
+        let sourceURL = "https://www.instagram.com/reel/DWmzyodgbuv/?igsh=tracking"
+
+        let candidate = service.reviewCandidatesOrSourceOnly(fromEvidenceText: "", sourceURL: sourceURL)[0]
+
+        XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries, [
+            "instagram reel DWmzyodgbuv place",
+            "DWmzyodgbuv restaurant venue",
+            "\"https://www.instagram.com/reel/DWmzyodgbuv/\""
+        ])
     }
 
     func testCaptionVenueWithoutVerifiedAddressStaysReviewCandidateWithoutCoordinates() {
@@ -365,6 +381,22 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(decoded.evidenceDiagnostic?.nextBestClue, diagnostic.nextBestClue)
     }
 
+    func testEvidenceDiagnosticDecodesOldRecordsWithoutSearchQueries() throws {
+        let json = """
+        {
+          "found": ["Source URL: https://www.instagram.com/reel/old/"],
+          "attempts": ["Checked public metadata/caption text for explicit place names"],
+          "missingFields": ["Verified place name"],
+          "nextBestClue": "Share a caption"
+        }
+        """.data(using: .utf8)!
+
+        let diagnostic = try JSONDecoder().decode(SocialPlaceEvidenceDiagnostic.self, from: json)
+
+        XCTAssertNil(diagnostic.suggestedSearchQueries)
+        XCTAssertEqual(diagnostic.found.first, "Source URL: https://www.instagram.com/reel/old/")
+    }
+
     func testSaveSourceOnlyCreatesEvidenceDiagnosticInsteadOfBareBookmark() throws {
         let vaultURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -380,7 +412,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Source URL: https://www.instagram.com/reel/DYfallback/") == true)
         XCTAssertTrue(record.evidenceDiagnostic?.found.contains("Shared text/caption was present but did not contain a verified place candidate") == true)
         XCTAssertTrue(record.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
-        XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel.")
+        XCTAssertEqual(record.evidenceDiagnostic?.suggestedSearchQueries?.first, "instagram reel DYfallback place")
+        XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.")
         XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Source clue")
         XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add caption / screenshot / map link")
         XCTAssertEqual(record.evidenceDiagnostic?.canSaveAsMapStamp, false)

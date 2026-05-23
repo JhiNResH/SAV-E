@@ -105,6 +105,7 @@ struct SaveMemoryDebugView: View {
 
             diagnosticSection("Found", items: diagnostic.found)
             diagnosticSection("Tried", items: diagnostic.attempts)
+            diagnosticSection("Search next", items: diagnostic.suggestedSearchQueries ?? [])
             diagnosticSection("Missing", items: diagnostic.missingFields)
 
             if !diagnostic.nextBestClue.isEmpty {
@@ -122,15 +123,17 @@ struct SaveMemoryDebugView: View {
 
     private func diagnosticSection(_ title: String, items: [String]) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            ForEach(items.prefix(3), id: \.self) { item in
-                Text("• \(item)")
+            if !items.isEmpty {
+                Text(title)
                     .font(.caption2)
+                    .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(items.prefix(3), id: \.self) { item in
+                    Text("• \(item)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
