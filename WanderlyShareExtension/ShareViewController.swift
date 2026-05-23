@@ -767,17 +767,17 @@ struct ShareExtensionView: View {
             }
 
             let escapedKey = NSRegularExpression.escapedPattern(for: key)
-            let patterns = [
-                #"<meta[^>]+(?:property|name)=["']\#(escapedKey)["'][^>]+content=["']([^"']+)["'][^>]*>"#,
-                #"<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']\#(escapedKey)["'][^>]*>"#
+            let patterns: [(pattern: String, valueCaptureIndex: Int)] = [
+                (#"<meta[^>]+(?:property|name)=["']\#(escapedKey)["'][^>]+content=(["'])(.*?)\1[^>]*>"#, 2),
+                (#"<meta[^>]+content=(["'])(.*?)\1[^>]+(?:property|name)=["']\#(escapedKey)["'][^>]*>"#, 2)
             ]
 
-            for pattern in patterns {
-                guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            for (pattern, valueCaptureIndex) in patterns {
+                guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else { continue }
                 let range = NSRange(html.startIndex..<html.endIndex, in: html)
                 guard let match = regex.firstMatch(in: html, range: range),
-                      match.numberOfRanges > 1,
-                      let valueRange = Range(match.range(at: 1), in: html) else {
+                      match.numberOfRanges > valueCaptureIndex,
+                      let valueRange = Range(match.range(at: valueCaptureIndex), in: html) else {
                     continue
                 }
                 let value = cleanHTMLText(String(html[valueRange]))
