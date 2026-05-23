@@ -10,6 +10,7 @@ SAV-E can now produce search queries for URL-only social links, but those querie
 - Add a backend public-search worker for source-only captures.
 - Add `POST /memory/captures/:id/search-recovery`.
 - Parse public search result titles/snippets into review-only place candidates.
+- Reject generic platform, maps, search/list, and venue-directory results before creating candidates.
 - Keep created candidates without coordinates and with verification missing info.
 - Trigger recovery from native iOS when a source-only candidate is persisted.
 
@@ -23,5 +24,7 @@ SAV-E can now produce search queries for URL-only social links, but those querie
 - Source-only URL imports can trigger backend search recovery.
 - Search-derived results are inserted as `place_candidates` with `status = review`.
 - Candidates include evidence pointing to query/result title/snippet/source URL.
+- Generic results such as Instagram landing pages, Google Maps home/directions pages, Yelp search/list pages, Tagvenue/Eventective lists, and generic venue directories remain diagnostic-only and create no candidates.
+- A search result can become a candidate only when it has explicit venue evidence: extracted address or an official venue signal from a non-blocked host.
 - Existing candidate duplicates for the same capture are not reinserted.
 - Backend tests, TypeScript build, iOS tests, and iOS generic build pass.
