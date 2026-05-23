@@ -80,6 +80,7 @@ private struct SocialPlaceEvidenceDiagnostic: Codable {
     var attempts: [String]
     var missingFields: [String]
     var nextBestClue: String
+    var suggestedSearchQueries: [String]? = nil
 
     var statusLabel: String {
         if canSaveAsMapStamp { return "Map match ready" }
@@ -488,6 +489,7 @@ struct ShareExtensionView: View {
 
             shareDiagnosticSection("Found", items: diagnostic.found)
             shareDiagnosticSection("Tried", items: diagnostic.attempts)
+            shareDiagnosticSection("Search next", items: diagnostic.suggestedSearchQueries ?? [])
             shareDiagnosticSection("Missing", items: diagnostic.missingFields)
 
             if !diagnostic.nextBestClue.isEmpty {
@@ -505,15 +507,17 @@ struct ShareExtensionView: View {
 
     private func shareDiagnosticSection(_ title: String, items: [String]) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            ForEach(items.prefix(3), id: \.self) { item in
-                Text("• \(item)")
+            if !items.isEmpty {
+                Text(title)
                     .font(.caption)
-                    .foregroundColor(Color(hex: "2C2C2E"))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                ForEach(items.prefix(3), id: \.self) { item in
+                    Text("• \(item)")
+                        .font(.caption)
+                        .foregroundColor(Color(hex: "2C2C2E"))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -1125,15 +1129,18 @@ struct ShareExtensionView: View {
     }
 
     private func sourceOnlyReviewCandidate(sourceURLString: String, evidenceText: String) -> PendingReviewCandidate {
+        let searchQueries = sourceRecoverySearchQueries(sourceURLString: sourceURLString, evidenceText: evidenceText)
         let diagnostic = SocialPlaceEvidenceDiagnostic(
             found: ["Source URL: \(sourceURLString)"],
             attempts: [
                 "Checked public metadata/caption text for explicit place names",
                 "Checked social handles without treating creator handles as places",
+                "Prepared public web search fallback queries for source-only recovery",
                 "Did not use logged-in Instagram scraping"
             ],
             missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
-            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+            nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
         return PendingReviewCandidate(
             candidateName: sourceOnlyDisplayName(for: sourceURLString),
@@ -1141,7 +1148,7 @@ struct ShareExtensionView: View {
             category: "attraction",
             sourceURL: sourceURLString,
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
-            evidence: diagnostic.found + diagnostic.attempts + ["Next best clue: \(diagnostic.nextBestClue)"],
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic) + ["Next best clue: \(diagnostic.nextBestClue)"],
             confidence: 0,
             missingInfo: diagnostic.missingFields,
             savedAt: Date(),
@@ -1150,12 +1157,65 @@ struct ShareExtensionView: View {
         )
     }
 
+    private func diagnosticSearchEvidence(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> [String] {
+        (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
+    }
+
     private func sourceOnlyDisplayName(for sourceURLString: String) -> String {
         guard let url = URL(string: sourceURLString) else { return "Social link" }
         let path = url.path.lowercased()
         if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
         if url.host?.lowercased().contains("instagram") == true { return "Instagram link" }
         return "Social link"
+    }
+
+    private func sourceRecoverySearchQueries(sourceURLString: String, evidenceText: String) -> [String] {
+        var queries: [String] = []
+        let url = URL(string: sourceURLString)
+        let host = url?.host?.lowercased() ?? ""
+        let cleanedEvidence = cleanHTMLText(evidenceText)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let reelID = instagramReelID(in: url) {
+            queries.append("instagram reel \(reelID) place")
+            queries.append("\(reelID) restaurant venue")
+        } else if let url, !host.isEmpty {
+            queries.append("\(host) \(url.lastPathComponent) place")
+        }
+
+        if let handle = firstSocialHandle(in: evidenceText) {
+            queries.append("@\(handle) address")
+        }
+
+        if !cleanedEvidence.isEmpty {
+            queries.append("\"\(String(cleanedEvidence.prefix(80)))\" place")
+        }
+
+        if let canonicalURL = canonicalSearchURL(from: url) {
+            queries.append("\"\(canonicalURL)\"")
+        }
+
+        return Array(appendUniqueEvidence([], queries).prefix(4))
+    }
+
+    private func instagramReelID(in url: URL?) -> String? {
+        guard let url,
+              url.host?.lowercased().contains("instagram") == true else { return nil }
+        let components = url.pathComponents
+        guard let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
+              components.indices.contains(markerIndex + 1) else { return nil }
+        let id = components[markerIndex + 1].trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        return id.isEmpty ? nil : id
+    }
+
+    private func canonicalSearchURL(from url: URL?) -> String? {
+        guard let url else { return nil }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        components?.fragment = nil
+        let value = components?.url?.absoluteString ?? url.absoluteString
+        return value.isEmpty ? nil : value
     }
 
     private func pendingReviewCandidate(
@@ -1982,11 +2042,13 @@ struct ShareExtensionView: View {
 
         let fileURL = containerURL.appendingPathComponent("save-memory-records.json")
         var records = loadMemoryRecords(from: fileURL)
+        let searchQueries = sourceRecoverySearchQueries(sourceURLString: source, evidenceText: sharedText)
         let diagnostic = SocialPlaceEvidenceDiagnostic(
             found: ["Source URL: \(source)"],
-            attempts: [reason, "Kept this as a source-only clue instead of inventing a place"].filter { !$0.isEmpty },
+            attempts: [reason, "Kept this as a source-only clue instead of inventing a place", "Prepared public web search fallback queries for source-only recovery"].filter { !$0.isEmpty },
             missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
-            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this source."
+            nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
         let record = ShareMemoryRecord(
             id: UUID(),
@@ -1996,7 +2058,7 @@ struct ShareExtensionView: View {
             title: sharedTitle.isEmpty ? (URL(string: source)?.host() ?? "Shared source") : sharedTitle,
             placeName: nil,
             address: nil,
-            evidence: diagnostic.found + diagnostic.attempts,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic),
             evidenceDiagnostic: diagnostic,
             createdAt: Date()
         )

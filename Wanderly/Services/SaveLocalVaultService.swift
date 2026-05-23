@@ -40,7 +40,7 @@ final class SaveLocalVaultService {
             sourceURL: url.absoluteString,
             sourceText: note,
             title: sourceOnlyDisplayName(for: url),
-            evidence: diagnostic.found + diagnostic.attempts,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic),
             evidenceDiagnostic: diagnostic
         )
         try append(record)
@@ -125,19 +125,78 @@ final class SaveLocalVaultService {
         if note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             found.append("Shared text/caption was present but did not contain a verified place candidate")
         }
+        let searchQueries = sourceRecoverySearchQueries(url: url, note: note)
         return SocialPlaceEvidenceDiagnostic(
             found: found,
             attempts: [
                 "Saved the original source before place evidence was verified",
-                "Kept this as a source-only clue instead of inventing a place"
+                "Kept this as a source-only clue instead of inventing a place",
+                "Prepared public web search fallback queries for source-only recovery"
             ],
             missingFields: [
                 "Verified place name",
                 "Verified address",
                 "Verified coordinates"
             ],
-            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+            nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
+    }
+
+    private func diagnosticSearchEvidence(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> [String] {
+        (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
+    }
+
+    private func sourceRecoverySearchQueries(url: URL, note: String?) -> [String] {
+        var queries: [String] = []
+        let host = url.host()?.lowercased() ?? ""
+        if let reelID = instagramReelID(in: url) {
+            queries.append("instagram reel \(reelID) place")
+            queries.append("\(reelID) restaurant venue")
+        } else if !host.isEmpty {
+            queries.append("\(host) \(url.lastPathComponent) place")
+        }
+
+        let cleanedNote = (note ?? "")
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanedNote.isEmpty {
+            queries.append("\"\(String(cleanedNote.prefix(80)))\" place")
+        }
+
+        if let canonicalURL = canonicalSearchURL(from: url) {
+            queries.append("\"\(canonicalURL)\"")
+        }
+
+        return Array(appendUnique([], queries).prefix(4))
+    }
+
+    private func instagramReelID(in url: URL) -> String? {
+        guard url.host()?.lowercased().contains("instagram") == true else { return nil }
+        let components = url.pathComponents
+        guard let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
+              components.indices.contains(markerIndex + 1) else { return nil }
+        let id = components[markerIndex + 1].trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        return id.isEmpty ? nil : id
+    }
+
+    private func canonicalSearchURL(from url: URL) -> String? {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        components?.fragment = nil
+        let value = components?.url?.absoluteString ?? url.absoluteString
+        return value.isEmpty ? nil : value
+    }
+
+    private func appendUnique(_ values: [String], _ newValues: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values + newValues {
+            guard !value.isEmpty, !seen.contains(value) else { continue }
+            seen.insert(value)
+            result.append(value)
+        }
+        return result
     }
 }
 

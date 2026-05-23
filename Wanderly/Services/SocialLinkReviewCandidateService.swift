@@ -610,7 +610,7 @@ final class SocialLinkReviewCandidateService {
             longitude: nil,
             sourceURL: sourceURL,
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
-            evidence: diagnostic.found + diagnostic.attempts,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic),
             confidence: 0,
             missingInfo: diagnostic.missingFields,
             savedAt: Date(),
@@ -624,11 +624,13 @@ final class SocialLinkReviewCandidateService {
         if !evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             found.append("Shared text/caption was present but did not contain a verified place candidate")
         }
+        let searchQueries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL)
         return SocialPlaceEvidenceDiagnostic(
             found: found,
             attempts: [
                 "Checked public metadata/caption text for explicit place names",
                 "Checked social handles without treating creator handles as places",
+                "Prepared public web search fallback queries for source-only recovery",
                 "Did not use logged-in Instagram scraping"
             ],
             missingFields: [
@@ -636,8 +638,64 @@ final class SocialLinkReviewCandidateService {
                 "Verified address",
                 "Verified coordinates"
             ],
-            nextBestClue: "Share a caption, screenshot/OCR frame, map link, or visible venue handle for this Reel."
+            nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
+    }
+
+    private func diagnosticSearchEvidence(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> [String] {
+        (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
+    }
+
+    private func sourceRecoverySearchQueries(evidenceText: String, sourceURL: String) -> [String] {
+        var queries: [String] = []
+        let url = URL(string: sourceURL)
+        let host = url?.host()?.lowercased() ?? ""
+        let reelID = instagramReelID(in: url)
+        let cleanedEvidence = cleanHTMLText(evidenceText)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let reelID {
+            queries.append("instagram reel \(reelID) place")
+            queries.append("\(reelID) restaurant venue")
+        } else if let url, !host.isEmpty {
+            queries.append("\(host) \(url.lastPathComponent) place")
+        }
+
+        if let handle = firstSocialHandle(in: evidenceText) {
+            queries.append("@\(handle) address")
+        }
+
+        if !cleanedEvidence.isEmpty {
+            let snippet = String(cleanedEvidence.prefix(80))
+            queries.append("\"\(snippet)\" place")
+        }
+
+        if let canonicalURL = canonicalSearchURL(from: url) {
+            queries.append("\"\(canonicalURL)\"")
+        }
+
+        return Array(appendUnique([], queries).prefix(4))
+    }
+
+    private func instagramReelID(in url: URL?) -> String? {
+        guard let url,
+              url.host()?.lowercased().contains("instagram") == true else { return nil }
+        let components = url.pathComponents
+        guard let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
+              components.indices.contains(markerIndex + 1) else { return nil }
+        let id = components[markerIndex + 1].trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        return id.isEmpty ? nil : id
+    }
+
+    private func canonicalSearchURL(from url: URL?) -> String? {
+        guard let url else { return nil }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        components?.fragment = nil
+        let value = components?.url?.absoluteString ?? url.absoluteString
+        return value.isEmpty ? nil : value
     }
 
     private func candidateDiagnostic(for candidate: PendingReviewCandidate, evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {

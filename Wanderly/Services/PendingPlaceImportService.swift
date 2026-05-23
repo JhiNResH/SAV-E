@@ -24,6 +24,7 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
     var attempts: [String]
     var missingFields: [String]
     var nextBestClue: String
+    var suggestedSearchQueries: [String]? = nil
 
     var statusLabel: String {
         if canSaveAsMapStamp { return "Map match ready" }
