@@ -119,7 +119,6 @@ private struct EditProfileSheet: View {
                                     .stroke(Color.saveNotebookLine, lineWidth: 2)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
                     }
                     .disabled(isSaving)
 
@@ -148,7 +147,6 @@ private struct EditProfileSheet: View {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .stroke(Color.saveNotebookLine, lineWidth: 2)
                             )
-                            .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
                     }
                     .disabled(isSaving)
                 }
@@ -236,7 +234,6 @@ private struct PassportTopBar: View {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
-                        .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .buttonStyle(.plain)
         }
@@ -247,7 +244,6 @@ private struct PassportTopBar: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -267,7 +263,6 @@ private struct PassportIconButton: View {
                         .stroke(Color.saveNotebookLine, lineWidth: 2)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -335,7 +330,6 @@ private struct PassportHero: View {
                                     .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Edit Passport")

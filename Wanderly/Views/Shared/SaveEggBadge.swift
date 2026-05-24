@@ -18,7 +18,6 @@ struct SaveEggBadge: View {
                     EggShape()
                         .stroke(Color.saveNotebookLine.opacity(0.9), lineWidth: 1.3)
                 )
-                .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
 
             icon
                 .font(.system(size: size * 0.34, weight: .black))

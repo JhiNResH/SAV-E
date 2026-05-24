@@ -65,7 +65,6 @@ struct MapView: View {
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .stroke(Color.saveNotebookLine, lineWidth: 2)
                                 )
-                                .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 3, y: 3)
 
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.system(size: 22, weight: .bold))
@@ -95,7 +94,6 @@ struct MapView: View {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(Color.saveNotebookLine, lineWidth: 2)
                 )
-                .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
                 .padding(.horizontal, 12)
                 .padding(.top, geo.safeAreaInsets.top + 8)
             }
@@ -124,7 +122,6 @@ private struct CurrentLocationButton: View {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
-                    .shadow(color: Color.saveInk.opacity(0.20), radius: 0, x: 4, y: 4)
 
                 if isLocating {
                     ProgressView()

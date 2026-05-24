@@ -120,7 +120,6 @@ struct PlaceBottomSheet: View {
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
-                        .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
                 }
 
                 Button(role: .destructive) {
@@ -138,7 +137,6 @@ struct PlaceBottomSheet: View {
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
-                        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 3, y: 3)
                 }
                 .disabled(isDeleting || onDelete == nil)
             }

@@ -250,7 +250,6 @@ struct PlaceDetailView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
         )
-        .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
         .padding(.horizontal)
     }
 

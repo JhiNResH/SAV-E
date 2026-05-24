@@ -841,21 +841,9 @@ const palette = {
   border: "#111111",
 };
 
-const hardShadow = {
-  shadowColor: palette.ink,
-  shadowOpacity: 0.18,
-  shadowRadius: 0,
-  shadowOffset: { width: 4, height: 4 },
-  elevation: 3,
-};
+const hardShadow = {};
 
-const smallShadow = {
-  shadowColor: palette.ink,
-  shadowOpacity: 0.14,
-  shadowRadius: 0,
-  shadowOffset: { width: 3, height: 3 },
-  elevation: 2,
-};
+const smallShadow = {};
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.cream },

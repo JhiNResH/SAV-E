@@ -187,7 +187,6 @@ struct SignInView: View {
                     .stroke(Color.saveNotebookLine, lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         }
         .buttonStyle(.plain)
     }
@@ -329,7 +328,6 @@ private struct WorkflowStepCard: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -367,6 +365,5 @@ private struct SignInInputRow: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }

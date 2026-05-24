@@ -39,7 +39,6 @@ struct OnboardingView: View {
                                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                                         .stroke(Color.saveNotebookLine.opacity(0.86), lineWidth: 1.2)
                                 )
-                                .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 4, y: 4)
                                 .frame(width: 132, height: 132)
 
                             Image(systemName: pages[index].icon)

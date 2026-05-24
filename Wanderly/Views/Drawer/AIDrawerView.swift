@@ -130,7 +130,6 @@ struct AIDrawerView: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(height: 72)
@@ -183,7 +182,6 @@ struct AIDrawerView: View {
                                 .stroke(Color.saveNotebookLine, lineWidth: 1.4)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
                 }
                 Spacer()
             }
@@ -306,7 +304,6 @@ struct AIDrawerView: View {
                             .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
                     .clipShape(Circle())
-                    .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .accessibilityLabel("Back to commands")
 
@@ -340,7 +337,6 @@ struct AIDrawerView: View {
                             .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
                     .clipShape(Circle())
-                    .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .accessibilityLabel("Close drawer content")
         }
@@ -1228,7 +1224,6 @@ private struct DrawerActionChip: View {
                     .stroke(Color.saveNotebookLine, lineWidth: 1.4)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
@@ -1321,7 +1316,6 @@ private struct AgentCommandRow: View {
             }
         }
         .buttonStyle(.plain)
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
     }
@@ -1405,7 +1399,6 @@ private struct AgentCommandCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
     }

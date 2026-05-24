@@ -78,7 +78,6 @@ private struct PreviewClipStop: Identifiable {
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .stroke(Color.saveNotebookLine, lineWidth: 2)
                             )
-                            .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
                     }
                     Button(action: {}) {
                         Text("Get the Full App")

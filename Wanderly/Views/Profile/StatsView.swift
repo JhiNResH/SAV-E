@@ -57,7 +57,6 @@ struct StatItem: View {
                 .offset(x: -8, y: -8)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.10), radius: 0, x: 2, y: 2)
     }
 }
 

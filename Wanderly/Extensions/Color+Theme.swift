@@ -64,7 +64,6 @@ extension View {
                     .stroke(Color.saveNotebookLine, lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 

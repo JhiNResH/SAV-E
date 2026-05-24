@@ -26,7 +26,6 @@ struct CategoryPill: View {
                 .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 2 : 1.4)
         )
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(isSelected ? 0.18 : 0.10), radius: 0, x: 3, y: 3)
     }
 }
 
