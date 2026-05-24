@@ -13,7 +13,7 @@ struct TripItineraryComponent: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.headline)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                     if let msg = aiMessage {
                         Text(msg)
                             .font(.caption)
@@ -25,7 +25,7 @@ struct TripItineraryComponent: View {
                 Button(action: { showShareSheet = true }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline)
-                        .foregroundColor(.wanderlyTerracotta)
+                        .foregroundColor(.saveBerry)
                 }
                 .sheet(isPresented: $showShareSheet) {
                     if let url = buildShareURL() {
@@ -36,7 +36,7 @@ struct TripItineraryComponent: View {
                 Label("\(days.count) days", systemImage: "calendar")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(.wanderlyTerracotta)
+                    .foregroundColor(.saveBerry)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -82,7 +82,7 @@ private struct DaySection: View {
             Text(day.label ?? "Day \(day.dayNumber)")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(.wanderlyTerracotta)
+                .foregroundColor(.saveBerry)
                 .padding(.bottom, 10)
 
             ForEach(Array(day.stops.enumerated()), id: \.element.id) { index, stop in
@@ -90,12 +90,12 @@ private struct DaySection: View {
                     // Timeline
                     VStack(spacing: 0) {
                         Circle()
-                            .fill(Color.wanderlyTerracotta)
+                            .fill(Color.saveBerry)
                             .frame(width: 8, height: 8)
                             .padding(.top, 5)
                         if index < day.stops.count - 1 {
                             Rectangle()
-                                .fill(Color.wanderlyTerracotta.opacity(0.25))
+                                .fill(Color.saveBerry.opacity(0.25))
                                 .frame(width: 2)
                                 .frame(maxHeight: .infinity)
                         }
@@ -108,7 +108,7 @@ private struct DaySection: View {
                             Text(stop.placeName)
                                 .font(.subheadline)
                                 .fontWeight(.medium)
-                                .foregroundColor(.wanderlyCharcoal)
+                                .foregroundColor(.saveInk)
                             Spacer()
                             if let time = stop.time {
                                 Text(time)
@@ -124,7 +124,7 @@ private struct DaySection: View {
                         if let note = stop.note {
                             Text(note)
                                 .font(.caption)
-                                .foregroundColor(.wanderlyTerracotta.opacity(0.8))
+                                .foregroundColor(.saveBerry.opacity(0.8))
                                 .padding(.top, 1)
                         }
                     }
@@ -133,7 +133,11 @@ private struct DaySection: View {
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.6))
+        .background(Color.saveNotebookPage.opacity(0.94))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.26), lineWidth: 1)
+        )
         .cornerRadius(12)
     }
 }

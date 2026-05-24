@@ -20,7 +20,7 @@ struct MapView: View {
                     }
                     if let polyline = viewModel.routePolyline {
                         MapPolyline(polyline)
-                            .stroke(Color.wanderlyTerracotta, lineWidth: 3)
+                            .stroke(Color.saveBerry, lineWidth: 3)
                     }
                 }
                 .mapControls {
@@ -117,21 +117,21 @@ private struct CurrentLocationButton: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.saveCard)
+                    .fill(Color.saveNotebookPage)
                     .frame(width: 54, height: 54)
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
                     )
-                    .shadow(color: Color.saveCocoa.opacity(0.18), radius: 12, y: 6)
+                    .shadow(color: Color.saveCocoa.opacity(0.18), radius: 0, x: 3, y: 3)
 
                 if isLocating {
                     ProgressView()
-                        .tint(.wanderlyTerracotta)
+                        .tint(.saveBerry)
                 } else {
                     Image(systemName: "location.fill")
                         .font(.system(size: 21, weight: .semibold))
-                        .foregroundColor(.wanderlyTerracotta)
+                        .foregroundColor(.saveBerry)
                 }
             }
         }
@@ -152,23 +152,13 @@ struct PlaceMapPin: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: place.category.iconName)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Color.saveStampForeground(for: place.category))
-                        .frame(width: 38, height: 38)
-                        .background(Color.saveStampColor(for: place.category))
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.white.opacity(0.9), lineWidth: 2)
-                        )
-                        .shadow(color: Color.saveCocoa.opacity(0.20), radius: 5, y: 3)
+                    SaveEggBadge(state: .hatched(place.category), size: 42)
 
                     if place.status == .visited {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.saveBerry)
-                            .background(Circle().fill(Color.white))
+                            .background(Circle().fill(Color.saveNotebookPage))
                             .offset(x: 5, y: -5)
                     }
                 }

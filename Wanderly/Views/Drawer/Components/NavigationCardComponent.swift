@@ -11,13 +11,13 @@ struct NavigationCardComponent: View {
 
             Image(systemName: modeIcon)
                 .font(.system(size: 48))
-                .foregroundColor(.wanderlyTerracotta)
+                .foregroundColor(.saveBerry)
 
             VStack(spacing: 6) {
                 Text(place.name)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
                     .multilineTextAlignment(.center)
 
                 Text(place.address)
@@ -29,20 +29,24 @@ struct NavigationCardComponent: View {
             Label(modeLabel, systemImage: modeIcon)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.wanderlyTerracotta)
+                .foregroundColor(.saveBerry)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(Color.wanderlyTerracotta.opacity(0.12))
+                .background(Color.saveBerry.opacity(0.12))
                 .cornerRadius(12)
 
             Button(action: openInMaps) {
                 Label("Start Navigation", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(.saveInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.wanderlyTerracotta)
+                    .background(Color.saveHoney)
                     .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                    )
             }
 
             Spacer()

@@ -59,7 +59,7 @@ struct ProfileView: View {
                         NavigationLink {
                             SaveMemoryDebugView()
                         } label: {
-                            SettingsRow(icon: "tray.full", title: "Local Memory", color: .wanderlyTerracotta)
+                            SettingsRow(icon: "tray.full", title: "Local Memory", color: .saveBerry)
                         }
                         .buttonStyle(.plain)
 
@@ -114,6 +114,10 @@ private struct EditProfileSheet: View {
                             .foregroundColor(.saveInk)
                             .frame(width: 38, height: 38)
                             .background(Color.saveNotebookPage)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.saveNotebookLine.opacity(0.80), lineWidth: 1)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .disabled(isSaving)
@@ -156,7 +160,11 @@ private struct EditProfileSheet: View {
                         .textInputAutocapitalization(.words)
                         .focused($isNameFocused)
                         .padding(14)
-                        .background(Color.saveLavender.opacity(0.18))
+                        .background(Color.saveNotebookPage)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     if let errorMessage {
@@ -213,11 +221,15 @@ private struct PassportTopBar: View {
                     Text("Edit")
                         .font(.caption.weight(.black))
                 }
-                .foregroundColor(.saveInk)
-                .padding(.horizontal, 11)
-                .frame(height: 38)
-                .background(Color.saveNotebookLine.opacity(0.70))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .foregroundColor(.saveInk)
+                        .padding(.horizontal, 11)
+                        .frame(height: 38)
+                        .background(Color.saveHoney)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1)
+                        )
             }
             .buttonStyle(.plain)
         }
@@ -242,6 +254,10 @@ private struct PassportIconButton: View {
                 .foregroundColor(.saveInk)
                 .frame(width: 38, height: 38)
                 .background(Color.saveNotebookPage)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -437,7 +453,7 @@ struct SettingsRow: View {
 
                 Text(title)
                     .font(.subheadline)
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
 
                 Spacer()
 

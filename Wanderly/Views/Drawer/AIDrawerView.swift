@@ -73,7 +73,7 @@ struct AIDrawerView: View {
 
             TextField("Ask about your places...", text: $viewModel.query)
                 .font(.subheadline)
-                .foregroundColor(.wanderlyCharcoal)
+                .foregroundColor(.saveInk)
                 .lineLimit(1)
                 .frame(height: 24)
                 .focused($searchFocused)
@@ -150,7 +150,7 @@ struct AIDrawerView: View {
         case .loading:
             VStack(spacing: 12) {
                 Spacer()
-                ProgressView().tint(.wanderlyTerracotta)
+                ProgressView().tint(.saveBerry)
                 Text("Thinking...").font(.subheadline).foregroundColor(.secondary)
                 Button(action: {
                     viewModel.cancelCurrentRequest()
@@ -160,10 +160,10 @@ struct AIDrawerView: View {
                     Label("Cancel", systemImage: "xmark")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.wanderlyTerracotta)
+                        .foregroundColor(.saveBerry)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color.wanderlyTerracotta.opacity(0.1))
+                        .background(Color.saveBerry.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 Spacer()
@@ -212,7 +212,7 @@ struct AIDrawerView: View {
                         }
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.wanderlyTerracotta)
+                        .foregroundColor(.saveBerry)
                         .padding(.vertical, 6)
                     }
 
@@ -245,7 +245,7 @@ struct AIDrawerView: View {
         case .error(let msg):
             VStack(spacing: 10) {
                 Spacer()
-                Image(systemName: "exclamationmark.triangle").foregroundColor(.wanderlyTerracotta)
+                Image(systemName: "exclamationmark.triangle").foregroundColor(.saveBerry)
                 Text(msg)
                     .font(.caption).foregroundColor(.secondary)
                     .multilineTextAlignment(.center).padding(.horizontal)
@@ -261,7 +261,7 @@ struct AIDrawerView: View {
                     Button("Try again") { Task { await viewModel.submit() } }
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.wanderlyTerracotta)
+                        .foregroundColor(.saveBerry)
                 }
                 Spacer()
             }
@@ -279,9 +279,13 @@ struct AIDrawerView: View {
             }) {
                 Image(systemName: "chevron.left")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
                     .frame(width: 32, height: 32)
-                    .background(Color.white.opacity(0.62))
+                    .background(Color.saveNotebookPage)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.saveNotebookLine.opacity(0.55), lineWidth: 1)
+                    )
                     .clipShape(Circle())
             }
             .accessibilityLabel("Back to commands")
@@ -290,7 +294,7 @@ struct AIDrawerView: View {
                 Text(navigationTitle)
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
                     .lineLimit(1)
                 Text(navigationSubtitle)
                     .font(.caption2)
@@ -310,14 +314,18 @@ struct AIDrawerView: View {
                     .font(.caption.weight(.bold))
                     .foregroundColor(.secondary)
                     .frame(width: 30, height: 30)
-                    .background(Color.white.opacity(0.55))
+                    .background(Color.saveNotebookPage)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.saveNotebookLine.opacity(0.45), lineWidth: 1)
+                    )
                     .clipShape(Circle())
             }
             .accessibilityLabel("Close drawer content")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color.wanderlyCream)
+        .background(Color.saveNotebookPage.opacity(0.96))
     }
 
     private var showsNavigationHeader: Bool {
@@ -364,7 +372,7 @@ struct AIDrawerView: View {
             Spacer()
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(.wanderlyCharcoal)
+                .foregroundColor(.saveInk)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
             Spacer()
@@ -437,7 +445,7 @@ struct AIDrawerView: View {
                                     .foregroundColor(.secondary)
                                 Text(entry.query)
                                     .font(.subheadline)
-                                    .foregroundColor(.wanderlyCharcoal)
+                                    .foregroundColor(.saveInk)
                                     .lineLimit(1)
                                 Spacer()
                             }
@@ -465,7 +473,7 @@ struct AIDrawerView: View {
                                 .foregroundColor(.secondary)
                             Text(suggestion)
                                 .font(.subheadline)
-                                .foregroundColor(.wanderlyCharcoal)
+                                .foregroundColor(.saveInk)
                             Spacer()
                         }
                         .padding(.horizontal, 16)
@@ -497,7 +505,7 @@ struct AIDrawerView: View {
                     title: "Investigate a link",
                     subtitle: "IG, TikTok, XHS, article, or map URL",
                     commandLabel: "returns review clues",
-                    tone: .terracotta,
+                    tone: .berry,
                     isPrimary: true
                 ) {
                     focusSocialInvestigationPrompt()
@@ -509,7 +517,7 @@ struct AIDrawerView: View {
                         title: "Review Nest",
                         subtitle: "Hatch clue eggs into memories",
                         commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
-                        tone: .amber
+                        tone: .honey
                     ) {
                         openReviewInbox()
                     }
@@ -519,7 +527,7 @@ struct AIDrawerView: View {
                         title: "Clipboard",
                         subtitle: "Read one copied URL",
                         commandLabel: "metadata",
-                        tone: .sage
+                        tone: .signal
                     ) {
                         importClipboardURL()
                     }
@@ -531,7 +539,7 @@ struct AIDrawerView: View {
                         title: "Notes",
                         subtitle: "Paste a rough list",
                         commandLabel: "review only",
-                        tone: .amber
+                        tone: .honey
                     ) {
                         focusAgentPrompt("""
                         Turn these notes into reviewable place clues.
@@ -547,7 +555,7 @@ struct AIDrawerView: View {
                         title: "Media",
                         subtitle: "Screenshot or file evidence",
                         commandLabel: "investigate",
-                        tone: .blue
+                        tone: .sky
                     ) {
                         focusMediaEvidencePrompt()
                     }
@@ -558,7 +566,7 @@ struct AIDrawerView: View {
                     title: "Resolve a fuzzy venue",
                     subtitle: "Find address, city, source links, and whether it is safe to save.",
                     commandLabel: "verifies address",
-                    tone: .charcoal
+                    tone: .cocoa
                 ) {
                     focusAgentPrompt("""
                     Find the real venue for this place idea and return review clues with evidence.
@@ -574,7 +582,7 @@ struct AIDrawerView: View {
                     title: "Plan from memories",
                     subtitle: "Build a route from confirmed places only.",
                     commandLabel: "uses saved spots",
-                    tone: .blue
+                    tone: .sky
                 ) {
                     focusAgentPrompt("""
                     Help me organize my saved places into a practical plan.
@@ -629,10 +637,10 @@ struct AIDrawerView: View {
                         Label("Commands", systemImage: "terminal")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundColor(.wanderlyTerracotta)
+                            .foregroundColor(.saveBerry)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(Color.wanderlyTerracotta.opacity(0.1))
+                            .background(Color.saveBerry.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                 }
@@ -1006,7 +1014,7 @@ private struct ReviewCandidatesEmptyState: View {
                 Text("No clue eggs waiting")
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
 
                 Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clue eggs until you hatch them into memory cards.")
                     .font(.caption)
@@ -1095,7 +1103,7 @@ private struct ReviewCandidateCard: View {
                         Text("Needs Google Places refinement or a map link before this can hatch.")
                             .font(.caption2.weight(.semibold))
                     }
-                    .foregroundColor(.wanderlyTerracotta)
+                    .foregroundColor(.saveBerry)
                 }
 
                 HStack(spacing: 8) {
@@ -1139,13 +1147,13 @@ private struct CandidateActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundColor(.wanderlyTerracotta)
+                .foregroundColor(.saveBerry)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .background(Color.wanderlyTerracotta.opacity(0.09))
+                .background(Color.saveBerry.opacity(0.09))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1177,14 +1185,14 @@ private struct DrawerActionChip: View {
                         .lineLimit(1)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.wanderlyTerracotta.opacity(0.14))
+                        .background(Color.saveBerry.opacity(0.14))
                         .clipShape(Capsule())
                 }
             }
-            .foregroundColor(.wanderlyTerracotta)
+            .foregroundColor(.saveBerry)
             .frame(height: 38)
             .padding(.horizontal, 12)
-            .background(Color.wanderlyTerracotta.opacity(0.09))
+            .background(Color.saveBerry.opacity(0.09))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1193,15 +1201,15 @@ private struct DrawerActionChip: View {
 }
 
 private enum AgentCommandTone {
-    case terracotta, sage, amber, blue, charcoal
+    case berry, signal, honey, sky, cocoa
 
     var color: Color {
         switch self {
-        case .terracotta: return .saveBerry
-        case .sage: return .wanderlySage
-        case .amber: return .saveHoney
-        case .blue: return Color(hex: "5B8FA8")
-        case .charcoal: return .saveCocoa
+        case .berry: return .saveBerry
+        case .signal: return .saveSignal
+        case .honey: return .saveHoney
+        case .sky: return .saveSky
+        case .cocoa: return .saveCocoa
         }
     }
 }
@@ -1229,7 +1237,7 @@ private struct AgentCommandRow: View {
                     Text(title)
                         .font(isPrimary ? .headline : .subheadline)
                         .fontWeight(.black)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
 
@@ -1257,7 +1265,7 @@ private struct AgentCommandRow: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isPrimary ? Color.savePeach.opacity(0.58) : Color.saveNotebookPage.opacity(0.94))
+                    .fill(isPrimary ? Color.saveHoney.opacity(0.48) : Color.saveNotebookPage.opacity(0.94))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(tone.color.opacity(isPrimary ? 0.28 : 0.12), lineWidth: 1)
@@ -1316,7 +1324,7 @@ private struct AgentCommandCard: View {
                     Text(title)
                         .font(.subheadline)
                         .fontWeight(.black)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                         .lineLimit(1)
                         .minimumScaleFactor(0.86)
 

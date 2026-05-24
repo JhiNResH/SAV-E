@@ -1,24 +1,7 @@
 import SwiftUI
 
 extension Color {
-    // MARK: - Wanderly Light Theme
-    static let wanderlyCream = Color(hex: "FFF8F0")
-    static let wanderlyTerracotta = Color(hex: "C75B39")
-    static let wanderlySage = Color(hex: "A8B5A0")
-    static let wanderlyCharcoal = Color(hex: "2C2C2E")
-
-    // MARK: - Wanderly Dark Theme
-    static let wanderlyDarkBackground = Color(hex: "1C1C1E")
-    static let wanderlyAmber = Color(hex: "E8A87C")
-
-    // MARK: - Semantic Colors
-    static let wanderlyBackground = Color("WanderlyBackground")
-    static let wanderlyAccent = Color("WanderlyAccent")
-    static let wanderlySecondary = Color("WanderlySecondary")
-    static let wanderlyText = Color("WanderlyText")
-
     // MARK: - SAV-E Field Notebook Theme
-    static let saveBlush = Color(hex: "FFF2E8")
     static let savePeach = Color(hex: "F1C889")
     static let saveCream = Color(hex: "FFF1DF")
     static let saveMint = Color(hex: "EAF1E7")
@@ -27,8 +10,6 @@ extension Color {
     static let saveRose = Color(hex: "8D5D4D")
     static let saveHoney = Color(hex: "FFD719")
     static let saveSky = Color(hex: "79D4DE")
-    static let saveLavender = Color(hex: "EDE4D5")
-    static let saveCard = Color.white.opacity(0.82)
     static let saveInk = Color(hex: "241D21")
     static let savePaper = Color(hex: "FFFDF7")
     static let saveLedger = Color(hex: "EFE7D6")
@@ -41,14 +22,7 @@ extension Color {
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
-        switch category {
-        case .food: return .wanderlyTerracotta
-        case .cafe: return Color(hex: "B07D62")
-        case .bar: return Color(hex: "8B5E83")
-        case .attraction: return Color(hex: "5B8FA8")
-        case .stay: return .wanderlySage
-        case .shopping: return Color(hex: "C4956A")
-        }
+        saveStampColor(for: category)
     }
 
     static func saveStampColor(for category: PlaceCategory) -> Color {
@@ -93,22 +67,7 @@ extension Color {
     }
 }
 
-// MARK: - View Modifier for Wanderly Theme
-
-struct WanderlyCardStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background(Color.wanderlyCream)
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
-    }
-}
-
 extension View {
-    func wanderlyCard() -> some View {
-        modifier(WanderlyCardStyle())
-    }
-
     func saveNotebookPage(cornerRadius: CGFloat = 18) -> some View {
         background(Color.saveNotebookPage)
             .overlay(

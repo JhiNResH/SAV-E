@@ -11,7 +11,7 @@ struct PlaceListComponent: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.headline)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                     if let msg = aiMessage {
                         Text(msg)
                             .font(.caption)
@@ -21,12 +21,16 @@ struct PlaceListComponent: View {
                 Spacer()
                 Text("\(places.count)")
                     .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .fontWeight(.black)
+                    .foregroundColor(.saveInk)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.wanderlyTerracotta)
+                    .background(Color.saveHoney)
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1)
+                    )
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

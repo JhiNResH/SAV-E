@@ -69,13 +69,13 @@ struct AuthLoadingView: View {
     var body: some View {
         VStack(spacing: 14) {
             ProgressView()
-                .tint(.wanderlyTerracotta)
+                .tint(.saveInk)
             Text("Opening SAV-E")
                 .font(.headline)
-                .foregroundColor(.wanderlyCharcoal)
+                .foregroundColor(.saveInk)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.wanderlyCream)
+        .background(SaveDottedBackground())
     }
 }
 
@@ -115,11 +115,11 @@ struct SignInView: View {
         .overlay(alignment: .bottom) {
             if isLoading {
                 ProgressView()
-                    .tint(.wanderlyTerracotta)
+                    .tint(.saveInk)
                     .padding(.bottom, 10)
             }
         }
-        .background(Color.wanderlyCream)
+        .background(SaveDottedBackground())
         .alert(errorTitle, isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: {
@@ -178,16 +178,16 @@ struct SignInView: View {
                 Text("Continue with Google")
             }
             .font(.headline)
-            .foregroundColor(.wanderlyCharcoal)
+            .foregroundColor(.saveInk)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(Color.white)
+            .background(Color.saveNotebookPage)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.2)
             )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+            .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
         }
         .buttonStyle(.plain)
     }
@@ -196,13 +196,13 @@ struct SignInView: View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
                 Rectangle()
-                    .fill(Color.wanderlyTerracotta.opacity(0.14))
+                    .fill(Color.saveNotebookLine.opacity(0.22))
                     .frame(height: 1)
                 Text("or use email")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Rectangle()
-                    .fill(Color.wanderlyTerracotta.opacity(0.14))
+                    .fill(Color.saveNotebookLine.opacity(0.22))
                     .frame(height: 1)
             }
 
@@ -249,23 +249,17 @@ private struct SignInHero: View {
     var body: some View {
         VStack(spacing: 18) {
             ZStack {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(Color.wanderlyTerracotta.opacity(0.10))
-                    .frame(width: 96, height: 96)
-
-                Image(systemName: "map.fill")
-                    .font(.system(size: 50, weight: .semibold))
-                    .foregroundColor(.wanderlyTerracotta)
+                SaveEggBadge(state: .clue, size: 98)
             }
 
             VStack(spacing: 8) {
                 Text("SAV-E")
                     .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
 
                 Text("Your personal place agent.")
                     .font(.title3.weight(.semibold))
-                    .foregroundColor(.wanderlyCharcoal)
+                    .foregroundColor(.saveInk)
 
                 Text("Send links, posts, screenshots, notes, or maps. SAV-E investigates first, then asks before saving.")
                     .font(.subheadline)
@@ -280,9 +274,9 @@ private struct SignInHero: View {
 
 private struct SignInWorkflowStrip: View {
     private let steps: [(String, String, Color)] = [
-        ("Capture", "link or media", .wanderlyTerracotta),
-        ("Review", "with evidence", Color(hex: "5B8FA8")),
-        ("Remember", "confirmed places", Color(hex: "8B5E83")),
+        ("Capture", "link or media", .saveHoney),
+        ("Review", "with evidence", .saveSky),
+        ("Hatch", "memory cards", .saveBerry),
     ]
 
     var body: some View {
@@ -313,7 +307,7 @@ private struct WorkflowStepCard: View {
 
             Text(title)
                 .font(.caption.weight(.bold))
-                .foregroundColor(.wanderlyCharcoal)
+                .foregroundColor(.saveInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
@@ -325,12 +319,13 @@ private struct WorkflowStepCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color.white.opacity(0.78))
+        .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(tint.opacity(0.16), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
     }
 }
 
@@ -349,20 +344,21 @@ private struct SignInInputRow: View {
                 .textContentType(keyboardType == .emailAddress ? .emailAddress : .oneTimeCode)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .foregroundColor(.wanderlyCharcoal)
+                .foregroundColor(.saveInk)
 
             Button(buttonTitle, action: action)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(isDisabled ? .secondary : .wanderlyTerracotta)
+                .foregroundColor(isDisabled ? .secondary : .saveBerry)
                 .disabled(isDisabled)
         }
         .padding(.horizontal, 14)
         .frame(height: 52)
-        .background(Color.white.opacity(0.86))
+        .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: Color.saveInk.opacity(0.10), radius: 0, x: 2, y: 2)
     }
 }

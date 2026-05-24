@@ -12,7 +12,7 @@ struct PlaceCard: View {
                     Text(place.name)
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                         .lineLimit(1)
 
                     Spacer()
@@ -79,7 +79,11 @@ struct PlaceCard: View {
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
-        .background(Color.saveBlush)
+        .background(Color.saveNotebookPage)
+        .overlay(
+            Capsule()
+                .stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1)
+        )
         .clipShape(Capsule())
     }
 
@@ -98,5 +102,5 @@ struct PlaceCard: View {
         PlaceCard(place: Place.mockList[1])
     }
     .padding()
-    .background(Color.wanderlyCream)
+    .background(SaveDottedBackground())
 }

@@ -22,11 +22,11 @@ struct PlaceDetailView: View {
                             InfoChip(icon: "star.fill", text: String(format: "%.1f", rating), color: .orange)
                         }
                         if let priceRange = place.priceRange {
-                            InfoChip(icon: "dollarsign.circle", text: priceRange, color: .wanderlySage)
+                            InfoChip(icon: "dollarsign.circle", text: priceRange, color: .saveSignal)
                         }
                         InfoChip(icon: place.status == .visited ? "checkmark.circle.fill" : "clock",
                                  text: place.status.displayName,
-                                 color: place.status == .visited ? .wanderlySage : .wanderlyTerracotta)
+                                 color: place.status == .visited ? .saveSignal : .saveBerry)
                     }
 
                     // Source
@@ -39,7 +39,7 @@ struct PlaceDetailView: View {
                         if let recommender = place.recommender {
                             Text("via \(recommender)")
                                 .font(.caption)
-                                .foregroundColor(.wanderlyTerracotta)
+                                .foregroundColor(.saveBerry)
                         }
 
                         Spacer()
@@ -53,7 +53,7 @@ struct PlaceDetailView: View {
                         Label("Opening Hours", systemImage: "clock")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.wanderlyCharcoal)
+                            .foregroundColor(.saveInk)
                         Text(hours)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -67,7 +67,7 @@ struct PlaceDetailView: View {
                         Text("Must-Try Dishes")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.wanderlyCharcoal)
+                            .foregroundColor(.saveInk)
 
                         FlowLayout(spacing: 8) {
                             ForEach(dishes, id: \.self) { dish in
@@ -79,9 +79,13 @@ struct PlaceDetailView: View {
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(Color.wanderlyTerracotta.opacity(0.1))
-                                .foregroundColor(.wanderlyTerracotta)
+                                .background(Color.saveHoney.opacity(0.30))
+                                .foregroundColor(.saveInk)
                                 .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+                                )
                             }
                         }
                     }
@@ -94,14 +98,18 @@ struct PlaceDetailView: View {
                         Label("Notes", systemImage: "note.text")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.wanderlyCharcoal)
+                            .foregroundColor(.saveInk)
                         Text(note)
                             .font(.subheadline)
-                            .foregroundColor(.wanderlyCharcoal)
+                            .foregroundColor(.saveInk)
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.wanderlySage.opacity(0.1))
+                            .background(Color.saveNotebookPage)
                             .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1)
+                            )
                     }
                     .padding(.horizontal)
                 }
@@ -123,24 +131,32 @@ struct PlaceDetailView: View {
                     Button(action: { openInMaps() }) {
                         Label("Navigate", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
                             .font(.subheadline)
-                            .fontWeight(.semibold)
+                            .fontWeight(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.wanderlyTerracotta)
-                            .foregroundColor(.white)
+                            .background(Color.saveHoney)
+                            .foregroundColor(.saveInk)
                             .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                            )
                     }
 
                     if let sourceUrl = place.sourceUrl, let url = URL(string: sourceUrl) {
                         Button(action: { openURL(url) }) {
                             Label("Source", systemImage: "link")
                                 .font(.subheadline)
-                                .fontWeight(.semibold)
+                                .fontWeight(.black)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(Color.wanderlySage.opacity(0.2))
-                                .foregroundColor(.wanderlyCharcoal)
+                                .background(Color.saveNotebookPage)
+                                .foregroundColor(.saveInk)
                                 .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .stroke(Color.saveNotebookLine.opacity(0.58), lineWidth: 1.1)
+                                )
                         }
                     }
                 }
@@ -155,7 +171,7 @@ struct PlaceDetailView: View {
             }
             .padding(.bottom, 32)
         }
-        .background(Color.wanderlyCream)
+        .background(SaveDottedBackground())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if onDelete != nil {
@@ -196,7 +212,7 @@ struct PlaceDetailView: View {
                     Text(place.name)
                         .font(.title2)
                         .fontWeight(.bold)
-                        .foregroundColor(.wanderlyCharcoal)
+                        .foregroundColor(.saveInk)
                         .lineLimit(2)
 
                     HStack(spacing: 6) {
@@ -277,8 +293,12 @@ struct InfoChip: View {
         .foregroundColor(color)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(color.opacity(0.12))
+        .background(Color.saveNotebookPage)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(color.opacity(0.38), lineWidth: 1)
+        )
     }
 }
 

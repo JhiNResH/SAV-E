@@ -45,7 +45,11 @@ struct StatItem: View {
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(Color.saveNotebookLine.opacity(0.22))
+        .background(Color.saveNotebookPage.opacity(0.92))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+        )
         .overlay(alignment: .topLeading) {
             Circle()
                 .fill(color.opacity(0.16))
@@ -59,5 +63,5 @@ struct StatItem: View {
 #Preview {
     StatsView(profile: .mock)
         .padding()
-        .background(Color.wanderlyCream)
+        .background(SaveDottedBackground())
 }
