@@ -25,7 +25,7 @@ struct PlaceDetailView: View {
                             InfoChip(icon: "dollarsign.circle", text: priceRange, color: .saveSignal)
                         }
                         InfoChip(icon: place.status == .visited ? "checkmark.circle.fill" : "clock",
-                                 text: place.status.displayName,
+                                 text: place.status.memoryCardLabel,
                                  color: place.status == .visited ? .saveSignal : .saveCocoa)
                     }
 
@@ -224,7 +224,7 @@ struct PlaceDetailView: View {
 
                     HStack(spacing: 8) {
                         CategoryPill(category: place.category, isSelected: true)
-                        Text(place.status == .visited ? "Visited" : "Egg hatched")
+                        Text(place.status.memoryCardLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.saveCocoa)
                             .padding(.horizontal, 10)

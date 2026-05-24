@@ -44,7 +44,7 @@ struct PlaceListView: View {
 
                 // Sort selector
                 HStack {
-                    Text("\(viewModel.filteredPlaces.count) places")
+                    Text("\(viewModel.filteredPlaces.count) memory cards")
                         .font(.caption)
                         .foregroundColor(.saveMutedText)
 
@@ -73,8 +73,8 @@ struct PlaceListView: View {
                 if viewModel.filteredPlaces.isEmpty {
                     EmptyStateView(
                         icon: "mappin.slash",
-                        title: "No Places Found",
-                        subtitle: "Try adjusting your filters or save a new place from any app."
+                        title: "No Memory Cards Found",
+                        subtitle: "Try adjusting filters or save a Review clue as a memory card."
                     )
                 } else {
                     List {
@@ -115,8 +115,8 @@ struct PlaceListView: View {
                 }
             }
             .background(SaveDottedBackground())
-            .navigationTitle("Places")
-            .searchable(text: $viewModel.searchText, prompt: "Search places...")
+            .navigationTitle("Memory Cards")
+            .searchable(text: $viewModel.searchText, prompt: "Search memory cards...")
             .navigationDestination(for: Place.self) { place in
                 PlaceDetailView(place: place) {
                     try await viewModel.deletePlace(place)

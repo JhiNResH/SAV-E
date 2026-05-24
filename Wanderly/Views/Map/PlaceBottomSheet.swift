@@ -58,7 +58,7 @@ struct PlaceBottomSheet: View {
 
                 Spacer()
 
-                Text(place.status == .visited ? "Visited" : "Egg hatched")
+                Text(place.status.memoryCardLabel)
                     .font(.caption)
                     .fontWeight(.black)
                     .foregroundColor(.saveInk)
