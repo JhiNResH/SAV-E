@@ -2,6 +2,7 @@ import UIKit
 import SwiftUI
 import UniformTypeIdentifiers
 import Vision
+import ImageIO
 
 class ShareViewController: UIViewController {
     override func viewDidLoad() {
@@ -72,7 +73,7 @@ private struct ShareMetadata {
     var resolvedURL: String?
     var title: String?
     var description: String?
-    var imageData: Data?
+    var imageURL: URL?
 }
 
 private let shareMetadataHTMLByteLimit = 2_000_000
@@ -725,26 +726,27 @@ struct ShareExtensionView: View {
             let (data, response) = try await URLSession.shared.data(for: request)
             let resolvedURL = response.url?.absoluteString ?? url.absoluteString
             let html = String(data: data.prefix(shareMetadataHTMLByteLimit), encoding: .utf8) ?? ""
-            let imageData = await metadataImageData(in: html, baseURL: response.url ?? url)
-            print("SAV-E share metadata imageData bytes=\(imageData?.count ?? 0)")
             return ShareMetadata(
                 resolvedURL: resolvedURL,
                 title: metadataValue(in: html, keys: ["og:title", "twitter:title", "title"]),
                 description: metadataValue(in: html, keys: ["og:description", "twitter:description", "description"]),
-                imageData: imageData
+                imageURL: metadataImageURL(in: html, baseURL: response.url ?? url)
             )
         } catch {
             return ShareMetadata(resolvedURL: url.absoluteString, title: nil, description: nil)
         }
     }
 
-    private func metadataImageData(in html: String, baseURL: URL) async -> Data? {
+    private func metadataImageURL(in html: String, baseURL: URL) -> URL? {
         guard let imageValue = metadataValue(in: html, keys: ["og:image", "twitter:image", "image"]),
               let imageURL = URL(string: imageValue, relativeTo: baseURL)?.absoluteURL,
               imageURL.scheme?.hasPrefix("http") == true else {
             return nil
         }
+        return imageURL
+    }
 
+    private func metadataImageData(from imageURL: URL) async -> Data? {
         var request = URLRequest(url: imageURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 8
@@ -891,7 +893,8 @@ struct ShareExtensionView: View {
         sharedText: String,
         sourceURLString: String
     ) async -> PendingReviewCandidate? {
-        guard let imageData = metadata.imageData else { return nil }
+        guard let imageURL = metadata.imageURL,
+              let imageData = await metadataImageData(from: imageURL) else { return nil }
         let ocrLines = await recognizedTextLines(from: imageData)
         guard let result = SocialOCRCandidateHeuristics.candidate(from: ocrLines) else { return nil }
 
@@ -932,8 +935,7 @@ struct ShareExtensionView: View {
     }
 
     private func recognizedTextLines(from imageData: Data) async -> [String] {
-        guard let image = UIImage(data: imageData),
-              let cgImage = image.cgImage else {
+        guard let cgImage = downsampledCGImage(from: imageData) else {
             return []
         }
 
@@ -956,6 +958,23 @@ struct ShareExtensionView: View {
                 continuation.resume(returning: [])
             }
         }
+    }
+
+    private func downsampledCGImage(from imageData: Data, maxPixelSize: CGFloat = 1_600) -> CGImage? {
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, sourceOptions) else {
+            return nil
+        }
+
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions)
     }
 
     private func captionNamedSocialReviewCandidate(
@@ -1105,14 +1124,35 @@ struct ShareExtensionView: View {
         sourceURLString: String
     ) async -> [PendingReviewCandidate] {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        let parser = SocialPlaceParser()
+        let textOnlyDrafts = parser.parse(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: sourceURLString,
+                resolvedURL: metadata.resolvedURL,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText,
+                metadataTitle: metadata.title,
+                metadataDescription: metadata.description,
+                ocrLines: []
+            )
+        )
+        if !textOnlyDrafts.isEmpty {
+            let candidates = textOnlyDrafts.map {
+                pendingReviewCandidate(from: $0, sourceURLString: sourceURLString, sourceText: evidenceText, ocrLines: [])
+            }
+            return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
+        }
+
         let ocrLines: [String]
-        if let imageData = metadata.imageData {
+        if let imageURL = metadata.imageURL,
+           let imageData = await metadataImageData(from: imageURL) {
             ocrLines = await recognizedTextLines(from: imageData)
         } else {
             ocrLines = []
         }
+        guard !ocrLines.isEmpty else { return [] }
 
-        let drafts = SocialPlaceParser().parse(
+        let drafts = parser.parse(
             evidence: SocialPlaceSourceEvidence(
                 sourceURL: sourceURLString,
                 resolvedURL: metadata.resolvedURL,
@@ -1126,7 +1166,6 @@ struct ShareExtensionView: View {
         let candidates = drafts.map {
             pendingReviewCandidate(from: $0, sourceURLString: sourceURLString, sourceText: evidenceText, ocrLines: ocrLines)
         }
-
         return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
     }
 
