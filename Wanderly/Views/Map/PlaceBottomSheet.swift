@@ -10,8 +10,14 @@ struct PlaceBottomSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
-            HStack {
+            HStack(alignment: .top, spacing: 12) {
+                SaveEggBadge(state: .hatched(place.category), size: 52)
+
                 VStack(alignment: .leading, spacing: 4) {
+                    Text("HATCHED MEMORY")
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveCocoa)
+
                     Text(place.name)
                         .font(.title3)
                         .fontWeight(.bold)
@@ -24,7 +30,7 @@ struct PlaceBottomSheet: View {
 
                 Spacer()
 
-                CategoryPill(category: place.category)
+                CategoryPill(category: place.category, isSelected: true)
             }
 
             Divider()
@@ -52,7 +58,7 @@ struct PlaceBottomSheet: View {
 
                 Spacer()
 
-                Text(place.status.displayName)
+                Text(place.status == .visited ? "Visited" : "Egg hatched")
                     .font(.caption)
                     .fontWeight(.medium)
                     .padding(.horizontal, 8)
@@ -132,7 +138,7 @@ struct PlaceBottomSheet: View {
             }
         }
         .padding()
-        .background(Color.wanderlyCream)
+        .background(Color.saveNotebookPage)
         .confirmationDialog(
             "Delete \(place.name)?",
             isPresented: $showDeleteConfirmation,

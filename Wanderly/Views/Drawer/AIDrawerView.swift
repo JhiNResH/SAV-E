@@ -802,7 +802,7 @@ struct AIDrawerView: View {
 
     private func hatchFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
-        return "Memory hatched · +1 \(category.displayName.lowercased()) card"
+        return "Egg hatched · +1 \(category.displayName.lowercased()) memory card"
     }
 }
 
@@ -1034,18 +1034,7 @@ private struct ReviewCandidateCard: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 11) {
-                    ZStack {
-                        Circle()
-                            .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.saveNotebookLine.opacity(0.72))
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
-                            )
-                        Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "circle.hexagongrid.fill")
-                            .font(.system(size: 17, weight: .black))
-                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
-                    }
-                    .frame(width: 40, height: 40)
+                    SaveEggBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")

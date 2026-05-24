@@ -186,18 +186,13 @@ struct PlaceDetailView: View {
     private var memoryHeader: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: place.category.iconName)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(Color.saveStampForeground(for: place.category))
-                    .frame(width: 64, height: 64)
-                    .background(Color.saveStampColor(for: place.category))
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color.white.opacity(0.88), lineWidth: 2)
-                    )
+                SaveEggBadge(state: .hatched(place.category), size: 62)
 
                 VStack(alignment: .leading, spacing: 6) {
+                    Text("HATCHED MEMORY CARD")
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveCocoa)
+
                     Text(place.name)
                         .font(.title2)
                         .fontWeight(.bold)
@@ -213,12 +208,12 @@ struct PlaceDetailView: View {
 
                     HStack(spacing: 8) {
                         CategoryPill(category: place.category, isSelected: true)
-                        Text(place.status == .visited ? "Visited" : "Memory saved")
+                        Text(place.status == .visited ? "Visited" : "Egg hatched")
                             .font(.caption.weight(.semibold))
-                            .foregroundColor(place.status == .visited ? .saveCocoa : .saveBerry)
+                            .foregroundColor(.saveCocoa)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(place.status == .visited ? Color.saveMint : Color.saveBlush)
+                            .background(place.status == .visited ? Color.saveMint : Color.saveHoney.opacity(0.42))
                             .clipShape(Capsule())
                     }
                 }
@@ -232,18 +227,14 @@ struct PlaceDetailView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            LinearGradient(
-                colors: [Color.saveBlush, Color.saveCream, Color.saveMint],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Color.saveNotebookPage
         )
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
         )
-        .shadow(color: Color.saveCocoa.opacity(0.08), radius: 14, y: 8)
+        .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
         .padding(.horizontal)
     }
 
