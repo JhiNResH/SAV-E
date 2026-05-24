@@ -67,7 +67,7 @@ struct AIDrawerView: View {
                 .foregroundColor(.saveInk)
                 .font(.caption.weight(.black))
                 .frame(width: 28, height: 28)
-                .background(Color.saveHoney)
+                .background(Color.saveCream)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .stroke(Color.saveNotebookLine, lineWidth: 2)
@@ -163,7 +163,7 @@ struct AIDrawerView: View {
             VStack(spacing: 12) {
                 Spacer()
                 ProgressView().tint(.saveInk)
-                Text("Thinking...").font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
+                Text("Memo is sorting the clues...").font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
                 Button(action: {
                     viewModel.cancelCurrentRequest()
                     searchFocused = false
@@ -824,18 +824,10 @@ private struct FieldNotebookHeader: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(Color.saveHoney)
-                            .rotationEffect(.degrees(-4))
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 18, weight: .black))
-                            .foregroundColor(.saveInk)
-                    }
-                    .frame(width: 46, height: 46)
+                    MemoMascotMark(size: 52)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("SAV-E Field Notebook")
+                        Text("SAV-E Memo Book")
                             .font(.title3)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
@@ -851,12 +843,12 @@ private struct FieldNotebookHeader: View {
 
                     Spacer(minLength: 0)
 
-                    Text("OPEN")
+                    Text("MEMO")
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveInk)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(Color.saveMint)
+                        .background(Color.saveSky.opacity(0.58))
                         .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.2))
                         .clipShape(Capsule())
                 }
@@ -864,7 +856,7 @@ private struct FieldNotebookHeader: View {
                 HStack(spacing: 8) {
                     FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
                     FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
-                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveCocoa)
+                    FieldNotebookStat(title: "HELPER", value: "MEMO", color: .saveSky)
                 }
             }
             .padding(14)

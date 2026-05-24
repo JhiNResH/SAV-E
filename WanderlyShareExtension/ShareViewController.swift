@@ -44,14 +44,14 @@ private enum WanderlySharedStorage {
 }
 
 private enum SaveTheme {
-    static let cream = Color(hex: "FFF7E8")
-    static let yellow = Color(hex: "FFE24A")
-    static let coral = Color(hex: "FF8A65")
-    static let sky = Color(hex: "7EDAEF")
-    static let mint = Color(hex: "B8F5C8")
-    static let pink = Color(hex: "FFD7E8")
-    static let ink = Color(hex: "111111")
-    static let paper = Color(hex: "FFFDF7")
+    static let cream = Color(hex: "FFF5E7")
+    static let yellow = Color(hex: "FFD66B")
+    static let coral = Color(hex: "EE9C78")
+    static let sky = Color(hex: "8FCAEA")
+    static let mint = Color(hex: "C8EBCF")
+    static let pink = Color(hex: "F6C1CB")
+    static let ink = Color(hex: "3A2415")
+    static let paper = Color(hex: "FFF0DC")
 }
 
 private struct ShareScrapbookBackground: View {

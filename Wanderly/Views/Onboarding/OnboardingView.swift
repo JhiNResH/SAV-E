@@ -8,7 +8,7 @@ struct OnboardingView: View {
         OnboardingPage(
             icon: "magnifyingglass.circle.fill",
             title: "Save spots while you scroll",
-            subtitle: "Share an IG post, map link, screenshot, or note. SAV-E turns messy clues into reviewable places.",
+            subtitle: "Share an IG post, map link, screenshot, or note. Memo helps SAV-E turn messy clues into reviewable places.",
             color: .saveHoney
         ),
         OnboardingPage(
@@ -41,9 +41,13 @@ struct OnboardingView: View {
                                 )
                                 .frame(width: 132, height: 132)
 
-                            Image(systemName: pages[index].icon)
-                                .font(.system(size: 64, weight: .semibold))
-                                .foregroundColor(pages[index].color)
+                            if index == 0 {
+                                MemoMascotMark(size: 98, framed: false)
+                            } else {
+                                Image(systemName: pages[index].icon)
+                                    .font(.system(size: 64, weight: .semibold))
+                                    .foregroundColor(pages[index].color)
+                            }
                         }
 
                         VStack(spacing: 12) {
