@@ -67,15 +67,19 @@ struct WanderlyApp: App {
 
 struct AuthLoadingView: View {
     var body: some View {
-        VStack(spacing: 14) {
-            ProgressView()
-                .tint(.saveInk)
-            Text("Opening SAV-E")
-                .font(.headline)
-                .foregroundColor(.saveInk)
+        ZStack {
+            SaveDottedBackground()
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                ProgressView()
+                    .tint(.saveInk)
+                Text("Opening SAV-E")
+                    .font(.headline)
+                    .foregroundColor(.saveInk)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(SaveDottedBackground())
     }
 }
 
@@ -91,26 +95,31 @@ struct SignInView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 24)
+        ZStack {
+            SaveDottedBackground()
+                .ignoresSafeArea()
 
-            SignInHero()
-                .padding(.horizontal, 24)
+            VStack(spacing: 0) {
+                Spacer(minLength: 24)
 
-            Spacer(minLength: 22)
+                SignInHero()
+                    .padding(.horizontal, 24)
 
-            SignInWorkflowStrip()
+                Spacer(minLength: 22)
+
+                SignInWorkflowStrip()
+                    .padding(.horizontal, 22)
+
+                Spacer(minLength: 24)
+
+                VStack(spacing: 12) {
+                    appleSignInButton
+                    googleSignInButton
+                    emailSignInSection
+                }
                 .padding(.horizontal, 22)
-
-            Spacer(minLength: 24)
-
-            VStack(spacing: 12) {
-                appleSignInButton
-                googleSignInButton
-                emailSignInSection
+                .padding(.bottom, 28)
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 28)
         }
         .overlay(alignment: .bottom) {
             if isLoading {
@@ -119,7 +128,6 @@ struct SignInView: View {
                     .padding(.bottom, 10)
             }
         }
-        .background(SaveDottedBackground())
         .alert(errorTitle, isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK") { errorMessage = nil }
         } message: {
@@ -199,7 +207,7 @@ struct SignInView: View {
                     .frame(height: 1)
                 Text("or use email")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.68))
                 Rectangle()
                     .fill(Color.saveNotebookLine.opacity(0.22))
                     .frame(height: 1)
@@ -316,7 +324,7 @@ private struct WorkflowStepCard: View {
 
             Text(subtitle)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveCocoa.opacity(0.68))
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
@@ -350,7 +358,7 @@ private struct SignInInputRow: View {
 
             Button(buttonTitle, action: action)
                 .font(.subheadline.weight(.black))
-                .foregroundColor(isDisabled ? .secondary : .saveInk)
+                .foregroundColor(isDisabled ? Color.saveCocoa.opacity(0.42) : .saveInk)
                 .padding(.horizontal, 10)
                 .frame(height: 34)
                 .background(isDisabled ? Color.clear : Color.saveHoney)
