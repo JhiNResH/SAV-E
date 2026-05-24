@@ -94,7 +94,7 @@ struct AIDrawerView: View {
                     withAnimation { drawerDetent = .medium }
                     searchFocused = false
                 }) {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.saveCocoa.opacity(0.72))
                 }
             } else if !viewModel.query.isEmpty {
                 Button(action: {
@@ -103,7 +103,7 @@ struct AIDrawerView: View {
                     searchFocused = true
                     withAnimation { drawerDetent = .medium }
                 }) {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.saveCocoa.opacity(0.72))
                 }
             } else if !reviewCandidates.isEmpty {
                 Button(action: openReviewInbox) {
@@ -143,7 +143,6 @@ struct AIDrawerView: View {
         VStack(spacing: 0) {
             if showsNavigationHeader {
                 navigationHeader
-                Divider().opacity(0.45)
             }
 
             contentBody
@@ -164,7 +163,7 @@ struct AIDrawerView: View {
             VStack(spacing: 12) {
                 Spacer()
                 ProgressView().tint(.saveInk)
-                Text("Thinking...").font(.subheadline).foregroundColor(.secondary)
+                Text("Thinking...").font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
                 Button(action: {
                     viewModel.cancelCurrentRequest()
                     searchFocused = false
@@ -244,7 +243,7 @@ struct AIDrawerView: View {
                             Text("New question")
                         }
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveCocoa.opacity(0.72))
                         .padding(.vertical, 4)
                     }
                 }
@@ -264,7 +263,7 @@ struct AIDrawerView: View {
                 Spacer()
                 Image(systemName: "exclamationmark.triangle").foregroundColor(.saveCocoa)
                 Text(msg)
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.caption).foregroundColor(.saveCocoa.opacity(0.74))
                     .multilineTextAlignment(.center).padding(.horizontal)
                 HStack(spacing: 12) {
                     Button("Back") {
@@ -273,7 +272,7 @@ struct AIDrawerView: View {
                     }
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
 
                     Button("Try again") { Task { await viewModel.submit() } }
                         .font(.caption)
@@ -315,7 +314,7 @@ struct AIDrawerView: View {
                     .lineLimit(1)
                 Text(navigationSubtitle)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
                     .lineLimit(1)
             }
 
@@ -329,7 +328,7 @@ struct AIDrawerView: View {
             }) {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.bold))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
                     .frame(width: 30, height: 30)
                     .background(Color.saveNotebookPage)
                     .overlay(
@@ -449,10 +448,7 @@ struct AIDrawerView: View {
                 addSpotsHub
 
                 if !viewModel.chatHistory.isEmpty {
-                    Text("Recent")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                    NotebookBandLabel("Recent")
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
 
@@ -461,26 +457,14 @@ struct AIDrawerView: View {
                             viewModel.query = entry.query
                             Task { await viewModel.submit() }
                         }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text(entry.query)
-                                    .font(.subheadline)
-                                    .foregroundColor(.saveInk)
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                            DrawerSuggestionRow(icon: "clock.arrow.circlepath", text: entry.query)
                         }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 16)
                     }
                 }
 
-                Text("Try asking")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                NotebookBandLabel("Try asking")
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
@@ -489,18 +473,10 @@ struct AIDrawerView: View {
                         viewModel.query = suggestion
                         Task { await viewModel.submit() }
                     }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.left")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(suggestion)
-                                .font(.subheadline)
-                                .foregroundColor(.saveInk)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        DrawerSuggestionRow(icon: "arrow.up.left", text: suggestion)
                     }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
                 }
             }
         }
@@ -638,7 +614,7 @@ struct AIDrawerView: View {
             if let addSpotStatus {
                 Text(addSpotStatus)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.74))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
             }
@@ -658,13 +634,18 @@ struct AIDrawerView: View {
                     }) {
                         Label("Commands", systemImage: "terminal")
                             .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.saveCocoa)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(Color.saveCocoa.opacity(0.1))
+                            .background(Color.saveSky.opacity(0.54))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
+                    .buttonStyle(.plain)
                 }
 
                 ReviewCandidatesSection(
@@ -691,7 +672,7 @@ struct AIDrawerView: View {
                 if let addSpotStatus {
                     Text(addSpotStatus)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveCocoa.opacity(0.74))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -885,10 +866,11 @@ private struct FieldNotebookHeader: View {
 
                     Text("OPEN")
                         .font(.caption2.weight(.black))
-                        .foregroundColor(.saveNotebookPage)
+                        .foregroundColor(.saveInk)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(Color.saveNotebookLine.opacity(0.82))
+                        .background(Color.saveMint)
+                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.2))
                         .clipShape(Capsule())
                 }
 
@@ -932,7 +914,7 @@ private struct FieldNotebookStat: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption2.weight(.black))
-                .foregroundColor(.saveCocoa.opacity(0.68))
+                .foregroundColor(.saveCocoa.opacity(0.74))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
@@ -948,8 +930,15 @@ private struct FieldNotebookStat: View {
         .background(Color.saveNotebookPage.opacity(0.92))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(color.opacity(0.30), lineWidth: 1)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.1)
         )
+        .overlay(alignment: .topLeading) {
+            Rectangle()
+                .fill(color.opacity(0.72))
+                .frame(width: 28, height: 4)
+                .clipShape(Capsule())
+                .padding(.leading, 9)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -968,12 +957,12 @@ private struct NotebookBandLabel: View {
                 .foregroundColor(.saveInk)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color.saveNotebookLine.opacity(0.46))
+                .background(Color.saveHoney)
+                .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.2))
                 .clipShape(Capsule())
             Rectangle()
-                .fill(Color.saveNotebookLine)
+                .fill(Color.saveNotebookLine.opacity(0.28))
                 .frame(height: 1)
-            Spacer()
         }
         .padding(.top, 2)
     }
@@ -989,18 +978,17 @@ private struct ReviewCandidatesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 NotebookBandLabel("Review Nest")
-
-                Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(candidates.count)")
-                    .font(.caption.monospacedDigit())
-                    .fontWeight(.semibold)
-                    .foregroundColor(.saveCocoa)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.saveHoney.opacity(0.18))
+                    .font(.caption.monospacedDigit().weight(.black))
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(candidates.isEmpty ? Color.saveNotebookPage : Color.saveMint)
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.2))
                     .clipShape(Capsule())
             }
 
@@ -1031,9 +1019,13 @@ private struct ReviewCandidatesEmptyState: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.saveCocoa)
+                .foregroundColor(.saveInk)
                 .frame(width: 34, height: 34)
-                .background(Color.saveNotebookLine.opacity(0.42))
+                .background(Color.saveSky.opacity(0.54))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -1044,7 +1036,7 @@ private struct ReviewCandidatesEmptyState: View {
 
                 Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clue eggs until you hatch them into memory cards.")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveCocoa.opacity(0.74))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -1084,7 +1076,7 @@ private struct ReviewCandidateCard: View {
 
                         Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveCocoa.opacity(0.74))
                             .lineLimit(2)
 
                         HStack(spacing: 6) {
@@ -1114,7 +1106,7 @@ private struct ReviewCandidateCard: View {
                     .padding(10)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.saveCream.opacity(0.74))
+                            .fill(Color.saveHoney.opacity(0.16))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
@@ -1133,9 +1125,28 @@ private struct ReviewCandidateCard: View {
                 }
 
                 HStack(spacing: 8) {
-                    CandidateActionButton(title: "Mark ready", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
-                    CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
-                    CandidateActionButton(title: "Not this", systemImage: "xmark", disabled: isWorking, action: onReject)
+                    CandidateActionButton(
+                        title: "Mark ready",
+                        systemImage: "checkmark",
+                        fill: Color.saveSky.opacity(0.54),
+                        disabled: isWorking,
+                        action: onConfirm
+                    )
+                    CandidateActionButton(
+                        title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch",
+                        systemImage: "seal",
+                        fill: .saveHoney,
+                        disabled: isWorking,
+                        action: onSave
+                    )
+                    CandidateActionButton(
+                        title: "Not this",
+                        systemImage: "xmark",
+                        fill: .saveNotebookPage,
+                        foreground: .saveSignal,
+                        disabled: isWorking,
+                        action: onReject
+                    )
                 }
             }
             .padding(12)
@@ -1152,12 +1163,13 @@ private struct StampChip: View {
     var body: some View {
         Text(text.uppercased())
             .font(.caption2.weight(.black))
-            .foregroundColor(.saveCocoa)
+            .foregroundColor(.saveInk)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(color.opacity(0.18))
+            .background(color.opacity(0.24))
+            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
             .clipShape(Capsule())
     }
 }
@@ -1165,6 +1177,8 @@ private struct StampChip: View {
 private struct CandidateActionButton: View {
     var title: String
     var systemImage: String
+    var fill: Color = .saveNotebookPage
+    var foreground: Color = .saveInk
     var disabled: Bool
     var action: () -> Void
 
@@ -1172,15 +1186,19 @@ private struct CandidateActionButton: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(.saveCocoa)
+                .fontWeight(.black)
+                .foregroundColor(foreground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .background(Color.saveCocoa.opacity(0.09))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .background(fill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -1211,11 +1229,12 @@ private struct DrawerActionChip: View {
                         .lineLimit(1)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.saveCocoa.opacity(0.14))
+                        .background(Color.saveMint)
+                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
                         .clipShape(Capsule())
                 }
             }
-            .foregroundColor(.saveCocoa)
+            .foregroundColor(.saveInk)
             .frame(height: 38)
             .padding(.horizontal, 12)
             .background(Color.saveNotebookPage)
@@ -1230,6 +1249,47 @@ private struct DrawerActionChip: View {
     }
 }
 
+private struct DrawerSuggestionRow: View {
+    var icon: String
+    var text: String
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 28, height: 28)
+                .background(Color.saveMint.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            Text(text)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.saveInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "arrow.up.right")
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa.opacity(0.7))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.saveNotebookPage.opacity(0.92))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 private enum AgentCommandTone {
     case signal, honey, sky, cocoa
 
@@ -1238,7 +1298,7 @@ private enum AgentCommandTone {
         case .signal: return .saveSignal
         case .honey: return .saveHoney
         case .sky: return .saveSky
-        case .cocoa: return .saveCocoa
+        case .cocoa: return .saveMint
         }
     }
 }
@@ -1276,7 +1336,7 @@ private struct AgentCommandRow: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveCocoa.opacity(0.74))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1367,7 +1427,7 @@ private struct AgentCommandCard: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveCocoa.opacity(0.74))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
