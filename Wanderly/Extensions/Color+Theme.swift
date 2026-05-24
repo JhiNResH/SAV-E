@@ -2,20 +2,22 @@ import SwiftUI
 
 extension Color {
     // MARK: - SAV-E Field Notebook Theme
-    static let saveCream = Color(hex: "FFF1DF")
-    static let saveMint = Color(hex: "EAF1E7")
-    static let saveCocoa = Color(hex: "3D302A")
-    static let saveHoney = Color(hex: "FFD719")
-    static let saveSky = Color(hex: "79D4DE")
-    static let saveInk = Color(hex: "241D21")
+    static let saveCream = Color(hex: "FFF7E8")
+    static let saveMint = Color(hex: "B8F5C8")
+    static let saveCocoa = Color(hex: "111111")
+    static let saveHoney = Color(hex: "FFE24A")
+    static let saveSky = Color(hex: "7EDAEF")
+    static let saveInk = Color(hex: "111111")
     static let savePaper = Color(hex: "FFFDF7")
-    static let saveLedger = Color(hex: "EFE7D6")
-    static let saveSignal = Color(hex: "6E7F67")
-    static let saveSuccess = Color(hex: "6F946D")
-    static let saveNotebookBackground = Color(hex: "F4B51B")
-    static let saveNotebookPage = Color(hex: "FFF1DF")
-    static let saveNotebookSpine = Color(hex: "FFD719")
-    static let saveNotebookLine = Color(hex: "3D302A")
+    static let saveLedger = Color(hex: "FFF7E8")
+    static let saveSignal = Color(hex: "FF8A65")
+    static let saveSuccess = Color(hex: "B8F5C8")
+    static let saveCoral = Color(hex: "FF8A65")
+    static let savePink = Color(hex: "FFD7E8")
+    static let saveNotebookBackground = Color(hex: "FFF7E8")
+    static let saveNotebookPage = Color(hex: "FFFDF7")
+    static let saveNotebookSpine = Color(hex: "FFE24A")
+    static let saveNotebookLine = Color(hex: "111111")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
@@ -59,10 +61,10 @@ extension View {
         background(Color.saveNotebookPage)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
+                    .stroke(Color.saveNotebookLine, lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
+            .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -71,11 +73,11 @@ struct SaveDottedBackground: View {
         Color.saveNotebookBackground
             .overlay {
                 Canvas { context, size in
-                    let spacing: CGFloat = 14
-                    for x in stride(from: CGFloat(7), through: size.width, by: spacing) {
-                        for y in stride(from: CGFloat(7), through: size.height, by: spacing) {
-                            let rect = CGRect(x: x, y: y, width: 2.2, height: 2.2)
-                            context.fill(Path(ellipseIn: rect), with: .color(Color.saveInk.opacity(0.28)))
+                    let spacing: CGFloat = 18
+                    for x in stride(from: CGFloat(8), through: size.width, by: spacing) {
+                        for y in stride(from: CGFloat(8), through: size.height, by: spacing) {
+                            let rect = CGRect(x: x, y: y, width: 2, height: 2)
+                            context.fill(Path(ellipseIn: rect), with: .color(Color.saveNotebookLine.opacity(0.08)))
                         }
                     }
                 }
