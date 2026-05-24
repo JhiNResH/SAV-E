@@ -753,7 +753,7 @@ struct ShareExtensionView: View {
         request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard data.count <= 5_000_000,
+            guard data.count <= 2_000_000,
                   (response as? HTTPURLResponse)?.statusCode ?? 200 < 400 else {
                 return nil
             }
@@ -960,7 +960,7 @@ struct ShareExtensionView: View {
         }
     }
 
-    private func downsampledCGImage(from imageData: Data, maxPixelSize: CGFloat = 1_600) -> CGImage? {
+    private func downsampledCGImage(from imageData: Data, maxPixelSize: CGFloat = 1_024) -> CGImage? {
         let sourceOptions = [
             kCGImageSourceShouldCache: false
         ] as CFDictionary

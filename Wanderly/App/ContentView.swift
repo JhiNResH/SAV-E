@@ -50,7 +50,7 @@ struct ContentView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
-                Task { await mapVM.loadPlaces(force: true) }
+                Task { await mapVM.handleSceneDidBecomeActive() }
             }
             .task {
                 drawerVM.places = mapVM.places
