@@ -82,6 +82,21 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
 }
 
 final class SocialPlacePipelineTests: XCTestCase {
+    private var douyinFoodListFixture: String {
+        """
+        叫我Wendii 的图文作品：🇺🇸LA必吃美食！都是我的宝藏店！
+        P2-P5 Brothers and cousins Taco
+        P6-P7 Artisanal Goods 可颂很好吃
+        P8-P9 Ruen Pair 泰国菜 在 Thai town
+        P10-P11 小食代川菜
+        P12-P13 马来西亚菜，Ipoh Kopitiam 怡保茶餐厅
+        P14-P15 Läderach 巧克力 推荐草莓味
+        P16 Potato Corner 已经开到上海咯
+        #美国生活 #加州美食 #洛杉矶 #洛杉矶美食 #留学生
+        https://v.douyin.com/buUywZoMiLw/
+        """
+    }
+
     func testPlaceBearingSourceRunsPublicSearchAndPlacesMatchWithEvidenceReceipt() async throws {
         let places = StubGooglePlacesService()
         let search = StubPublicSourceSearchService()
@@ -505,6 +520,108 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "MY FAVORITE" })
         XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "Teresa" })
         XCTAssertTrue(analysis.nextBestAction.contains("enrich selected venue clues"))
+    }
+
+    func testDouyinFoodListProducesMultiPlaceSourceUnderstanding() {
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://v.douyin.com/buUywZoMiLw/",
+                resolvedURL: "https://www.iesdouyin.com/share/video/buUywZoMiLw/",
+                sharedTitle: nil,
+                sharedText: douyinFoodListFixture,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        let names = analysis.placesFound.map(\.displayName)
+        XCTAssertEqual(analysis.sourceType, .multiPlaceList)
+        XCTAssertEqual(analysis.sourceIntent, .multiPlaceList)
+        XCTAssertTrue(analysis.isPlaceBearing)
+        XCTAssertTrue(names.contains("Brothers and Cousins Tacos"))
+        XCTAssertTrue(names.contains("Artisanal Goods"))
+        XCTAssertTrue(names.contains("Ruen Pair"))
+        XCTAssertTrue(names.contains("小食代川菜"))
+        XCTAssertTrue(names.contains("Ipoh Kopitiam 怡保茶餐厅"))
+        XCTAssertTrue(names.contains("Läderach"))
+        XCTAssertTrue(names.contains("Potato Corner"))
+        XCTAssertTrue(analysis.regionClues.contains("LA"))
+        XCTAssertTrue(analysis.regionClues.contains("洛杉矶"))
+        XCTAssertTrue(analysis.regionClues.contains { $0.localizedCaseInsensitiveContains("Thai Town") })
+    }
+
+    func testDouyinFoodListCreatesReviewCandidatesWithoutFakeCoordinates() {
+        let service = SocialLinkReviewCandidateService()
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: douyinFoodListFixture,
+            sourceURL: "https://v.douyin.com/buUywZoMiLw/"
+        )
+
+        let names = candidates.map(\.candidateName)
+        XCTAssertGreaterThan(candidates.count, 1)
+        XCTAssertFalse(candidates.contains { $0.isSourceOnly })
+        XCTAssertTrue(names.contains("Brothers and Cousins Tacos"))
+        XCTAssertTrue(names.contains("Artisanal Goods"))
+        XCTAssertTrue(names.contains("Ruen Pair"))
+        XCTAssertTrue(names.contains("小食代川菜"))
+        XCTAssertTrue(names.contains("Ipoh Kopitiam 怡保茶餐厅"))
+        XCTAssertTrue(names.contains("Läderach"))
+        XCTAssertTrue(names.contains("Potato Corner"))
+        XCTAssertTrue(candidates.allSatisfy { $0.latitude == nil && $0.longitude == nil })
+        XCTAssertTrue(candidates.allSatisfy { $0.address.isEmpty })
+        XCTAssertTrue(candidates.allSatisfy { !$0.hasReliableCoordinates })
+        XCTAssertFalse(names.contains("可颂很好吃"))
+        XCTAssertFalse(names.contains("巧克力 推荐草莓味"))
+        XCTAssertFalse(names.contains("已经开到上海咯"))
+    }
+
+    func testInstagramCarouselWithPMarkersDoesNotTriggerDouyinListParser() {
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/not-douyin/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: """
+                MY FAVORITE LA food carousel
+                P1 best for coffee quality
+                P2 atmosphere and aesthetic
+                P3 desserts worth it
+                """,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        let names = analysis.placesFound.map(\.displayName)
+        XCTAssertFalse(names.contains("best for coffee quality"))
+        XCTAssertFalse(names.contains("atmosphere and aesthetic"))
+        XCTAssertFalse(names.contains("desserts worth it"))
+        XCTAssertFalse(names.contains("MY FAVORITE LA food carousel"))
+    }
+
+    func testDouyinCuisinePrefixKeepsFollowingVenueName() {
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.iesdouyin.com/share/note/example/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: """
+                抖音图文：LA food list
+                P2 泰国菜 Palms Thai 在 Thai Town
+                P3 可颂很好吃
+                """,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        let names = analysis.placesFound.map(\.displayName)
+        XCTAssertTrue(names.contains("Palms Thai"))
+        XCTAssertFalse(names.contains("泰国菜"))
+        XCTAssertFalse(names.contains("可颂很好吃"))
     }
 
     func testRestaurantRecommendationWithoutVenueBecomesPlaceBearingIntent() {
