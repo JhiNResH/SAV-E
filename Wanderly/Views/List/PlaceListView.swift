@@ -74,7 +74,7 @@ struct PlaceListView: View {
                     EmptyStateView(
                         icon: "mappin.slash",
                         title: "No Memory Cards Found",
-                        subtitle: "Try adjusting filters or hatch a Review Nest clue into a memory card."
+                        subtitle: "Try adjusting filters or save a Review clue as a memory card."
                     )
                 } else {
                     List {

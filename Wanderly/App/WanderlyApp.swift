@@ -281,7 +281,7 @@ private struct SignInWorkflowStrip: View {
     private let steps: [(String, String, Color)] = [
         ("Capture", "link or media", .saveHoney),
         ("Review", "with evidence", .saveSky),
-        ("Hatch", "memory cards", .saveMint),
+        ("Save", "memory cards", .saveMint),
     ]
 
     var body: some View {

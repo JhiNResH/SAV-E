@@ -682,7 +682,7 @@ struct ShareExtensionView: View {
             ShareStatusPill(text: "\(candidates.count) possible places found")
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("Pick the place clue to hatch")
+                Text("Pick the place clue to save")
                     .font(.title3.weight(.black))
                     .foregroundColor(SaveTheme.ink)
 

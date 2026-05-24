@@ -213,7 +213,27 @@ struct PlaceMapPin: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 ZStack(alignment: .topTrailing) {
-                    SaveEggBadge(state: .hatched(place.category), size: 42)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.saveCream)
+                            .frame(width: 40, height: 34)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
+
+                        HStack(spacing: 2) {
+                            Image(systemName: place.category.iconName)
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(.saveInk)
+                            Rectangle()
+                                .fill(Color.saveSky)
+                                .frame(width: 4, height: 18)
+                            Rectangle()
+                                .fill(Color.saveHoney)
+                                .frame(width: 4, height: 18)
+                        }
+                    }
 
                     if place.status == .visited {
                         Image(systemName: "checkmark.seal.fill")
@@ -226,7 +246,7 @@ struct PlaceMapPin: View {
 
                 Image(systemName: "triangle.fill")
                     .font(.system(size: 8))
-                    .foregroundColor(Color.saveStampColor(for: place.category))
+                    .foregroundColor(.saveNotebookLine)
                     .rotationEffect(.degrees(180))
                     .offset(y: -2)
             }

@@ -386,7 +386,7 @@ private struct PassportStampSection: View {
                     .clipShape(Capsule())
             }
 
-            PassportStampRow(icon: "rectangle.stack.fill", title: "Memory cards", value: "\(profile.savedCount) hatched")
+            PassportStampRow(icon: "rectangle.stack.fill", title: "Memory cards", value: "\(profile.savedCount) saved")
             PassportStampRow(icon: "checkmark.seal.fill", title: "Verified", value: "\(max(profile.savedCount - waitingClues, 0)) ready to plan")
             PassportStampRow(icon: "building.2.fill", title: "Cities", value: "\(profile.citiesCount) city stamps")
             PassportStampRow(icon: "circle.hexagongrid.fill", title: "Waiting clues", value: waitingClues == 1 ? "1 maybe place" : "\(waitingClues) maybe places")
