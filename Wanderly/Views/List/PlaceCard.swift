@@ -5,7 +5,7 @@ struct PlaceCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            memoryEgg
+            memoryBadge
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -60,10 +60,10 @@ struct PlaceCard: View {
         .saveNotebookPage(cornerRadius: 16)
     }
 
-    private var memoryEgg: some View {
+    private var memoryBadge: some View {
         VStack(spacing: 4) {
-            SaveEggBadge(state: .hatched(place.category), size: 44)
-            Text("HATCHED")
+            SaveMemoryBadge(state: .saved(place.category), size: 44)
+            Text("SAVED")
                 .font(.system(size: 7, weight: .black))
                 .foregroundColor(.saveCocoa)
         }

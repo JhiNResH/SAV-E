@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct SaveEggBadge: View {
+struct SaveMemoryBadge: View {
     enum State {
         case clue
         case ready
-        case hatched(PlaceCategory)
+        case saved(PlaceCategory)
     }
 
     let state: State
@@ -19,7 +19,7 @@ struct SaveEggBadge: View {
                         .stroke(Color.saveNotebookLine.opacity(0.9), lineWidth: 1.3)
                 )
 
-            if case .hatched = state {
+            if case .saved = state {
                 cardTabs
             }
 
@@ -38,7 +38,7 @@ struct SaveEggBadge: View {
                 Image(systemName: "link")
             case .ready:
                 Image(systemName: "seal.fill")
-            case .hatched(let category):
+            case .saved(let category):
                 Image(systemName: category.iconName)
             }
         }
@@ -50,7 +50,7 @@ struct SaveEggBadge: View {
             return .saveNotebookPage
         case .ready:
             return .saveHoney
-        case .hatched(let category):
+        case .saved(let category):
             return Color.saveStampColor(for: category)
         }
     }
@@ -61,7 +61,7 @@ struct SaveEggBadge: View {
             return .saveInk
         case .ready:
             return .saveInk
-        case .hatched(let category):
+        case .saved(let category):
             return Color.saveStampForeground(for: category)
         }
     }
@@ -87,8 +87,8 @@ struct SaveEggBadge: View {
         case .clue:
             return "Place clue"
         case .ready:
-            return "Ready to save"
-        case .hatched:
+            return "Map-ready place"
+        case .saved:
             return "Saved memory card"
         }
     }
@@ -96,9 +96,9 @@ struct SaveEggBadge: View {
 
 #Preview {
     HStack(spacing: 18) {
-        SaveEggBadge(state: .clue)
-        SaveEggBadge(state: .ready)
-        SaveEggBadge(state: .hatched(.food))
+        SaveMemoryBadge(state: .clue)
+        SaveMemoryBadge(state: .ready)
+        SaveMemoryBadge(state: .saved(.food))
     }
     .padding()
     .background(SaveDottedBackground())

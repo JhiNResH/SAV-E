@@ -202,10 +202,10 @@ struct PlaceDetailView: View {
     private var memoryHeader: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
-                SaveEggBadge(state: .hatched(place.category), size: 62)
+                SaveMemoryBadge(state: .saved(place.category), size: 62)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("HATCHED MEMORY CARD")
+                    Text("SAVED MEMORY CARD")
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveCocoa)
 

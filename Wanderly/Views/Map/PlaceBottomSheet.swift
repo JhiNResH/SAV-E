@@ -11,10 +11,10 @@ struct PlaceBottomSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack(alignment: .top, spacing: 12) {
-                SaveEggBadge(state: .hatched(place.category), size: 52)
+                SaveMemoryBadge(state: .saved(place.category), size: 52)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("HATCHED MEMORY")
+                    Text("MEMORY CARD")
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveCocoa)
 
