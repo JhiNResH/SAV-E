@@ -61,6 +61,27 @@ const fixtures = [
     },
   },
   {
+    name: "apple maps with q address and ll can save as place",
+    url: "https://maps.apple.com/?address=317%20S%20Broadway,%20Los%20Angeles,%20CA%2090013,%20United%20States&auid=123&ll=34.050536,-118.248981&lsp=9902&q=Grand%20Central%20Market",
+    expected: {
+      sourcePlatform: "appleMaps",
+      importKind: "place",
+      latitude: 34.050536,
+      longitude: -118.248981,
+    },
+  },
+  {
+    name: "apple maps place route with name and coordinate can save as place",
+    url: "Check out Grand Central Market https://maps.apple.com/place?address=317%20S%20Broadway,%20Los%20Angeles,%20CA%2090013&coordinate=34.050536,-118.248981&name=Grand%20Central%20Market",
+    expected: {
+      sourcePlatform: "appleMaps",
+      importKind: "place",
+      latitude: 34.050536,
+      longitude: -118.248981,
+      name: "Grand Central Market",
+    },
+  },
+  {
     name: "luma event stays unresolved candidate",
     url: "https://lu.ma/save-agent-dinner-at-riverside-hall",
     expected: {
