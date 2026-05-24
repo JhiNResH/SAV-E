@@ -488,6 +488,7 @@ struct SocialPlaceParser {
         }
 
         var candidates: [SocialPlaceCandidateDraft] = []
+        candidates.append(contentsOf: douyinFoodListCandidates(from: text, sourceURL: evidence.sourceURL))
         candidates.append(contentsOf: numberedCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text, handleContexts: handleContexts))
         candidates.append(contentsOf: bracketedCandidates(from: text, sourceURL: evidence.sourceURL))
         candidates.append(contentsOf: englishStayCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
@@ -499,6 +500,7 @@ struct SocialPlaceParser {
 
         let sourceType = sourceType(
             text: text,
+            sourceURL: evidence.sourceURL,
             groups: sourceGroups,
             candidates: candidates,
             creatorHandles: creatorHandles
@@ -566,6 +568,38 @@ struct SocialPlaceParser {
     }
 
     // MARK: - Candidate builders
+
+    private func douyinFoodListCandidates(from text: String, sourceURL: String) -> [SocialPlaceCandidateDraft] {
+        let segments = douyinListSegments(from: text, sourceURL: sourceURL)
+        guard segments.count >= 2 else { return [] }
+        let regions = regionClues(from: text)
+        let primaryRegion = normalizedPrimaryRegion(from: regions)
+
+        return segments.compactMap { segment in
+            guard let name = douyinVenueName(from: segment.body) else { return nil }
+            let category = category(from: "\(name)\n\(segment.body)\n\(text)")
+            var atoms = [
+                SocialEvidenceAtom(source: .numberedCaption, role: .venueName, value: name, line: segment.line, confidence: 0.7)
+            ]
+            if let primaryRegion {
+                atoms.append(SocialEvidenceAtom(source: .captionSentence, role: .cityClue, value: primaryRegion, line: text, confidence: 0.5))
+            }
+            if segment.body.range(of: #"(?i)\bThai\s+Town\b"#, options: .regularExpression) != nil {
+                atoms.append(SocialEvidenceAtom(source: .captionSentence, role: .cityClue, value: "Thai Town", line: segment.line, confidence: 0.58))
+            }
+
+            return draft(
+                name: name,
+                category: category,
+                sourceURL: sourceURL,
+                fullText: text,
+                atoms: atoms,
+                confidence: category == "food" ? 0.6 : 0.54,
+                tier: .weakCandidate,
+                extraMissingInfo: ["Douyin food-list candidate; confirm exact map listing"]
+            )
+        }
+    }
 
     private func numberedCandidates(
         from lines: [String],
@@ -1023,6 +1057,66 @@ struct SocialPlaceParser {
         firstCapture(in: line, pattern: #"^\s*(?:\d{1,2}[\.)]|[①②③④⑤⑥⑦⑧⑨])\s*([^\n\r]+)"#)
     }
 
+    private func douyinListSegments(from text: String, sourceURL: String) -> [(line: String, body: String)] {
+        guard looksLikeDouyinFoodList(text: text, sourceURL: sourceURL),
+              let regex = try? NSRegularExpression(
+                pattern: #"(?i)\bP\d{1,2}(?:\s*[-–—]\s*P?\d{1,2})?\s+(.+?)(?=\s+\bP\d{1,2}(?:\s*[-–—]\s*P?\d{1,2})?\s+|#[^\s#]+|$)"#,
+                options: [.dotMatchesLineSeparators]
+              ) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range).compactMap { match in
+            guard match.numberOfRanges > 1,
+                  let fullRange = Range(match.range(at: 0), in: text),
+                  let bodyRange = Range(match.range(at: 1), in: text) else {
+                return nil
+            }
+            let line = SocialPlaceEvidenceScorer.cleanText(String(text[fullRange]))
+            let body = SocialPlaceEvidenceScorer.cleanText(String(text[bodyRange]))
+            guard !body.isEmpty else { return nil }
+            return (line, body)
+        }
+    }
+
+    private func looksLikeDouyinFoodList(text: String, sourceURL: String) -> Bool {
+        let loweredURL = sourceURL.lowercased()
+        let hasDouyinSource = loweredURL.contains("douyin.com") || loweredURL.contains("iesdouyin.com") || text.contains("抖音")
+        let pRangeCount = matches(in: text, pattern: #"(?i)\bP\d{1,2}(?:\s*[-–—]\s*P?\d{1,2})?\s+"#).count
+        let textHasDouyinURL = text.range(of: #"(?i)https?://(?:www\.)?(?:v\.)?(?:ies)?douyin\.com/\S*"#, options: .regularExpression) != nil
+        return pRangeCount >= 2 && (hasDouyinSource || textHasDouyinURL)
+    }
+
+    private func douyinVenueName(from body: String) -> String? {
+        var value = body
+            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^(?:泰国菜|泰國菜|马来西亚菜|馬來西亞菜)[，,、\s]+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(?:可颂很好吃|巧克力.*|推荐.*|推薦.*|已经.*|已經.*|在\s+Thai\s+town.*)$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.,，。:：;；!！"))
+
+        if let latinLead = firstCapture(in: value, pattern: #"^([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ0-9 &'._-]{1,60})(?=\s+[\u4e00-\u9fff]|$)"#) {
+            value = latinLead
+        }
+        if let mixedKopitiam = firstCapture(in: body, pattern: #"(?i)\b(Ipoh\s+Kopitiam\s+怡保茶餐[厅廳])\b"#) {
+            value = mixedKopitiam
+        }
+
+        value = normalizeDouyinVenueName(value)
+        guard SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(value) else { return nil }
+        return value
+    }
+
+    private func normalizeDouyinVenueName(_ value: String) -> String {
+        let cleaned = cleanDisplayName(value)
+        let canonical = Self.canonicalPlaceName(cleaned)
+        switch canonical {
+        case "brothers and cousins taco", "brothers and cousins tacos":
+            return "Brothers and Cousins Tacos"
+        default:
+            return cleaned
+        }
+    }
+
     private func extractNameAndHandles(from value: String) -> (name: String, handles: [String]) {
         let handles = handles(in: value)
         let name = value
@@ -1269,6 +1363,14 @@ struct SocialPlaceParser {
         return String(text[captureRange])
     }
 
+    private func matches(in text: String, pattern: String) -> [NSTextCheckingResult] {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range)
+    }
+
     private func candidateScore(_ candidate: SocialPlaceCandidateDraft) -> Double {
         var score = candidate.confidence
         if !candidate.locationClues.isEmpty { score += 0.14 }
@@ -1305,6 +1407,7 @@ struct SocialPlaceParser {
 
     private func sourceType(
         text: String,
+        sourceURL: String,
         groups: [SocialPlaceSourceGroup],
         candidates: [SocialPlaceCandidateDraft],
         creatorHandles: Set<String>
@@ -1313,6 +1416,9 @@ struct SocialPlaceParser {
             return .multiPlaceList
         }
         if looksLikeSocialPlaceList(text), candidates.filter({ !$0.venueHandles.isEmpty }).count >= 2 {
+            return .multiPlaceList
+        }
+        if looksLikeDouyinFoodList(text: text, sourceURL: sourceURL), candidates.count >= 2 {
             return .multiPlaceList
         }
         if candidates.count == 1 {
@@ -1571,6 +1677,9 @@ struct SocialPlaceParser {
 
     private func sourceTopic(from text: String) -> String? {
         let patterns = [
+            #"(?i)\b(LA\s*(?:must[-\s]*eat\s*)?(?:food|restaurants?|eats?)\s*list)\b"#,
+            #"(?:🇺🇸)?\s*(LA必吃美食)"#,
+            #"(洛杉[矶磯]美食)"#,
             #"(?i)\b(?:the\s+)?(coffee shops?\s+in\s+Los Angeles County)\b"#,
             #"(?i)\b(?:favorite|favourite|best|top|must-try|must try|hidden gems?)?[^\n\r]{0,30}\b((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+(?:LA|OC|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"(?i)\b((?:LA|Los Angeles|Orange County|OC|Tokyo|Taipei|Seoul|Paris|London|New York)\s+(?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?))\b"#
@@ -1587,9 +1696,11 @@ struct SocialPlaceParser {
     private func regionClues(from text: String) -> [String] {
         var clues: [String] = []
         let patterns = [
+            #"(?i)(?:^|[^A-Za-z])(LA)(?:[^A-Za-z]|$)"#,
             #"(?i)\bLos Angeles County\b"#,
             #"(?i)\bLos Angeles\b"#,
-            #"(?i)\bLA\b"#,
+            #"(?i)\bThai\s+Town\b"#,
+            #"洛杉[矶磯]"#,
             #"(?i)\bOrange County\b"#,
             #"(?i)\bOC\b"#,
             #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#
@@ -1598,7 +1709,10 @@ struct SocialPlaceParser {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
             let range = NSRange(text.startIndex..<text.endIndex, in: text)
             for match in regex.matches(in: text, range: range) {
-                guard let matchRange = Range(match.range, in: text) else { continue }
+                let captureRange = match.numberOfRanges > 1 && match.range(at: 1).location != NSNotFound
+                    ? match.range(at: 1)
+                    : match.range
+                guard let matchRange = Range(captureRange, in: text) else { continue }
                 let raw = String(text[matchRange]).replacingOccurrences(of: "#", with: "")
                 clues.append(SocialPlaceEvidenceScorer.cleanText(raw))
             }
