@@ -75,7 +75,7 @@ struct MapView: View {
             .ignoresSafeArea()
         }
         .sheet(isPresented: $showProfile) {
-            ProfileView()
+            ProfileView(waitingClues: viewModel.reviewCandidates.count)
         }
         .task {
             await viewModel.focusOnUserLocationOnLaunch()

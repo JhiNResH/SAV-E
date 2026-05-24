@@ -2,17 +2,25 @@ import SwiftUI
 
 struct StatsView: View {
     let profile: UserProfile
+    var waitingClues: Int = 0
 
     var body: some View {
-        HStack(spacing: 0) {
-            StatItem(value: "\(profile.savedCount)", label: "Saved", color: .wanderlyTerracotta)
-            Divider().frame(height: 40)
-            StatItem(value: "\(profile.visitedCount)", label: "Visited", color: .wanderlySage)
-            Divider().frame(height: 40)
-            StatItem(value: "\(profile.citiesCount)", label: "Cities", color: .wanderlyAmber)
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8),
+        ], spacing: 8) {
+            StatItem(value: "\(profile.savedCount)", label: "Memories", color: .saveBerry, icon: "rectangle.stack.fill")
+            StatItem(value: "\(profile.visitedCount)", label: "Verified", color: .saveSuccess, icon: "checkmark.seal.fill")
+            StatItem(value: "\(profile.citiesCount)", label: "Cities", color: .saveHoney, icon: "building.2.fill")
+            StatItem(value: "\(waitingClues)", label: "Waiting clues", color: .saveSignal, icon: "circle.hexagongrid.fill")
         }
-        .padding(.vertical, 16)
-        .wanderlyCard()
+        .padding(12)
+        .background(Color.savePaper.opacity(0.88))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveCocoa.opacity(0.10), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .padding(.horizontal)
     }
 }
@@ -21,18 +29,29 @@ struct StatItem: View {
     let value: String
     let label: String
     let color: Color
+    let icon: String
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(color)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(color)
+                Spacer()
+                Text(value)
+                    .font(.title3.monospacedDigit().weight(.black))
+                    .foregroundColor(.saveInk)
+            }
             Text(label)
-                .font(.caption)
+                .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
         }
         .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(color.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
