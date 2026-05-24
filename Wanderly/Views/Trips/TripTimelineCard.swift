@@ -8,10 +8,10 @@ struct TripTimelineCard: View {
             // Timeline indicator
             VStack(spacing: 0) {
                 Circle()
-                    .fill(Color.saveBerry)
+                    .fill(Color.saveCocoa)
                     .frame(width: 10, height: 10)
                 Rectangle()
-                    .fill(Color.saveBerry.opacity(0.3))
+                    .fill(Color.saveCocoa.opacity(0.3))
                     .frame(width: 2)
             }
             .frame(width: 10)
@@ -39,7 +39,7 @@ struct TripTimelineCard: View {
                     Text("Day \(stop.day)")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveCocoa)
                 }
 
                 if let note = stop.note {

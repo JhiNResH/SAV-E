@@ -276,7 +276,7 @@ private struct SignInWorkflowStrip: View {
     private let steps: [(String, String, Color)] = [
         ("Capture", "link or media", .saveHoney),
         ("Review", "with evidence", .saveSky),
-        ("Hatch", "memory cards", .saveBerry),
+        ("Hatch", "memory cards", .saveCocoa),
     ]
 
     var body: some View {
@@ -348,7 +348,7 @@ private struct SignInInputRow: View {
 
             Button(buttonTitle, action: action)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(isDisabled ? .secondary : .saveBerry)
+                .foregroundColor(isDisabled ? .secondary : .saveCocoa)
                 .disabled(isDisabled)
         }
         .padding(.horizontal, 14)

@@ -39,8 +39,8 @@ private struct EvidenceLinkRow: View {
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.saveBerry.opacity(0.1))
-                                .foregroundColor(.saveBerry)
+                                .background(Color.saveCocoa.opacity(0.1))
+                                .foregroundColor(.saveCocoa)
                                 .clipShape(Capsule())
                         }
                     }

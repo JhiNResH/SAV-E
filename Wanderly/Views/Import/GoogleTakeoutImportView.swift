@@ -58,7 +58,7 @@ struct GoogleTakeoutImportView: View {
 
             Image(systemName: "square.and.arrow.down")
                 .font(.system(size: 44))
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
 
             VStack(spacing: 8) {
                 Text("Import saved places")
@@ -168,7 +168,7 @@ struct GoogleTakeoutImportView: View {
                     selectedDraftIds = Set(readyDrafts(result).map(\.id))
                 }
                 .font(.caption)
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
             }
 
             if let saveSummary {
@@ -197,7 +197,7 @@ struct GoogleTakeoutImportView: View {
         } label: {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: selectable ? (selectedDraftIds.contains(draft.id) ? "checkmark.circle.fill" : "circle") : "exclamationmark.triangle")
-                    .foregroundColor(selectable ? .saveBerry : .saveHoney)
+                    .foregroundColor(selectable ? .saveCocoa : .saveHoney)
                     .frame(width: 22)
 
                 VStack(alignment: .leading, spacing: 4) {

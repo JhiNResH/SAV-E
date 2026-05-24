@@ -60,7 +60,7 @@ struct PlaceListView: View {
                             Image(systemName: "chevron.down")
                                 .font(.caption2)
                         }
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveCocoa)
                     }
                 }
                 .padding(.horizontal)

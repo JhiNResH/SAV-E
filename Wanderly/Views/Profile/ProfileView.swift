@@ -59,7 +59,7 @@ struct ProfileView: View {
                         NavigationLink {
                             SaveMemoryDebugView()
                         } label: {
-                            SettingsRow(icon: "tray.full", title: "Local Memory", color: .saveBerry)
+                            SettingsRow(icon: "tray.full", title: "Local Memory", color: .saveCocoa)
                         }
                         .buttonStyle(.plain)
 

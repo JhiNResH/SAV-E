@@ -8,9 +8,9 @@ struct CategoryPill: View {
         HStack(spacing: 6) {
             Image(systemName: category.iconName)
                 .font(.system(size: 10, weight: .black))
-                .foregroundColor(isSelected ? .saveInk : Color.saveStampForeground(for: category))
+                .foregroundColor(.saveInk)
                 .frame(width: 22, height: 22)
-                .background(stampColor.opacity(isSelected ? 0.86 : 0.22))
+                .background(isSelected ? Color.saveHoney : Color.saveNotebookLine.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             Text(category.displayName)
                 .font(.caption.weight(.black))
@@ -27,10 +27,6 @@ struct CategoryPill: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.10 : 0.04), radius: 8, y: 4)
-    }
-
-    private var stampColor: Color {
-        Color.saveStampColor(for: category)
     }
 }
 

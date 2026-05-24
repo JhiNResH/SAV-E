@@ -48,9 +48,9 @@ struct SaveEggBadge: View {
     private var fillColor: Color {
         switch state {
         case .clue:
-            return .saveHoney
+            return .saveNotebookPage
         case .ready:
-            return .saveMint
+            return .saveHoney
         case .hatched(let category):
             return Color.saveStampColor(for: category)
         }
@@ -61,7 +61,7 @@ struct SaveEggBadge: View {
         case .clue:
             return .saveInk
         case .ready:
-            return .saveCocoa
+            return .saveInk
         case .hatched(let category):
             return Color.saveStampForeground(for: category)
         }

@@ -19,14 +19,14 @@ struct PlaceDetailView: View {
                 VStack(spacing: 12) {
                     HStack(spacing: 16) {
                         if let rating = place.googleRating {
-                            InfoChip(icon: "star.fill", text: String(format: "%.1f", rating), color: .orange)
+                            InfoChip(icon: "star.fill", text: String(format: "%.1f", rating), color: .saveCocoa)
                         }
                         if let priceRange = place.priceRange {
                             InfoChip(icon: "dollarsign.circle", text: priceRange, color: .saveSignal)
                         }
                         InfoChip(icon: place.status == .visited ? "checkmark.circle.fill" : "clock",
                                  text: place.status.displayName,
-                                 color: place.status == .visited ? .saveSignal : .saveBerry)
+                                 color: place.status == .visited ? .saveSignal : .saveCocoa)
                     }
 
                     // Source
@@ -39,7 +39,7 @@ struct PlaceDetailView: View {
                         if let recommender = place.recommender {
                             Text("via \(recommender)")
                                 .font(.caption)
-                                .foregroundColor(.saveBerry)
+                                .foregroundColor(.saveCocoa)
                         }
 
                         Spacer()
@@ -219,7 +219,7 @@ struct PlaceDetailView: View {
                         PlatformIcon(platform: place.sourcePlatform, size: 14)
                         Text("Saved from \(place.sourcePlatform.displayName)")
                             .font(.caption.weight(.semibold))
-                            .foregroundColor(.saveRose)
+                            .foregroundColor(.saveCocoa)
                     }
 
                     HStack(spacing: 8) {

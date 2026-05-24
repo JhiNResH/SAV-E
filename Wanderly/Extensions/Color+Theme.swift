@@ -2,12 +2,9 @@ import SwiftUI
 
 extension Color {
     // MARK: - SAV-E Field Notebook Theme
-    static let savePeach = Color(hex: "F1C889")
     static let saveCream = Color(hex: "FFF1DF")
     static let saveMint = Color(hex: "EAF1E7")
-    static let saveBerry = Color(hex: "D85D4D")
     static let saveCocoa = Color(hex: "3D302A")
-    static let saveRose = Color(hex: "8D5D4D")
     static let saveHoney = Color(hex: "FFD719")
     static let saveSky = Color(hex: "79D4DE")
     static let saveInk = Color(hex: "241D21")
@@ -26,21 +23,11 @@ extension Color {
     }
 
     static func saveStampColor(for category: PlaceCategory) -> Color {
-        switch category {
-        case .food: return .saveBerry
-        case .cafe: return .saveHoney
-        case .bar: return .saveCocoa
-        case .attraction: return .saveSignal
-        case .stay: return .saveMint
-        case .shopping: return .savePeach
-        }
+        .saveHoney
     }
 
     static func saveStampForeground(for category: PlaceCategory) -> Color {
-        switch category {
-        case .cafe, .stay, .shopping: return .saveCocoa
-        case .food, .bar, .attraction: return .white
-        }
+        .saveInk
     }
 
     // MARK: - Hex Initializer

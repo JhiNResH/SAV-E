@@ -11,7 +11,7 @@ struct NavigationCardComponent: View {
 
             Image(systemName: modeIcon)
                 .font(.system(size: 48))
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
 
             VStack(spacing: 6) {
                 Text(place.name)
@@ -29,10 +29,10 @@ struct NavigationCardComponent: View {
             Label(modeLabel, systemImage: modeIcon)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(Color.saveBerry.opacity(0.12))
+                .background(Color.saveCocoa.opacity(0.12))
                 .cornerRadius(12)
 
             Button(action: openInMaps) {

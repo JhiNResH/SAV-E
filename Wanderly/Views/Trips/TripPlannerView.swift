@@ -37,7 +37,7 @@ struct TripPlannerView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showNewTrip = true }) {
                         Image(systemName: "plus")
-                            .foregroundColor(.saveBerry)
+                            .foregroundColor(.saveCocoa)
                     }
                 }
             }

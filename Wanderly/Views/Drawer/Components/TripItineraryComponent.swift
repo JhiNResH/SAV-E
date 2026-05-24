@@ -25,7 +25,7 @@ struct TripItineraryComponent: View {
                 Button(action: { showShareSheet = true }) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline)
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveCocoa)
                 }
                 .sheet(isPresented: $showShareSheet) {
                     if let url = buildShareURL() {
@@ -36,7 +36,7 @@ struct TripItineraryComponent: View {
                 Label("\(days.count) days", systemImage: "calendar")
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundColor(.saveBerry)
+                    .foregroundColor(.saveCocoa)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -82,7 +82,7 @@ private struct DaySection: View {
             Text(day.label ?? "Day \(day.dayNumber)")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
                 .padding(.bottom, 10)
 
             ForEach(Array(day.stops.enumerated()), id: \.element.id) { index, stop in
@@ -90,12 +90,12 @@ private struct DaySection: View {
                     // Timeline
                     VStack(spacing: 0) {
                         Circle()
-                            .fill(Color.saveBerry)
+                            .fill(Color.saveCocoa)
                             .frame(width: 8, height: 8)
                             .padding(.top, 5)
                         if index < day.stops.count - 1 {
                             Rectangle()
-                                .fill(Color.saveBerry.opacity(0.25))
+                                .fill(Color.saveCocoa.opacity(0.25))
                                 .frame(width: 2)
                                 .frame(maxHeight: .infinity)
                         }
@@ -124,7 +124,7 @@ private struct DaySection: View {
                         if let note = stop.note {
                             Text(note)
                                 .font(.caption)
-                                .foregroundColor(.saveBerry.opacity(0.8))
+                                .foregroundColor(.saveCocoa.opacity(0.8))
                                 .padding(.top, 1)
                         }
                     }

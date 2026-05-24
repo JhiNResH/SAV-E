@@ -20,7 +20,7 @@ struct MapView: View {
                     }
                     if let polyline = viewModel.routePolyline {
                         MapPolyline(polyline)
-                            .stroke(Color.saveBerry, lineWidth: 3)
+                            .stroke(Color.saveCocoa, lineWidth: 3)
                     }
                 }
                 .mapControls {
@@ -92,9 +92,9 @@ struct MapView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.60), lineWidth: 1.1)
+                        .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.2)
                 )
-                .shadow(color: Color.saveCocoa.opacity(0.12), radius: 14, y: 6)
+                .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
                 .padding(.horizontal, 12)
                 .padding(.top, geo.safeAreaInsets.top + 8)
             }
@@ -127,11 +127,11 @@ private struct CurrentLocationButton: View {
 
                 if isLocating {
                     ProgressView()
-                        .tint(.saveBerry)
+                        .tint(.saveInk)
                 } else {
                     Image(systemName: "location.fill")
                         .font(.system(size: 21, weight: .semibold))
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveInk)
                 }
             }
         }
@@ -157,7 +157,7 @@ struct PlaceMapPin: View {
                     if place.status == .visited {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.saveBerry)
+                            .foregroundColor(.saveSignal)
                             .background(Circle().fill(Color.saveNotebookPage))
                             .offset(x: 5, y: -5)
                     }

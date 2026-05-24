@@ -30,7 +30,7 @@ struct PlaceCard: View {
                         HStack(spacing: 2) {
                             Image(systemName: "star.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(.orange)
+                                .foregroundColor(.saveHoney)
                             Text(String(format: "%.1f", rating))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -75,7 +75,7 @@ struct PlaceCard: View {
             PlatformIcon(platform: place.sourcePlatform, size: 12)
             Text(sourceLabel)
                 .font(.caption2.weight(.semibold))
-                .foregroundColor(.saveRose)
+                .foregroundColor(.saveCocoa)
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 3)

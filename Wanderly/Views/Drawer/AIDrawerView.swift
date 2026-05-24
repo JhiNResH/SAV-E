@@ -67,7 +67,11 @@ struct AIDrawerView: View {
                 .foregroundColor(.saveInk)
                 .font(.caption.weight(.black))
                 .frame(width: 28, height: 28)
-                .background(Color.saveHoney.opacity(0.35))
+                .background(Color.saveHoney)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .symbolEffect(.pulse, isActive: isLoading)
 
@@ -111,7 +115,8 @@ struct AIDrawerView: View {
                     .foregroundColor(.saveInk)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
-                    .background(Color.saveHoney.opacity(0.28))
+                    .background(Color.saveHoney)
+                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1))
                     .clipShape(Capsule())
                 }
                 .accessibilityLabel("Open review candidates")
@@ -120,7 +125,12 @@ struct AIDrawerView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(height: 64)
-        .background(Color.saveNotebookPage.opacity(0.92))
+        .background(Color.saveNotebookPage.opacity(0.96))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.saveNotebookLine.opacity(0.18))
+                .frame(height: 1)
+        }
     }
 
     // MARK: - Content
@@ -150,7 +160,7 @@ struct AIDrawerView: View {
         case .loading:
             VStack(spacing: 12) {
                 Spacer()
-                ProgressView().tint(.saveBerry)
+                ProgressView().tint(.saveInk)
                 Text("Thinking...").font(.subheadline).foregroundColor(.secondary)
                 Button(action: {
                     viewModel.cancelCurrentRequest()
@@ -160,10 +170,14 @@ struct AIDrawerView: View {
                     Label("Cancel", systemImage: "xmark")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color.saveBerry.opacity(0.1))
+                        .background(Color.saveNotebookPage)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.saveNotebookLine.opacity(0.48), lineWidth: 1)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 Spacer()
@@ -211,8 +225,8 @@ struct AIDrawerView: View {
                             Text("Follow up")
                         }
                         .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.saveBerry)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
                         .padding(.vertical, 6)
                     }
 
@@ -245,7 +259,7 @@ struct AIDrawerView: View {
         case .error(let msg):
             VStack(spacing: 10) {
                 Spacer()
-                Image(systemName: "exclamationmark.triangle").foregroundColor(.saveBerry)
+                Image(systemName: "exclamationmark.triangle").foregroundColor(.saveCocoa)
                 Text(msg)
                     .font(.caption).foregroundColor(.secondary)
                     .multilineTextAlignment(.center).padding(.horizontal)
@@ -261,7 +275,7 @@ struct AIDrawerView: View {
                     Button("Try again") { Task { await viewModel.submit() } }
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.saveBerry)
+                        .foregroundColor(.saveCocoa)
                 }
                 Spacer()
             }
@@ -505,7 +519,7 @@ struct AIDrawerView: View {
                     title: "Investigate a link",
                     subtitle: "IG, TikTok, XHS, article, or map URL",
                     commandLabel: "returns review clues",
-                    tone: .berry,
+                    tone: .cocoa,
                     isPrimary: true
                 ) {
                     focusSocialInvestigationPrompt()
@@ -637,10 +651,10 @@ struct AIDrawerView: View {
                         Label("Commands", systemImage: "terminal")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundColor(.saveBerry)
+                            .foregroundColor(.saveCocoa)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(Color.saveBerry.opacity(0.1))
+                            .background(Color.saveCocoa.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                 }
@@ -863,7 +877,7 @@ private struct FieldNotebookHeader: View {
 
                     Text("OPEN")
                         .font(.caption2.weight(.black))
-                        .foregroundColor(.saveInk)
+                        .foregroundColor(.saveNotebookPage)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(Color.saveNotebookLine.opacity(0.82))
@@ -873,7 +887,7 @@ private struct FieldNotebookHeader: View {
                 HStack(spacing: 8) {
                     FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
                     FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
-                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSignal)
+                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveCocoa)
                 }
             }
             .padding(14)
@@ -923,7 +937,11 @@ private struct FieldNotebookStat: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
-        .background(color.opacity(0.12))
+        .background(Color.saveNotebookPage.opacity(0.92))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(color.opacity(0.30), lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -1047,7 +1065,7 @@ private struct ReviewCandidateCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")
                             .font(.caption2.weight(.black))
-                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
+                            .foregroundColor(.saveCocoa)
                             .lineLimit(1)
 
                         Text(candidate.name)
@@ -1103,7 +1121,7 @@ private struct ReviewCandidateCard: View {
                         Text("Needs Google Places refinement or a map link before this can hatch.")
                             .font(.caption2.weight(.semibold))
                     }
-                    .foregroundColor(.saveBerry)
+                    .foregroundColor(.saveCocoa)
                 }
 
                 HStack(spacing: 8) {
@@ -1147,13 +1165,13 @@ private struct CandidateActionButton: View {
             Label(title, systemImage: systemImage)
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .background(Color.saveBerry.opacity(0.09))
+                .background(Color.saveCocoa.opacity(0.09))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1185,14 +1203,14 @@ private struct DrawerActionChip: View {
                         .lineLimit(1)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.saveBerry.opacity(0.14))
+                        .background(Color.saveCocoa.opacity(0.14))
                         .clipShape(Capsule())
                 }
             }
-            .foregroundColor(.saveBerry)
+            .foregroundColor(.saveCocoa)
             .frame(height: 38)
             .padding(.horizontal, 12)
-            .background(Color.saveBerry.opacity(0.09))
+            .background(Color.saveCocoa.opacity(0.09))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1201,11 +1219,10 @@ private struct DrawerActionChip: View {
 }
 
 private enum AgentCommandTone {
-    case berry, signal, honey, sky, cocoa
+    case signal, honey, sky, cocoa
 
     var color: Color {
         switch self {
-        case .berry: return .saveBerry
         case .signal: return .saveSignal
         case .honey: return .saveHoney
         case .sky: return .saveSky

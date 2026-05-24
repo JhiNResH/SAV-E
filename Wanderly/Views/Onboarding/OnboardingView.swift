@@ -21,7 +21,7 @@ struct OnboardingView: View {
             icon: "rectangle.stack.badge.plus",
             title: "Turn memories into trips",
             subtitle: "Your confirmed spots become a private travel memory SAV-E can plan from.",
-            color: .saveBerry
+            color: .saveCocoa
         ),
     ]
 
@@ -75,7 +75,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ForEach(pages.indices, id: \.self) { index in
                         Capsule()
-                            .fill(index == currentPage ? Color.saveBerry : Color.saveBerry.opacity(0.26))
+                            .fill(index == currentPage ? Color.saveCocoa : Color.saveCocoa.opacity(0.26))
                             .frame(width: index == currentPage ? 24 : 8, height: 8)
                             .animation(.easeInOut(duration: 0.2), value: currentPage)
                     }

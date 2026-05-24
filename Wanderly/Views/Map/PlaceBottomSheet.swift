@@ -40,7 +40,7 @@ struct PlaceBottomSheet: View {
                 if let rating = place.googleRating {
                     Label(String(format: "%.1f", rating), systemImage: "star.fill")
                         .font(.subheadline)
-                        .foregroundColor(.orange)
+                        .foregroundColor(.saveCocoa)
                 }
 
                 if let priceRange = place.priceRange {
