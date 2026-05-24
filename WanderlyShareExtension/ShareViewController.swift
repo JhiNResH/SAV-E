@@ -238,35 +238,91 @@ private struct ShareEvidenceRow: View {
     }
 }
 
-private struct ShareBottomTabs: View {
-    private let tabs: [(String, String)] = [
-        ("tray.fill", "Inbox"),
-        ("map.fill", "Places"),
-        ("sparkles", "Trips"),
-    ]
+private struct ShareCheckingStepRow: View {
+    var systemImage: String
+    var title: String
+    var subtitle: String
+    var fill: Color
+    var isActive: Bool = false
 
     var body: some View {
-        HStack {
-            ForEach(tabs, id: \.1) { tab in
-                VStack(spacing: 4) {
-                    Image(systemName: tab.0)
-                        .font(.caption.weight(.black))
-                    Text(tab.1)
-                        .font(.caption2.weight(.black))
-                }
-                .foregroundColor(SaveTheme.ink)
-                .frame(maxWidth: .infinity)
+        HStack(spacing: 11) {
+            ShareFlatSticker(systemImage: systemImage, fill: fill)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.black))
+                    .foregroundColor(SaveTheme.ink)
+                Text(subtitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(SaveTheme.ink.opacity(0.66))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            if isActive {
+                ProgressView()
+                    .tint(SaveTheme.ink)
+                    .scaleEffect(0.82)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.black))
+                    .foregroundColor(SaveTheme.ink)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 8)
-        .background(SaveTheme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(10)
+        .background(SaveTheme.cream)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(SaveTheme.ink, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(SaveTheme.ink, lineWidth: 1.6)
         )
-        .shadow(color: SaveTheme.ink.opacity(0.16), radius: 0, x: 4, y: 4)
+    }
+}
+
+private struct ShareFlatSticker: View {
+    var systemImage: String
+    var fill: Color
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 17, weight: .black))
+            .foregroundColor(SaveTheme.ink)
+            .frame(width: 40, height: 40)
+            .background(fill)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(SaveTheme.ink, lineWidth: 1.6)
+            )
+    }
+}
+
+private struct ShareCaptureFooter: View {
+    var text: String = "SAV-E Review · Open the app to finish"
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "tray.and.arrow.down.fill")
+                .font(.caption.weight(.black))
+            Text(text)
+                .font(.caption.weight(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.black))
+        }
+        .foregroundColor(SaveTheme.ink)
+        .padding(.vertical, 11)
+        .padding(.horizontal, 14)
+        .background(SaveTheme.paper)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(SaveTheme.ink, lineWidth: 1.8)
+        )
     }
 }
 
@@ -385,29 +441,7 @@ struct ShareExtensionView: View {
         NavigationView {
             VStack(spacing: 24) {
                 if isParsing {
-                    VStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(SaveTheme.paper)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                        .stroke(SaveTheme.ink, lineWidth: 2)
-                                )
-                                .frame(width: 84, height: 84)
-                                .shadow(color: SaveTheme.ink.opacity(0.18), radius: 0, x: 4, y: 4)
-                            Text("✨")
-                                .font(.system(size: 34))
-                            ProgressView()
-                                .scaleEffect(0.9)
-                                .tint(SaveTheme.ink)
-                                .offset(y: 42)
-                        }
-
-                        Text("SAV-E is checking the place clues...")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(SaveTheme.ink)
-                    }
-                    .frame(maxHeight: .infinity)
+                    checkingPlaceCluesView
                 } else if isSaved {
                     VStack(spacing: 16) {
                         Text("🌸")
@@ -486,6 +520,75 @@ struct ShareExtensionView: View {
         .task {
             await extractAndParse()
         }
+    }
+
+    private var checkingPlaceCluesView: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("SAV-E ✨")
+                    .font(.title3.weight(.black))
+                    .foregroundColor(SaveTheme.ink)
+                Spacer()
+                ShareStatusPill(text: "Checking place clues")
+            }
+            .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    ShareFlatSticker(systemImage: "magnifyingglass", fill: SaveTheme.yellow)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Reading the shared post")
+                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .foregroundColor(SaveTheme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("SAV-E is looking for a real place name before it creates a review card.")
+                            .font(.subheadline)
+                            .foregroundColor(SaveTheme.ink.opacity(0.76))
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                ShareBadge(text: "No map pin until the place is confirmed")
+
+                VStack(spacing: 9) {
+                    ShareCheckingStepRow(
+                        systemImage: "link",
+                        title: "Source received",
+                        subtitle: "The shared link is saved as evidence.",
+                        fill: SaveTheme.sky
+                    )
+                    ShareCheckingStepRow(
+                        systemImage: "text.magnifyingglass",
+                        title: "Finding place names",
+                        subtitle: "Captions, handles, and visible clues are being checked.",
+                        fill: SaveTheme.pink,
+                        isActive: true
+                    )
+                    ShareCheckingStepRow(
+                        systemImage: "rectangle.stack.badge.plus",
+                        title: "Review card next",
+                        subtitle: "Possible places wait in Review before saving.",
+                        fill: SaveTheme.mint
+                    )
+                }
+            }
+            .padding(18)
+            .background(SaveTheme.paper)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(SaveTheme.ink, lineWidth: 2.4)
+            )
+
+            Spacer(minLength: 8)
+
+            ShareCaptureFooter()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 
     // MARK: - Place Preview
@@ -583,7 +686,7 @@ struct ShareExtensionView: View {
 
             Spacer(minLength: 8)
 
-            ShareBottomTabs()
+            ShareCaptureFooter()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -609,7 +712,7 @@ struct ShareExtensionView: View {
 
             Spacer(minLength: 8)
 
-            ShareBottomTabs()
+            ShareCaptureFooter()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -691,30 +794,43 @@ struct ShareExtensionView: View {
                     .foregroundColor(SaveTheme.ink.opacity(0.76))
 
                 ForEach(Array(candidates.prefix(4).enumerated()), id: \.offset) { _, candidate in
-                    HStack(spacing: 10) {
-                        ShareMiniSticker(systemImage: iconForCategory(candidate.category), fill: SaveTheme.yellow)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(candidate.candidateName)
-                                .font(.subheadline.weight(.black))
+                    Button {
+                        saveReviewCandidates([candidate])
+                    } label: {
+                        HStack(spacing: 10) {
+                            ShareMiniSticker(systemImage: iconForCategory(candidate.category), fill: SaveTheme.yellow)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(candidate.candidateName)
+                                    .font(.subheadline.weight(.black))
+                                    .foregroundColor(SaveTheme.ink)
+                                    .lineLimit(2)
+                                Text(candidate.address.isEmpty ? "Address still needed" : candidate.address)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(SaveTheme.ink.opacity(0.62))
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Text("Add")
+                                .font(.caption.weight(.black))
                                 .foregroundColor(SaveTheme.ink)
-                                .lineLimit(2)
-                            Text(candidate.address.isEmpty ? "Address still needed" : candidate.address)
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(SaveTheme.ink.opacity(0.62))
-                                .lineLimit(2)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(SaveTheme.mint)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(SaveTheme.ink, lineWidth: 1.2))
                         }
-                        Spacer()
+                        .padding(10)
+                        .background(SaveTheme.cream)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(SaveTheme.ink, lineWidth: 1.6)
+                        )
                     }
-                    .padding(10)
-                    .background(SaveTheme.cream)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(SaveTheme.ink, lineWidth: 1.6)
-                    )
+                    .buttonStyle(.plain)
                 }
 
-                ShareScrapbookButton(title: "Add \(candidates.count) to Review", fill: SaveTheme.yellow, systemImage: "tray.and.arrow.down.fill", action: saveReviewCandidates)
+                ShareScrapbookButton(title: "Add all \(candidates.count) to Review", fill: SaveTheme.yellow, systemImage: "tray.and.arrow.down.fill", action: saveReviewCandidates)
             }
             .padding(16)
             .background(SaveTheme.paper)
@@ -2693,6 +2809,10 @@ struct ShareExtensionView: View {
 
     private func saveReviewCandidates() {
         let candidates = reviewCandidates.isEmpty ? reviewCandidate.map { [$0] } ?? [] : reviewCandidates
+        saveReviewCandidates(candidates)
+    }
+
+    private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
         guard !candidates.isEmpty else { return }
         guard let fileURL = appGroupFileURL(named: WanderlySharedStorage.pendingReviewCandidatesFileName) else {
             parseError = "Shared app storage is unavailable"
