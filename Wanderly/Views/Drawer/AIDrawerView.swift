@@ -402,12 +402,10 @@ struct AIDrawerView: View {
 
                         DrawerActionChip(
                             title: "Nest",
-                            systemImage: "bird",
+                            systemImage: "circle.hexagongrid.fill",
                             count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
                             action: openReviewInbox
                         )
-
-                        SavedCountChip(count: viewModel.places.count)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 2)
@@ -485,103 +483,76 @@ struct AIDrawerView: View {
 
     private var addSpotsHub: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("SAV-E’s Backpack")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.wanderlyCharcoal)
-                    Text("Drop in a link, screenshot, or note. SAV-E will sniff for the real place before saving.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 9) {
+                NotebookBandLabel("Command Console")
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    CountPill(text: "\(viewModel.places.count) memories", color: .saveBerry)
-                    CountPill(text: "\(reviewCandidates.count) clues waiting", color: .saveHoney)
-                }
-            }
-
-            LazyVGrid(columns: addSpotColumns, spacing: 10) {
-                AgentCommandCard(
-                    icon: "pawprint.fill",
-                    title: "Sniff a Link 🐾",
+                AgentCommandRow(
+                    icon: "sparkle.magnifyingglass",
+                    title: "Investigate a link",
                     subtitle: "IG, TikTok, XHS, article, or map URL",
-                    commandLabel: "returns clues",
-                    tone: .terracotta
+                    commandLabel: "returns review clues",
+                    tone: .terracotta,
+                    isPrimary: true
                 ) {
                     focusSocialInvestigationPrompt()
                 }
 
-                AgentCommandCard(
-                    icon: "bird.fill",
-                    title: "Review Clues 🪺",
-                    subtitle: "Check evidence before saving",
-                    commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
-                    tone: .amber
-                ) {
-                    openReviewInbox()
+                HStack(spacing: 9) {
+                    AgentCommandCard(
+                        icon: "circle.hexagongrid.fill",
+                        title: "Review Nest",
+                        subtitle: "Hatch clue eggs into memories",
+                        commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
+                        tone: .amber
+                    ) {
+                        openReviewInbox()
+                    }
+
+                    AgentCommandCard(
+                        icon: "link",
+                        title: "Clipboard",
+                        subtitle: "Read one copied URL",
+                        commandLabel: "metadata",
+                        tone: .sage
+                    ) {
+                        importClipboardURL()
+                    }
                 }
 
-                AgentCommandCard(
-                    icon: "suitcase.rolling.fill",
-                    title: "Plan Memories 🧳",
-                    subtitle: "Build a route from confirmed places",
-                    commandLabel: "uses saved spots",
-                    tone: .blue
-                ) {
-                    focusAgentPrompt("""
-                    Help me organize my saved places into a practical plan.
+                HStack(spacing: 9) {
+                    AgentCommandCard(
+                        icon: "note.text",
+                        title: "Notes",
+                        subtitle: "Paste a rough list",
+                        commandLabel: "review only",
+                        tone: .amber
+                    ) {
+                        focusAgentPrompt("""
+                        Turn these notes into reviewable place clues.
 
-                    Use only confirmed saved places unless I explicitly ask you to investigate new candidates. Start with:
-                    """)
-                }
-            }
+                        Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
 
-            LazyVGrid(columns: addSpotColumns, spacing: 10) {
-                AgentCommandCard(
-                    icon: "link",
-                    title: "Clipboard 💌",
-                    subtitle: "Read one copied URL into SAV-E",
-                    commandLabel: "checks metadata",
-                    tone: .sage
-                ) {
-                    importClipboardURL()
-                }
+                        Notes:
+                        """)
+                    }
 
-                AgentCommandCard(
-                    icon: "note.text",
-                    title: "Notes 📓",
-                    subtitle: "Turn pasted lists into review clues",
-                    commandLabel: "no auto-save",
-                    tone: .amber
-                ) {
-                    focusAgentPrompt("""
-                    Turn these notes into reviewable place clues.
-
-                    Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
-
-                    Notes:
-                    """)
+                    AgentCommandCard(
+                        icon: "doc.viewfinder",
+                        title: "Media",
+                        subtitle: "Screenshot or file evidence",
+                        commandLabel: "investigate",
+                        tone: .blue
+                    ) {
+                        focusMediaEvidencePrompt()
+                    }
                 }
 
-                AgentCommandCard(
-                    icon: "doc.viewfinder",
-                    title: "Screenshot 🔎",
-                    subtitle: "Use screenshots or files as evidence",
-                    commandLabel: "investigates",
-                    tone: .blue
-                ) {
-                    focusMediaEvidencePrompt()
-                }
-
-                AgentCommandCard(
+                AgentCommandRow(
                     icon: "location.magnifyingglass",
-                    title: "Find Venue 🧭",
-                    subtitle: "Resolve a fuzzy place into a real spot",
+                    title: "Resolve a fuzzy venue",
+                    subtitle: "Find address, city, source links, and whether it is safe to save.",
                     commandLabel: "verifies address",
                     tone: .charcoal
                 ) {
@@ -593,6 +564,20 @@ struct AIDrawerView: View {
                     Place idea:
                     """)
                 }
+
+                AgentCommandRow(
+                    icon: "map.fill",
+                    title: "Plan from memories",
+                    subtitle: "Build a route from confirmed places only.",
+                    commandLabel: "uses saved spots",
+                    tone: .blue
+                ) {
+                    focusAgentPrompt("""
+                    Help me organize my saved places into a practical plan.
+
+                    Use only confirmed saved places unless I explicitly ask you to investigate new candidates. Start with:
+                    """)
+                }
             }
 
             ReviewCandidatesSection(
@@ -600,17 +585,17 @@ struct AIDrawerView: View {
                 limit: 2,
                 actionInFlight: candidateActionInFlight,
                 onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Clue marked as looking right. Hatch it once coordinates are reliable.") {
+                    performCandidateAction(candidate, successMessage: "Clue marked ready. Hatch it once coordinates are reliable.") {
                         try await onConfirmCandidate(candidate)
                     }
                 },
                 onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Clue removed from the nest.") {
+                    performCandidateAction(candidate, successMessage: "Clue egg cleared from the nest.") {
                         try await onRejectCandidate(candidate)
                     }
                 },
                 onSave: { candidate in
-                    performCandidateAction(candidate, successMessage: "Hatched into a saved memory.") {
+                    performCandidateAction(candidate, successMessage: hatchFeedback(for: candidate)) {
                         try await onSaveCandidate(candidate)
                     }
                 }
@@ -631,25 +616,13 @@ struct AIDrawerView: View {
     private var reviewInboxView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Review Nest 🪺")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.wanderlyCharcoal)
-                        Text("Clues wait here until you check the evidence and hatch them into saved memories.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
+                VStack(alignment: .leading, spacing: 10) {
+                    FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
                     Button(action: {
                         showReviewInbox = false
                         withAnimation { drawerDetent = .medium }
                     }) {
-                        Label("Backpack", systemImage: "backpack")
+                        Label("Commands", systemImage: "terminal")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.wanderlyTerracotta)
@@ -665,17 +638,17 @@ struct AIDrawerView: View {
                     limit: nil,
                     actionInFlight: candidateActionInFlight,
                     onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Clue marked as looking right. Hatch it once coordinates are reliable.") {
+                        performCandidateAction(candidate, successMessage: "Clue marked ready. Hatch it once coordinates are reliable.") {
                             try await onConfirmCandidate(candidate)
                         }
                     },
                     onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Clue removed from the nest.") {
+                        performCandidateAction(candidate, successMessage: "Clue egg cleared from the nest.") {
                             try await onRejectCandidate(candidate)
                         }
                     },
                     onSave: { candidate in
-                        performCandidateAction(candidate, successMessage: "Hatched into a saved memory.") {
+                        performCandidateAction(candidate, successMessage: hatchFeedback(for: candidate)) {
                             try await onSaveCandidate(candidate)
                         }
                     }
@@ -692,13 +665,6 @@ struct AIDrawerView: View {
             .padding(.top, 14)
             .padding(.bottom, 24)
         }
-    }
-
-    private var addSpotColumns: [GridItem] {
-        [
-            GridItem(.flexible(), spacing: 10),
-            GridItem(.flexible(), spacing: 10),
-        ]
     }
 
     private func focusSocialInvestigationPrompt() {
@@ -743,7 +709,7 @@ struct AIDrawerView: View {
             return
         }
 
-        addSpotStatus = "Clipboard link loaded. SAV-E will add clues before saving."
+        addSpotStatus = "Clipboard link loaded. SAV-E will add clue eggs before saving."
         importURLToReviewCandidates(url)
     }
 
@@ -811,7 +777,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         searchFocused = false
         isImportingURL = true
-        addSpotStatus = "Sniffing public metadata and tucking clues into Review Nest..."
+        addSpotStatus = "Checking public metadata and adding clue eggs to the Review Nest..."
         viewModel.returnToCommands()
         withAnimation { drawerDetent = .medium }
 
@@ -819,8 +785,8 @@ struct AIDrawerView: View {
             do {
                 let count = try await onImportURLAsReviewCandidates(url)
                 addSpotStatus = count == 1
-                    ? "Added 1 clue to Review Nest. Check evidence before hatching it."
-                    : "Added \(count) clues to Review Nest. Check evidence before hatching them."
+                    ? "Added 1 clue egg to Review Nest. Check the receipt before hatching it."
+                    : "Added \(count) clue eggs to Review Nest. Check receipts before hatching them."
                 openReviewInbox()
             } catch {
                 addSpotStatus = error.localizedDescription
@@ -828,6 +794,130 @@ struct AIDrawerView: View {
             }
             isImportingURL = false
         }
+    }
+
+    private func hatchFeedback(for candidate: PlaceReviewCandidate) -> String {
+        let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
+        return "Memory hatched · +1 \(category.displayName.lowercased()) card"
+    }
+}
+
+private struct FieldNotebookHeader: View {
+    var memoryCount: Int
+    var clueCount: Int
+
+    private var statusText: String {
+        if clueCount > 0 {
+            return "\(clueCount) clue eggs waiting to hatch"
+        }
+        if memoryCount > 0 {
+            return "Ready to investigate the next save"
+        }
+        return "Waiting for the first clue egg"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.saveHoney)
+                        .rotationEffect(.degrees(-5))
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(.saveCocoa)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SAV-E Field Notebook")
+                        .font(.title3)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveCream)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+
+                    Text(statusText)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.saveCream.opacity(0.82))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveBerry)
+                FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
+                FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSky)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.saveInk, Color.saveCocoa],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.saveHoney.opacity(0.85))
+                        .frame(height: 3)
+                        .padding(.horizontal, 14)
+                }
+        )
+    }
+}
+
+private struct FieldNotebookStat: View {
+    var title: String
+    var value: String
+    var color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCream.opacity(0.64))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            Text(value)
+                .font(.caption.monospacedDigit().weight(.black))
+                .foregroundColor(.saveCream)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(color.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct NotebookBandLabel: View {
+    var title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Rectangle()
+                .fill(Color.saveCocoa)
+                .frame(width: 18, height: 2)
+            Text(title.uppercased())
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+            Spacer()
+        }
+        .padding(.top, 2)
     }
 }
 
@@ -841,18 +931,19 @@ private struct ReviewCandidatesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Review Nest", systemImage: "bird")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.wanderlyCharcoal)
+            HStack(spacing: 8) {
+                NotebookBandLabel("Review Nest")
 
                 Spacer()
 
                 Text("\(candidates.count)")
                     .font(.caption.monospacedDigit())
                     .fontWeight(.semibold)
-                    .foregroundColor(.wanderlyTerracotta)
+                    .foregroundColor(.saveCocoa)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.saveHoney.opacity(0.18))
+                    .clipShape(Capsule())
             }
 
             if candidates.isEmpty {
@@ -880,7 +971,7 @@ private struct ReviewCandidatesSection: View {
 private struct ReviewCandidatesEmptyState: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "bird")
+            Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.saveBerry)
                 .frame(width: 34, height: 34)
@@ -888,12 +979,12 @@ private struct ReviewCandidatesEmptyState: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("No clues waiting")
+                Text("No clue eggs waiting")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.wanderlyCharcoal)
 
-                Text("Share a post, screenshot, or map link for SAV-E to sniff. Uncertain places land here before they become saved memories.")
+                Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clue eggs until you hatch them into memory cards.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -921,19 +1012,30 @@ private struct ReviewCandidateCard: View {
     var onSave: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "leaf.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
-                    .frame(width: 34, height: 34)
-                    .background(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 11) {
+                ZStack {
+                    Circle()
+                        .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
+                        )
+                    Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "circle.hexagongrid.fill")
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
+                }
+                .frame(width: 40, height: 40)
 
                 VStack(alignment: .leading, spacing: 4) {
+                    Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
+                        .lineLimit(1)
+
                     Text(candidate.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.headline)
+                        .fontWeight(.black)
                         .foregroundColor(.wanderlyCharcoal)
                         .lineLimit(2)
 
@@ -942,10 +1044,11 @@ private struct ReviewCandidateCard: View {
                         .foregroundColor(.secondary)
                         .lineLimit(2)
 
-                    if let confidence = candidate.confidence {
-                        Text("Confidence \(Int(confidence * 100))% · \(candidate.status)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                    HStack(spacing: 6) {
+                        if let confidence = candidate.confidence {
+                            StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveBerry)
+                        }
+                        StampChip(text: candidate.status.replacingOccurrences(of: "_", with: " "), color: .saveHoney)
                     }
                 }
 
@@ -953,46 +1056,77 @@ private struct ReviewCandidateCard: View {
             }
 
             if !candidate.evidence.isEmpty {
-                EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.caption2.weight(.bold))
+                        Text("Source receipt")
+                            .font(.caption2.weight(.black))
+                        Spacer()
+                    }
+                    .foregroundColor(.saveCocoa)
+
+                    EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.saveCream.opacity(0.82))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.saveCocoa.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        )
+                )
             }
 
             if !candidate.hasReliableCoordinates {
-                Text("Hatching needs Google Places refinement or a map link.")
-                    .font(.caption2)
-                    .foregroundColor(.wanderlyTerracotta)
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                    Text("Needs Google Places refinement or a map link before this can hatch.")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundColor(.wanderlyTerracotta)
             }
 
             HStack(spacing: 8) {
-                CandidateActionButton(title: "Looks right", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
-                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch Memory" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
+                CandidateActionButton(title: "Mark ready", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
+                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
                 CandidateActionButton(title: "Not this", systemImage: "xmark", disabled: isWorking, action: onReject)
             }
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.saveCard)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.9))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.wanderlyCharcoal.opacity(0.08), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
                 )
         )
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(candidate.hasReliableCoordinates ? Color.saveSuccess : Color.saveHoney)
+                .frame(width: 4)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .padding(.vertical, 10)
+        }
         .opacity(isWorking ? 0.65 : 1)
     }
 }
 
-private struct CountPill: View {
+private struct StampChip: View {
     var text: String
     var color: Color
 
     var body: some View {
-        Text(text)
-            .font(.caption2.monospacedDigit().weight(.bold))
+        Text(text.uppercased())
+            .font(.caption2.weight(.black))
             .foregroundColor(.saveCocoa)
             .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .minimumScaleFactor(0.72)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
             .background(color.opacity(0.18))
             .clipShape(Capsule())
     }
@@ -1062,56 +1196,109 @@ private struct DrawerActionChip: View {
     }
 }
 
-private struct SavedCountChip: View {
-    var count: Int
+private enum AgentCommandTone {
+    case terracotta, sage, amber, blue, charcoal
+
+    var color: Color {
+        switch self {
+        case .terracotta: return .saveBerry
+        case .sage: return .wanderlySage
+        case .amber: return .saveHoney
+        case .blue: return Color(hex: "5B8FA8")
+        case .charcoal: return .saveCocoa
+        }
+    }
+}
+
+private struct AgentCommandRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let commandLabel: String
+    let tone: AgentCommandTone
+    var isPrimary: Bool = false
+    let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "mappin.and.ellipse")
-                .font(.caption.weight(.semibold))
-            Text("\(count) saved")
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 11) {
+                Image(systemName: icon)
+                    .font(.system(size: isPrimary ? 19 : 16, weight: .black))
+                    .foregroundColor(isPrimary ? .saveCream : tone.color)
+                    .frame(width: 40, height: 40)
+                    .background(isPrimary ? tone.color : tone.color.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(isPrimary ? .headline : .subheadline)
+                        .fontWeight(.black)
+                        .foregroundColor(.wanderlyCharcoal)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption2.weight(.black))
+                    Text(commandLabel.uppercased())
+                        .font(.caption2.weight(.black))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                        .minimumScaleFactor(0.72)
+                }
+                .foregroundColor(tone.color)
+                .frame(maxWidth: 82, alignment: .trailing)
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isPrimary ? Color.savePeach.opacity(0.7) : Color.white.opacity(0.78))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(tone.color.opacity(isPrimary ? 0.28 : 0.12), lineWidth: 1)
+                    )
+            )
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(tone.color)
+                    .frame(width: 4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .padding(.vertical, 10)
+            }
         }
-        .foregroundColor(.secondary)
-        .frame(height: 38)
-        .padding(.horizontal, 12)
-        .background(Color.white.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
     }
 }
 
 private struct AgentCommandCard: View {
-    enum Tone {
-        case terracotta, sage, amber, blue, charcoal
-
-        var color: Color {
-            switch self {
-            case .terracotta: return .saveBerry
-            case .sage: return .wanderlySage
-            case .amber: return .saveHoney
-            case .blue: return Color(hex: "5B8FA8")
-            case .charcoal: return .saveCocoa
-            }
-        }
-    }
+    typealias Tone = AgentCommandTone
 
     let icon: String
     let title: String
     let subtitle: String
     let commandLabel: String
-    let tone: Tone
+    let tone: AgentCommandTone
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .black))
                         .foregroundColor(tone.color)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 34, height: 34)
                         .background(tone.color.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
@@ -1129,7 +1316,7 @@ private struct AgentCommandCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.black)
                         .foregroundColor(.wanderlyCharcoal)
                         .lineLimit(1)
                         .minimumScaleFactor(0.86)
@@ -1144,7 +1331,7 @@ private struct AgentCommandCard: View {
 
                 Text(commandLabel.uppercased())
                     .font(.caption2)
-                    .fontWeight(.bold)
+                    .fontWeight(.black)
                     .foregroundColor(tone.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1155,11 +1342,11 @@ private struct AgentCommandCard: View {
 
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 134, alignment: .topLeading)
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.72))
+                    .fill(Color.white.opacity(0.78))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(tone.color.opacity(0.12), lineWidth: 1)

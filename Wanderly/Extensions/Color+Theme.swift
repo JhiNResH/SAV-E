@@ -17,7 +17,7 @@ extension Color {
     static let wanderlySecondary = Color("WanderlySecondary")
     static let wanderlyText = Color("WanderlyText")
 
-    // MARK: - SAV-E Cute Theme
+    // MARK: - SAV-E Agent Passport Theme
     static let saveBlush = Color(hex: "FFF6F8")
     static let savePeach = Color(hex: "FFF1D8")
     static let saveCream = Color(hex: "FFF8E8")
@@ -29,6 +29,11 @@ extension Color {
     static let saveSky = Color(hex: "BEE7F8")
     static let saveLavender = Color(hex: "DCC8FF")
     static let saveCard = Color.white.opacity(0.82)
+    static let saveInk = Color(hex: "241D21")
+    static let savePaper = Color(hex: "FFFDF7")
+    static let saveLedger = Color(hex: "EFE7D6")
+    static let saveSignal = Color(hex: "7C8CFF")
+    static let saveSuccess = Color(hex: "7FB78A")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {

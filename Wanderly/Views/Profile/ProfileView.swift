@@ -4,47 +4,23 @@ struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showEditProfile = false
     @State private var draftDisplayName = ""
+    var waitingClues: Int = 0
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Avatar & Name
-                    VStack(spacing: 12) {
-                        Image(systemName: "passport.fill")
-                            .font(.system(size: 48, weight: .semibold))
-                            .foregroundColor(.saveBerry)
-                            .frame(width: 82, height: 82)
-                            .background(Color.saveBlush)
-                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-
-                        Text(viewModel.profile.displayName)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.wanderlyCharcoal)
-
-                        Button {
+                VStack(spacing: 16) {
+                    PassportHero(
+                        profile: viewModel.profile,
+                        onEdit: {
                             draftDisplayName = viewModel.profile.displayName
                             showEditProfile = true
-                        } label: {
-                            Label("Edit Passport", systemImage: "pencil")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.wanderlyTerracotta)
                         }
-                        .buttonStyle(.plain)
-
-                        if let email = viewModel.profile.email {
-                            Text(email)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-
-                    }
+                    )
+                    .padding(.horizontal)
                     .padding(.top, 16)
 
-                    // Stats
-                    StatsView(profile: viewModel.profile)
+                    StatsView(profile: viewModel.profile, waitingClues: waitingClues)
 
                     if let errorMessage = viewModel.errorMessage {
                         HStack(spacing: 8) {
@@ -61,10 +37,14 @@ struct ProfileView: View {
                         .padding(.horizontal)
                     }
 
-                    ProfileSummaryCard(profile: viewModel.profile)
+                    PassportStampSection(profile: viewModel.profile)
 
-                    // Settings section
-                    VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Passport Controls")
+                            .font(.caption2.weight(.black))
+                            .foregroundColor(.saveCocoa)
+                            .padding(.horizontal, 16)
+
                         NavigationLink {
                             SaveMemoryDebugView()
                         } label: {
@@ -80,7 +60,13 @@ struct ProfileView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .background(Color.wanderlyCream)
+            .background(
+                LinearGradient(
+                    colors: [Color.saveCream, Color.saveBlush.opacity(0.72), Color.saveMint.opacity(0.72)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .navigationTitle("SAV-E Passport")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -164,44 +150,146 @@ private struct EditProfileSheet: View {
     }
 }
 
-// MARK: - Profile Summary
+// MARK: - Passport
 
-private struct ProfileSummaryCard: View {
+private struct PassportHero: View {
+    let profile: UserProfile
+    let onEdit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.saveInk, Color.saveCocoa],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Image(systemName: "passport.fill")
+                        .font(.system(size: 32, weight: .black))
+                        .foregroundColor(.saveHoney)
+                }
+                .frame(width: 70, height: 78)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(.saveSuccess)
+                        .background(Circle().fill(Color.savePaper))
+                        .offset(x: 5, y: 5)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("SAV-E Passport")
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveHoney)
+                    Text(profile.displayName)
+                        .font(.title2.weight(.black))
+                        .foregroundColor(.savePaper)
+                        .lineLimit(2)
+                    Text(profile.email ?? "Local memory agent")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.savePaper.opacity(0.76))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                PassportBadge(text: "MEMORY AGENT", color: .saveHoney)
+                PassportBadge(text: "REVIEW FIRST", color: .saveSky)
+                Spacer()
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.caption.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .frame(width: 32, height: 32)
+                        .background(Color.savePaper.opacity(0.92))
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit Passport")
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.saveInk)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.saveHoney)
+                        .frame(height: 4)
+                        .padding(.horizontal, 16)
+                }
+        )
+    }
+}
+
+private struct PassportBadge: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.black))
+            .foregroundColor(.savePaper)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.22))
+            .clipShape(Capsule())
+    }
+}
+
+private struct PassportStampSection: View {
     let profile: UserProfile
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Travel Memory Passport")
-                .font(.headline)
-                .foregroundColor(.wanderlyCharcoal)
-
-            VStack(spacing: 12) {
-                ProfileInfoRow(
-                    icon: "person.crop.circle",
-                    title: "Name",
-                    value: profile.displayName
-                )
-
-                ProfileInfoRow(
-                    icon: "envelope",
-                    title: "Email",
-                    value: profile.email ?? "Not available"
-                )
-
-                ProfileInfoRow(
-                    icon: "calendar",
-                    title: "Joined",
-                    value: profile.createdAt.formatted(date: .abbreviated, time: .omitted)
-                )
+            HStack {
+                Text("Recent stamps")
+                    .font(.headline.weight(.black))
+                    .foregroundColor(.saveInk)
+                Spacer()
+                Text(profile.createdAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveCocoa)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.saveHoney.opacity(0.18))
+                    .clipShape(Capsule())
             }
+
+            if profile.collections.isEmpty {
+                PassportStampRow(icon: "rectangle.stack.badge.plus", title: "No stamps yet", value: "Hatch a clue into your first memory card")
+            } else {
+                ForEach(profile.collections.prefix(3)) { collection in
+                    PassportStampRow(
+                        icon: "seal.fill",
+                        title: collection.name,
+                        value: "\(collection.placeIds.count) memory cards"
+                    )
+                }
+            }
+
+            PassportStampRow(icon: "calendar", title: "Joined", value: profile.createdAt.formatted(date: .abbreviated, time: .omitted))
         }
         .padding()
-        .wanderlyCard()
+        .background(Color.savePaper.opacity(0.88))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.saveCocoa.opacity(0.10), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal)
     }
 }
 
-private struct ProfileInfoRow: View {
+private struct PassportStampRow: View {
     let icon: String
     let title: String
     let value: String
@@ -210,20 +298,22 @@ private struct ProfileInfoRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.subheadline)
-                .foregroundColor(.wanderlyTerracotta)
-                .frame(width: 24)
+                .foregroundColor(.saveCocoa)
+                .frame(width: 30, height: 30)
+                .background(Color.saveHoney.opacity(0.16))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(.saveInk)
+                Text(value)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
 
             Spacer()
-
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.wanderlyCharcoal)
-                .multilineTextAlignment(.trailing)
         }
     }
 }
