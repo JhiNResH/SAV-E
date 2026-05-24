@@ -68,7 +68,7 @@ struct GoogleTakeoutImportView: View {
 
                 Text("Choose a Google Takeout export. SAV-E previews everything first and only saves places with real coordinates.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
             }
@@ -90,11 +90,11 @@ struct GoogleTakeoutImportView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.saveHoney)
-                .cornerRadius(14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                 )
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .disabled(isParsing)
             .padding(.horizontal, 24)
@@ -159,7 +159,7 @@ struct GoogleTakeoutImportView: View {
                         .lineLimit(1)
                     Text("\(result.readyDrafts.count) ready · \(result.reviewDrafts.count) review drafts")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 Spacer()
@@ -174,7 +174,7 @@ struct GoogleTakeoutImportView: View {
             if let saveSummary {
                 Text("Saved \(saveSummary.saved). Skipped \(saveSummary.skippedDuplicates) duplicates. \(saveSummary.reviewDrafts) left for review.")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
             }
 
             if let saveError {
@@ -209,7 +209,7 @@ struct GoogleTakeoutImportView: View {
                     if !draft.address.isEmpty {
                         Text(draft.address)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                             .lineLimit(2)
                     }
 
@@ -222,7 +222,7 @@ struct GoogleTakeoutImportView: View {
                         }
                     }
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                 }
             }
             .padding(.vertical, 4)
@@ -245,20 +245,25 @@ struct GoogleTakeoutImportView: View {
                 }
                 .font(.subheadline)
                 .fontWeight(.black)
-                .foregroundColor(selectedDraftIds.isEmpty ? .secondary : .saveInk)
+                .foregroundColor(selectedDraftIds.isEmpty ? .saveMutedText : .saveInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(selectedDraftIds.isEmpty ? Color.saveNotebookLine.opacity(0.12) : Color.saveHoney)
-                .cornerRadius(14)
+                .background(selectedDraftIds.isEmpty ? Color.saveDisabled : Color.saveHoney)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(selectedDraftIds.isEmpty ? 0.24 : 0.82), lineWidth: 1.1)
+                        .stroke(Color.saveNotebookLine.opacity(selectedDraftIds.isEmpty ? 0.42 : 1), lineWidth: 1.6)
                 )
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .disabled(selectedDraftIds.isEmpty || isSaving)
         }
         .padding(16)
         .background(Color.saveNotebookPage)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.saveNotebookLine)
+                .frame(height: 2)
+        }
     }
 
     private var allowedContentTypes: [UTType] {

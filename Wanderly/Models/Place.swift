@@ -67,6 +67,13 @@ enum PlaceStatus: String, Codable, Hashable {
         case .visited: return "Visited"
         }
     }
+
+    var memoryCardLabel: String {
+        switch self {
+        case .wantToGo: return "Verified"
+        case .visited: return "Visited"
+        }
+    }
 }
 
 enum SourcePlatform: String, Codable, CaseIterable, Hashable {

@@ -8,7 +8,7 @@ struct OnboardingView: View {
         OnboardingPage(
             icon: "magnifyingglass.circle.fill",
             title: "Save spots while you scroll",
-            subtitle: "Share an IG post, map link, screenshot, or note. SAV-E turns messy clues into reviewable places.",
+            subtitle: "Share an IG post, map link, screenshot, or note. Memo helps SAV-E turn messy clues into reviewable places.",
             color: .saveHoney
         ),
         OnboardingPage(
@@ -41,9 +41,13 @@ struct OnboardingView: View {
                                 )
                                 .frame(width: 132, height: 132)
 
-                            Image(systemName: pages[index].icon)
-                                .font(.system(size: 64, weight: .semibold))
-                                .foregroundColor(pages[index].color)
+                            if index == 0 {
+                                MemoMascotMark(size: 98, framed: false)
+                            } else {
+                                Image(systemName: pages[index].icon)
+                                    .font(.system(size: 64, weight: .semibold))
+                                    .foregroundColor(pages[index].color)
+                            }
                         }
 
                         VStack(spacing: 12) {
@@ -56,7 +60,7 @@ struct OnboardingView: View {
                             Text(pages[index].subtitle)
                                 .font(.subheadline)
                                 .lineSpacing(3)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.saveMutedText)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 32)
                         }
@@ -91,11 +95,16 @@ struct OnboardingView: View {
                 }) {
                     Text(currentPage < pages.count - 1 ? "Next" : "Start with SAV-E")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.saveInk)
-                        .cornerRadius(16)
+                        .background(Color.saveHoney)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -105,7 +114,8 @@ struct OnboardingView: View {
                         onComplete()
                     }
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.saveMutedText)
                     .padding(.bottom, 16)
                 }
             }

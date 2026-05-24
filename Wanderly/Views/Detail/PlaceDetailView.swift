@@ -25,7 +25,7 @@ struct PlaceDetailView: View {
                             InfoChip(icon: "dollarsign.circle", text: priceRange, color: .saveSignal)
                         }
                         InfoChip(icon: place.status == .visited ? "checkmark.circle.fill" : "clock",
-                                 text: place.status.displayName,
+                                 text: place.status.memoryCardLabel,
                                  color: place.status == .visited ? .saveSignal : .saveCocoa)
                     }
 
@@ -34,7 +34,7 @@ struct PlaceDetailView: View {
                         PlatformIcon(platform: place.sourcePlatform)
                         Text("Saved from \(place.sourcePlatform.displayName)")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
 
                         if let recommender = place.recommender {
                             Text("via \(recommender)")
@@ -56,7 +56,7 @@ struct PlaceDetailView: View {
                             .foregroundColor(.saveInk)
                         Text(hours)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
                     .padding(.horizontal)
                 }
@@ -136,11 +136,11 @@ struct PlaceDetailView: View {
                             .padding(.vertical, 14)
                             .background(Color.saveHoney)
                             .foregroundColor(.saveInk)
-                            .cornerRadius(16)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                             )
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
 
                     if let sourceUrl = place.sourceUrl, let url = URL(string: sourceUrl) {
@@ -152,11 +152,11 @@ struct PlaceDetailView: View {
                                 .padding(.vertical, 14)
                                 .background(Color.saveNotebookPage)
                                 .foregroundColor(.saveInk)
-                                .cornerRadius(16)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.saveNotebookLine.opacity(0.58), lineWidth: 1.1)
+                                        .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                                 )
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
                     }
                 }
@@ -224,7 +224,7 @@ struct PlaceDetailView: View {
 
                     HStack(spacing: 8) {
                         CategoryPill(category: place.category, isSelected: true)
-                        Text(place.status == .visited ? "Visited" : "Egg hatched")
+                        Text(place.status.memoryCardLabel)
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.saveCocoa)
                             .padding(.horizontal, 10)
@@ -237,7 +237,7 @@ struct PlaceDetailView: View {
 
             Text(place.address)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)

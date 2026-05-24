@@ -17,12 +17,12 @@ struct PlaceCard: View {
 
                     Spacer()
 
-                    sourceBadge
+                    memoryStatusBadge
                 }
 
                 Text(place.address)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
@@ -33,24 +33,24 @@ struct PlaceCard: View {
                                 .foregroundColor(.saveHoney)
                             Text(String(format: "%.1f", rating))
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.saveMutedText)
                         }
                     }
 
                     if let priceRange = place.priceRange {
                         Text(priceRange)
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
 
                     Spacer()
 
-                    Text(statusLabel)
+                    Text(sourceLabel.uppercased())
                         .font(.system(size: 10))
                         .fontWeight(.semibold)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(place.status == .visited ? Color.saveMint : Color.saveHoney.opacity(0.42))
+                        .background(Color.saveHoney.opacity(0.42))
                         .foregroundColor(.saveCocoa)
                         .cornerRadius(8)
                 }
@@ -70,10 +70,11 @@ struct PlaceCard: View {
         .frame(width: 54)
     }
 
-    private var sourceBadge: some View {
+    private var memoryStatusBadge: some View {
         HStack(spacing: 4) {
-            PlatformIcon(platform: place.sourcePlatform, size: 12)
-            Text(sourceLabel)
+            Image(systemName: place.status == .visited ? "seal.fill" : "checkmark.seal.fill")
+                .font(.caption2.weight(.black))
+            Text(place.status.memoryCardLabel)
                 .font(.caption2.weight(.semibold))
                 .foregroundColor(.saveCocoa)
         }
@@ -89,10 +90,6 @@ struct PlaceCard: View {
 
     private var sourceLabel: String {
         place.sourcePlatform == .other ? "Memory" : "\(place.sourcePlatform.displayName) memory"
-    }
-
-    private var statusLabel: String {
-        place.status == .visited ? "Visited" : "Hatched"
     }
 }
 

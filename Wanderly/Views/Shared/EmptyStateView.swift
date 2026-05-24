@@ -11,7 +11,14 @@ struct EmptyStateView: View {
         VStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.system(size: 48))
-                .foregroundColor(.saveSignal)
+                .foregroundColor(.saveInk)
+                .frame(width: 76, height: 76)
+                .background(Color.saveHoney)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
 
             Text(title)
                 .font(.title3)
@@ -20,7 +27,7 @@ struct EmptyStateView: View {
 
             Text(subtitle)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
@@ -33,15 +40,18 @@ struct EmptyStateView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 10)
                         .background(Color.saveHoney)
-                        .cornerRadius(16)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .padding(.top, 8)
             }
         }
+        .padding(18)
+        .saveNotebookPage(cornerRadius: 22)
+        .padding(22)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
