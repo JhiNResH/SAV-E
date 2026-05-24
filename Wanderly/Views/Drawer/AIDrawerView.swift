@@ -952,11 +952,8 @@ private struct ReviewCandidateCard: View {
                 Spacer(minLength: 0)
             }
 
-            if let evidence = candidate.evidence.first {
-                Text(evidence)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
+            if !candidate.evidence.isEmpty {
+                EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
             }
 
             if !candidate.hasReliableCoordinates {

@@ -39,11 +39,12 @@ struct SaveMemoryDebugView: View {
                             .foregroundColor(.secondary)
                     }
 
-                    if let sourceURL = record.sourceURL {
-                        Text(sourceURL)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
+                    if let sourceURL = record.sourceURL, let url = URL(string: sourceURL) {
+                        Link(destination: url) {
+                            Label("Open source", systemImage: "link")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.wanderlyTerracotta)
+                        }
                     }
 
                     if let diagnostic = record.evidenceDiagnostic {
@@ -54,12 +55,7 @@ struct SaveMemoryDebugView: View {
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.secondary)
-                            ForEach(record.evidence.prefix(3), id: \.self) { item in
-                                Text("• \(item)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                            EvidenceLinkList(evidence: record.evidence, maxItems: 3)
                         }
                     }
 
@@ -128,12 +124,7 @@ struct SaveMemoryDebugView: View {
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                ForEach(items.prefix(3), id: \.self) { item in
-                    Text("• \(item)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                EvidenceLinkList(evidence: Array(items.prefix(3)), maxItems: 3)
             }
         }
     }
