@@ -42,7 +42,7 @@ struct MapView: View {
                     }
                 }
 
-                HStack(spacing: 0) {
+                HStack(spacing: 10) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(PlaceCategory.allCases, id: \.self) { category in
@@ -53,24 +53,50 @@ struct MapView: View {
                                 .onTapGesture { viewModel.toggleCategory(category) }
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 4)
                     }
 
                     Button(action: { showProfile = true }) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.wanderlyTerracotta)
-                            .background(
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .frame(width: 36, height: 36)
-                            )
+                        ZStack(alignment: .topTrailing) {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.saveNotebookPage)
+                                .frame(width: 42, height: 42)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
+                                )
+
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.saveCocoa)
+
+                            if !viewModel.reviewCandidates.isEmpty {
+                                Text("\(viewModel.reviewCandidates.count)")
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundColor(.saveInk)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.saveHoney)
+                                    .clipShape(Capsule())
+                                    .offset(x: 6, y: -5)
+                            }
+                        }
+                        .frame(width: 42, height: 42)
                     }
-                    .padding(.trailing, 16)
+                    .accessibilityLabel("Open SAV-E Passport")
                 }
+                .padding(.leading, 12)
+                .padding(.trailing, 10)
+                .padding(.vertical, 8)
                 .background(.ultraThinMaterial)
-                .padding(.top, geo.safeAreaInsets.top)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.saveNotebookPage.opacity(0.78), lineWidth: 1)
+                )
+                .shadow(color: Color.saveCocoa.opacity(0.12), radius: 14, y: 6)
+                .padding(.horizontal, 12)
+                .padding(.top, geo.safeAreaInsets.top + 8)
             }
             .ignoresSafeArea()
         }

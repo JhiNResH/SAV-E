@@ -25,11 +25,11 @@ struct AIDrawerView: View {
         VStack(spacing: 0) {
             searchBar
             if showsContentArea {
-                Divider()
+                Divider().opacity(0.35)
                 contentArea
             }
         }
-        .background(Color.wanderlyCream)
+        .background(Color.saveNotebookBackground)
         .sheet(isPresented: $viewModel.showPlaceList) {
             PlaceListView()
         }
@@ -64,8 +64,11 @@ struct AIDrawerView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: isLoading ? "hourglass" : "sparkles")
-                .foregroundColor(.wanderlyTerracotta)
-                .font(.subheadline)
+                .foregroundColor(.saveInk)
+                .font(.caption.weight(.black))
+                .frame(width: 28, height: 28)
+                .background(Color.saveHoney.opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .symbolEffect(.pulse, isActive: isLoading)
 
             TextField("Ask about your places...", text: $viewModel.query)
@@ -105,10 +108,10 @@ struct AIDrawerView: View {
                         Text("\(reviewCandidates.count)")
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.wanderlyTerracotta)
+                    .foregroundColor(.saveInk)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
-                    .background(Color.wanderlyTerracotta.opacity(0.1))
+                    .background(Color.saveHoney.opacity(0.28))
                     .clipShape(Capsule())
                 }
                 .accessibilityLabel("Open review candidates")
@@ -117,6 +120,7 @@ struct AIDrawerView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(height: 64)
+        .background(Color.saveNotebookPage.opacity(0.86))
     }
 
     // MARK: - Content
@@ -817,59 +821,75 @@ private struct FieldNotebookHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.saveHoney)
-                        .rotationEffect(.degrees(-5))
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18, weight: .black))
-                        .foregroundColor(.saveCocoa)
+        HStack(spacing: 0) {
+            NotebookSpine(color: .saveNotebookSpine)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(Color.saveHoney)
+                            .rotationEffect(.degrees(-4))
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundColor(.saveInk)
+                    }
+                    .frame(width: 46, height: 46)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SAV-E Field Notebook")
+                            .font(.title3)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+
+                        Text(statusText)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.saveCocoa.opacity(0.82))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Text("OPEN")
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.saveSky.opacity(0.78))
+                        .clipShape(Capsule())
                 }
-                .frame(width: 42, height: 42)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("SAV-E Field Notebook")
-                        .font(.title3)
-                        .fontWeight(.black)
-                        .foregroundColor(.saveCream)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-
-                    Text(statusText)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.saveCream.opacity(0.82))
-                        .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveBerry)
+                    FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
+                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSky)
                 }
-
-                Spacer(minLength: 0)
             }
-
-            HStack(spacing: 8) {
-                FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveBerry)
-                FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
-                FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSky)
-            }
+            .padding(14)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.saveInk, Color.saveCocoa],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Color.saveHoney.opacity(0.85))
-                        .frame(height: 3)
-                        .padding(.horizontal, 14)
-                }
-        )
+        .saveNotebookPage(cornerRadius: 18)
+    }
+}
+
+private struct NotebookSpine: View {
+    var color: Color
+
+    var body: some View {
+        VStack(spacing: 11) {
+            ForEach(0..<4, id: \.self) { _ in
+                Circle()
+                    .fill(Color.saveNotebookPage)
+                    .frame(width: 7, height: 7)
+                    .overlay(Circle().stroke(Color.saveCocoa.opacity(0.16), lineWidth: 1))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(width: 24)
+        .padding(.top, 18)
+        .background(color.opacity(0.86))
     }
 }
 
@@ -882,21 +902,21 @@ private struct FieldNotebookStat: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption2.weight(.black))
-                .foregroundColor(.saveCream.opacity(0.64))
+                .foregroundColor(.saveCocoa.opacity(0.68))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
             Text(value)
                 .font(.caption.monospacedDigit().weight(.black))
-                .foregroundColor(.saveCream)
+                .foregroundColor(.saveInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
-        .background(color.opacity(0.18))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(color.opacity(0.22))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -909,12 +929,16 @@ private struct NotebookBandLabel: View {
 
     var body: some View {
         HStack(spacing: 7) {
-            Rectangle()
-                .fill(Color.saveCocoa)
-                .frame(width: 18, height: 2)
             Text(title.uppercased())
                 .font(.caption2.weight(.black))
-                .foregroundColor(.saveCocoa)
+                .foregroundColor(.saveInk)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.saveLavender.opacity(0.48))
+                .clipShape(Capsule())
+            Rectangle()
+                .fill(Color.saveNotebookLine)
+                .frame(height: 1)
             Spacer()
         }
         .padding(.top, 2)
@@ -993,14 +1017,7 @@ private struct ReviewCandidatesEmptyState: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.55))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.wanderlyCharcoal.opacity(0.07), style: StrokeStyle(lineWidth: 1, dash: [5]))
-                )
-        )
+        .saveNotebookPage(cornerRadius: 14)
     }
 }
 
@@ -1012,105 +1029,95 @@ private struct ReviewCandidateCard: View {
     var onSave: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 11) {
-                ZStack {
-                    Circle()
-                        .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
-                        )
-                    Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "circle.hexagongrid.fill")
-                        .font(.system(size: 17, weight: .black))
-                        .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
-                }
-                .frame(width: 40, height: 40)
+        HStack(spacing: 0) {
+            NotebookSpine(color: candidate.hasReliableCoordinates ? .saveMint : .savePeach)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")
-                        .font(.caption2.weight(.black))
-                        .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
-                        .lineLimit(1)
-
-                    Text(candidate.name)
-                        .font(.headline)
-                        .fontWeight(.black)
-                        .foregroundColor(.wanderlyCharcoal)
-                        .lineLimit(2)
-
-                    Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-
-                    HStack(spacing: 6) {
-                        if let confidence = candidate.confidence {
-                            StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveBerry)
-                        }
-                        StampChip(text: candidate.status.replacingOccurrences(of: "_", with: " "), color: .saveHoney)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 11) {
+                    ZStack {
+                        Circle()
+                            .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
+                            )
+                        Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "circle.hexagongrid.fill")
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
                     }
-                }
+                    .frame(width: 40, height: 40)
 
-                Spacer(minLength: 0)
-            }
-
-            if !candidate.evidence.isEmpty {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .font(.caption2.weight(.bold))
-                        Text("Source receipt")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")
                             .font(.caption2.weight(.black))
-                        Spacer()
+                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
+                            .lineLimit(1)
+
+                        Text(candidate.name)
+                            .font(.headline)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .lineLimit(2)
+
+                        Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+
+                        HStack(spacing: 6) {
+                            if let confidence = candidate.confidence {
+                                StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveBerry)
+                            }
+                            StampChip(text: candidate.status.replacingOccurrences(of: "_", with: " "), color: .saveHoney)
+                        }
                     }
-                    .foregroundColor(.saveCocoa)
 
-                    EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
+                    Spacer(minLength: 0)
                 }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.saveCream.opacity(0.82))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Color.saveCocoa.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [4]))
-                        )
-                )
-            }
 
-            if !candidate.hasReliableCoordinates {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption2)
-                    Text("Needs Google Places refinement or a map link before this can hatch.")
-                        .font(.caption2.weight(.semibold))
+                if !candidate.evidence.isEmpty {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.caption2.weight(.bold))
+                            Text("Source receipt")
+                                .font(.caption2.weight(.black))
+                            Spacer()
+                        }
+                        .foregroundColor(.saveCocoa)
+
+                        EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.saveCream.opacity(0.74))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                            )
+                    )
                 }
-                .foregroundColor(.wanderlyTerracotta)
-            }
 
-            HStack(spacing: 8) {
-                CandidateActionButton(title: "Mark ready", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
-                CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
-                CandidateActionButton(title: "Not this", systemImage: "xmark", disabled: isWorking, action: onReject)
+                if !candidate.hasReliableCoordinates {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                        Text("Needs Google Places refinement or a map link before this can hatch.")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundColor(.wanderlyTerracotta)
+                }
+
+                HStack(spacing: 8) {
+                    CandidateActionButton(title: "Mark ready", systemImage: "checkmark", disabled: isWorking, action: onConfirm)
+                    CandidateActionButton(title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch", systemImage: "seal", disabled: isWorking, action: onSave)
+                    CandidateActionButton(title: "Not this", systemImage: "xmark", disabled: isWorking, action: onReject)
+                }
             }
+            .padding(12)
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.9))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
-                )
-        )
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(candidate.hasReliableCoordinates ? Color.saveSuccess : Color.saveHoney)
-                .frame(width: 4)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                .padding(.vertical, 10)
-        }
+        .saveNotebookPage(cornerRadius: 16)
         .opacity(isWorking ? 0.65 : 1)
     }
 }
@@ -1260,19 +1267,22 @@ private struct AgentCommandRow: View {
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isPrimary ? Color.savePeach.opacity(0.7) : Color.white.opacity(0.78))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isPrimary ? Color.savePeach.opacity(0.58) : Color.saveNotebookPage.opacity(0.94))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(tone.color.opacity(isPrimary ? 0.28 : 0.12), lineWidth: 1)
                     )
             )
             .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(tone.color)
-                    .frame(width: 4)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .padding(.vertical, 10)
+                VStack(spacing: 6) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Circle()
+                            .fill(tone.color.opacity(0.35))
+                            .frame(width: 5, height: 5)
+                    }
+                }
+                .frame(width: 18)
             }
         }
         .buttonStyle(.plain)
@@ -1345,14 +1355,14 @@ private struct AgentCommandCard: View {
             .frame(maxWidth: .infinity, minHeight: 134, alignment: .topLeading)
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.78))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.saveNotebookPage.opacity(0.94))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .stroke(tone.color.opacity(0.12), lineWidth: 1)
                     )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

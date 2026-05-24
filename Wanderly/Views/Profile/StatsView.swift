@@ -15,12 +15,7 @@ struct StatsView: View {
             StatItem(value: "\(waitingClues)", label: "Waiting clues", color: .saveSignal, icon: "circle.hexagongrid.fill")
         }
         .padding(12)
-        .background(Color.savePaper.opacity(0.88))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.saveCocoa.opacity(0.10), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .saveNotebookPage(cornerRadius: 18)
         .padding(.horizontal)
     }
 }

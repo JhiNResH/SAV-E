@@ -17,7 +17,7 @@ extension Color {
     static let wanderlySecondary = Color("WanderlySecondary")
     static let wanderlyText = Color("WanderlyText")
 
-    // MARK: - SAV-E Agent Passport Theme
+    // MARK: - SAV-E Pastel Notebook Theme
     static let saveBlush = Color(hex: "FFF6F8")
     static let savePeach = Color(hex: "FFF1D8")
     static let saveCream = Color(hex: "FFF8E8")
@@ -34,6 +34,10 @@ extension Color {
     static let saveLedger = Color(hex: "EFE7D6")
     static let saveSignal = Color(hex: "7C8CFF")
     static let saveSuccess = Color(hex: "7FB78A")
+    static let saveNotebookBackground = Color(hex: "F4F1FF")
+    static let saveNotebookPage = Color(hex: "FFFDF8")
+    static let saveNotebookSpine = Color(hex: "F1D7C8")
+    static let saveNotebookLine = Color(hex: "EDE4D4")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
@@ -103,5 +107,15 @@ struct WanderlyCardStyle: ViewModifier {
 extension View {
     func wanderlyCard() -> some View {
         modifier(WanderlyCardStyle())
+    }
+
+    func saveNotebookPage(cornerRadius: CGFloat = 18) -> some View {
+        background(Color.saveNotebookPage)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.saveCocoa.opacity(0.10), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: Color.saveCocoa.opacity(0.08), radius: 14, y: 7)
     }
 }
