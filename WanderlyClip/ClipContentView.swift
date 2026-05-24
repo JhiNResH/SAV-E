@@ -245,7 +245,7 @@ extension Color {
     static let saveMint = Color(hex: "B8F5C8")
     static let savePink = Color(hex: "FFD7E8")
     static let saveInk = Color(hex: "111111")
-    static let savePaper = Color(hex: "FFFDF7")
+    static let savePaper = Color(hex: "FFF0D6")
     static let saveNotebookLine = Color(hex: "111111")
 
     init(hex: String) {

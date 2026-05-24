@@ -830,7 +830,7 @@ function DecodedTrip({ trip }: { trip: SharedTripData }) {
 
 const palette = {
   cream: "#FFF7E8",
-  paper: "#FFFDF7",
+  paper: "#FFF0D6",
   yellow: "#FFE24A",
   coral: "#FF8A65",
   sky: "#7EDAEF",
