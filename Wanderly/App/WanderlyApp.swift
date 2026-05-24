@@ -184,10 +184,10 @@ struct SignInView: View {
             .background(Color.saveNotebookPage)
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.2)
+                    .stroke(Color.saveNotebookLine, lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
+            .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         }
         .buttonStyle(.plain)
     }
@@ -264,7 +264,7 @@ private struct SignInHero: View {
                 Text("Send links, posts, screenshots, notes, or maps. SAV-E investigates first, then asks before saving.")
                     .font(.subheadline)
                     .lineSpacing(3)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveInk.opacity(0.66))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -276,7 +276,7 @@ private struct SignInWorkflowStrip: View {
     private let steps: [(String, String, Color)] = [
         ("Capture", "link or media", .saveHoney),
         ("Review", "with evidence", .saveSky),
-        ("Hatch", "memory cards", .saveCocoa),
+        ("Hatch", "memory cards", .saveMint),
     ]
 
     var body: some View {
@@ -303,7 +303,11 @@ private struct WorkflowStepCard: View {
         VStack(alignment: .leading, spacing: 5) {
             Circle()
                 .fill(tint)
-                .frame(width: 8, height: 8)
+                .frame(width: 10, height: 10)
+                .overlay(
+                    Circle()
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                )
 
             Text(title)
                 .font(.caption.weight(.bold))
@@ -322,10 +326,10 @@ private struct WorkflowStepCard: View {
         .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -347,8 +351,12 @@ private struct SignInInputRow: View {
                 .foregroundColor(.saveInk)
 
             Button(buttonTitle, action: action)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(isDisabled ? .secondary : .saveCocoa)
+                .font(.subheadline.weight(.black))
+                .foregroundColor(isDisabled ? .secondary : .saveInk)
+                .padding(.horizontal, 10)
+                .frame(height: 34)
+                .background(isDisabled ? Color.clear : Color.saveHoney)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .disabled(isDisabled)
         }
         .padding(.horizontal, 14)
@@ -356,9 +364,9 @@ private struct SignInInputRow: View {
         .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.saveInk.opacity(0.10), radius: 0, x: 2, y: 2)
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
