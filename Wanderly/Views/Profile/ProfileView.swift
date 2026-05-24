@@ -48,7 +48,7 @@ struct ProfileView: View {
                         .padding(.horizontal)
                     }
 
-                    PassportStampSection(profile: viewModel.profile)
+                    PassportStampSection(profile: viewModel.profile, waitingClues: waitingClues)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Passport Controls")
@@ -379,15 +379,16 @@ private struct PassportBadge: View {
 
 private struct PassportStampSection: View {
     let profile: UserProfile
+    let waitingClues: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Recent stamps")
+                Text("Passport Stamps")
                     .font(.headline.weight(.black))
                     .foregroundColor(.saveInk)
                 Spacer()
-                Text(profile.createdAt.formatted(date: .abbreviated, time: .omitted))
+                Text("MEMORY AGENT")
                     .font(.caption2.weight(.black))
                     .foregroundColor(.saveCocoa)
                     .padding(.horizontal, 8)
@@ -396,19 +397,11 @@ private struct PassportStampSection: View {
                     .clipShape(Capsule())
             }
 
-            if profile.collections.isEmpty {
-                PassportStampRow(icon: "rectangle.stack.badge.plus", title: "No stamps yet", value: "Hatch a clue into your first memory card")
-            } else {
-                ForEach(profile.collections.prefix(3)) { collection in
-                    PassportStampRow(
-                        icon: "seal.fill",
-                        title: collection.name,
-                        value: "\(collection.placeIds.count) memory cards"
-                    )
-                }
-            }
-
-            PassportStampRow(icon: "calendar", title: "Joined", value: profile.createdAt.formatted(date: .abbreviated, time: .omitted))
+            PassportStampRow(icon: "rectangle.stack.fill", title: "Memory cards", value: "\(profile.savedCount) hatched")
+            PassportStampRow(icon: "checkmark.seal.fill", title: "Verified", value: "\(max(profile.savedCount - waitingClues, 0)) ready to plan")
+            PassportStampRow(icon: "building.2.fill", title: "Cities", value: "\(profile.citiesCount) city stamps")
+            PassportStampRow(icon: "circle.hexagongrid.fill", title: "Waiting clues", value: waitingClues == 1 ? "1 maybe place" : "\(waitingClues) maybe places")
+            PassportStampRow(icon: "calendar", title: "Member since", value: profile.createdAt.formatted(date: .abbreviated, time: .omitted))
         }
         .padding()
         .saveNotebookPage(cornerRadius: 18)

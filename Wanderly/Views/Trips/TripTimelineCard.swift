@@ -36,7 +36,7 @@ struct TripTimelineCard: View {
                             .foregroundColor(.saveMutedText)
                     }
 
-                    Text("Day \(stop.day)")
+                    Text("Memory stop · Day \(stop.day)")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.saveCocoa)

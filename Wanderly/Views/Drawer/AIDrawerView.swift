@@ -472,7 +472,7 @@ struct AIDrawerView: View {
     private let suggestions = [
         "Show my food spots on the map",
         "Navigate to the nearest cafe",
-        "Plan a 2-day itinerary",
+        "Plan a day from my memory cards",
         "What haven't I visited yet?",
     ]
 
@@ -565,14 +565,14 @@ struct AIDrawerView: View {
                 AgentCommandRow(
                     icon: "map.fill",
                     title: "Plan from memories",
-                    subtitle: "Build a route from confirmed places only.",
+                    subtitle: "Build a route from verified memory cards.",
                     commandLabel: "uses saved spots",
                     tone: .sky
                 ) {
                     focusAgentPrompt("""
                     Help me organize my saved places into a practical plan.
 
-                    Use only confirmed saved places unless I explicitly ask you to investigate new candidates. Start with:
+                    Use only verified memory cards unless I explicitly ask you to investigate new candidates. Start with:
                     """)
                 }
             }
@@ -1070,7 +1070,7 @@ private struct ReviewCandidateCard: View {
                             if let confidence = candidate.confidence {
                                 StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveCocoa)
                             }
-                            StampChip(text: candidate.hasReliableCoordinates ? "map ready" : "1 clue missing", color: .saveHoney)
+                            StampChip(text: candidate.hasReliableCoordinates ? "maybe · map ready" : "maybe · 1 clue missing", color: .saveHoney)
                         }
                     }
 
