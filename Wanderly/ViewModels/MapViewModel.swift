@@ -15,6 +15,8 @@ enum ReviewCandidateError: LocalizedError {
 
 @MainActor
 final class MapViewModel: ObservableObject {
+    private static let pendingReviewImportBatchLimit = 4
+
     @Published var places: [Place] = []
     @Published var selectedPlace: Place?
     @Published var cameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
@@ -102,7 +104,7 @@ final class MapViewModel: ObservableObject {
 
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
-            try await importPendingReviewCandidates(for: userId)
+            try await importPendingReviewCandidates(for: userId, runSourceRecovery: false)
             do {
                 try await refreshReviewCandidates()
             } catch {
@@ -112,6 +114,30 @@ final class MapViewModel: ObservableObject {
         } catch {
             print("MapViewModel: failed to load places: \(error)")
             importPendingPlacesForLocalUse()
+        }
+    }
+
+    func handleSceneDidBecomeActive() async {
+        guard hasLoadedPlaces else {
+            await loadPlaces()
+            return
+        }
+        guard !isLoadingPlaces else { return }
+
+        guard let userId = authService.currentUserId else {
+            importPendingPlacesForLocalUse()
+            return
+        }
+
+        isLoadingPlaces = true
+        defer { isLoadingPlaces = false }
+
+        do {
+            try await importPendingReviewCandidates(for: userId, runSourceRecovery: false)
+            try await importPendingPlaces(for: userId)
+            try await refreshReviewCandidates()
+        } catch {
+            print("MapViewModel: failed to process scene activation imports: \(error)")
         }
     }
 
@@ -174,19 +200,20 @@ final class MapViewModel: ObservableObject {
         pendingImportService.restorePendingPlaces(failedImports)
     }
 
-    private func importPendingReviewCandidates(for userId: String) async throws {
+    private func importPendingReviewCandidates(for userId: String, runSourceRecovery: Bool) async throws {
         let pending = pendingImportService.consumePendingReviewCandidates()
         guard !pending.isEmpty else { return }
 
-        var failedCandidates: [PendingReviewCandidate] = []
+        let currentBatch = Array(pending.prefix(Self.pendingReviewImportBatchLimit))
+        var failedCandidates = Array(pending.dropFirst(Self.pendingReviewImportBatchLimit))
 
-        for candidate in pending {
+        for candidate in currentBatch {
             let refinedCandidate = await socialLinkReviewCandidateService.refineCandidate(candidate)
             mirrorToLocalVault(refinedCandidate)
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: refinedCandidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(refinedCandidate, captureId: captureId, userId: userId)
-                if refinedCandidate.isSourceOnly {
+                if runSourceRecovery && refinedCandidate.isSourceOnly {
                     _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
                 }
             } catch {
@@ -210,7 +237,7 @@ final class MapViewModel: ObservableObject {
             throw SupabaseError.notAuthenticated
         }
 
-        try? saveLocalVaultService.saveSourceOnly(url: url)
+        _ = try? saveLocalVaultService.saveSourceOnly(url: url)
         let candidates = try await socialLinkReviewCandidateService.reviewCandidates(from: url)
         var importedCount = candidates.count
         for candidate in candidates {

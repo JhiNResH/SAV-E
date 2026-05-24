@@ -15,6 +15,8 @@ enum PlaceSort: String, CaseIterable {
 
 @MainActor
 final class PlaceListViewModel: ObservableObject {
+    private static let pendingReviewImportBatchLimit = 4
+
     @Published var places: [Place] = Place.mockList
     @Published var filter: PlaceFilter = .all
     @Published var sort: PlaceSort = .recent
@@ -87,7 +89,7 @@ final class PlaceListViewModel: ObservableObject {
 
         do {
             places = try await supabaseService.fetchPlaces(for: userId)
-            try await importPendingReviewCandidates(for: userId)
+            try await importPendingReviewCandidates(for: userId, runSourceRecovery: false)
             try await importPendingPlaces(for: userId)
         } catch {
             print("Failed to load places: \(error)")
@@ -137,7 +139,7 @@ final class PlaceListViewModel: ObservableObject {
 
             do {
                 try await supabaseService.savePlace(place, userId: userId)
-                try? saveLocalVaultService.saveConfirmedPlace(place)
+                _ = try? saveLocalVaultService.saveConfirmedPlace(place)
                 importedPendingKeys.insert(key)
                 importedPlaces.append(place)
             } catch {
@@ -153,13 +155,14 @@ final class PlaceListViewModel: ObservableObject {
         pendingImportService.restorePendingPlaces(failedImports)
     }
 
-    private func importPendingReviewCandidates(for userId: String) async throws {
+    private func importPendingReviewCandidates(for userId: String, runSourceRecovery: Bool) async throws {
         let pending = pendingImportService.consumePendingReviewCandidates()
         guard !pending.isEmpty else { return }
 
-        var failedCandidates: [PendingReviewCandidate] = []
+        let currentBatch = Array(pending.prefix(Self.pendingReviewImportBatchLimit))
+        var failedCandidates = Array(pending.dropFirst(Self.pendingReviewImportBatchLimit))
 
-        for candidate in pending {
+        for candidate in currentBatch {
             let refinedCandidate = await socialLinkReviewCandidateService.refineCandidate(candidate)
             do {
                 _ = try saveLocalVaultService.saveReviewCandidate(refinedCandidate)
@@ -170,7 +173,7 @@ final class PlaceListViewModel: ObservableObject {
             do {
                 let captureId = try await supabaseService.createMemoryCapture(from: refinedCandidate, userId: userId)
                 try await supabaseService.createPlaceCandidate(refinedCandidate, captureId: captureId, userId: userId)
-                if refinedCandidate.isSourceOnly {
+                if runSourceRecovery && refinedCandidate.isSourceOnly {
                     _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
                 }
             } catch {
