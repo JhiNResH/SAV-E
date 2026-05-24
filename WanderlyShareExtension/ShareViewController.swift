@@ -299,35 +299,30 @@ private struct ShareFlatSticker: View {
     }
 }
 
-private struct ShareBottomTabs: View {
-    private let tabs: [(String, String)] = [
-        ("tray.fill", "Inbox"),
-        ("map.fill", "Places"),
-        ("sparkles", "Trips"),
-    ]
+private struct ShareCaptureFooter: View {
+    var text: String = "SAV-E Review · Open the app to finish"
 
     var body: some View {
-        HStack {
-            ForEach(tabs, id: \.1) { tab in
-                VStack(spacing: 4) {
-                    Image(systemName: tab.0)
-                        .font(.caption.weight(.black))
-                    Text(tab.1)
-                        .font(.caption2.weight(.black))
-                }
-                .foregroundColor(SaveTheme.ink)
-                .frame(maxWidth: .infinity)
-            }
+        HStack(spacing: 9) {
+            Image(systemName: "tray.and.arrow.down.fill")
+                .font(.caption.weight(.black))
+            Text(text)
+                .font(.caption.weight(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.black))
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 8)
+        .foregroundColor(SaveTheme.ink)
+        .padding(.vertical, 11)
+        .padding(.horizontal, 14)
         .background(SaveTheme.paper)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(SaveTheme.ink, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(SaveTheme.ink, lineWidth: 1.8)
         )
-        .shadow(color: SaveTheme.ink.opacity(0.16), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -590,7 +585,7 @@ struct ShareExtensionView: View {
 
             Spacer(minLength: 8)
 
-            ShareBottomTabs()
+            ShareCaptureFooter()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -691,7 +686,7 @@ struct ShareExtensionView: View {
 
             Spacer(minLength: 8)
 
-            ShareBottomTabs()
+            ShareCaptureFooter()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -717,7 +712,7 @@ struct ShareExtensionView: View {
 
             Spacer(minLength: 8)
 
-            ShareBottomTabs()
+            ShareCaptureFooter()
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
