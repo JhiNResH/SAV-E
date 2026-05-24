@@ -423,6 +423,7 @@ struct AIDrawerView: View {
                             title: "Memories",
                             systemImage: "list.bullet",
                             count: nil,
+                            fill: Color.saveMint.opacity(0.74),
                             action: { viewModel.showPlaceList = true }
                         )
 
@@ -430,6 +431,7 @@ struct AIDrawerView: View {
                             title: "Import",
                             systemImage: "tray.and.arrow.down",
                             count: nil,
+                            fill: Color.saveSky.opacity(0.64),
                             action: { showGoogleTakeoutImport = true }
                         )
 
@@ -437,6 +439,7 @@ struct AIDrawerView: View {
                             title: "Nest",
                             systemImage: "circle.hexagongrid.fill",
                             count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
+                            fill: Color.saveHoney.opacity(0.84),
                             action: openReviewInbox
                         )
                     }
@@ -1209,6 +1212,7 @@ private struct DrawerActionChip: View {
     var title: String
     var systemImage: String
     var count: Int?
+    var fill: Color = Color.saveHoney.opacity(0.84)
     var action: () -> Void
 
     var body: some View {
@@ -1237,7 +1241,7 @@ private struct DrawerActionChip: View {
             .foregroundColor(.saveInk)
             .frame(height: 38)
             .padding(.horizontal, 12)
-            .background(Color.saveNotebookPage)
+            .background(fill)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Color.saveNotebookLine, lineWidth: 1.4)
