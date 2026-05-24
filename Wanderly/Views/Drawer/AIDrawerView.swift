@@ -1040,10 +1040,10 @@ private struct ReviewCandidateCard: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 11) {
-                    SaveEggBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
+                    SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "POSSIBLE PLACE FOUND")
+                        Text(candidate.hasReliableCoordinates ? "READY TO SAVE" : "POSSIBLE PLACE FOUND")
                             .font(.caption2.weight(.black))
                             .foregroundColor(.saveCocoa)
                             .lineLimit(1)
