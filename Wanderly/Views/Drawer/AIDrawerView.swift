@@ -1043,7 +1043,7 @@ private struct ReviewCandidateCard: View {
                     SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(candidate.hasReliableCoordinates ? "READY TO SAVE" : "POSSIBLE PLACE FOUND")
+                        Text(candidate.hasReliableCoordinates ? "MAP READY" : "POSSIBLE PLACE FOUND")
                             .font(.caption2.weight(.black))
                             .foregroundColor(.saveCocoa)
                             .lineLimit(1)

@@ -87,7 +87,7 @@ struct SaveMemoryBadge: View {
         case .clue:
             return "Place clue"
         case .ready:
-            return "Ready to save"
+            return "Map-ready place"
         case .saved:
             return "Saved memory card"
         }
