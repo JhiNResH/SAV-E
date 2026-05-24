@@ -48,15 +48,16 @@ struct StatItem: View {
         .background(Color.saveNotebookPage.opacity(0.92))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
         )
         .overlay(alignment: .topLeading) {
             Circle()
-                .fill(color.opacity(0.16))
+                .fill(color.opacity(0.42))
                 .frame(width: 28, height: 28)
                 .offset(x: -8, y: -8)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: Color.saveInk.opacity(0.10), radius: 0, x: 2, y: 2)
     }
 }
 

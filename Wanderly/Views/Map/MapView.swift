@@ -63,8 +63,9 @@ struct MapView: View {
                                 .frame(width: 42, height: 42)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
+                                        .stroke(Color.saveNotebookLine, lineWidth: 2)
                                 )
+                                .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 3, y: 3)
 
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.system(size: 22, weight: .bold))
@@ -92,9 +93,9 @@ struct MapView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.2)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
                 )
-                .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
+                .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
                 .padding(.horizontal, 12)
                 .padding(.top, geo.safeAreaInsets.top + 8)
             }
@@ -121,9 +122,9 @@ private struct CurrentLocationButton: View {
                     .frame(width: 54, height: 54)
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
-                    .shadow(color: Color.saveCocoa.opacity(0.18), radius: 0, x: 3, y: 3)
+                    .shadow(color: Color.saveInk.opacity(0.20), radius: 0, x: 4, y: 4)
 
                 if isLocating {
                     ProgressView()

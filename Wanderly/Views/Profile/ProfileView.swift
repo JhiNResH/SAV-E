@@ -116,9 +116,10 @@ private struct EditProfileSheet: View {
                             .background(Color.saveNotebookPage)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.saveNotebookLine.opacity(0.80), lineWidth: 1)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
                     }
                     .disabled(isSaving)
 
@@ -141,8 +142,13 @@ private struct EditProfileSheet: View {
                             .foregroundColor(.saveInk)
                             .padding(.horizontal, 13)
                             .frame(height: 38)
-                            .background(Color.saveHoney.opacity(0.86))
+                            .background(Color.saveHoney)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
+                            .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
                     }
                     .disabled(isSaving)
                 }
@@ -163,7 +169,7 @@ private struct EditProfileSheet: View {
                         .background(Color.saveNotebookPage)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
@@ -228,8 +234,9 @@ private struct PassportTopBar: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
+                        .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .buttonStyle(.plain)
         }
@@ -238,8 +245,9 @@ private struct PassportTopBar: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 }
 
@@ -256,9 +264,10 @@ private struct PassportIconButton: View {
                 .background(Color.saveNotebookPage)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -276,7 +285,11 @@ private struct PassportHero: View {
                 HStack(alignment: .top, spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.saveNotebookLine.opacity(0.70))
+                            .fill(Color.saveHoney)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
                         Image(systemName: "passport.fill")
                             .font(.system(size: 32, weight: .black))
                             .foregroundColor(.saveInk)
@@ -316,8 +329,13 @@ private struct PassportHero: View {
                             .font(.caption.weight(.black))
                             .foregroundColor(.saveInk)
                             .frame(width: 32, height: 32)
-                            .background(Color.saveNotebookLine.opacity(0.78))
+                            .background(Color.saveHoney)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Edit Passport")

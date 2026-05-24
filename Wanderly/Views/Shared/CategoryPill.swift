@@ -19,14 +19,14 @@ struct CategoryPill: View {
         .padding(.leading, 6)
         .padding(.trailing, 10)
         .padding(.vertical, 5)
-        .background(isSelected ? Color.saveHoney.opacity(0.80) : Color.saveNotebookPage.opacity(0.90))
-        .foregroundColor(isSelected ? .saveInk : .saveCocoa)
+        .background(isSelected ? Color.saveHoney : Color.saveNotebookPage)
+        .foregroundColor(.saveInk)
         .overlay(
             RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(isSelected ? 0.82 : 0.24), lineWidth: 1)
+                .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 2 : 1.4)
         )
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.10 : 0.04), radius: 8, y: 4)
+        .shadow(color: Color.saveInk.opacity(isSelected ? 0.18 : 0.10), radius: 0, x: 3, y: 3)
     }
 }
 

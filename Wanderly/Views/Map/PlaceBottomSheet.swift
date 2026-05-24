@@ -115,11 +115,12 @@ struct PlaceBottomSheet: View {
                         .padding(.vertical, 10)
                         .background(Color.saveHoney)
                         .foregroundColor(.saveInk)
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
+                        .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
                 }
 
                 Button(role: .destructive) {
@@ -132,11 +133,12 @@ struct PlaceBottomSheet: View {
                         .padding(.vertical, 10)
                         .background(Color.saveNotebookPage)
                         .foregroundColor(.red)
-                        .cornerRadius(16)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.red.opacity(0.36), lineWidth: 1.1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
                         )
+                        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 3, y: 3)
                 }
                 .disabled(isDeleting || onDelete == nil)
             }
@@ -148,7 +150,7 @@ struct PlaceBottomSheet: View {
             }
         }
         .padding()
-        .background(Color.saveNotebookPage)
+        .background(SaveDottedBackground())
         .confirmationDialog(
             "Delete \(place.name)?",
             isPresented: $showDeleteConfirmation,

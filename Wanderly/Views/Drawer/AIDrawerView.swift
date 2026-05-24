@@ -70,7 +70,7 @@ struct AIDrawerView: View {
                 .background(Color.saveHoney)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .symbolEffect(.pulse, isActive: isLoading)
@@ -116,21 +116,25 @@ struct AIDrawerView: View {
                     .padding(.horizontal, 9)
                     .padding(.vertical, 6)
                     .background(Color.saveHoney)
-                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1))
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.4))
                     .clipShape(Capsule())
                 }
                 .accessibilityLabel("Open review candidates")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(height: 64)
-        .background(Color.saveNotebookPage.opacity(0.96))
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.saveNotebookLine.opacity(0.18))
-                .frame(height: 1)
-        }
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .background(Color.saveNotebookPage)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(height: 72)
+        .background(Color.saveNotebookPage)
     }
 
     // MARK: - Content
@@ -176,9 +180,10 @@ struct AIDrawerView: View {
                         .background(Color.saveNotebookPage)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.48), lineWidth: 1)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
                 }
                 Spacer()
             }
@@ -298,9 +303,10 @@ struct AIDrawerView: View {
                     .background(Color.saveNotebookPage)
                     .overlay(
                         Circle()
-                            .stroke(Color.saveNotebookLine.opacity(0.55), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
                     .clipShape(Circle())
+                    .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .accessibilityLabel("Back to commands")
 
@@ -331,15 +337,21 @@ struct AIDrawerView: View {
                     .background(Color.saveNotebookPage)
                     .overlay(
                         Circle()
-                            .stroke(Color.saveNotebookLine.opacity(0.45), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
                     .clipShape(Circle())
+                    .shadow(color: Color.saveInk.opacity(0.14), radius: 0, x: 2, y: 2)
             }
             .accessibilityLabel("Close drawer content")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color.saveNotebookPage.opacity(0.96))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.saveNotebookLine)
+                .frame(height: 2)
+        }
     }
 
     private var showsNavigationHeader: Bool {
@@ -1210,8 +1222,13 @@ private struct DrawerActionChip: View {
             .foregroundColor(.saveCocoa)
             .frame(height: 38)
             .padding(.horizontal, 12)
-            .background(Color.saveCocoa.opacity(0.09))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.saveNotebookPage)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .shadow(color: Color.saveInk.opacity(0.12), radius: 0, x: 2, y: 2)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
@@ -1245,9 +1262,13 @@ private struct AgentCommandRow: View {
             HStack(alignment: .center, spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: isPrimary ? 19 : 16, weight: .black))
-                    .foregroundColor(isPrimary ? .saveCream : tone.color)
+                    .foregroundColor(.saveInk)
                     .frame(width: 40, height: 40)
-                    .background(isPrimary ? tone.color : tone.color.opacity(0.12))
+                    .background(isPrimary ? Color.saveHoney : tone.color.opacity(0.42))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -1282,10 +1303,10 @@ private struct AgentCommandRow: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isPrimary ? Color.saveHoney.opacity(0.48) : Color.saveNotebookPage.opacity(0.94))
+                    .fill(isPrimary ? Color.saveHoney.opacity(0.72) : Color.saveNotebookPage.opacity(0.96))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(tone.color.opacity(isPrimary ? 0.28 : 0.12), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
             )
             .overlay(alignment: .leading) {
@@ -1300,6 +1321,7 @@ private struct AgentCommandRow: View {
             }
         }
         .buttonStyle(.plain)
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
     }
@@ -1321,9 +1343,13 @@ private struct AgentCommandCard: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: icon)
                         .font(.system(size: 16, weight: .black))
-                        .foregroundColor(tone.color)
+                        .foregroundColor(.saveInk)
                         .frame(width: 34, height: 34)
-                        .background(tone.color.opacity(0.12))
+                        .background(tone.color.opacity(0.42))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                     Spacer(minLength: 0)
@@ -1333,7 +1359,7 @@ private struct AgentCommandCard: View {
                         .fontWeight(.bold)
                         .foregroundColor(tone.color)
                         .padding(6)
-                        .background(tone.color.opacity(0.08))
+                        .background(tone.color.opacity(0.24))
                         .clipShape(Circle())
                 }
 
@@ -1370,15 +1396,16 @@ private struct AgentCommandCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.saveNotebookPage.opacity(0.94))
+                    .fill(Color.saveNotebookPage.opacity(0.96))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(tone.color.opacity(0.12), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .shadow(color: Color.saveInk.opacity(0.18), radius: 0, x: 4, y: 4)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
     }
