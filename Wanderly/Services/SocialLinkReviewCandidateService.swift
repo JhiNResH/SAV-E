@@ -826,6 +826,24 @@ final class SocialLinkReviewCandidateService {
 
     private func sourceOnlyCandidate(evidenceText: String, sourceURL: String) -> PendingReviewCandidate {
         let diagnostic = sourceOnlyDiagnostic(evidenceText: evidenceText, sourceURL: sourceURL)
+        if let candidateName = unresolvedPlaceCandidateName(from: diagnostic.suggestedSearchQueries ?? []) {
+            let upgradedDiagnostic = unresolvedPlaceDiagnostic(from: diagnostic, candidateName: candidateName)
+            return PendingReviewCandidate(
+                candidateName: candidateName,
+                address: "",
+                category: category(from: "\(candidateName) \(evidenceText)"),
+                latitude: nil,
+                longitude: nil,
+                sourceURL: sourceURL,
+                sourceText: evidenceText.isEmpty ? nil : evidenceText,
+                evidence: upgradedDiagnostic.found + upgradedDiagnostic.attempts + diagnosticSearchEvidence(upgradedDiagnostic) + ["Next best clue: \(upgradedDiagnostic.nextBestClue)"],
+                confidence: 0.32,
+                missingInfo: upgradedDiagnostic.missingFields,
+                savedAt: Date(),
+                evidenceDiagnostic: upgradedDiagnostic,
+                reviewState: "unresolved_place_candidate"
+            )
+        }
         return PendingReviewCandidate(
             candidateName: sourceOnlyDisplayName(for: sourceURL),
             address: "",
@@ -848,9 +866,13 @@ final class SocialLinkReviewCandidateService {
         evidenceText: String,
         sourceURL: String
     ) -> PendingReviewCandidate {
-        let diagnostic = placeBearingDiagnostic(from: analysis, evidenceText: evidenceText, sourceURL: sourceURL)
+        var diagnostic = placeBearingDiagnostic(from: analysis, evidenceText: evidenceText, sourceURL: sourceURL)
+        let candidateName = unresolvedPlaceCandidateName(from: diagnostic.suggestedSearchQueries ?? [], analysis: analysis)
+        if let candidateName {
+            diagnostic = unresolvedPlaceDiagnostic(from: diagnostic, candidateName: candidateName)
+        }
         return PendingReviewCandidate(
-            candidateName: placeBearingCandidateName(from: analysis),
+            candidateName: candidateName ?? placeBearingCandidateName(from: analysis),
             address: "",
             category: category(for: analysis.sourceIntent),
             sourceURL: sourceURL,
@@ -860,8 +882,28 @@ final class SocialLinkReviewCandidateService {
             missingInfo: diagnostic.missingFields,
             savedAt: Date(),
             evidenceDiagnostic: diagnostic,
-            reviewState: "place_bearing_source"
+            reviewState: candidateName == nil ? "place_bearing_source" : "unresolved_place_candidate"
         )
+    }
+
+    private func unresolvedPlaceDiagnostic(
+        from diagnostic: SocialPlaceEvidenceDiagnostic,
+        candidateName: String
+    ) -> SocialPlaceEvidenceDiagnostic {
+        var upgraded = diagnostic
+        upgraded.found = appendUnique(upgraded.found, ["Candidate place name: \(candidateName)"])
+        upgraded.attempts = appendUnique(upgraded.attempts, ["Promoted source clue to unresolved place candidate instead of showing the source as the title"])
+        upgraded.missingFields = appendUnique(
+            upgraded.missingFields.filter { missing in
+                let lowered = missing.lowercased()
+                return !lowered.contains("place name") &&
+                    !lowered.contains("exact restaurant name") &&
+                    !lowered.contains("exact venue")
+            },
+            ["Verified address", "Verified coordinates"]
+        )
+        upgraded.nextBestClue = "Confirm the address or Google Places match before saving this as a Map Stamp."
+        return upgraded
     }
 
     private func placeBearingDiagnostic(
@@ -1013,6 +1055,80 @@ final class SocialLinkReviewCandidateService {
         case .nonPlace, .creatorOnly:
             return "Social link"
         }
+    }
+
+    private func unresolvedPlaceCandidateName(
+        from searchQueries: [String],
+        analysis: SocialPlaceAgentAnalysis? = nil
+    ) -> String? {
+        let analysisHints = analysis.map { current in
+            ([current.topic].compactMap { $0 } + current.recoveryHints
+                .filter { $0.label != "region" && $0.label != "category" }
+                .map(\.queryFragment))
+        } ?? []
+
+        for rawValue in analysisHints + searchQueries {
+            guard let candidate = unresolvedPlaceCandidateName(fromRawSearchText: rawValue) else { continue }
+            return candidate
+        }
+        return nil
+    }
+
+    private func unresolvedPlaceCandidateName(fromRawSearchText rawValue: String) -> String? {
+        var candidate = cleanHTMLText(rawValue)
+            .replacingOccurrences(of: #"https?://\S+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"site:\S+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\bD[A-Za-z0-9_-]{6,}\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\binstagram\s+reel\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(?:restaurant|venue|place|address|cafe|coffee|hotel|map)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\"'“”"))
+
+        if candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil {
+            for marker in [" 台北", " 臺北", " Taipei", " Taiwan", " 士林站", " Shilin Station"] {
+                if let range = candidate.range(of: marker, options: [.caseInsensitive]) {
+                    candidate = String(candidate[..<range.lowerBound])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
+                }
+            }
+        }
+
+        candidate = candidate
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，\"'“”"))
+
+        guard candidate.count >= 2, candidate.count <= 80 else { return nil }
+        let hasCJK = candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil
+        if !hasCJK && candidate.count <= 3 { return nil }
+        guard isUsableCandidateName(candidate) else { return nil }
+        guard !looksLikeMarketingLine(candidate) else { return nil }
+
+        let lowered = candidate.lowercased()
+        if ["la", "oc", "nyc", "sf", "taipei", "tokyo"].contains(lowered) { return nil }
+        let genericValues = [
+            "instagram",
+            "social link",
+            "restaurant recommendation",
+            "restaurants in",
+            "restaurant in",
+            "coffee shops in",
+            "coffee shop in",
+            "cafes in",
+            "cafe in",
+            "where to eat",
+            "favorite restaurants",
+            "best restaurants",
+            "top restaurants",
+            "hidden gems",
+            "coffee shop clue",
+            "place clue",
+            "source clue"
+        ]
+        if genericValues.contains(where: { lowered.contains($0) }) { return nil }
+        if lowered.range(of: #"^(favorite|favourite|best|top|must-try|must try|iconic)\b"#, options: .regularExpression) != nil {
+            return nil
+        }
+        return candidate
     }
 
     private func category(for intent: SocialPlaceSourceIntent) -> String {
