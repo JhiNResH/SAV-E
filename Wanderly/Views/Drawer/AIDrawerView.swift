@@ -1305,6 +1305,24 @@ private enum AgentCommandTone {
         case .cocoa: return .saveMint
         }
     }
+
+    var textColor: Color {
+        switch self {
+        case .signal: return .saveSignal
+        case .honey: return .saveInk
+        case .sky: return .saveInk
+        case .cocoa: return .saveInk
+        }
+    }
+
+    var chipFill: Color {
+        switch self {
+        case .signal: return .saveSignal.opacity(0.18)
+        case .honey: return .saveHoney.opacity(0.58)
+        case .sky: return .saveSky.opacity(0.46)
+        case .cocoa: return .saveMint.opacity(0.54)
+        }
+    }
 }
 
 private struct AgentCommandRow: View {
@@ -1340,7 +1358,7 @@ private struct AgentCommandRow: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.saveCocoa.opacity(0.74))
+                        .foregroundColor(.saveInk.opacity(0.82))
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1350,13 +1368,23 @@ private struct AgentCommandRow: View {
                 VStack(alignment: .trailing, spacing: 8) {
                     Image(systemName: "arrow.up.right")
                         .font(.caption2.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .padding(5)
+                        .background(tone.chipFill)
+                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1))
+                        .clipShape(Circle())
                     Text(commandLabel.uppercased())
                         .font(.caption2.weight(.black))
+                        .foregroundColor(tone.textColor)
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
                         .minimumScaleFactor(0.72)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(tone.chipFill)
+                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                        .clipShape(Capsule())
                 }
-                .foregroundColor(tone.color)
                 .frame(maxWidth: 82, alignment: .trailing)
             }
             .padding(12)
@@ -1431,7 +1459,7 @@ private struct AgentCommandCard: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.saveCocoa.opacity(0.74))
+                        .foregroundColor(.saveInk.opacity(0.82))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1440,12 +1468,13 @@ private struct AgentCommandCard: View {
                 Text(commandLabel.uppercased())
                     .font(.caption2)
                     .fontWeight(.black)
-                    .foregroundColor(tone.color)
+                    .foregroundColor(tone.textColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(tone.color.opacity(0.08))
+                    .background(tone.chipFill)
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
                     .clipShape(Capsule())
 
                 Spacer(minLength: 0)
