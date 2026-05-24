@@ -9,7 +9,7 @@ struct StatsView: View {
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8),
         ], spacing: 8) {
-            StatItem(value: "\(profile.savedCount)", label: "Memories", color: .saveBerry, icon: "rectangle.stack.fill")
+            StatItem(value: "\(profile.savedCount)", label: "Memories", color: .saveCocoa, icon: "rectangle.stack.fill")
             StatItem(value: "\(profile.visitedCount)", label: "Verified", color: .saveSuccess, icon: "checkmark.seal.fill")
             StatItem(value: "\(profile.citiesCount)", label: "Cities", color: .saveHoney, icon: "building.2.fill")
             StatItem(value: "\(waitingClues)", label: "Waiting clues", color: .saveSignal, icon: "circle.hexagongrid.fill")
@@ -45,7 +45,13 @@ struct StatItem: View {
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(color.opacity(0.10))
+        .background(Color.saveNotebookLine.opacity(0.22))
+        .overlay(alignment: .topLeading) {
+            Circle()
+                .fill(color.opacity(0.16))
+                .frame(width: 28, height: 28)
+                .offset(x: -8, y: -8)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

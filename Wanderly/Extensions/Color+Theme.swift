@@ -17,27 +17,27 @@ extension Color {
     static let wanderlySecondary = Color("WanderlySecondary")
     static let wanderlyText = Color("WanderlyText")
 
-    // MARK: - SAV-E Pastel Notebook Theme
-    static let saveBlush = Color(hex: "FFF6F8")
-    static let savePeach = Color(hex: "FFF1D8")
-    static let saveCream = Color(hex: "FFF8E8")
-    static let saveMint = Color(hex: "F1FBF5")
-    static let saveBerry = Color(hex: "E8849B")
-    static let saveCocoa = Color(hex: "6B4E57")
-    static let saveRose = Color(hex: "9B6B78")
-    static let saveHoney = Color(hex: "F4B860")
-    static let saveSky = Color(hex: "BEE7F8")
-    static let saveLavender = Color(hex: "DCC8FF")
+    // MARK: - SAV-E Field Notebook Theme
+    static let saveBlush = Color(hex: "FFF2E8")
+    static let savePeach = Color(hex: "F1C889")
+    static let saveCream = Color(hex: "FFF1DF")
+    static let saveMint = Color(hex: "EAF1E7")
+    static let saveBerry = Color(hex: "D85D4D")
+    static let saveCocoa = Color(hex: "3D302A")
+    static let saveRose = Color(hex: "8D5D4D")
+    static let saveHoney = Color(hex: "FFD719")
+    static let saveSky = Color(hex: "79D4DE")
+    static let saveLavender = Color(hex: "EDE4D5")
     static let saveCard = Color.white.opacity(0.82)
     static let saveInk = Color(hex: "241D21")
     static let savePaper = Color(hex: "FFFDF7")
     static let saveLedger = Color(hex: "EFE7D6")
-    static let saveSignal = Color(hex: "7C8CFF")
-    static let saveSuccess = Color(hex: "7FB78A")
-    static let saveNotebookBackground = Color(hex: "F4F1FF")
-    static let saveNotebookPage = Color(hex: "FFFDF8")
-    static let saveNotebookSpine = Color(hex: "F1D7C8")
-    static let saveNotebookLine = Color(hex: "EDE4D4")
+    static let saveSignal = Color(hex: "6E7F67")
+    static let saveSuccess = Color(hex: "6F946D")
+    static let saveNotebookBackground = Color(hex: "F4B51B")
+    static let saveNotebookPage = Color(hex: "FFF1DF")
+    static let saveNotebookSpine = Color(hex: "FFD719")
+    static let saveNotebookLine = Color(hex: "3D302A")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
@@ -54,18 +54,18 @@ extension Color {
     static func saveStampColor(for category: PlaceCategory) -> Color {
         switch category {
         case .food: return .saveBerry
-        case .cafe: return .savePeach
-        case .bar: return .saveLavender
-        case .attraction: return .saveSky
+        case .cafe: return .saveHoney
+        case .bar: return .saveCocoa
+        case .attraction: return .saveSignal
         case .stay: return .saveMint
-        case .shopping: return .saveHoney
+        case .shopping: return .savePeach
         }
     }
 
     static func saveStampForeground(for category: PlaceCategory) -> Color {
         switch category {
-        case .cafe, .stay, .attraction, .shopping: return .saveCocoa
-        case .food, .bar: return .white
+        case .cafe, .stay, .shopping: return .saveCocoa
+        case .food, .bar, .attraction: return .white
         }
     }
 
@@ -113,9 +113,27 @@ extension View {
         background(Color.saveNotebookPage)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.saveCocoa.opacity(0.10), lineWidth: 1)
+                    .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.saveCocoa.opacity(0.08), radius: 14, y: 7)
+            .shadow(color: Color.saveInk.opacity(0.16), radius: 0, x: 3, y: 3)
+    }
+}
+
+struct SaveDottedBackground: View {
+    var body: some View {
+        Color.saveNotebookBackground
+            .overlay {
+                Canvas { context, size in
+                    let spacing: CGFloat = 14
+                    for x in stride(from: CGFloat(7), through: size.width, by: spacing) {
+                        for y in stride(from: CGFloat(7), through: size.height, by: spacing) {
+                            let rect = CGRect(x: x, y: y, width: 2.2, height: 2.2)
+                            context.fill(Path(ellipseIn: rect), with: .color(Color.saveInk.opacity(0.28)))
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
+            }
     }
 }

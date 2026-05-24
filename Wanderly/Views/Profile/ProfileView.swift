@@ -73,7 +73,7 @@ struct ProfileView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .background(Color.saveNotebookBackground)
+            .background(SaveDottedBackground())
             .toolbar(.hidden, for: .navigationBar)
         }
         .task {
@@ -175,7 +175,7 @@ private struct EditProfileSheet: View {
 
                 Spacer()
             }
-            .background(Color.saveNotebookBackground)
+            .background(SaveDottedBackground())
             .toolbar(.hidden, for: .navigationBar)
         }
         .onAppear {
@@ -216,17 +216,17 @@ private struct PassportTopBar: View {
                 .foregroundColor(.saveInk)
                 .padding(.horizontal, 11)
                 .frame(height: 38)
-                .background(Color.saveHoney.opacity(0.42))
+                .background(Color.saveNotebookLine.opacity(0.70))
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
         }
         .padding(10)
-        .background(.ultraThinMaterial)
+        .background(Color.saveNotebookPage.opacity(0.96))
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.saveNotebookPage.opacity(0.78), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(0.88), lineWidth: 1.2)
         )
     }
 }
@@ -260,7 +260,7 @@ private struct PassportHero: View {
                 HStack(alignment: .top, spacing: 14) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.saveSky.opacity(0.72))
+                            .fill(Color.saveNotebookLine.opacity(0.70))
                         Image(systemName: "passport.fill")
                             .font(.system(size: 32, weight: .black))
                             .foregroundColor(.saveInk)
@@ -293,14 +293,14 @@ private struct PassportHero: View {
 
                 HStack(spacing: 8) {
                     PassportBadge(text: "MEMORY AGENT", color: .saveHoney)
-                    PassportBadge(text: "REVIEW FIRST", color: .saveSky)
+                    PassportBadge(text: "REVIEW FIRST", color: .saveSignal)
                     Spacer()
                     Button(action: onEdit) {
                         Image(systemName: "pencil")
                             .font(.caption.weight(.black))
                             .foregroundColor(.saveInk)
                             .frame(width: 32, height: 32)
-                            .background(Color.savePeach.opacity(0.88))
+                            .background(Color.saveNotebookLine.opacity(0.78))
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)

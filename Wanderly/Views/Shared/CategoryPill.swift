@@ -19,11 +19,11 @@ struct CategoryPill: View {
         .padding(.leading, 6)
         .padding(.trailing, 10)
         .padding(.vertical, 5)
-        .background(isSelected ? stampColor.opacity(0.26) : Color.saveNotebookPage.opacity(0.82))
+        .background(isSelected ? Color.saveHoney.opacity(0.80) : Color.saveNotebookPage.opacity(0.90))
         .foregroundColor(isSelected ? .saveInk : .saveCocoa)
         .overlay(
             RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(isSelected ? stampColor.opacity(0.62) : Color.saveCocoa.opacity(0.10), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(isSelected ? 0.82 : 0.24), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
         .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.10 : 0.04), radius: 8, y: 4)

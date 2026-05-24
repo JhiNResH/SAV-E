@@ -29,7 +29,7 @@ struct AIDrawerView: View {
                 contentArea
             }
         }
-        .background(Color.saveNotebookBackground)
+        .background(SaveDottedBackground())
         .sheet(isPresented: $viewModel.showPlaceList) {
             PlaceListView()
         }
@@ -120,7 +120,7 @@ struct AIDrawerView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(height: 64)
-        .background(Color.saveNotebookPage.opacity(0.86))
+        .background(Color.saveNotebookPage.opacity(0.92))
     }
 
     // MARK: - Content
@@ -858,14 +858,14 @@ private struct FieldNotebookHeader: View {
                         .foregroundColor(.saveInk)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(Color.saveSky.opacity(0.78))
+                        .background(Color.saveNotebookLine.opacity(0.82))
                         .clipShape(Capsule())
                 }
 
                 HStack(spacing: 8) {
-                    FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveBerry)
+                    FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
                     FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
-                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSky)
+                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveSignal)
                 }
             }
             .padding(14)
@@ -915,7 +915,7 @@ private struct FieldNotebookStat: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
-        .background(color.opacity(0.22))
+        .background(color.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -934,7 +934,7 @@ private struct NotebookBandLabel: View {
                 .foregroundColor(.saveInk)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(Color.saveLavender.opacity(0.48))
+                .background(Color.saveNotebookLine.opacity(0.46))
                 .clipShape(Capsule())
             Rectangle()
                 .fill(Color.saveNotebookLine)
@@ -997,9 +997,9 @@ private struct ReviewCandidatesEmptyState: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.saveBerry)
+                .foregroundColor(.saveCocoa)
                 .frame(width: 34, height: 34)
-                .background(Color.saveBlush)
+                .background(Color.saveNotebookLine.opacity(0.42))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -1030,20 +1030,20 @@ private struct ReviewCandidateCard: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            NotebookSpine(color: candidate.hasReliableCoordinates ? .saveMint : .savePeach)
+            NotebookSpine(color: candidate.hasReliableCoordinates ? .saveSignal : .saveNotebookSpine)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 11) {
                     ZStack {
                         Circle()
-                            .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.savePeach)
+                            .fill(candidate.hasReliableCoordinates ? Color.saveMint : Color.saveNotebookLine.opacity(0.72))
                             .overlay(
                                 Circle()
                                     .stroke(Color.saveCocoa.opacity(0.12), lineWidth: 1)
                             )
                         Image(systemName: candidate.hasReliableCoordinates ? "seal.fill" : "circle.hexagongrid.fill")
                             .font(.system(size: 17, weight: .black))
-                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveHoney)
+                            .foregroundColor(candidate.hasReliableCoordinates ? .saveCocoa : .saveRose)
                     }
                     .frame(width: 40, height: 40)
 
@@ -1066,7 +1066,7 @@ private struct ReviewCandidateCard: View {
 
                         HStack(spacing: 6) {
                             if let confidence = candidate.confidence {
-                                StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveBerry)
+                                StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveCocoa)
                             }
                             StampChip(text: candidate.status.replacingOccurrences(of: "_", with: " "), color: .saveHoney)
                         }

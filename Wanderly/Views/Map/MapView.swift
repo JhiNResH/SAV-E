@@ -88,11 +88,11 @@ struct MapView: View {
                 .padding(.leading, 12)
                 .padding(.trailing, 10)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
+                .background(Color.saveNotebookPage.opacity(0.92))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.saveNotebookPage.opacity(0.78), lineWidth: 1)
+                        .stroke(Color.saveNotebookLine.opacity(0.60), lineWidth: 1.1)
                 )
                 .shadow(color: Color.saveCocoa.opacity(0.12), radius: 14, y: 6)
                 .padding(.horizontal, 12)
