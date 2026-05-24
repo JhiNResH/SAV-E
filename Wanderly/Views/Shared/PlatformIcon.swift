@@ -25,7 +25,7 @@ struct PlatformIcon: View {
     private var iconColor: Color {
         switch platform {
         case .instagram, .threads, .xiaohongshu, .googleMaps: return .saveCocoa
-        case .other: return .secondary
+        case .other: return .saveMutedText
         }
     }
 }

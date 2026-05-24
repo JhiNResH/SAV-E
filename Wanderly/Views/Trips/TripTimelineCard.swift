@@ -27,16 +27,16 @@ struct TripTimelineCard: View {
                     if let time = stop.startTime {
                         Label(time, systemImage: "clock")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
 
                     if let duration = stop.duration {
                         Label(formatDuration(duration), systemImage: "hourglass")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
 
-                    Text("Day \(stop.day)")
+                    Text("Memory stop · Day \(stop.day)")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.saveCocoa)
@@ -45,7 +45,7 @@ struct TripTimelineCard: View {
                 if let note = stop.note {
                     Text(note)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                         .italic()
                 }
             }
@@ -53,7 +53,7 @@ struct TripTimelineCard: View {
             Spacer()
 
             Image(systemName: "line.3.horizontal")
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
                 .font(.caption)
         }
         .padding(.vertical, 4)

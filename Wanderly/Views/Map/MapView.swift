@@ -75,8 +75,7 @@ private struct TopNotebookNavBar: View {
     var body: some View {
         HStack(spacing: 9) {
             HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.caption.weight(.black))
+                MemoMascotMark(size: 24, framed: false)
                 Text("SAV-E")
                     .font(.caption.weight(.black))
                     .lineLimit(1)
@@ -84,7 +83,7 @@ private struct TopNotebookNavBar: View {
             .foregroundColor(.saveInk)
             .padding(.horizontal, 10)
             .frame(height: 38)
-            .background(Color.saveHoney)
+            .background(Color.saveCream.opacity(0.98))
             .overlay(
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .stroke(Color.saveNotebookLine, lineWidth: 1.6)
@@ -138,14 +137,14 @@ private struct PassportNavButton: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.saveMint)
+                    .fill(Color.saveCream)
                     .frame(width: 42, height: 38)
                     .overlay(
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                     )
 
-                Image(systemName: "person.crop.circle.fill")
+                Image(systemName: "person.crop.circle")
                     .font(.system(size: 21, weight: .black))
                     .foregroundColor(.saveInk)
 
@@ -214,7 +213,27 @@ struct PlaceMapPin: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 ZStack(alignment: .topTrailing) {
-                    SaveEggBadge(state: .hatched(place.category), size: 42)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.saveCream)
+                            .frame(width: 40, height: 34)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
+
+                        HStack(spacing: 2) {
+                            Image(systemName: place.category.iconName)
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(.saveInk)
+                            Rectangle()
+                                .fill(Color.saveSky)
+                                .frame(width: 4, height: 18)
+                            Rectangle()
+                                .fill(Color.saveHoney)
+                                .frame(width: 4, height: 18)
+                        }
+                    }
 
                     if place.status == .visited {
                         Image(systemName: "checkmark.seal.fill")
@@ -227,7 +246,7 @@ struct PlaceMapPin: View {
 
                 Image(systemName: "triangle.fill")
                     .font(.system(size: 8))
-                    .foregroundColor(Color.saveStampColor(for: place.category))
+                    .foregroundColor(.saveNotebookLine)
                     .rotationEffect(.degrees(180))
                     .offset(y: -2)
             }

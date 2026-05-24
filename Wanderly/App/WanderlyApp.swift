@@ -255,20 +255,18 @@ struct SignInView: View {
 private struct SignInHero: View {
     var body: some View {
         VStack(spacing: 18) {
-            ZStack {
-                SaveEggBadge(state: .clue, size: 98)
-            }
+            MemoMascotMark(size: 132)
 
             VStack(spacing: 8) {
                 Text("SAV-E")
                     .font(.system(size: 38, weight: .bold, design: .rounded))
                     .foregroundColor(.saveInk)
 
-                Text("Your personal place agent.")
+                Text("Your personal place memory.")
                     .font(.title3.weight(.semibold))
                     .foregroundColor(.saveInk)
 
-                Text("Send links, posts, screenshots, notes, or maps. SAV-E investigates first, then asks before saving.")
+                Text("Drop in links, posts, screenshots, notes, or maps. Memo helps SAV-E turn them into reviewable place cards.")
                     .font(.subheadline)
                     .lineSpacing(3)
                     .foregroundColor(.saveInk.opacity(0.66))
@@ -283,7 +281,7 @@ private struct SignInWorkflowStrip: View {
     private let steps: [(String, String, Color)] = [
         ("Capture", "link or media", .saveHoney),
         ("Review", "with evidence", .saveSky),
-        ("Hatch", "memory cards", .saveMint),
+        ("Save", "memory cards", .saveMint),
     ]
 
     var body: some View {

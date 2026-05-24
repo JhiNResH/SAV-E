@@ -39,7 +39,7 @@ struct StatItem: View {
             }
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }

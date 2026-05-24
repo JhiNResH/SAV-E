@@ -25,7 +25,7 @@ private struct EvidenceLinkRow: View {
             if !displayText.isEmpty {
                 Text(displayText)
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -39,8 +39,9 @@ private struct EvidenceLinkRow: View {
                                 .lineLimit(1)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.saveCocoa.opacity(0.1))
-                                .foregroundColor(.saveCocoa)
+                                .background(Color.saveNotebookPage)
+                                .foregroundColor(.saveInk)
+                                .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
                                 .clipShape(Capsule())
                         }
                     }

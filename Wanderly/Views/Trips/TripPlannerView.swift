@@ -11,10 +11,10 @@ struct TripPlannerView: View {
             Group {
                 if viewModel.trips.isEmpty {
                     EmptyStateView(
-                        icon: "airplane",
-                        title: "No Trips Yet",
-                        subtitle: "Plan your next adventure by creating a trip and adding saved places.",
-                        actionTitle: "Create Trip",
+                        icon: "map.fill",
+                        title: "No Plans Yet",
+                        subtitle: "Ask SAV-E to turn verified memory cards into a practical day plan.",
+                        actionTitle: "Create Plan",
                         action: { showNewTrip = true }
                     )
                 } else {
@@ -32,7 +32,7 @@ struct TripPlannerView: View {
                     .background(SaveDottedBackground())
                 }
             }
-            .navigationTitle("Trips")
+            .navigationTitle("Plans")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: { showNewTrip = true }) {
@@ -44,8 +44,8 @@ struct TripPlannerView: View {
             .navigationDestination(for: Trip.self) { trip in
                 TripDetailView(trip: trip, viewModel: viewModel)
             }
-            .alert("New Trip", isPresented: $showNewTrip) {
-                TextField("Trip Name", text: $newTripName)
+            .alert("New Plan", isPresented: $showNewTrip) {
+                TextField("Plan Name", text: $newTripName)
                 TextField("City", text: $newTripCity)
                 Button("Create") {
                     Task {
@@ -73,6 +73,15 @@ struct TripCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text(trip.isOptimized ? "ROUTE READY" : "PLAN DRAFT")
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(trip.isOptimized ? Color.saveMint : Color.saveHoney.opacity(0.56))
+                .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                .clipShape(Capsule())
+
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(trip.name)
@@ -81,7 +90,7 @@ struct TripCard: View {
 
                     Text(trip.city)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 Spacer()
@@ -96,11 +105,11 @@ struct TripCard: View {
             HStack(spacing: 16) {
                 Label(trip.dateRangeText, systemImage: "calendar")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
 
-                Label("\(trip.places.count) stops", systemImage: "mappin")
+                Label("\(trip.places.count) memory stops", systemImage: "mappin")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
             }
         }
         .padding(16)
@@ -123,7 +132,7 @@ struct TripDetailView: View {
                     Label("\(trip.places.count) stops", systemImage: "mappin")
                 }
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
             }
 
             Section("Timeline") {
@@ -148,11 +157,11 @@ struct TripDetailView: View {
                     .foregroundColor(.saveInk)
                     .padding(.vertical, 10)
                     .background(Color.saveHoney)
-                    .cornerRadius(16)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(viewModel.isOptimizing)
                 .listRowBackground(Color.clear)

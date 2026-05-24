@@ -30,6 +30,9 @@ struct TripItineraryComponent: View {
                             .foregroundColor(.saveInk.opacity(0.78))
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    Text("Built from verified memory cards.")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.saveMutedText)
                 }
                 Spacer()
 

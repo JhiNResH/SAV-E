@@ -45,7 +45,7 @@ struct PlaceListComponent: View {
             }
 
             if places.isEmpty {
-                Text("No matching places in your collection.")
+                Text("No matching memory cards yet.")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.saveInk.opacity(0.72))

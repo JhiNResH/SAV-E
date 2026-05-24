@@ -67,7 +67,7 @@ struct AIDrawerView: View {
                 .foregroundColor(.saveInk)
                 .font(.caption.weight(.black))
                 .frame(width: 28, height: 28)
-                .background(Color.saveHoney)
+                .background(Color.saveCream)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .stroke(Color.saveNotebookLine, lineWidth: 2)
@@ -163,7 +163,7 @@ struct AIDrawerView: View {
             VStack(spacing: 12) {
                 Spacer()
                 ProgressView().tint(.saveInk)
-                Text("Thinking...").font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
+                Text("Memo is sorting the clues...").font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
                 Button(action: {
                     viewModel.cancelCurrentRequest()
                     searchFocused = false
@@ -420,7 +420,7 @@ struct AIDrawerView: View {
                         )
 
                         DrawerActionChip(
-                            title: "Nest",
+                            title: "Review",
                             systemImage: "circle.hexagongrid.fill",
                             count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
                             fill: Color.saveHoney.opacity(0.84),
@@ -472,7 +472,7 @@ struct AIDrawerView: View {
     private let suggestions = [
         "Show my food spots on the map",
         "Navigate to the nearest cafe",
-        "Plan a 2-day itinerary",
+        "Plan a day from my memory cards",
         "What haven't I visited yet?",
     ]
 
@@ -499,8 +499,8 @@ struct AIDrawerView: View {
                 HStack(spacing: 9) {
                     AgentCommandCard(
                         icon: "circle.hexagongrid.fill",
-                        title: "Review Nest",
-                        subtitle: "Hatch clue eggs into memories",
+                        title: "Review",
+                        subtitle: "Turn clues into memory cards",
                         commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
                         tone: .honey
                     ) {
@@ -565,14 +565,14 @@ struct AIDrawerView: View {
                 AgentCommandRow(
                     icon: "map.fill",
                     title: "Plan from memories",
-                    subtitle: "Build a route from confirmed places only.",
+                    subtitle: "Build a route from verified memory cards.",
                     commandLabel: "uses saved spots",
                     tone: .sky
                 ) {
                     focusAgentPrompt("""
                     Help me organize my saved places into a practical plan.
 
-                    Use only confirmed saved places unless I explicitly ask you to investigate new candidates. Start with:
+                    Use only verified memory cards unless I explicitly ask you to investigate new candidates. Start with:
                     """)
                 }
             }
@@ -582,17 +582,17 @@ struct AIDrawerView: View {
                 limit: 2,
                 actionInFlight: candidateActionInFlight,
                 onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Place confirmed. Hatch it when the address is ready.") {
+                    performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
                         try await onConfirmCandidate(candidate)
                     }
                 },
                 onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Clue egg cleared from the nest.") {
+                    performCandidateAction(candidate, successMessage: "Review clue cleared.") {
                         try await onRejectCandidate(candidate)
                     }
                 },
                 onSave: { candidate in
-                    performCandidateAction(candidate, successMessage: hatchFeedback(for: candidate)) {
+                    performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
                         try await onSaveCandidate(candidate)
                     }
                 }
@@ -640,17 +640,17 @@ struct AIDrawerView: View {
                     limit: nil,
                     actionInFlight: candidateActionInFlight,
                     onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Place confirmed. Hatch it when the address is ready.") {
+                        performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
                             try await onConfirmCandidate(candidate)
                         }
                     },
                     onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Clue egg cleared from the nest.") {
+                        performCandidateAction(candidate, successMessage: "Review clue cleared.") {
                             try await onRejectCandidate(candidate)
                         }
                     },
                     onSave: { candidate in
-                        performCandidateAction(candidate, successMessage: hatchFeedback(for: candidate)) {
+                        performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
                             try await onSaveCandidate(candidate)
                         }
                     }
@@ -711,7 +711,7 @@ struct AIDrawerView: View {
             return
         }
 
-        addSpotStatus = "Clipboard link loaded. SAV-E will save possible places to Review Nest first."
+        addSpotStatus = "Clipboard link loaded. SAV-E will save possible places to Review first."
         importURLToReviewCandidates(url)
     }
 
@@ -779,7 +779,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         searchFocused = false
         isImportingURL = true
-        addSpotStatus = "Checking the link and saving possible places to Review Nest..."
+        addSpotStatus = "Checking the link and saving possible places to Review..."
         viewModel.returnToCommands()
         withAnimation { drawerDetent = .medium }
 
@@ -787,8 +787,8 @@ struct AIDrawerView: View {
             do {
                 let count = try await onImportURLAsReviewCandidates(url)
                 addSpotStatus = count == 1
-                    ? "Saved 1 possible place to Review Nest. Check the receipt, then hatch it."
-                    : "Saved \(count) possible places to Review Nest. Check receipts before hatching them."
+                    ? "Saved 1 possible place to Review. Check the receipt, then save it."
+                    : "Saved \(count) possible places to Review. Check receipts before saving them."
                 openReviewInbox()
             } catch {
                 addSpotStatus = error.localizedDescription
@@ -798,9 +798,9 @@ struct AIDrawerView: View {
         }
     }
 
-    private func hatchFeedback(for candidate: PlaceReviewCandidate) -> String {
+    private func saveFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
-        return "Memory hatched · +1 \(category.displayName.lowercased()) card"
+        return "Memory saved · +1 \(category.displayName.lowercased()) card"
     }
 }
 
@@ -810,12 +810,12 @@ private struct FieldNotebookHeader: View {
 
     private var statusText: String {
         if clueCount > 0 {
-            return "\(clueCount) clue eggs waiting to hatch"
+            return "\(clueCount) clues waiting to save"
         }
         if memoryCount > 0 {
             return "Ready to investigate the next save"
         }
-        return "Waiting for the first clue egg"
+        return "Waiting for the first place clue"
     }
 
     var body: some View {
@@ -824,18 +824,10 @@ private struct FieldNotebookHeader: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .fill(Color.saveHoney)
-                            .rotationEffect(.degrees(-4))
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 18, weight: .black))
-                            .foregroundColor(.saveInk)
-                    }
-                    .frame(width: 46, height: 46)
+                    MemoMascotMark(size: 52)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("SAV-E Field Notebook")
+                        Text("SAV-E Memo Book")
                             .font(.title3)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
@@ -851,12 +843,12 @@ private struct FieldNotebookHeader: View {
 
                     Spacer(minLength: 0)
 
-                    Text("OPEN")
+                    Text("MEMO")
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveInk)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
-                        .background(Color.saveMint)
+                        .background(Color.saveSky.opacity(0.58))
                         .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.2))
                         .clipShape(Capsule())
                 }
@@ -864,7 +856,7 @@ private struct FieldNotebookHeader: View {
                 HStack(spacing: 8) {
                     FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
                     FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
-                    FieldNotebookStat(title: "MODE", value: "AGENT", color: .saveCocoa)
+                    FieldNotebookStat(title: "HELPER", value: "MEMO", color: .saveSky)
                 }
             }
             .padding(14)
@@ -966,7 +958,7 @@ private struct ReviewCandidatesSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                NotebookBandLabel("Review Nest")
+                NotebookBandLabel("Review")
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text("\(candidates.count)")
@@ -1016,12 +1008,12 @@ private struct ReviewCandidatesEmptyState: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("No clue eggs waiting")
+                Text("No clues waiting")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.saveInk)
 
-                Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clue eggs until you hatch them into memory cards.")
+                Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clues until you save them as memory cards.")
                     .font(.caption)
                     .foregroundColor(.saveCocoa.opacity(0.74))
                     .fixedSize(horizontal: false, vertical: true)
@@ -1070,7 +1062,7 @@ private struct ReviewCandidateCard: View {
                             if let confidence = candidate.confidence {
                                 StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveCocoa)
                             }
-                            StampChip(text: candidate.hasReliableCoordinates ? "map ready" : "1 clue missing", color: .saveHoney)
+                            StampChip(text: candidate.hasReliableCoordinates ? "maybe · map ready" : "maybe · 1 clue missing", color: .saveHoney)
                         }
                     }
 
@@ -1078,7 +1070,7 @@ private struct ReviewCandidateCard: View {
                 }
 
                 Text(candidate.hasReliableCoordinates
-                     ? "I found enough map evidence. Hatch it into a saved memory card when this looks right."
+                     ? "I found enough map evidence. Save it as a memory card when this looks right."
                      : "I found the likely place, but I still need the exact address before saving it as a map pin.")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.82))
@@ -1112,7 +1104,7 @@ private struct ReviewCandidateCard: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption2)
-                        Text("Needs Google Places refinement or a map link before this can hatch.")
+                        Text("Needs Google Places refinement or a map link before this can be saved.")
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundColor(.saveCocoa)
@@ -1127,7 +1119,7 @@ private struct ReviewCandidateCard: View {
                         action: onConfirm
                     )
                     CandidateActionButton(
-                        title: candidate.hasReliableCoordinates ? "Hatch" : "Find + Hatch",
+                        title: candidate.hasReliableCoordinates ? "Save" : "Find + Save",
                         systemImage: "seal",
                         fill: .saveHoney,
                         disabled: isWorking,

@@ -1,23 +1,25 @@
 import SwiftUI
 
 extension Color {
-    // MARK: - SAV-E Field Notebook Theme
-    static let saveCream = Color(hex: "FFF7E8")
-    static let saveMint = Color(hex: "B8F5C8")
-    static let saveCocoa = Color(hex: "111111")
-    static let saveHoney = Color(hex: "FFE24A")
-    static let saveSky = Color(hex: "7EDAEF")
-    static let saveInk = Color(hex: "111111")
-    static let savePaper = Color(hex: "FFF0D6")
-    static let saveLedger = Color(hex: "FFF7E8")
-    static let saveSignal = Color(hex: "FF8A65")
-    static let saveSuccess = Color(hex: "B8F5C8")
-    static let saveCoral = Color(hex: "FF8A65")
-    static let savePink = Color(hex: "FFD7E8")
-    static let saveNotebookBackground = Color(hex: "FFF7E8")
-    static let saveNotebookPage = Color(hex: "FFF0D6")
-    static let saveNotebookSpine = Color(hex: "FFE24A")
-    static let saveNotebookLine = Color(hex: "111111")
+    // MARK: - SAV-E Memo Scrapbook Theme
+    static let saveCream = Color(hex: "FFF5E7")
+    static let saveMint = Color(hex: "C8EBCF")
+    static let saveCocoa = Color(hex: "3A2415")
+    static let saveHoney = Color(hex: "FFD66B")
+    static let saveSky = Color(hex: "8FCAEA")
+    static let saveInk = Color(hex: "3A2415")
+    static let saveMutedText = Color(hex: "7A5D45")
+    static let saveDisabled = Color(hex: "D7C0A6")
+    static let savePaper = Color(hex: "FFF0DC")
+    static let saveLedger = Color(hex: "FFF5E7")
+    static let saveSignal = Color(hex: "EE9C78")
+    static let saveSuccess = Color(hex: "C8EBCF")
+    static let saveCoral = Color(hex: "EE9C78")
+    static let savePink = Color(hex: "F6C1CB")
+    static let saveNotebookBackground = Color(hex: "FFF5E7")
+    static let saveNotebookPage = Color(hex: "FFF0DC")
+    static let saveNotebookSpine = Color(hex: "F6C181")
+    static let saveNotebookLine = Color(hex: "3A2415")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
@@ -65,6 +67,23 @@ extension View {
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
+
+    func saveOutlinedButton(
+        fill: Color = .saveHoney,
+        foreground: Color = .saveInk,
+        cornerRadius: CGFloat = 14
+    ) -> some View {
+        font(.subheadline.weight(.black))
+            .foregroundColor(foreground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(fill)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
 }
 
 struct SaveDottedBackground: View {
@@ -76,7 +95,7 @@ struct SaveDottedBackground: View {
                     for x in stride(from: CGFloat(8), through: size.width, by: spacing) {
                         for y in stride(from: CGFloat(8), through: size.height, by: spacing) {
                             let rect = CGRect(x: x, y: y, width: 2, height: 2)
-                            context.fill(Path(ellipseIn: rect), with: .color(Color.saveNotebookLine.opacity(0.08)))
+                            context.fill(Path(ellipseIn: rect), with: .color(Color.saveNotebookLine.opacity(0.055)))
                         }
                     }
                 }
