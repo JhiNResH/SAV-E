@@ -22,6 +22,7 @@
 		348DE07F8D4F598B28DE45A6 /* AIDrawerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD7B4457DC96D743D1728AD /* AIDrawerViewModel.swift */; };
 		37E5463A0876A9A8A488CBA5 /* WanderlyClipApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1EE43098CE11980FE39320 /* WanderlyClipApp.swift */; };
 		3940D24F410C832173C2A3F7 /* PrivyAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA2DE34F0656884DCAB54CD /* PrivyAuthService.swift */; };
+		3A63B4770318E849D26C5ADF /* EvidenceLinkList.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5ECE6C1F7F66FCFF9EF27DD /* EvidenceLinkList.swift */; };
 		3C47D91BEEB572F207301996 /* ClipContentPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F0D8561BF3280B1FC8411B /* ClipContentPreview.swift */; };
 		3C7C8030AE94DB96C22525E8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E13C1C53E31D45A01D6519F5 /* Assets.xcassets */; };
 		428BB50934904B5BD89A32E9 /* CategoryPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54E6F570FEC5900B20243363 /* CategoryPill.swift */; };
@@ -188,6 +189,7 @@
 		BA1EE43098CE11980FE39320 /* WanderlyClipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanderlyClipApp.swift; sourceTree = "<group>"; };
 		C09120C4FFC2D6CA18D10FDF /* SaveLocalVaultService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLocalVaultService.swift; sourceTree = "<group>"; };
 		C2F4C10AEE6E547B29704866 /* ClipContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipContentView.swift; sourceTree = "<group>"; };
+		C5ECE6C1F7F66FCFF9EF27DD /* EvidenceLinkList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceLinkList.swift; sourceTree = "<group>"; };
 		C6332D88A442A562A21E3D73 /* NavigationCardComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCardComponent.swift; sourceTree = "<group>"; };
 		D361AE888D21B3766DD265FD /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		D3F0D8561BF3280B1FC8411B /* ClipContentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipContentPreview.swift; sourceTree = "<group>"; };
@@ -387,6 +389,7 @@
 			children = (
 				54E6F570FEC5900B20243363 /* CategoryPill.swift */,
 				7ECDC9A866952173B6DC923C /* EmptyStateView.swift */,
+				C5ECE6C1F7F66FCFF9EF27DD /* EvidenceLinkList.swift */,
 				F4061D8BC422CE2AA6DCEA08 /* PlatformIcon.swift */,
 			);
 			path = Shared;
@@ -746,6 +749,7 @@
 				7D12FEF322E5753B2E2B1C58 /* Color+Theme.swift in Sources */,
 				74335232F64578F6C51A16C2 /* ContentView.swift in Sources */,
 				BCAD4123ACE867DA79F69A22 /* EmptyStateView.swift in Sources */,
+				3A63B4770318E849D26C5ADF /* EvidenceLinkList.swift in Sources */,
 				AF350EA915E5F6350300BCBE /* GooglePlacesService.swift in Sources */,
 				D53AA8C2DBC231ABA8E9ED74 /* GoogleTakeoutImport.swift in Sources */,
 				E7B4FE596AB72D438E1B8A83 /* GoogleTakeoutImportService.swift in Sources */,
@@ -1033,7 +1037,7 @@
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = "SAV-E";
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
@@ -1113,7 +1117,7 @@
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = "SAV-E";
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
