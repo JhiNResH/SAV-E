@@ -130,6 +130,10 @@ private struct PendingReviewCandidate: Codable {
     var isPlaceBearingSource: Bool {
         reviewState == "place_bearing_source"
     }
+
+    var isUnresolvedPlaceCandidate: Bool {
+        reviewState == "unresolved_place_candidate"
+    }
 }
 
 private struct ShareMemoryRecord: Codable {
@@ -461,6 +465,7 @@ struct ShareExtensionView: View {
         guard candidates.count == 1, let candidate = candidates.first else {
             return "Review each candidate in SAV-E before saving."
         }
+        if candidate.isUnresolvedPlaceCandidate { return "Possible place from Instagram Reel" }
         if candidate.isSourceOnly { return "Saved as a source clue, not a map pin yet" }
         if candidate.isPlaceBearingSource { return "Needs exact venue before Map Stamp" }
         return candidate.address.isEmpty ? "Needs address confirmation" : candidate.address
@@ -473,6 +478,9 @@ struct ShareExtensionView: View {
         if candidate.isSourceOnly {
             return "SAV-E found the source, but not enough place evidence yet. It will keep this as a clue and show exactly what is missing."
         }
+        if candidate.isUnresolvedPlaceCandidate {
+            return "SAV-E found a possible place. It still needs an address or Google Places match before saving this as a Map Stamp."
+        }
         if candidate.isPlaceBearingSource {
             return "This looks place-related, but SAV-E still needs the exact venue before it can save a Map Stamp."
         }
@@ -480,13 +488,16 @@ struct ShareExtensionView: View {
     }
 
     private func candidateActionTitle(_ candidate: PendingReviewCandidate) -> String {
-        candidate.isSourceOnly ? "Save Source Clue 💌" : "Add to Review 💌"
+        if candidate.isSourceOnly { return "Save Source Clue 💌" }
+        if candidate.isUnresolvedPlaceCandidate { return "Add Place Candidate 💌" }
+        return "Add to Review 💌"
     }
 
     private func reviewCandidatesHeading(_ candidates: [PendingReviewCandidate]) -> String {
         guard candidates.count == 1, let candidate = candidates.first else {
             return "Place clues found"
         }
+        if candidate.isUnresolvedPlaceCandidate { return "Possible place found" }
         if candidate.isSourceOnly { return "Source clue saved" }
         if candidate.isPlaceBearingSource {
             return candidate.category == "food" || candidate.category == "cafe"
@@ -1231,18 +1242,22 @@ struct ShareExtensionView: View {
             nextBestClue: "Run source recovery search or add the exact place name/map link before saving as a Map Stamp.",
             suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
+        let candidateName = unresolvedPlaceCandidateName(from: searchQueries, analysis: analysis)
+        let displayDiagnostic = candidateName.map {
+            unresolvedPlaceDiagnostic(from: diagnostic, candidateName: $0)
+        } ?? diagnostic
         return PendingReviewCandidate(
-            candidateName: placeBearingCandidateName(from: analysis),
+            candidateName: candidateName ?? placeBearingCandidateName(from: analysis),
             address: "",
             category: category(for: analysis.sourceIntent),
             sourceURL: sourceURLString,
             sourceText: evidenceText.isEmpty ? nil : evidenceText,
-            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic) + ["Next best clue: \(diagnostic.nextBestClue)"],
+            evidence: displayDiagnostic.found + displayDiagnostic.attempts + diagnosticSearchEvidence(displayDiagnostic) + ["Next best clue: \(displayDiagnostic.nextBestClue)"],
             confidence: confidence(for: analysis.sourceIntent),
-            missingInfo: diagnostic.missingFields,
+            missingInfo: displayDiagnostic.missingFields,
             savedAt: Date(),
-            evidenceDiagnostic: diagnostic,
-            reviewState: "place_bearing_source"
+            evidenceDiagnostic: displayDiagnostic,
+            reviewState: candidateName == nil ? "place_bearing_source" : "unresolved_place_candidate"
         )
     }
 
@@ -1260,6 +1275,22 @@ struct ShareExtensionView: View {
             nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
             suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
+        if let candidateName = unresolvedPlaceCandidateName(from: searchQueries) {
+            let upgradedDiagnostic = unresolvedPlaceDiagnostic(from: diagnostic, candidateName: candidateName)
+            return PendingReviewCandidate(
+                candidateName: candidateName,
+                address: "",
+                category: "attraction",
+                sourceURL: sourceURLString,
+                sourceText: evidenceText.isEmpty ? nil : evidenceText,
+                evidence: upgradedDiagnostic.found + upgradedDiagnostic.attempts + diagnosticSearchEvidence(upgradedDiagnostic) + ["Next best clue: \(upgradedDiagnostic.nextBestClue)"],
+                confidence: 0.32,
+                missingInfo: upgradedDiagnostic.missingFields,
+                savedAt: Date(),
+                evidenceDiagnostic: upgradedDiagnostic,
+                reviewState: "unresolved_place_candidate"
+            )
+        }
         return PendingReviewCandidate(
             candidateName: sourceOnlyDisplayName(for: sourceURLString),
             address: "",
@@ -1285,6 +1316,100 @@ struct ShareExtensionView: View {
         if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
         if url.host?.lowercased().contains("instagram") == true { return "Instagram link" }
         return "Social link"
+    }
+
+    private func unresolvedPlaceDiagnostic(
+        from diagnostic: SocialPlaceEvidenceDiagnostic,
+        candidateName: String
+    ) -> SocialPlaceEvidenceDiagnostic {
+        var upgraded = diagnostic
+        upgraded.found = appendUniqueEvidence(upgraded.found, ["Candidate place name: \(candidateName)"])
+        upgraded.attempts = appendUniqueEvidence(upgraded.attempts, ["Promoted source clue to unresolved place candidate instead of showing the source as the title"])
+        upgraded.missingFields = appendUniqueEvidence(
+            upgraded.missingFields.filter { missing in
+                let lowered = missing.lowercased()
+                return !lowered.contains("place name") &&
+                    !lowered.contains("exact restaurant name") &&
+                    !lowered.contains("exact venue")
+            },
+            ["Verified address", "Verified coordinates"]
+        )
+        upgraded.nextBestClue = "Confirm the address or Google Places match before saving this as a Map Stamp."
+        return upgraded
+    }
+
+    private func unresolvedPlaceCandidateName(
+        from searchQueries: [String],
+        analysis: SocialPlaceAgentAnalysis? = nil
+    ) -> String? {
+        let analysisHints = analysis.map { current in
+            ([current.topic].compactMap { $0 } + current.recoveryHints
+                .filter { $0.label != "region" && $0.label != "category" }
+                .map(\.queryFragment))
+        } ?? []
+
+        for rawValue in analysisHints + searchQueries {
+            guard let candidate = unresolvedPlaceCandidateName(fromRawSearchText: rawValue) else { continue }
+            return candidate
+        }
+        return nil
+    }
+
+    private func unresolvedPlaceCandidateName(fromRawSearchText rawValue: String) -> String? {
+        var candidate = cleanHTMLText(rawValue)
+            .replacingOccurrences(of: #"https?://\S+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"site:\S+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\bD[A-Za-z0-9_-]{6,}\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\binstagram\s+reel\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(?:restaurant|venue|place|address|cafe|coffee|hotel|map)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\"'“”"))
+
+        if candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil {
+            for marker in [" 台北", " 臺北", " Taipei", " Taiwan", " 士林站", " Shilin Station"] {
+                if let range = candidate.range(of: marker, options: [.caseInsensitive]) {
+                    candidate = String(candidate[..<range.lowerBound])
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    break
+                }
+            }
+        }
+
+        candidate = candidate
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，\"'“”"))
+
+        guard candidate.count >= 2, candidate.count <= 80 else { return nil }
+        let hasCJK = candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil
+        if !hasCJK && candidate.count <= 3 { return nil }
+        guard isUsablePlaceName(candidate) else { return nil }
+        guard !looksLikeMarketingLine(candidate) else { return nil }
+
+        let lowered = candidate.lowercased()
+        if ["la", "oc", "nyc", "sf", "taipei", "tokyo"].contains(lowered) { return nil }
+        let genericValues = [
+            "instagram",
+            "social link",
+            "restaurant recommendation",
+            "restaurants in",
+            "restaurant in",
+            "coffee shops in",
+            "coffee shop in",
+            "cafes in",
+            "cafe in",
+            "where to eat",
+            "favorite restaurants",
+            "best restaurants",
+            "top restaurants",
+            "hidden gems",
+            "coffee shop clue",
+            "place clue",
+            "source clue"
+        ]
+        if genericValues.contains(where: { lowered.contains($0) }) { return nil }
+        if lowered.range(of: #"^(favorite|favourite|best|top|must-try|must try|iconic)\b"#, options: .regularExpression) != nil {
+            return nil
+        }
+        return candidate
     }
 
     private func sourceRecoverySearchQueries(

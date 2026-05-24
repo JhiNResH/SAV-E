@@ -707,6 +707,30 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
     }
 
+    func testPlausiblePlaceNameInSearchQueryBecomesUnresolvedCandidate() {
+        let service = SocialLinkReviewCandidateService()
+        let sourceURL = "https://www.instagram.com/reel/DYtokyoPasta/"
+
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "東京家庭義大利麵 士林店 台北 Taipei 士林站",
+            sourceURL: sourceURL
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = candidates[0]
+        XCTAssertFalse(candidate.isSourceOnly)
+        XCTAssertEqual(candidate.reviewState, "unresolved_place_candidate")
+        XCTAssertEqual(candidate.candidateName, "東京家庭義大利麵 士林店")
+        XCTAssertEqual(candidate.address, "")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertTrue(candidate.missingInfo.contains("Verified address"))
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
+        XCTAssertFalse(candidate.missingInfo.contains("Verified place name"))
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Candidate place name: 東京家庭義大利麵 士林店") == true)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Needs confirmation")
+    }
+
     func testPlaceBearingInstagramMetadataCreatesWeakReviewCandidateInsteadOfSourceOnly() {
         let service = SocialLinkReviewCandidateService()
         let sourceURL = "https://www.instagram.com/reel/DW2ZpyADbZ6/?igsh=tracking"
