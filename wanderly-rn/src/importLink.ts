@@ -39,6 +39,10 @@ export function parseSharedLink(input: string): Place | null {
 function normalizeInput(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
+
+  const embeddedUrl = trimmed.match(/https?:\/\/[^\s]+/i)?.[0];
+  if (embeddedUrl) return embeddedUrl.replace(/[)\].,，。]+$/, "");
+
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.includes(".")) return `https://${trimmed}`;
   return null;
@@ -86,7 +90,7 @@ function buildGoogleMapsPlace(url: URL): Place {
 }
 
 function buildAppleMapsPlace(url: URL): Place {
-  const query = url.searchParams.get("q");
+  const query = url.searchParams.get("q") || url.searchParams.get("name");
   const address = decodeSegment(
     url.searchParams.get("address") ||
       url.searchParams.get("daddr") ||
@@ -188,9 +192,10 @@ function extractCoordinates(url: URL): [number, number] {
   const match = full.match(coordinatePattern);
   if (match) return [Number(match[1]), Number(match[2])];
 
-  const ll = url.searchParams.get("ll");
-  if (ll) {
-    const [lat, lng] = ll.split(",").map(Number);
+  for (const paramName of ["ll", "coordinate", "center", "sll"]) {
+    const value = url.searchParams.get(paramName);
+    if (!value) continue;
+    const [lat, lng] = value.split(",").map(Number);
     if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
   }
 
