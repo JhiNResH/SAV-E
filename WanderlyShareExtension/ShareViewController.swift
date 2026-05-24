@@ -443,34 +443,7 @@ struct ShareExtensionView: View {
                 if isParsing {
                     checkingPlaceCluesView
                 } else if isSaved {
-                    VStack(spacing: 16) {
-                        Text("🌸")
-                            .font(.system(size: 56))
-
-                        Text(savedReviewCandidateCount == nil ? "Saved to SAV-E!" : "Tucked into Review")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(SaveTheme.ink)
-
-                        Text(savedReviewCandidateCount.map { count in
-                            count == 1
-                                ? "Open SAV-E to finish importing this candidate into Review."
-                                : "Open SAV-E to finish importing these \(count) candidates into Review."
-                        } ?? "Open the app to see it on your map.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
-                    }
-                    .padding(24)
-                    .background(SaveTheme.paper)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(SaveTheme.ink, lineWidth: 2)
-                    )
-                    .cornerRadius(28)
-                    .shadow(color: SaveTheme.ink.opacity(0.16), radius: 0, x: 5, y: 5)
-                    .frame(maxHeight: .infinity)
+                    savedConfirmationView
                 } else if let error = parseError {
                     VStack(spacing: 16) {
                         Text("🧸")
@@ -589,6 +562,82 @@ struct ShareExtensionView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
+    }
+
+    private var savedConfirmationView: some View {
+        VStack(spacing: 14) {
+            ShareStatusPill(text: savedReviewCandidateCount == nil ? "Memory card saved" : "Added to Review")
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    ShareMiniSticker(
+                        systemImage: savedReviewCandidateCount == nil ? "checkmark.seal.fill" : "tray.and.arrow.down.fill",
+                        fill: savedReviewCandidateCount == nil ? SaveTheme.mint : SaveTheme.yellow
+                    )
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(savedConfirmationTitle)
+                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .foregroundColor(SaveTheme.ink)
+                            .lineLimit(2)
+
+                        Text(savedConfirmationSubtitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(SaveTheme.ink.opacity(0.70))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    ShareEvidenceRow(text: "Source saved", isComplete: true)
+                    ShareEvidenceRow(text: savedReviewCandidateCount == nil ? "Map pin ready" : "Waiting in Review", isComplete: true)
+                    ShareEvidenceRow(text: "Open SAV-E to confirm", isComplete: savedReviewCandidateCount != nil)
+                }
+                .padding(12)
+                .background(SaveTheme.yellow.opacity(0.18))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(SaveTheme.ink, style: StrokeStyle(lineWidth: 1.4, dash: [4]))
+                )
+
+                Text("Closing in a moment...")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(SaveTheme.ink.opacity(0.58))
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .padding(18)
+            .background(SaveTheme.paper)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(SaveTheme.ink, lineWidth: 2.4)
+            )
+
+            Spacer(minLength: 8)
+
+            ShareCaptureFooter()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
+    private var savedConfirmationTitle: String {
+        guard let count = savedReviewCandidateCount else {
+            return "Saved to SAV-E"
+        }
+        return count == 1 ? "Review card added" : "\(count) review cards added"
+    }
+
+    private var savedConfirmationSubtitle: String {
+        guard let count = savedReviewCandidateCount else {
+            return "Open the app to see it on your map."
+        }
+        return count == 1
+            ? "It will wait in SAV-E Review before becoming a saved place."
+            : "They will wait in SAV-E Review before becoming saved places."
     }
 
     // MARK: - Place Preview
