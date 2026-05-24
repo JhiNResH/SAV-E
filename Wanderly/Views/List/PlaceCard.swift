@@ -22,7 +22,7 @@ struct PlaceCard: View {
 
                 Text(place.address)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
@@ -33,14 +33,14 @@ struct PlaceCard: View {
                                 .foregroundColor(.saveHoney)
                             Text(String(format: "%.1f", rating))
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.saveMutedText)
                         }
                     }
 
                     if let priceRange = place.priceRange {
                         Text(priceRange)
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
 
                     Spacer()

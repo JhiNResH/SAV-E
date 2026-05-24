@@ -8,15 +8,18 @@ struct PlaceListView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Filter tabs
-                Picker("Filter", selection: $viewModel.filter) {
+                HStack(spacing: 7) {
                     ForEach(PlaceFilter.allCases, id: \.self) { filter in
-                        Text(filter.rawValue).tag(filter)
+                        FilterNotebookTab(
+                            title: filter.rawValue,
+                            isSelected: viewModel.filter == filter
+                        ) {
+                            viewModel.filter = filter
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal)
-                .padding(.top, 8)
+                .padding(.top, 12)
 
                 // Category pills
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -43,7 +46,7 @@ struct PlaceListView: View {
                 HStack {
                     Text("\(viewModel.filteredPlaces.count) places")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
 
                     Spacer()
 
@@ -138,6 +141,33 @@ struct PlaceListView: View {
         loadPlacesTask = Task {
             await viewModel.loadPlaces()
         }
+    }
+}
+
+private struct FilterNotebookTab: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+                .background(isSelected ? Color.saveHoney : Color.saveNotebookPage)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 1.8 : 1.2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 }
 

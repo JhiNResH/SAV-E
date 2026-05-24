@@ -81,7 +81,7 @@ struct TripCard: View {
 
                     Text(trip.city)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 Spacer()
@@ -96,11 +96,11 @@ struct TripCard: View {
             HStack(spacing: 16) {
                 Label(trip.dateRangeText, systemImage: "calendar")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
 
                 Label("\(trip.places.count) stops", systemImage: "mappin")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
             }
         }
         .padding(16)
@@ -123,7 +123,7 @@ struct TripDetailView: View {
                     Label("\(trip.places.count) stops", systemImage: "mappin")
                 }
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(.saveMutedText)
             }
 
             Section("Timeline") {
@@ -148,11 +148,11 @@ struct TripDetailView: View {
                     .foregroundColor(.saveInk)
                     .padding(.vertical, 10)
                     .background(Color.saveHoney)
-                    .cornerRadius(16)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.6)
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .disabled(viewModel.isOptimizing)
                 .listRowBackground(Color.clear)

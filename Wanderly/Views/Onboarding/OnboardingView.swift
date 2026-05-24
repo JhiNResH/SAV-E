@@ -56,7 +56,7 @@ struct OnboardingView: View {
                             Text(pages[index].subtitle)
                                 .font(.subheadline)
                                 .lineSpacing(3)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.saveMutedText)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 32)
                         }
@@ -91,11 +91,16 @@ struct OnboardingView: View {
                 }) {
                     Text(currentPage < pages.count - 1 ? "Next" : "Start with SAV-E")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.saveInk)
-                        .cornerRadius(16)
+                        .background(Color.saveHoney)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -105,7 +110,8 @@ struct OnboardingView: View {
                         onComplete()
                     }
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.saveMutedText)
                     .padding(.bottom, 16)
                 }
             }

@@ -8,6 +8,8 @@ extension Color {
     static let saveHoney = Color(hex: "FFE24A")
     static let saveSky = Color(hex: "7EDAEF")
     static let saveInk = Color(hex: "111111")
+    static let saveMutedText = Color(hex: "66584A")
+    static let saveDisabled = Color(hex: "D8CAB9")
     static let savePaper = Color(hex: "FFF0D6")
     static let saveLedger = Color(hex: "FFF7E8")
     static let saveSignal = Color(hex: "FF8A65")
@@ -62,6 +64,23 @@ extension View {
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Color.saveNotebookLine, lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    func saveOutlinedButton(
+        fill: Color = .saveHoney,
+        foreground: Color = .saveInk,
+        cornerRadius: CGFloat = 14
+    ) -> some View {
+        font(.subheadline.weight(.black))
+            .foregroundColor(foreground)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(fill)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }

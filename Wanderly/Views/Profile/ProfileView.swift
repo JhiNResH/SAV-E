@@ -128,7 +128,7 @@ private struct EditProfileSheet: View {
                             .foregroundColor(.saveInk)
                         Text("This is how SAV-E labels your memory book.")
                             .font(.caption.weight(.semibold))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
 
                     Spacer()
@@ -178,7 +178,7 @@ private struct EditProfileSheet: View {
                     } else {
                         Text("Email and sign-in provider stay managed by your login account.")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                     }
                 }
                 .padding(16)
@@ -213,7 +213,7 @@ private struct PassportTopBar: View {
                     .foregroundColor(.saveInk)
                 Text(waitingClues == 1 ? "1 clue waiting" : "\(waitingClues) clues waiting")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
             }
 
             Spacer()
@@ -308,7 +308,7 @@ private struct PassportHero: View {
                             .lineLimit(2)
                         Text(profile.email ?? "Local memory agent")
                             .font(.caption.weight(.semibold))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.saveMutedText)
                             .lineLimit(1)
                     }
 
@@ -436,7 +436,7 @@ private struct PassportStampRow: View {
                     .foregroundColor(.saveInk)
                 Text(value)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
                     .lineLimit(1)
             }
 
@@ -471,7 +471,7 @@ struct SettingsRow: View {
 
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.saveMutedText)
             }
             .padding(.vertical, 14)
             .padding(.horizontal, 4)

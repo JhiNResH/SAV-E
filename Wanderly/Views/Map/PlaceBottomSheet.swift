@@ -25,7 +25,7 @@ struct PlaceBottomSheet: View {
 
                     Text(place.address)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 Spacer()
@@ -46,14 +46,14 @@ struct PlaceBottomSheet: View {
                 if let priceRange = place.priceRange {
                     Text(priceRange)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 HStack(spacing: 4) {
                     PlatformIcon(platform: place.sourcePlatform, size: 14)
                     Text(place.sourcePlatform.displayName)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                 }
 
                 Spacer()
@@ -74,7 +74,7 @@ struct PlaceBottomSheet: View {
                     Text("Recommended")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
 
                     FlowLayout(spacing: 6) {
                         ForEach(dishes, id: \.self) { dish in
@@ -96,7 +96,7 @@ struct PlaceBottomSheet: View {
                     Text("Note")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.saveMutedText)
                     Text(note)
                         .font(.subheadline)
                         .foregroundColor(.saveInk)
