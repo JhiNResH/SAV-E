@@ -57,7 +57,7 @@ struct MapView: View {
                     }
 
                     Button(action: { showProfile = true }) {
-                        ZStack(alignment: .topTrailing) {
+                        ZStack {
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.saveNotebookPage)
                                 .frame(width: 42, height: 42)
@@ -69,7 +69,9 @@ struct MapView: View {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(.saveCocoa)
-
+                        }
+                        .frame(width: 42, height: 42)
+                        .overlay(alignment: .topTrailing) {
                             if !viewModel.reviewCandidates.isEmpty {
                                 Text("\(viewModel.reviewCandidates.count)")
                                     .font(.system(size: 9, weight: .black))
@@ -81,7 +83,6 @@ struct MapView: View {
                                     .offset(x: 6, y: -5)
                             }
                         }
-                        .frame(width: 42, height: 42)
                     }
                     .accessibilityLabel("Open SAV-E Passport")
                 }
