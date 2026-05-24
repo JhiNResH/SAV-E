@@ -65,6 +65,9 @@ struct SocialEvidenceAtom {
         case .marketingText:
             return "Marketing text ignored"
         case .sourceAccount:
+            if value.hasPrefix("http://") || value.hasPrefix("https://") {
+                return "Source URL: \(value)"
+            }
             return "Source account: @\(value)"
         case .categoryClue:
             return "Category clue: \(value)"
@@ -602,7 +605,7 @@ struct SocialPlaceParser {
             return (.creatorHandle, "Appears near creator/follow language; not near a venue line.")
         }
         if numberedName(from: line) != nil ||
-            line.range(of: #"(?i)\b(?:staying at|located at|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse)\b"#, options: .regularExpression) != nil {
+            line.range(of: #"(?i)\b(?:staying at|located at|located in|known for|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse)\b"#, options: .regularExpression) != nil {
             return (.venueHandle, "Appears inside a venue/stay/place line.")
         }
         if looksLikeSocialPlaceList(fullText), handles(in: line).count > 0 {
@@ -690,8 +693,13 @@ struct SocialPlaceParser {
     }
 
     private func cleanLocationMarker(from value: String) -> String {
-        SocialPlaceEvidenceScorer.cleanText(value)
+        let cleaned = SocialPlaceEvidenceScorer.cleanText(value)
             .replacingOccurrences(of: #"^[📍🗺]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)^\s*(?:located\s+at|located|address)\s*[:：]?\s*[📍🗺]?\s*"#, with: "", options: .regularExpression)
+        if let streetAddress = firstStreetAddress(in: cleaned) {
+            return streetAddress
+        }
+        return cleaned
     }
 
     private func englishThisIsStayMatch(in line: String) -> (name: String, area: String)? {
@@ -717,7 +725,7 @@ struct SocialPlaceParser {
     }
 
     private func looksVenueContext(_ line: String) -> Bool {
-        line.range(of: #"(?i)\b(staying at|located at|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse|spot|place)\b"#, options: .regularExpression) != nil
+        line.range(of: #"(?i)\b(staying at|located at|located in|known for|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse|spot|place)\b"#, options: .regularExpression) != nil
     }
 
     private func bookingLinks(in text: String) -> [String] {
@@ -728,6 +736,13 @@ struct SocialPlaceParser {
         return regex.matches(in: text, range: range).compactMap { match in
             Range(match.range, in: text).map { String(text[$0]) }
         }
+    }
+
+    private func firstStreetAddress(in text: String) -> String? {
+        firstCapture(
+            in: text,
+            pattern: #"\b(\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy|Old Street)(?:,\s*[A-Za-z0-9 .'-]{2,60}){0,2}(?:\s+\d{5}(?:-\d{4})?)?)\b"#
+        )
     }
 
     private func candidateNameFromCaptionLine(_ line: String) -> String? {

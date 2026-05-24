@@ -134,6 +134,7 @@ enum SocialPlaceEvidenceScorer {
             #"台南爆漿巴斯克|巴斯克控不能錯過|不要說你吃過巴斯克蛋糕|一入口直接幸福感爆棚"#,
             #"^(?:💡\s*)?(補充|补充)\s*(?:💡)?|既視感|点就对了|點就對了"#,
             #"(?i)follow|save this|likes|comments|instagram|must try|don't miss|viral"#,
+            #"(?i)\b(?:most\s+iconic|iconic\s+(?:restaurant|dinner|spot)|dinner\s+spot\s+by\s+the\s+beach)\b"#,
             #"(?i)\b(?:unique\s+coffee\s+experiences|best\s+for\s+coffee\s+quality|atmosphere\s*&\s*aesthetic|desserts?\s+worth\s+it)\b"#,
             #"(?i)^(?:my\s+favorite|my\s+favourite|favorite|favourite|which\s+one\s+would\s+you\s+go\s+to\s+first)\b"#
         ]
@@ -178,7 +179,8 @@ enum SocialPlaceEvidenceScorer {
 
         let knownProfiles: [String: String] = [
             "mikantaichung": "蜜柑 關西風壽喜燒",
-            "fourseasonsteahousehotpot": "Four Seasons Tea House Hot Pot"
+            "fourseasonsteahousehotpot": "Four Seasons Tea House Hot Pot",
+            "themarineroom": "The Marine Room"
         ]
         if let name = knownProfiles[normalized] {
             return (name, "Resolved public profile/listing for @\(handle): \(name)", 0.15)

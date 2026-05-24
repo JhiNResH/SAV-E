@@ -126,6 +126,32 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.candidateName == "MEDITERRANEAN" })
     }
 
+    func testInstagramLocatedHandleBeatsGenericOCRTitle() {
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/DXI_znYBvKV/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: nil,
+                metadataTitle: """
+                Samantha Jacksich | San Diego Foodie on Instagram: "The most iconic dinner spot by the beach in San Diego✨
+
+                @themarineroom is located in La Jolla and known for their stunning ocean views and waves crashing into the windows.
+
+                Located at 📍 1950 Spindrift Dr if you want to check it out 🤩
+                """,
+                metadataDescription: nil,
+                ocrLines: ["LA JOLLA'S MOST ICONIC RESTAURANT"]
+            )
+        )
+
+        XCTAssertEqual(analysis.placesFound.first?.displayName, "The Marine Room")
+        XCTAssertEqual(analysis.placesFound.first?.locationClues.first, "1950 Spindrift Dr")
+        XCTAssertTrue(analysis.placesFound.first?.venueHandles.contains("themarineroom") == true)
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "LA JOLLA'S MOST ICONIC RESTAURANT" })
+        XCTAssertFalse(analysis.placesFound.first?.evidenceChips.contains { $0.contains("@https://") } == true)
+    }
+
     func testAgentParserMergesNumberedPlaceEvidence() {
         let analysis = SocialPlaceParser().analyze(
             evidence: SocialPlaceSourceEvidence(
