@@ -216,37 +216,21 @@ struct AIDrawerView: View {
                         messageView(response.messageText ?? response.aiMessage ?? "")
                     }
 
-                    // Follow-up: keeps conversation context
-                    Button(action: {
-                        viewModel.query = ""
-                        searchFocused = true
-                        withAnimation { drawerDetent = .medium }
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "text.bubble")
-                            Text("Follow up")
+                    AIResultActionBar(
+                        onFollowUp: {
+                            viewModel.query = ""
+                            searchFocused = true
+                            withAnimation { drawerDetent = .medium }
+                        },
+                        onNewQuestion: {
+                            viewModel.startNewConversation()
+                            searchFocused = true
+                            withAnimation { drawerDetent = .medium }
                         }
-                        .font(.subheadline)
-                        .fontWeight(.black)
-                        .foregroundColor(.saveInk)
-                        .padding(.vertical, 6)
-                    }
-
-                    // New conversation: clears context
-                    Button(action: {
-                        viewModel.startNewConversation()
-                        searchFocused = true
-                        withAnimation { drawerDetent = .medium }
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus.bubble")
-                            Text("New question")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.saveCocoa.opacity(0.72))
-                        .padding(.vertical, 4)
-                    }
+                    )
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
             }
 
         case .placeDetail(let place):
@@ -1291,6 +1275,56 @@ private struct DrawerSuggestionRow: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 1.1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+private struct AIResultActionBar: View {
+    var onFollowUp: () -> Void
+    var onNewQuestion: () -> Void
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Button(action: onFollowUp) {
+                Label("Follow up", systemImage: "text.bubble")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.saveHoney)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onNewQuestion) {
+                Label("New", systemImage: "plus.bubble")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.saveMint.opacity(0.74))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .background(Color.saveNotebookPage.opacity(0.94))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

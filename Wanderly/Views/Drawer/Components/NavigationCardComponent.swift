@@ -6,34 +6,51 @@ struct NavigationCardComponent: View {
     let mode: WanderlyAIResponse.TransportMode
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
+        VStack(spacing: 18) {
             Image(systemName: modeIcon)
-                .font(.system(size: 48))
-                .foregroundColor(.saveCocoa)
+                .font(.system(size: 26, weight: .black))
+                .foregroundColor(.saveInk)
+                .frame(width: 58, height: 58)
+                .background(Color.saveSky.opacity(0.54))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-            VStack(spacing: 6) {
+            VStack(spacing: 7) {
+                Text("ROUTE READY")
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.saveHoney)
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                    .clipShape(Capsule())
+
                 Text(place.name)
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(.title3.weight(.black))
                     .foregroundColor(.saveInk)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
 
                 Text(place.address)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.saveInk.opacity(0.74))
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Label(modeLabel, systemImage: modeIcon)
                 .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.saveCocoa)
+                .fontWeight(.black)
+                .foregroundColor(.saveInk)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(Color.saveCocoa.opacity(0.12))
-                .cornerRadius(12)
+                .background(Color.saveMint.opacity(0.74))
+                .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                .clipShape(Capsule())
 
             Button(action: openInMaps) {
                 Label("Start Navigation", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
@@ -42,17 +59,21 @@ struct NavigationCardComponent: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(Color.saveHoney)
-                    .cornerRadius(16)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.1)
+                            .stroke(Color.saveNotebookLine, lineWidth: 2)
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-
-            Spacer()
         }
-        .padding(.horizontal, 24)
+        .padding(18)
         .frame(maxWidth: .infinity)
+        .background(Color.saveNotebookPage.opacity(0.96))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var modeIcon: String {
