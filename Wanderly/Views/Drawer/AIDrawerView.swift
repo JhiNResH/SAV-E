@@ -582,7 +582,7 @@ struct AIDrawerView: View {
                 limit: 2,
                 actionInFlight: candidateActionInFlight,
                 onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Clue marked ready. Hatch it once coordinates are reliable.") {
+                    performCandidateAction(candidate, successMessage: "Place confirmed. Hatch it when the address is ready.") {
                         try await onConfirmCandidate(candidate)
                     }
                 },
@@ -640,7 +640,7 @@ struct AIDrawerView: View {
                     limit: nil,
                     actionInFlight: candidateActionInFlight,
                     onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Clue marked ready. Hatch it once coordinates are reliable.") {
+                        performCandidateAction(candidate, successMessage: "Place confirmed. Hatch it when the address is ready.") {
                             try await onConfirmCandidate(candidate)
                         }
                     },
@@ -711,7 +711,7 @@ struct AIDrawerView: View {
             return
         }
 
-        addSpotStatus = "Clipboard link loaded. SAV-E will add clue eggs before saving."
+        addSpotStatus = "Clipboard link loaded. SAV-E will save possible places to Review Nest first."
         importURLToReviewCandidates(url)
     }
 
@@ -779,7 +779,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         searchFocused = false
         isImportingURL = true
-        addSpotStatus = "Checking public metadata and adding clue eggs to the Review Nest..."
+        addSpotStatus = "Checking the link and saving possible places to Review Nest..."
         viewModel.returnToCommands()
         withAnimation { drawerDetent = .medium }
 
@@ -787,8 +787,8 @@ struct AIDrawerView: View {
             do {
                 let count = try await onImportURLAsReviewCandidates(url)
                 addSpotStatus = count == 1
-                    ? "Added 1 clue egg to Review Nest. Check the receipt before hatching it."
-                    : "Added \(count) clue eggs to Review Nest. Check receipts before hatching them."
+                    ? "Saved 1 possible place to Review Nest. Check the receipt, then hatch it."
+                    : "Saved \(count) possible places to Review Nest. Check receipts before hatching them."
                 openReviewInbox()
             } catch {
                 addSpotStatus = error.localizedDescription
@@ -800,7 +800,7 @@ struct AIDrawerView: View {
 
     private func hatchFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
-        return "Egg hatched · +1 \(category.displayName.lowercased()) memory card"
+        return "Memory hatched · +1 \(category.displayName.lowercased()) card"
     }
 }
 
@@ -1050,7 +1050,7 @@ private struct ReviewCandidateCard: View {
                     SaveEggBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "CLUE EGG")
+                        Text(candidate.hasReliableCoordinates ? "READY TO HATCH" : "POSSIBLE PLACE FOUND")
                             .font(.caption2.weight(.black))
                             .foregroundColor(.saveCocoa)
                             .lineLimit(1)
@@ -1070,19 +1070,26 @@ private struct ReviewCandidateCard: View {
                             if let confidence = candidate.confidence {
                                 StampChip(text: "\(Int(confidence * 100))% confidence", color: .saveCocoa)
                             }
-                            StampChip(text: candidate.status.replacingOccurrences(of: "_", with: " "), color: .saveHoney)
+                            StampChip(text: candidate.hasReliableCoordinates ? "map ready" : "1 clue missing", color: .saveHoney)
                         }
                     }
 
                     Spacer(minLength: 0)
                 }
 
+                Text(candidate.hasReliableCoordinates
+                     ? "I found enough map evidence. Hatch it into a saved memory card when this looks right."
+                     : "I found the likely place, but I still need the exact address before saving it as a map pin.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+
                 if !candidate.evidence.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 6) {
                             Image(systemName: "doc.text.magnifyingglass")
                                 .font(.caption2.weight(.bold))
-                            Text("Source receipt")
+                            Text("Evidence receipt")
                                 .font(.caption2.weight(.black))
                             Spacer()
                         }
@@ -1113,14 +1120,14 @@ private struct ReviewCandidateCard: View {
 
                 HStack(spacing: 8) {
                     CandidateActionButton(
-                        title: "Mark ready",
-                        systemImage: "checkmark",
+                        title: "Confirm",
+                        systemImage: "checkmark.seal",
                         fill: Color.saveSky.opacity(0.54),
                         disabled: isWorking,
                         action: onConfirm
                     )
                     CandidateActionButton(
-                        title: candidate.hasReliableCoordinates ? "Hatch" : "Refine + Hatch",
+                        title: candidate.hasReliableCoordinates ? "Hatch" : "Find + Hatch",
                         systemImage: "seal",
                         fill: .saveHoney,
                         disabled: isWorking,
