@@ -87,6 +87,7 @@ private struct SocialPlaceEvidenceDiagnostic: Codable {
 
     var statusLabel: String {
         if canSaveAsMapStamp { return "Map match ready" }
+        if found.joined(separator: "\n").lowercased().contains("place-bearing source") { return "Place clue" }
         if lowercasedMissingFields.contains(where: { $0.contains("place name") }) { return "Source clue" }
         if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Needs confirmation" }
         return "Review candidate"
@@ -94,6 +95,7 @@ private struct SocialPlaceEvidenceDiagnostic: Codable {
 
     var primaryActionLabel: String {
         if canSaveAsMapStamp { return "Confirm map match" }
+        if statusLabel == "Place clue" { return "Run recovery search" }
         if statusLabel == "Source clue" { return "Add caption / screenshot / map link" }
         if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Confirm address / coordinates" }
         return "Review evidence"
@@ -123,6 +125,11 @@ private struct PendingReviewCandidate: Codable {
     var savedAt: Date
     var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil
     var isSourceOnly: Bool = false
+    var reviewState: String? = nil
+
+    var isPlaceBearingSource: Bool {
+        reviewState == "place_bearing_source"
+    }
 }
 
 private struct ShareMemoryRecord: Codable {
@@ -362,7 +369,7 @@ struct ShareExtensionView: View {
     private func reviewCandidatesPreview(_ candidates: [PendingReviewCandidate]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(candidates.count == 1 ? "Tiny clue found" : "Tiny clues found")
+                Text(reviewCandidatesHeading(candidates))
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(SaveTheme.rose)
@@ -455,21 +462,38 @@ struct ShareExtensionView: View {
             return "Review each candidate in SAV-E before saving."
         }
         if candidate.isSourceOnly { return "Saved as a source clue, not a map pin yet" }
+        if candidate.isPlaceBearingSource { return "Needs exact venue before Map Stamp" }
         return candidate.address.isEmpty ? "Needs address confirmation" : candidate.address
     }
 
     private func candidateIntro(_ candidates: [PendingReviewCandidate]) -> String {
         guard candidates.count == 1, let candidate = candidates.first else {
-            return "SAV-E found a few tiny place clues. Check the evidence, then hatch them into saved memories."
+            return "SAV-E found a few place clues. Review the evidence before saving."
         }
         if candidate.isSourceOnly {
             return "SAV-E found the source, but not enough place evidence yet. It will keep this as a clue and show exactly what is missing."
         }
-        return "SAV-E found a tiny place clue. Check the evidence, then hatch it into a saved memory."
+        if candidate.isPlaceBearingSource {
+            return "This looks place-related, but SAV-E still needs the exact venue before it can save a Map Stamp."
+        }
+        return "SAV-E found a place clue. Check the evidence before saving."
     }
 
     private func candidateActionTitle(_ candidate: PendingReviewCandidate) -> String {
         candidate.isSourceOnly ? "Save Source Clue 💌" : "Add to Review 💌"
+    }
+
+    private func reviewCandidatesHeading(_ candidates: [PendingReviewCandidate]) -> String {
+        guard candidates.count == 1, let candidate = candidates.first else {
+            return "Place clues found"
+        }
+        if candidate.isSourceOnly { return "Source clue saved" }
+        if candidate.isPlaceBearingSource {
+            return candidate.category == "food" || candidate.category == "cafe"
+                ? "Restaurant clue found"
+                : "Place clue found"
+        }
+        return "Place clue found"
     }
 
     private func shareEvidenceDiagnosticView(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> some View {
@@ -1125,7 +1149,7 @@ struct ShareExtensionView: View {
     ) async -> [PendingReviewCandidate] {
         let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
         let parser = SocialPlaceParser()
-        let textOnlyDrafts = parser.parse(
+        let textOnlyAnalysis = parser.analyze(
             evidence: SocialPlaceSourceEvidence(
                 sourceURL: sourceURLString,
                 resolvedURL: metadata.resolvedURL,
@@ -1136,8 +1160,8 @@ struct ShareExtensionView: View {
                 ocrLines: []
             )
         )
-        if !textOnlyDrafts.isEmpty {
-            let candidates = textOnlyDrafts.map {
+        if !textOnlyAnalysis.placesFound.isEmpty {
+            let candidates = textOnlyAnalysis.placesFound.map {
                 pendingReviewCandidate(from: $0, sourceURLString: sourceURLString, sourceText: evidenceText, ocrLines: [])
             }
             return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
@@ -1150,9 +1174,13 @@ struct ShareExtensionView: View {
         } else {
             ocrLines = []
         }
-        guard !ocrLines.isEmpty else { return [] }
+        guard !ocrLines.isEmpty else {
+            return textOnlyAnalysis.isPlaceBearing
+                ? [placeBearingSourceReviewCandidate(from: textOnlyAnalysis, sourceURLString: sourceURLString, evidenceText: evidenceText)]
+                : []
+        }
 
-        let drafts = parser.parse(
+        let ocrAnalysis = parser.analyze(
             evidence: SocialPlaceSourceEvidence(
                 sourceURL: sourceURLString,
                 resolvedURL: metadata.resolvedURL,
@@ -1163,10 +1191,59 @@ struct ShareExtensionView: View {
                 ocrLines: ocrLines
             )
         )
-        let candidates = drafts.map {
+        let candidates = ocrAnalysis.placesFound.map {
             pendingReviewCandidate(from: $0, sourceURLString: sourceURLString, sourceText: evidenceText, ocrLines: ocrLines)
         }
+        if candidates.isEmpty, ocrAnalysis.isPlaceBearing {
+            return [placeBearingSourceReviewCandidate(from: ocrAnalysis, sourceURLString: sourceURLString, evidenceText: evidenceText)]
+        }
         return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
+    }
+
+    private func placeBearingSourceReviewCandidate(
+        from analysis: SocialPlaceAgentAnalysis,
+        sourceURLString: String,
+        evidenceText: String
+    ) -> PendingReviewCandidate {
+        let searchQueries = sourceRecoverySearchQueries(sourceURLString: sourceURLString, evidenceText: evidenceText, analysis: analysis)
+        var found = ["Source URL: \(sourceURLString)", "Source intent: \(analysis.sourceIntent.rawValue)"]
+        if let reason = analysis.placeBearingReason {
+            found.append("Place-bearing source: \(reason)")
+        }
+        if let topic = analysis.topic {
+            found.append("Topic clue: \(topic)")
+        }
+        found.append(contentsOf: analysis.regionClues.map { "Region clue: \($0)" })
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: appendUniqueEvidence([], found),
+            attempts: [
+                "Checked public metadata/caption text for explicit place names",
+                "Classified the source as place-bearing even though no exact venue was verified",
+                "Kept this in Review instead of inventing a map pin",
+                "Prepared public source-recovery search queries",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: appendUniqueEvidence([], [
+                exactVenueMissingField(for: analysis.sourceIntent),
+                "Verified address",
+                "Verified coordinates"
+            ]),
+            nextBestClue: "Run source recovery search or add the exact place name/map link before saving as a Map Stamp.",
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
+        )
+        return PendingReviewCandidate(
+            candidateName: placeBearingCandidateName(from: analysis),
+            address: "",
+            category: category(for: analysis.sourceIntent),
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic) + ["Next best clue: \(diagnostic.nextBestClue)"],
+            confidence: confidence(for: analysis.sourceIntent),
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            reviewState: "place_bearing_source"
+        )
     }
 
     private func sourceOnlyReviewCandidate(sourceURLString: String, evidenceText: String) -> PendingReviewCandidate {
@@ -1210,13 +1287,43 @@ struct ShareExtensionView: View {
         return "Social link"
     }
 
-    private func sourceRecoverySearchQueries(sourceURLString: String, evidenceText: String) -> [String] {
+    private func sourceRecoverySearchQueries(
+        sourceURLString: String,
+        evidenceText: String,
+        analysis: SocialPlaceAgentAnalysis? = nil
+    ) -> [String] {
         var queries: [String] = []
         let url = URL(string: sourceURLString)
         let host = url?.host?.lowercased() ?? ""
         let cleanedEvidence = cleanHTMLText(evidenceText)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let analysis, analysis.isPlaceBearing {
+            let keyword = searchKeyword(for: analysis.sourceIntent)
+            let region = primaryRegion(from: analysis.regionClues)
+            let phrase = meaningfulPlacePhrase(from: evidenceText)
+            if let reelID = instagramReelID(in: url) {
+                if let region {
+                    queries.append("\"\(reelID)\" \(keyword) \(region)")
+                }
+                if let topic = analysis.topic {
+                    queries.append("\"\(reelID)\" \"\(topic)\"")
+                } else if let phrase {
+                    queries.append("\"\(reelID)\" \"\(phrase)\"")
+                }
+                queries.append("site:instagram.com/reel/\(reelID) \(keyword)")
+            } else if let url, !host.isEmpty {
+                queries.append("\(host) \(url.lastPathComponent) \(keyword)")
+            }
+            if let region, let phrase {
+                queries.append("\"\(phrase)\" \(region) \(keyword)")
+            }
+            if let canonicalURL = canonicalSearchURL(from: url) {
+                queries.append("\"\(canonicalURL)\"")
+            }
+            return Array(appendUniqueEvidence([], queries).prefix(4))
+        }
 
         if let reelID = instagramReelID(in: url) {
             queries.append("instagram reel \(reelID) place")
@@ -1238,6 +1345,110 @@ struct ShareExtensionView: View {
         }
 
         return Array(appendUniqueEvidence([], queries).prefix(4))
+    }
+
+    private func placeBearingCandidateName(from analysis: SocialPlaceAgentAnalysis) -> String {
+        let region = primaryRegion(from: analysis.regionClues)
+        switch analysis.sourceIntent {
+        case .restaurantRecommendation:
+            return region.map { "\($0) restaurant recommendation clue" } ?? "Restaurant recommendation clue"
+        case .cafeRecommendation:
+            return region.map { "\($0) coffee shop clue" } ?? "Coffee shop clue"
+        case .stayRecommendation:
+            return region.map { "\($0) stay recommendation clue" } ?? "Stay recommendation clue"
+        case .travelRecommendation:
+            return region.map { "\($0) travel place clue" } ?? "Travel place clue"
+        case .multiPlaceList:
+            return analysis.topic ?? "Place list clue"
+        case .singleVenuePost:
+            return "Venue clue"
+        case .unknownPlaceBearing:
+            return region.map { "\($0) place clue" } ?? "Place clue"
+        case .nonPlace, .creatorOnly:
+            return "Social link"
+        }
+    }
+
+    private func category(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "food"
+        case .cafeRecommendation:
+            return "cafe"
+        case .stayRecommendation:
+            return "stay"
+        case .travelRecommendation, .multiPlaceList, .singleVenuePost, .unknownPlaceBearing, .nonPlace, .creatorOnly:
+            return "attraction"
+        }
+    }
+
+    private func confidence(for intent: SocialPlaceSourceIntent) -> Double {
+        switch intent {
+        case .restaurantRecommendation, .cafeRecommendation, .stayRecommendation, .travelRecommendation:
+            return 0.35
+        case .multiPlaceList, .singleVenuePost:
+            return 0.4
+        case .unknownPlaceBearing:
+            return 0.25
+        case .nonPlace, .creatorOnly:
+            return 0
+        }
+    }
+
+    private func exactVenueMissingField(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "Exact restaurant name"
+        case .cafeRecommendation:
+            return "Exact cafe name"
+        case .stayRecommendation:
+            return "Exact hotel/stay name"
+        default:
+            return "Exact place name"
+        }
+    }
+
+    private func searchKeyword(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "restaurant"
+        case .cafeRecommendation:
+            return "cafe"
+        case .stayRecommendation:
+            return "hotel resort"
+        case .travelRecommendation, .multiPlaceList, .singleVenuePost, .unknownPlaceBearing, .nonPlace, .creatorOnly:
+            return "place"
+        }
+    }
+
+    private func primaryRegion(from regionClues: [String]) -> String? {
+        guard let clue = regionClues.first else { return nil }
+        let lowered = clue.lowercased()
+        if lowered == "losangeles" || lowered == "la" || lowered == "lacoffee" { return "LA" }
+        if lowered == "orangecounty" || lowered == "oc" || lowered == "ocfood" { return "Orange County" }
+        if lowered == "newyork" { return "New York" }
+        return clue
+    }
+
+    private func meaningfulPlacePhrase(from evidenceText: String) -> String? {
+        let patterns = [
+            #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
+            #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(evidenceText.startIndex..<evidenceText.endIndex, in: evidenceText)
+            guard let match = regex.firstMatch(in: evidenceText, range: range),
+                  match.numberOfRanges > 1,
+                  let captureRange = Range(match.range(at: 1), in: evidenceText) else { continue }
+            let cleaned = cleanHTMLText(String(evidenceText[captureRange]))
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，\"'“”"))
+            if cleaned.count >= 8, cleaned.count <= 120 {
+                return cleaned
+            }
+        }
+        return nil
     }
 
     private func instagramReelID(in url: URL?) -> String? {
