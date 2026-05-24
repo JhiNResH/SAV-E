@@ -28,6 +28,7 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
 
     var statusLabel: String {
         if canSaveAsMapStamp { return "Map match ready" }
+        if found.joined(separator: "\n").lowercased().contains("place-bearing source") { return "Place clue" }
         if lowercasedMissingFields.contains(where: { $0.contains("place name") }) { return "Source clue" }
         if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Needs confirmation" }
         return "Review candidate"
@@ -35,6 +36,7 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
 
     var primaryActionLabel: String {
         if canSaveAsMapStamp { return "Confirm map match" }
+        if statusLabel == "Place clue" { return "Run recovery search" }
         if statusLabel == "Source clue" { return "Add caption / screenshot / map link" }
         if lowercasedMissingFields.contains(where: { $0.contains("address") || $0.contains("coordinates") }) { return "Confirm address / coordinates" }
         return "Review evidence"
@@ -66,6 +68,7 @@ struct PendingReviewCandidate: Codable {
     var savedAt: Date
     var evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil
     var isSourceOnly: Bool = false
+    var reviewState: String? = nil
 
     init(
         candidateName: String,
@@ -80,7 +83,8 @@ struct PendingReviewCandidate: Codable {
         missingInfo: [String],
         savedAt: Date,
         evidenceDiagnostic: SocialPlaceEvidenceDiagnostic? = nil,
-        isSourceOnly: Bool = false
+        isSourceOnly: Bool = false,
+        reviewState: String? = nil
     ) {
         self.candidateName = candidateName
         self.address = address
@@ -95,6 +99,7 @@ struct PendingReviewCandidate: Codable {
         self.savedAt = savedAt
         self.evidenceDiagnostic = evidenceDiagnostic
         self.isSourceOnly = isSourceOnly
+        self.reviewState = reviewState
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -111,6 +116,7 @@ struct PendingReviewCandidate: Codable {
         case savedAt
         case evidenceDiagnostic
         case isSourceOnly
+        case reviewState
     }
 
     init(from decoder: Decoder) throws {
@@ -128,11 +134,16 @@ struct PendingReviewCandidate: Codable {
         savedAt = try container.decode(Date.self, forKey: .savedAt)
         evidenceDiagnostic = try container.decodeIfPresent(SocialPlaceEvidenceDiagnostic.self, forKey: .evidenceDiagnostic)
         isSourceOnly = try container.decodeIfPresent(Bool.self, forKey: .isSourceOnly) ?? false
+        reviewState = try container.decodeIfPresent(String.self, forKey: .reviewState)
     }
 
     var hasReliableCoordinates: Bool {
         guard let latitude, let longitude else { return false }
         return latitude != 0 || longitude != 0
+    }
+
+    var isPlaceBearingSource: Bool {
+        reviewState == "place_bearing_source"
     }
 }
 

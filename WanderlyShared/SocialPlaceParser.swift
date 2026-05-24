@@ -116,6 +116,23 @@ enum SocialPlaceSourceType: String, Codable {
     case unknown
 }
 
+enum SocialPlaceSourceIntent: String, Codable {
+    case nonPlace
+    case creatorOnly
+    case restaurantRecommendation
+    case cafeRecommendation
+    case travelRecommendation
+    case stayRecommendation
+    case multiPlaceList
+    case singleVenuePost
+    case unknownPlaceBearing
+}
+
+struct SocialPlaceRecoveryHint: Codable, Hashable {
+    var label: String
+    var queryFragment: String
+}
+
 struct SocialPlaceSourceGroup {
     var label: String
     var venueHandles: [String]
@@ -131,6 +148,10 @@ struct SocialPlaceAgentAnalysis {
     var placesFound: [SocialPlaceCandidateDraft]
     var sourceActors: [SocialPlaceSourceActor]
     var discardedCandidates: [SocialPlaceDiscardedCandidate]
+    var sourceIntent: SocialPlaceSourceIntent
+    var isPlaceBearing: Bool
+    var placeBearingReason: String?
+    var recoveryHints: [SocialPlaceRecoveryHint]
     var confidence: Double
     var nextBestAction: String
 }
@@ -183,6 +204,16 @@ struct SocialPlaceParser {
             to: mergeCandidates(candidates)
         )
             .filter { !SocialPlaceEvidenceScorer.isRejectedTitle($0.displayName) }
+        let intent = sourceIntent(
+            text: text,
+            sourceType: sourceType,
+            topic: topic,
+            regionClues: regionClues,
+            groups: sourceGroups,
+            placesFound: merged,
+            creatorHandles: creatorHandles
+        )
+        let isPlaceBearing = isPlaceBearingIntent(intent)
 
         return SocialPlaceAgentAnalysis(
             sourceType: sourceType,
@@ -193,9 +224,15 @@ struct SocialPlaceParser {
             placesFound: merged,
             sourceActors: uniqueActors(sourceActors),
             discardedCandidates: uniqueDiscarded(discarded),
+            sourceIntent: intent,
+            isPlaceBearing: isPlaceBearing,
+            placeBearingReason: isPlaceBearing ? placeBearingReason(intent: intent, topic: topic, regionClues: regionClues) : nil,
+            recoveryHints: recoveryHints(intent: intent, topic: topic, regionClues: regionClues, text: text),
             confidence: sourceConfidence(sourceType: sourceType, groups: sourceGroups, candidates: merged),
             nextBestAction: merged.isEmpty
-                ? "Add one more clue: place name, screenshot, caption, or map link."
+                ? isPlaceBearing
+                    ? "Run source recovery search or add the exact place name/map link before saving as a Map Stamp."
+                    : "Add one more clue: place name, screenshot, caption, or map link."
                 : sourceType == .multiPlaceList
                     ? "Review or enrich selected venue clues before saving Map Stamps."
                 : "Open Review to confirm exact address and coordinates."
@@ -1020,10 +1057,208 @@ struct SocialPlaceParser {
         return cleaned.lowercased()
     }
 
+    private func sourceIntent(
+        text: String,
+        sourceType: SocialPlaceSourceType,
+        topic: String?,
+        regionClues: [String],
+        groups: [SocialPlaceSourceGroup],
+        placesFound: [SocialPlaceCandidateDraft],
+        creatorHandles: Set<String>
+    ) -> SocialPlaceSourceIntent {
+        if sourceType == .multiPlaceList || !groups.isEmpty {
+            return .multiPlaceList
+        }
+        if sourceType == .singleVenuePost || !placesFound.isEmpty {
+            return .singleVenuePost
+        }
+        let trimmed = SocialPlaceEvidenceScorer.cleanText(text)
+        guard !trimmed.isEmpty else { return .nonPlace }
+
+        let searchable = normalizedSearchText(trimmed)
+        let topicText = normalizedSearchText(topic ?? "")
+        if isRestaurantRecommendation(searchable) || isRestaurantRecommendation(topicText) {
+            return .restaurantRecommendation
+        }
+        if isCafeRecommendation(searchable) || isCafeRecommendation(topicText) {
+            return .cafeRecommendation
+        }
+        if isStayRecommendation(searchable) || isStayRecommendation(topicText) {
+            return .stayRecommendation
+        }
+        if isTravelRecommendation(searchable) || isTravelRecommendation(topicText) {
+            return .travelRecommendation
+        }
+        if sourceType == .creatorOnly || !creatorHandles.isEmpty {
+            return .creatorOnly
+        }
+        if !regionClues.isEmpty, hasPlaceCategorySignal(searchable) {
+            return .unknownPlaceBearing
+        }
+        return .nonPlace
+    }
+
+    private func isPlaceBearingIntent(_ intent: SocialPlaceSourceIntent) -> Bool {
+        switch intent {
+        case .nonPlace, .creatorOnly:
+            return false
+        case .restaurantRecommendation, .cafeRecommendation, .travelRecommendation, .stayRecommendation, .multiPlaceList, .singleVenuePost, .unknownPlaceBearing:
+            return true
+        }
+    }
+
+    private func placeBearingReason(intent: SocialPlaceSourceIntent, topic: String?, regionClues: [String]) -> String {
+        let topicSuffix = topic.map { " about \($0)" } ?? ""
+        let regionSuffix = normalizedPrimaryRegion(from: regionClues).map { " near \($0)" } ?? ""
+        switch intent {
+        case .restaurantRecommendation:
+            return "restaurant recommendation source\(topicSuffix)\(regionSuffix)"
+        case .cafeRecommendation:
+            return "cafe or coffee recommendation source\(topicSuffix)\(regionSuffix)"
+        case .stayRecommendation:
+            return "stay or resort recommendation source\(topicSuffix)\(regionSuffix)"
+        case .travelRecommendation:
+            return "travel place recommendation source\(topicSuffix)\(regionSuffix)"
+        case .multiPlaceList:
+            return "multi-place list source\(topicSuffix)\(regionSuffix)"
+        case .singleVenuePost:
+            return "single venue source\(topicSuffix)\(regionSuffix)"
+        case .unknownPlaceBearing:
+            return "place-bearing source\(topicSuffix)\(regionSuffix)"
+        case .nonPlace, .creatorOnly:
+            return "not place-bearing"
+        }
+    }
+
+    private func recoveryHints(
+        intent: SocialPlaceSourceIntent,
+        topic: String?,
+        regionClues: [String],
+        text: String
+    ) -> [SocialPlaceRecoveryHint] {
+        guard isPlaceBearingIntent(intent) else { return [] }
+        var hints: [SocialPlaceRecoveryHint] = []
+        if let topic, !topic.isEmpty {
+            hints.append(SocialPlaceRecoveryHint(label: "topic", queryFragment: topic))
+        }
+        if let region = normalizedPrimaryRegion(from: regionClues) {
+            hints.append(SocialPlaceRecoveryHint(label: "region", queryFragment: region))
+        }
+        if let phrase = meaningfulPlaceBearingPhrase(from: text) {
+            hints.append(SocialPlaceRecoveryHint(label: "caption phrase", queryFragment: phrase))
+        }
+        let keyword = sourceIntentSearchKeyword(intent)
+        if !keyword.isEmpty {
+            hints.append(SocialPlaceRecoveryHint(label: "category", queryFragment: keyword))
+        }
+        var seen = Set<String>()
+        return hints.filter { hint in
+            let key = "\(hint.label)|\(hint.queryFragment.lowercased())"
+            guard !seen.contains(key), !hint.queryFragment.isEmpty else { return false }
+            seen.insert(key)
+            return true
+        }
+    }
+
+    private func normalizedSearchText(_ text: String) -> String {
+        text
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: #"[#_]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isRestaurantRecommendation(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        let patterns = [
+            #"\b(?:favorite|favourite|best|top|must try|must-try|iconic|hidden gem|hidden gems)[^.\n]{0,80}\b(?:restaurants?|food spots?|dinner spots?|brunch spots?|places to eat)\b"#,
+            #"\b(?:where to eat|wheretoeat|places to eat|food spots?|dinner spots?|brunch spots?)\b"#,
+            #"\b(?:restaurants?|food spots?|places to eat)\s+in\s+(?:la|los angeles|oc|orange county|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    private func isCafeRecommendation(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        let patterns = [
+            #"\b(?:favorite|favourite|best|top|must try|must-try|hidden gem|hidden gems)[^.\n]{0,80}\b(?:cafes?|coffee shops?)\b"#,
+            #"\b(?:cafes?|coffee shops?)\s+in\s+(?:la|los angeles|oc|orange county|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    private func isStayRecommendation(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        let patterns = [
+            #"\b(?:hotels?|resorts?|stays?|villas?|airbnbs?|where to stay)\s+in\s+(?:la|los angeles|oc|orange county|bali|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#,
+            #"\b(?:best|favorite|favourite|hidden gem|iconic)[^.\n]{0,80}\b(?:hotels?|resorts?|stays?|villas?|airbnbs?)\b"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    private func isTravelRecommendation(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        let patterns = [
+            #"\b(?:hidden gems?|things to do|places to visit|travel spots?|must visit|must-visit)\s+(?:in|near)\s+(?:la|los angeles|oc|orange county|bali|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#,
+            #"\b(?:best|favorite|favourite|top)[^.\n]{0,80}\b(?:things to do|places to visit|travel spots?)\b"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    private func hasPlaceCategorySignal(_ text: String) -> Bool {
+        text.range(
+            of: #"\b(?:restaurants?|cafes?|coffee shops?|bars?|bakeries|dessert shops?|hotels?|resorts?|places to eat|things to do|hidden gems?)\b"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    private func sourceIntentSearchKeyword(_ intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "restaurant"
+        case .cafeRecommendation:
+            return "cafe coffee shop"
+        case .stayRecommendation:
+            return "hotel resort stay"
+        case .travelRecommendation, .unknownPlaceBearing, .multiPlaceList:
+            return "place"
+        case .singleVenuePost:
+            return "venue"
+        case .nonPlace, .creatorOnly:
+            return ""
+        }
+    }
+
+    private func normalizedPrimaryRegion(from regionClues: [String]) -> String? {
+        guard let clue = regionClues.first else { return nil }
+        let lowered = clue.lowercased()
+        if lowered == "losangeles" || lowered == "la" || lowered == "lacoffee" { return "LA" }
+        if lowered == "orangecounty" || lowered == "oc" || lowered == "ocfood" { return "Orange County" }
+        if lowered == "newyork" { return "New York" }
+        return clue
+    }
+
+    private func meaningfulPlaceBearingPhrase(from text: String) -> String? {
+        let patterns = [
+            #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
+            #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#
+        ]
+        for pattern in patterns {
+            guard let phrase = firstCapture(in: text, pattern: pattern) else { continue }
+            let cleaned = SocialPlaceEvidenceScorer.cleanText(phrase)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，\"'“”"))
+            if cleaned.count >= 8, cleaned.count <= 120 {
+                return cleaned
+            }
+        }
+        return nil
+    }
+
     private func sourceTopic(from text: String) -> String? {
         let patterns = [
             #"(?i)\b(?:the\s+)?(coffee shops?\s+in\s+Los Angeles County)\b"#,
-            #"(?i)\b(?:the\s+)?((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+[A-Z][A-Za-z .'-]{2,60})\b"#,
+            #"(?i)\b(?:favorite|favourite|best|top|must-try|must try|hidden gems?)?[^\n\r]{0,30}\b((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+(?:LA|OC|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"(?i)\b((?:LA|Los Angeles|Orange County|OC|Tokyo|Taipei|Seoul|Paris|London|New York)\s+(?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?))\b"#
         ]
         for pattern in patterns {

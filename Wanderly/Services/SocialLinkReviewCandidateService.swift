@@ -45,6 +45,7 @@ final class SocialLinkReviewCandidateService {
 
     func refineCandidate(_ candidate: PendingReviewCandidate, evidenceText: String? = nil) async -> PendingReviewCandidate {
         guard !candidate.isSourceOnly else { return candidate }
+        guard !candidate.isPlaceBearingSource else { return candidate }
         guard !candidate.hasReliableCoordinates else { return candidate }
         let query = refinementQuery(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
         guard !query.isEmpty else { return candidate }
@@ -99,7 +100,10 @@ final class SocialLinkReviewCandidateService {
     }
 
     func reviewCandidatesOrSourceOnly(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
-        let candidates = reviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+        let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
+        let candidates = rankedCandidates(
+            analysis.placesFound.map { pendingReviewCandidate(from: $0, sourceURL: sourceURL, sourceText: evidenceText) }
+        )
             .map { candidate in
                 var diagnosed = candidate
                 diagnosed.evidenceDiagnostic = candidateDiagnostic(for: candidate, evidenceText: evidenceText, sourceURL: sourceURL)
@@ -110,24 +114,31 @@ final class SocialLinkReviewCandidateService {
             }
 
         guard candidates.isEmpty else { return candidates }
+        if analysis.isPlaceBearing {
+            return [placeBearingSourceCandidate(from: analysis, evidenceText: evidenceText, sourceURL: sourceURL)]
+        }
         return [sourceOnlyCandidate(evidenceText: evidenceText, sourceURL: sourceURL)]
     }
 
     func reviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
-        let candidates = SocialPlaceParser()
-            .parse(
-                evidence: SocialPlaceSourceEvidence(
-                    sourceURL: sourceURL,
-                    resolvedURL: sourceURL,
-                    sharedTitle: nil,
-                    sharedText: evidenceText,
-                    metadataTitle: nil,
-                    metadataDescription: nil,
-                    ocrLines: []
-                )
-            )
+        let candidates = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
+            .placesFound
             .map { pendingReviewCandidate(from: $0, sourceURL: sourceURL, sourceText: evidenceText) }
         return rankedCandidates(candidates)
+    }
+
+    private func analyze(evidenceText: String, sourceURL: String) -> SocialPlaceAgentAnalysis {
+        SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: sourceURL,
+                resolvedURL: sourceURL,
+                sharedTitle: nil,
+                sharedText: evidenceText,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
     }
 
     private func analyzedCandidates(from evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
@@ -619,6 +630,65 @@ final class SocialLinkReviewCandidateService {
         )
     }
 
+    private func placeBearingSourceCandidate(
+        from analysis: SocialPlaceAgentAnalysis,
+        evidenceText: String,
+        sourceURL: String
+    ) -> PendingReviewCandidate {
+        let diagnostic = placeBearingDiagnostic(from: analysis, evidenceText: evidenceText, sourceURL: sourceURL)
+        return PendingReviewCandidate(
+            candidateName: placeBearingCandidateName(from: analysis),
+            address: "",
+            category: category(for: analysis.sourceIntent),
+            sourceURL: sourceURL,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic) + ["Next best clue: \(diagnostic.nextBestClue)"],
+            confidence: confidence(for: analysis.sourceIntent),
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            reviewState: "place_bearing_source"
+        )
+    }
+
+    private func placeBearingDiagnostic(
+        from analysis: SocialPlaceAgentAnalysis,
+        evidenceText: String,
+        sourceURL: String
+    ) -> SocialPlaceEvidenceDiagnostic {
+        var found = ["Source URL: \(sourceURL)"]
+        if let reason = analysis.placeBearingReason {
+            found.append("Place-bearing source: \(reason)")
+        }
+        found.append("Source intent: \(analysis.sourceIntent.rawValue)")
+        if let topic = analysis.topic {
+            found.append("Topic clue: \(topic)")
+        }
+        found.append(contentsOf: analysis.regionClues.map { "Region clue: \($0)" })
+        found.append(contentsOf: analysis.recoveryHints.map { "Recovery hint: \($0.label)=\($0.queryFragment)" })
+
+        return SocialPlaceEvidenceDiagnostic(
+            found: appendUnique([], found),
+            attempts: [
+                "Checked public metadata/caption text for explicit place names",
+                "Classified the source as place-bearing even though no exact venue was verified",
+                "Kept this in Review instead of inventing a map pin",
+                "Prepared public source-recovery search queries",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: appendUnique(
+                [],
+                [
+                    exactVenueMissingField(for: analysis.sourceIntent),
+                    "Verified address",
+                    "Verified coordinates"
+                ]
+            ),
+            nextBestClue: "Run source recovery search or add the exact place name/map link before saving as a Map Stamp.",
+            suggestedSearchQueries: sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
+        )
+    }
+
     private func sourceOnlyDiagnostic(evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {
         var found = ["Source URL: \(sourceURL)"]
         if !evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -647,7 +717,11 @@ final class SocialLinkReviewCandidateService {
         (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
     }
 
-    private func sourceRecoverySearchQueries(evidenceText: String, sourceURL: String) -> [String] {
+    private func sourceRecoverySearchQueries(
+        evidenceText: String,
+        sourceURL: String,
+        analysis: SocialPlaceAgentAnalysis? = nil
+    ) -> [String] {
         var queries: [String] = []
         let url = URL(string: sourceURL)
         let host = url?.host()?.lowercased() ?? ""
@@ -655,6 +729,33 @@ final class SocialLinkReviewCandidateService {
         let cleanedEvidence = cleanHTMLText(evidenceText)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let analysis, analysis.isPlaceBearing {
+            let keyword = searchKeyword(for: analysis.sourceIntent)
+            let region = primaryRegion(from: analysis.regionClues)
+            let topic = analysis.topic
+            let phrase = meaningfulPlacePhrase(from: evidenceText)
+            if let reelID {
+                if let region {
+                    queries.append("\"\(reelID)\" \(keyword) \(region)")
+                }
+                if let topic {
+                    queries.append("\"\(reelID)\" \"\(topic)\"")
+                } else if let phrase {
+                    queries.append("\"\(reelID)\" \"\(phrase)\"")
+                }
+                queries.append("site:instagram.com/reel/\(reelID) \(keyword)")
+            } else if let url, !host.isEmpty {
+                queries.append("\(host) \(url.lastPathComponent) \(keyword)")
+            }
+            if let region, let phrase {
+                queries.append("\"\(phrase)\" \(region) \(keyword)")
+            }
+            if let canonicalURL = canonicalSearchURL(from: url) {
+                queries.append("\"\(canonicalURL)\"")
+            }
+            return Array(appendUnique([], queries).prefix(4))
+        }
 
         if let reelID {
             queries.append("instagram reel \(reelID) place")
@@ -677,6 +778,112 @@ final class SocialLinkReviewCandidateService {
         }
 
         return Array(appendUnique([], queries).prefix(4))
+    }
+
+    private func placeBearingCandidateName(from analysis: SocialPlaceAgentAnalysis) -> String {
+        let region = primaryRegion(from: analysis.regionClues)
+        switch analysis.sourceIntent {
+        case .restaurantRecommendation:
+            return region.map { "\($0) restaurant recommendation clue" } ?? "Restaurant recommendation clue"
+        case .cafeRecommendation:
+            return region.map { "\($0) coffee shop clue" } ?? "Coffee shop clue"
+        case .stayRecommendation:
+            return region.map { "\($0) stay recommendation clue" } ?? "Stay recommendation clue"
+        case .travelRecommendation:
+            return region.map { "\($0) travel place clue" } ?? "Travel place clue"
+        case .multiPlaceList:
+            return analysis.topic ?? "Place list clue"
+        case .singleVenuePost:
+            return "Venue clue"
+        case .unknownPlaceBearing:
+            return region.map { "\($0) place clue" } ?? "Place clue"
+        case .nonPlace, .creatorOnly:
+            return "Social link"
+        }
+    }
+
+    private func category(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "food"
+        case .cafeRecommendation:
+            return "cafe"
+        case .stayRecommendation:
+            return "stay"
+        case .travelRecommendation, .multiPlaceList, .singleVenuePost, .unknownPlaceBearing, .nonPlace, .creatorOnly:
+            return "attraction"
+        }
+    }
+
+    private func confidence(for intent: SocialPlaceSourceIntent) -> Double {
+        switch intent {
+        case .restaurantRecommendation, .cafeRecommendation, .stayRecommendation, .travelRecommendation:
+            return 0.35
+        case .multiPlaceList, .singleVenuePost:
+            return 0.4
+        case .unknownPlaceBearing:
+            return 0.25
+        case .nonPlace, .creatorOnly:
+            return 0
+        }
+    }
+
+    private func exactVenueMissingField(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "Exact restaurant name"
+        case .cafeRecommendation:
+            return "Exact cafe name"
+        case .stayRecommendation:
+            return "Exact hotel/stay name"
+        default:
+            return "Exact place name"
+        }
+    }
+
+    private func searchKeyword(for intent: SocialPlaceSourceIntent) -> String {
+        switch intent {
+        case .restaurantRecommendation:
+            return "restaurant"
+        case .cafeRecommendation:
+            return "cafe"
+        case .stayRecommendation:
+            return "hotel resort"
+        case .travelRecommendation, .multiPlaceList, .singleVenuePost, .unknownPlaceBearing:
+            return "place"
+        case .nonPlace, .creatorOnly:
+            return "place"
+        }
+    }
+
+    private func primaryRegion(from regionClues: [String]) -> String? {
+        guard let clue = regionClues.first else { return nil }
+        let lowered = clue.lowercased()
+        if lowered == "losangeles" || lowered == "la" || lowered == "lacoffee" { return "LA" }
+        if lowered == "orangecounty" || lowered == "oc" || lowered == "ocfood" { return "Orange County" }
+        if lowered == "newyork" { return "New York" }
+        return clue
+    }
+
+    private func meaningfulPlacePhrase(from evidenceText: String) -> String? {
+        let patterns = [
+            #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
+            #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(evidenceText.startIndex..<evidenceText.endIndex, in: evidenceText)
+            guard let match = regex.firstMatch(in: evidenceText, range: range),
+                  match.numberOfRanges > 1,
+                  let captureRange = Range(match.range(at: 1), in: evidenceText) else { continue }
+            let cleaned = cleanHTMLText(String(evidenceText[captureRange]))
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，\"'“”"))
+            if cleaned.count >= 8, cleaned.count <= 120 {
+                return cleaned
+            }
+        }
+        return nil
     }
 
     private func instagramReelID(in url: URL?) -> String? {

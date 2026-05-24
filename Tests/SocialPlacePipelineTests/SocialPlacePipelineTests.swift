@@ -422,6 +422,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         )
 
         XCTAssertEqual(analysis.sourceType, .multiPlaceList)
+        XCTAssertEqual(analysis.sourceIntent, .multiPlaceList)
+        XCTAssertTrue(analysis.isPlaceBearing)
         XCTAssertEqual(analysis.topic, "coffee shops in Los Angeles County")
         XCTAssertTrue(analysis.sourceSummary.contains("multi-place list"))
         XCTAssertTrue(analysis.regionClues.contains("Los Angeles County"))
@@ -442,6 +444,53 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "MY FAVORITE" })
         XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "Teresa" })
         XCTAssertTrue(analysis.nextBestAction.contains("enrich selected venue clues"))
+    }
+
+    func testRestaurantRecommendationWithoutVenueBecomesPlaceBearingIntent() {
+        let evidenceText = """
+        Talia on Instagram: "This is one of my absolutely favorite restaurants in LA.
+        Save this for a slow dinner night."
+        """
+
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/DW2ZpyADbZ6/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: evidenceText,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertEqual(analysis.sourceType, .sourceOnly)
+        XCTAssertEqual(analysis.sourceIntent, .restaurantRecommendation)
+        XCTAssertTrue(analysis.isPlaceBearing)
+        XCTAssertTrue(analysis.placesFound.isEmpty)
+        XCTAssertEqual(analysis.topic, "restaurants in LA")
+        XCTAssertTrue(analysis.regionClues.contains("LA"))
+        XCTAssertTrue(analysis.nextBestAction.contains("source recovery search"))
+    }
+
+    func testCreatorOnlyHandleDoesNotBecomePlaceBearingSource() {
+        let evidenceText = "Please follow @travelcreator for daily hidden gems."
+
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/creator-only/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: evidenceText,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertEqual(analysis.sourceIntent, .creatorOnly)
+        XCTAssertFalse(analysis.isPlaceBearing)
+        XCTAssertTrue(analysis.placesFound.isEmpty)
     }
 
     func testOCRRejectsGenericCoffeeListLabelsAndFavoriteHeader() {
@@ -505,6 +554,38 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidence.contains("Suggested public search: instagram reel DYsourceOnly place"))
         XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.")
         XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
+    }
+
+    func testPlaceBearingInstagramMetadataCreatesWeakReviewCandidateInsteadOfSourceOnly() {
+        let service = SocialLinkReviewCandidateService()
+        let sourceURL = "https://www.instagram.com/reel/DW2ZpyADbZ6/?igsh=tracking"
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            Talia on Instagram: "This is one of my absolutely favorite restaurants in LA.
+            Save this for a slow dinner night."
+            """,
+            sourceURL: sourceURL
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        let candidate = candidates[0]
+        XCTAssertFalse(candidate.isSourceOnly)
+        XCTAssertEqual(candidate.reviewState, "place_bearing_source")
+        XCTAssertEqual(candidate.candidateName, "LA restaurant recommendation clue")
+        XCTAssertEqual(candidate.category, "food")
+        XCTAssertEqual(candidate.confidence, 0.35)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertTrue(candidate.missingInfo.contains("Exact restaurant name"))
+        XCTAssertTrue(candidate.missingInfo.contains("Verified address"))
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains(where: { $0.contains("Place-bearing source") }) == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source intent: restaurantRecommendation") == true)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Place clue")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.primaryActionLabel, "Run recovery search")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries?.first, "\"DW2ZpyADbZ6\" restaurant LA")
+        XCTAssertFalse(candidate.evidenceDiagnostic?.suggestedSearchQueries?.joined(separator: " ").contains("igsh") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.nextBestClue.contains("source recovery search") == true)
     }
 
     func testURLOnlyInstagramReelSearchPlanRemovesTrackingQuery() {
