@@ -804,7 +804,9 @@ struct SocialPlaceParser {
                 return nil
             }
             let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(name)
-            guard SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned), looksLikeVenueTitle(cleaned) else {
+            guard SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned),
+                  looksLikeVenueTitle(cleaned),
+                  !looksLikeInstagramCreatorTitle(cleaned) else {
                 return nil
             }
             let location = firstLocationClue(in: fullText)
@@ -1142,7 +1144,7 @@ struct SocialPlaceParser {
         if let addressLine { return cleanLocationMarker(from: addressLine) }
 
         let patterns = [
-            #"📍\s*([^\n\r\.]+)"#,
+            #"[📍👣]\s*([^\n\r\.]+)"#,
             #"\bLocation:\s*([^\n\r\.]+)"#,
             #"(?i)\b(?:located|based)\s+in\s+([A-Z][A-Za-z .'-]{2,40})(?:[.!?,\n\r]|$)"#,
             #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China|California))\b"#
@@ -1158,7 +1160,7 @@ struct SocialPlaceParser {
 
     private func cleanLocationMarker(from value: String) -> String {
         let cleaned = SocialPlaceEvidenceScorer.cleanText(value)
-            .replacingOccurrences(of: #"^[📍🗺]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^[📍🗺👣🚩]\s*"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)^\s*(?:located\s+at|located|address)\s*[:：]?\s*[📍🗺]?\s*"#, with: "", options: .regularExpression)
         if let streetAddress = firstStreetAddress(in: cleaned) {
             return streetAddress
@@ -1188,6 +1190,14 @@ struct SocialPlaceParser {
 
     private func looksLikeVenueTitle(_ value: String) -> Bool {
         value.range(of: #"(?i)\b(restaurant|cafe|coffee|bar|bakery|bistro|kitchen|grill|pizzeria|taqueria|sushi|ramen|hotel|resort|inn|villa|district|market|mall|museum|gallery|park|beach|garden|paseo|dining|pottery|ceramics?|studio|workshops?|classes?|lessons?|experience|atelier)\b"#, options: .regularExpression) != nil
+    }
+
+    private func looksLikeInstagramCreatorTitle(_ value: String) -> Bool {
+        let cityCount = ["台北", "臺北", "新北", "台中", "臺中", "台南", "臺南", "高雄", "全台", "Taipei", "Taichung", "Tainan", "Kaohsiung"]
+            .filter { value.localizedCaseInsensitiveContains($0) }
+            .count
+        return cityCount >= 2 ||
+            value.range(of: #"(?i)(食記|美食|foodie|food blogger|travel guide|全台)"#, options: .regularExpression) != nil
     }
 
     private func looksVenueContext(_ line: String) -> Bool {
@@ -1255,6 +1265,7 @@ struct SocialPlaceParser {
             firstScalar == 0x279C ||
             firstScalar == 0x1F4CC ||
             firstScalar == 0x1F4CD ||
+            firstScalar == 0x1F6A9 ||
             trimmedLine.hasPrefix("店名")
         if hasVenueMarker {
             let markerStripped = trimmedLine
