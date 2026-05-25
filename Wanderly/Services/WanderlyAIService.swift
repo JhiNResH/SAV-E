@@ -236,8 +236,9 @@ final class WanderlyAIService {
             DETERMINISTIC PLANNER DRAFT:
             \(deterministicDraftJSON)
 
-            Use this draft as the source of truth for itinerary place IDs, day grouping, stop order, first-pass times, and map route IDs.
-            You may polish the title, aiMessage, and stop notes. Do not introduce unknown place IDs or claim live travel times.
+            Use this draft as a safe baseline built from saved places and distance/time-slot rules.
+            You may improve the day grouping, stop order, times, title, aiMessage, and notes when it makes the itinerary more useful.
+            Keep every place ID valid and do not introduce unknown place IDs or claim live travel times.
             """
         } else {
             deterministicDraftSection = ""
@@ -286,7 +287,7 @@ final class WanderlyAIService {
 
         RULES:
         - For itinerary requests: use saved places to build a realistic schedule with smart times and geographic order.
-        - If a DETERMINISTIC PLANNER DRAFT is provided, preserve its place IDs, day grouping, stop order, first-pass times, and mapAction. Polish explanation and notes only.
+        - If a DETERMINISTIC PLANNER DRAFT is provided, use it as a safe baseline. You may improve grouping, order, times, title, aiMessage, and stop notes, but every place ID must come from SAVED PLACES.
         - For destination-specific requests, choose saved places whose name/address matches the destination or whose coordinates are geographically near the matching anchor places.
         - If the saved places are far apart, still plan them honestly with realistic travel notes instead of rejecting them as "not in San Francisco".
         - placeList: set placeIds + mapAction.filterPins with same ids

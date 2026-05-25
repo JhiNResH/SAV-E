@@ -131,6 +131,8 @@ struct DeterministicTripPlanner {
             score += place.name.lowercased().contains(token) ? 5 : 3
         }
 
+        score += locationAliasScore(for: searchable, tokens: tokens)
+
         if categoryAliases(for: place.category).contains(where: { normalized.contains($0) }) {
             score += 4
         }
@@ -164,6 +166,24 @@ struct DeterministicTripPlanner {
         text
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
+    }
+
+    private func locationAliasScore(for searchable: String, tokens: [String]) -> Int {
+        let aliases: [String: [String]] = [
+            "la": ["los angeles"],
+            "oc": ["orange county", "irvine", "anaheim", "costa mesa", "newport beach", "westminster"],
+            "ny": ["new york"],
+            "sf": ["san francisco"],
+            "sd": ["san diego"]
+        ]
+
+        return tokens.reduce(0) { score, token in
+            guard let expansions = aliases[token],
+                  expansions.contains(where: { searchable.contains($0) }) else {
+                return score
+            }
+            return score + 4
+        }
     }
 
     private func categoryAliases(for category: PlaceCategory) -> [String] {
