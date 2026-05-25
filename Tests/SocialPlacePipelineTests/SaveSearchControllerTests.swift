@@ -36,6 +36,39 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.fromYourSave.results.first?.userState, .visited)
     }
 
+    func testUnsavedMapCandidatesStayCollectibleButNotSaved() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "nearby sushi",
+            places: [],
+            localRecords: [],
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "Sushi Gen",
+                    subtitle: "Little Tokyo · Japanese",
+                    latitude: 34.0478,
+                    longitude: -118.2386,
+                    category: .food,
+                    rating: 4.6,
+                    reviewCount: 4100,
+                    sourceURL: "https://maps.google.com/?q=Sushi+Gen",
+                    sourcePlatform: .googleMaps,
+                    evidence: ["Visible on map", "Google rating 4.6"]
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.newRecommendations.results.first)
+        XCTAssertEqual(result.objectType, .mapVisibleUnsavedPlace)
+        XCTAssertEqual(result.userState, .unsaved)
+        XCTAssertEqual(result.title, "Sushi Gen")
+        XCTAssertEqual(result.rating, 4.6)
+        XCTAssertEqual(result.reviewCount, 4100)
+        XCTAssertEqual(result.primaryAction, .savePlace)
+        XCTAssertFalse(result.isRecommendationShell)
+        XCTAssertTrue(result.evidence.contains("Visible on map"))
+    }
+
     func testSourceOnlyAndReviewRecordsStayReviewScoped() throws {
         let controller = SaveSearchController()
         let response = controller.search(

@@ -244,11 +244,30 @@ private struct SaveSearchResultCard: View {
                 }
             }
 
+            if result.rating != nil || result.reviewCount != nil {
+                HStack(spacing: 6) {
+                    if let rating = result.rating {
+                        Label(String(format: "%.1f", rating), systemImage: "star.fill")
+                    }
+                    if let reviewCount = result.reviewCount {
+                        Label("\(reviewCount) reviews", systemImage: "text.bubble.fill")
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.saveCocoa)
+            }
+
             if !result.missingInfo.isEmpty {
                 Text("Missing: \(result.missingInfo.prefix(2).joined(separator: ", "))")
                     .font(.caption2.weight(.semibold))
                     .foregroundColor(.saveCocoa)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if result.primaryAction != .none && result.primaryAction != .openSource {
+                Label(result.primaryAction.displayName, systemImage: result.primaryAction.systemImage)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
             }
 
             if let sourceURL = result.sourceURL, let url = URL(string: sourceURL) {
@@ -257,6 +276,10 @@ private struct SaveSearchResultCard: View {
                         .font(.caption.weight(.black))
                         .foregroundColor(.saveInk)
                 }
+            } else if result.primaryAction == .openSource {
+                Label(result.primaryAction.displayName, systemImage: result.primaryAction.systemImage)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
             } else if result.isRecommendationShell {
                 Label("No place saved yet", systemImage: "sparkle.magnifyingglass")
                     .font(.caption.weight(.black))
@@ -275,6 +298,7 @@ private struct SaveSearchResultCard: View {
         case .triedMemory: return "checkmark.seal.fill"
         case .review: return "text.bubble.fill"
         case .tripStop: return "route.fill"
+        case .mapVisibleUnsavedPlace: return "mappin.and.ellipse"
         case .newRecommendation: return "sparkle.magnifyingglass"
         }
     }
@@ -283,7 +307,7 @@ private struct SaveSearchResultCard: View {
         switch result.objectType {
         case .savedPlace, .triedMemory: return .saveMint
         case .pendingCandidate, .sourceOnlyClue: return .saveHoney
-        case .review: return .saveSignal
+        case .review, .mapVisibleUnsavedPlace: return .saveSignal
         case .tripStop: return .saveSky
         case .newRecommendation: return .saveSky.opacity(0.72)
         }
