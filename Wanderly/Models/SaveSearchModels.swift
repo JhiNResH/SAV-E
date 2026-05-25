@@ -7,6 +7,7 @@ enum SaveSearchObjectType: String, Codable, CaseIterable, Hashable {
     case triedMemory = "tried_memory"
     case review = "review"
     case tripStop = "trip_stop"
+    case mapVisibleUnsavedPlace = "map_visible_unsaved_place"
     case newRecommendation = "new_recommendation"
 
     var displayName: String {
@@ -17,8 +18,80 @@ enum SaveSearchObjectType: String, Codable, CaseIterable, Hashable {
         case .triedMemory: return "Tried memory"
         case .review: return "Private review"
         case .tripStop: return "Trip stop"
+        case .mapVisibleUnsavedPlace: return "Map place"
         case .newRecommendation: return "New recommendation"
         }
+    }
+}
+
+enum SaveSearchPrimaryAction: String, Codable, Hashable {
+    case openSource = "open_source"
+    case runRecovery = "run_recovery"
+    case savePlace = "save_place"
+    case planAround = "plan_around"
+    case none = "none"
+
+    var displayName: String {
+        switch self {
+        case .openSource: return "Open source"
+        case .runRecovery: return "Find exact place"
+        case .savePlace: return "Save this place"
+        case .planAround: return "Plan around this"
+        case .none: return "No action"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .openSource: return "link"
+        case .runRecovery: return "sparkle.magnifyingglass"
+        case .savePlace: return "bookmark.badge.plus"
+        case .planAround: return "wand.and.stars"
+        case .none: return "circle"
+        }
+    }
+}
+
+struct SaveMapCandidate: Identifiable, Hashable {
+    var id: String
+    var title: String
+    var subtitle: String
+    var latitude: Double
+    var longitude: Double
+    var category: PlaceCategory?
+    var rating: Double?
+    var reviewCount: Int?
+    var sourceURL: String?
+    var sourcePlatform: SourcePlatform?
+    var evidence: [String]
+    var createdAt: Date
+
+    init(
+        id: String = UUID().uuidString,
+        title: String,
+        subtitle: String,
+        latitude: Double,
+        longitude: Double,
+        category: PlaceCategory? = nil,
+        rating: Double? = nil,
+        reviewCount: Int? = nil,
+        sourceURL: String? = nil,
+        sourcePlatform: SourcePlatform? = nil,
+        evidence: [String] = [],
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.latitude = latitude
+        self.longitude = longitude
+        self.category = category
+        self.rating = rating
+        self.reviewCount = reviewCount
+        self.sourceURL = sourceURL
+        self.sourcePlatform = sourcePlatform
+        self.evidence = evidence
+        self.createdAt = createdAt
     }
 }
 
@@ -106,12 +179,17 @@ struct SaveSearchResult: Identifiable, Hashable {
     var sourcePlatform: SourcePlatform?
     var category: PlaceCategory?
     var cityOrArea: String?
+    var latitude: Double?
+    var longitude: Double?
+    var rating: Double?
+    var reviewCount: Int?
     var confidence: Double?
     var missingInfo: [String]
     var evidence: [String]
     var createdAt: Date
     var canRunRecovery: Bool
     var isRecommendationShell: Bool
+    var primaryAction: SaveSearchPrimaryAction
 
     var searchText: String {
         [
@@ -122,6 +200,8 @@ struct SaveSearchResult: Identifiable, Hashable {
             sourcePlatform?.displayName,
             category?.displayName,
             cityOrArea,
+            rating.map { "rating \($0)" },
+            reviewCount.map { "reviews \($0)" },
             missingInfo.joined(separator: " "),
             evidence.joined(separator: " "),
         ]

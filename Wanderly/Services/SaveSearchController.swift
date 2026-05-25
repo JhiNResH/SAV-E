@@ -4,7 +4,8 @@ struct SaveSearchController {
     func search(
         query rawQuery: String,
         places: [Place],
-        localRecords: [SaveMemoryRecord]
+        localRecords: [SaveMemoryRecord],
+        mapCandidates: [SaveMapCandidate] = []
     ) -> SaveSearchResponse {
         let query = SaveSearchQuery(rawValue: rawQuery)
         let placeResults = places.map(makePlaceResult)
@@ -17,10 +18,19 @@ struct SaveSearchController {
                 if lhsScore == rhsScore { return lhs.createdAt > rhs.createdAt }
                 return lhsScore > rhsScore
             }
+        let mapRecommendationResults = mapCandidates
+            .map(makeMapCandidateResult)
+            .filter { query.matches($0) || (query.wantsNewRecommendations && query.terms.isEmpty) }
+            .sorted { lhs, rhs in
+                let lhsScore = query.score(lhs)
+                let rhsScore = query.score(rhs)
+                if lhsScore == rhsScore { return lhs.createdAt > rhs.createdAt }
+                return lhsScore > rhsScore
+            }
 
-        let recommendationResults = query.wantsNewRecommendations
-            ? [makeRecommendationShell(for: query)]
-            : []
+        let recommendationResults = !mapRecommendationResults.isEmpty
+            ? mapRecommendationResults
+            : (query.wantsNewRecommendations ? [makeRecommendationShell(for: query)] : [])
 
         return SaveSearchResponse(
             query: rawQuery,
@@ -54,12 +64,17 @@ struct SaveSearchController {
             sourcePlatform: place.sourcePlatform,
             category: place.category,
             cityOrArea: cityOrArea(from: place.address),
+            latitude: place.latitude,
+            longitude: place.longitude,
+            rating: place.googleRating ?? place.rating,
+            reviewCount: nil,
             confidence: nil,
             missingInfo: [],
             evidence: placeEvidence(place),
             createdAt: place.createdAt,
             canRunRecovery: false,
-            isRecommendationShell: false
+            isRecommendationShell: false,
+            primaryAction: place.sourceUrl == nil ? .planAround : .openSource
         )
     }
 
@@ -94,12 +109,17 @@ struct SaveSearchController {
             sourcePlatform: sourcePlatform(from: record.sourceURL),
             category: nil,
             cityOrArea: record.address.flatMap(cityOrArea),
+            latitude: nil,
+            longitude: nil,
+            rating: nil,
+            reviewCount: nil,
             confidence: nil,
             missingInfo: record.evidenceDiagnostic?.missingFields ?? [],
             evidence: record.evidence,
             createdAt: record.createdAt,
             canRunRecovery: record.state == .sourceOnly,
-            isRecommendationShell: false
+            isRecommendationShell: false,
+            primaryAction: record.state == .sourceOnly ? .runRecovery : .openSource
         )
     }
 
@@ -115,12 +135,43 @@ struct SaveSearchController {
             sourcePlatform: nil,
             category: query.categories.first,
             cityOrArea: nil,
+            latitude: nil,
+            longitude: nil,
+            rating: nil,
+            reviewCount: nil,
             confidence: nil,
             missingInfo: ["Choose a result before it becomes a review clue or memory card"],
             evidence: ["Recommendation shell only; no map pin or saved place was created"],
             createdAt: Date(),
             canRunRecovery: false,
-            isRecommendationShell: true
+            isRecommendationShell: true,
+            primaryAction: .none
+        )
+    }
+
+    private func makeMapCandidateResult(_ candidate: SaveMapCandidate) -> SaveSearchResult {
+        SaveSearchResult(
+            id: "map-candidate-\(candidate.id)",
+            objectType: .mapVisibleUnsavedPlace,
+            userState: .unsaved,
+            title: candidate.title,
+            subtitle: candidate.subtitle,
+            statusLabel: "Unsaved map place",
+            sourceURL: candidate.sourceURL,
+            sourcePlatform: candidate.sourcePlatform,
+            category: candidate.category,
+            cityOrArea: cityOrArea(from: candidate.subtitle),
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            rating: candidate.rating,
+            reviewCount: candidate.reviewCount,
+            confidence: nil,
+            missingInfo: [],
+            evidence: candidate.evidence.isEmpty ? ["Visible on map; not saved yet"] : candidate.evidence,
+            createdAt: candidate.createdAt,
+            canRunRecovery: false,
+            isRecommendationShell: false,
+            primaryAction: .savePlace
         )
     }
 
@@ -222,7 +273,7 @@ private struct SaveSearchQuery {
         if states.contains(result.userState) { value += 6 }
         switch result.objectType {
         case .savedPlace, .triedMemory: value += 4
-        case .pendingCandidate: value += 3
+        case .pendingCandidate, .mapVisibleUnsavedPlace: value += 3
         case .sourceOnlyClue: value += 2
         case .review, .tripStop, .newRecommendation: value += 1
         }
