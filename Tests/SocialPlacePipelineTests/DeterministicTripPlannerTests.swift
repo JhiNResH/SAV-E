@@ -50,6 +50,22 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertEqual(stops.first(where: { $0.placeName == "Night Bar" })?.time, "8:30 PM")
     }
 
+    func testPlannerUnderstandsChineseTwoDayLAPrompt() throws {
+        let places = [
+            makePlace("Los Angeles Taco", address: "Los Angeles, CA", latitude: 34.0522, longitude: -118.2437, category: .food),
+            makePlace("LA Coffee", address: "Los Angeles, CA", latitude: 34.0450, longitude: -118.2500, category: .cafe),
+            makePlace("Irvine Dinner", address: "Irvine, CA", latitude: 33.6846, longitude: -117.8265, category: .food)
+        ]
+
+        let response = try XCTUnwrap(DeterministicTripPlanner().plan(for: "幫我規劃 LA 兩天行程", places: places))
+        let plannedNames = response.itineraryDays.flatMap(\.stops).map(\.placeName)
+
+        XCTAssertEqual(response.itineraryDays.count, 2)
+        XCTAssertTrue(plannedNames.contains("Los Angeles Taco"))
+        XCTAssertTrue(plannedNames.contains("LA Coffee"))
+        XCTAssertFalse(plannedNames.contains("Irvine Dinner"))
+    }
+
     func testPlannerSkipsNonItineraryQueries() {
         let response = DeterministicTripPlanner().plan(
             for: "Show my food spots on the map",

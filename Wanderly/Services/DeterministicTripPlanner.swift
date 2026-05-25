@@ -88,6 +88,19 @@ struct DeterministicTripPlanner {
             return 2
         }
 
+        let chineseDayCounts: [(String, Int)] = [
+            ("一天", 1), ("一日", 1),
+            ("兩天", 2), ("两天", 2), ("二天", 2), ("二日", 2),
+            ("三天", 3), ("三日", 3),
+            ("四天", 4), ("四日", 4),
+            ("五天", 5), ("五日", 5),
+            ("六天", 6), ("六日", 6),
+            ("七天", 7), ("七日", 7)
+        ]
+        if let count = chineseDayCounts.first(where: { normalized.contains($0.0) })?.1 {
+            return count
+        }
+
         return max(1, min(3, Int(ceil(Double(placeCount) / 4.0))))
     }
 
@@ -139,7 +152,12 @@ struct DeterministicTripPlanner {
         return normalized
             .split { !$0.isLetter && !$0.isNumber }
             .map(String.init)
-            .filter { $0.count >= 3 && !stopWords.contains($0) && Int($0) == nil }
+            .filter { token in
+                let shortLocationTokens: Set<String> = ["la", "oc", "ny", "sf", "sd"]
+                return (token.count >= 3 || shortLocationTokens.contains(token))
+                    && !stopWords.contains(token)
+                    && Int(token) == nil
+            }
     }
 
     private func normalize(_ text: String) -> String {

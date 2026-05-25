@@ -104,26 +104,58 @@ final class WanderlyAIService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = requestBody
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await URLSession.shared.data(for: request)
+            } catch {
+                print("Gemini request failed on \(model): \(error)")
+                if let deterministicDraft {
+                    return deterministicDraft
+                }
+                throw error
+            }
+
             guard let http = response as? HTTPURLResponse else {
                 lastError = .apiError(0)
                 continue
             }
 
             if http.statusCode == 200 {
-                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                guard let candidates = json?["candidates"] as? [[String: Any]],
+                let json: [String: Any]
+                do {
+                    json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+                } catch {
+                    print("Gemini envelope parse failed on \(model): \(error)")
+                    if let deterministicDraft {
+                        return deterministicDraft
+                    }
+                    throw WanderlyAIError.parseError
+                }
+
+                guard let candidates = json["candidates"] as? [[String: Any]],
                       let content = candidates.first?["content"] as? [String: Any],
                       let parts = content["parts"] as? [[String: Any]],
                       let text = parts.first?["text"] as? String else {
+                    if let deterministicDraft {
+                        return deterministicDraft
+                    }
                     throw WanderlyAIError.emptyResponse
                 }
 
-                let parsed = try parseResponse(text)
-                if let deterministicDraft {
-                    return validatedItineraryPolish(parsed, fallback: deterministicDraft, places: places)
+                do {
+                    let parsed = try parseResponse(text)
+                    if let deterministicDraft {
+                        return validatedItineraryPolish(parsed, fallback: deterministicDraft, places: places)
+                    }
+                    return parsed
+                } catch {
+                    print("Gemini response parse failed on \(model): \(error)")
+                    if let deterministicDraft {
+                        return deterministicDraft
+                    }
+                    throw WanderlyAIError.parseError
                 }
-                return parsed
             }
 
             let responseBody = String(data: data, encoding: .utf8) ?? "no body"
