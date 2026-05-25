@@ -152,6 +152,18 @@ final class SaveSearchControllerTests: XCTestCase {
                         missingFields: ["exact place", "coordinates"],
                         nextBestClue: "Find tagged venue profile"
                     )
+                ),
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "javascript:alert(1)",
+                    title: "Malformed source clue",
+                    evidence: ["Invalid source URL should not render as a link"],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source text"],
+                        attempts: ["Parsed source"],
+                        missingFields: ["valid source URL"],
+                        nextBestClue: "Share the original link"
+                    )
                 )
             ],
             mapCandidates: [
@@ -170,11 +182,14 @@ final class SaveSearchControllerTests: XCTestCase {
             ]
         )
 
-        let sourceOnly = try XCTUnwrap(response.fromYourSave.results.first { $0.objectType == .sourceOnlyClue })
+        let sourceOnly = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "Pasta reel clue" })
         XCTAssertEqual(sourceOnly.agentDrawer.primaryAction.kind, .runRecovery)
         XCTAssertEqual(sourceOnly.agentDrawer.heading, "Recover exact place")
         XCTAssertTrue(sourceOnly.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
         XCTAssertTrue(sourceOnly.agentDrawer.evidenceSummary.contains("Missing: exact place, coordinates"))
+
+        let malformedSource = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "Malformed source clue" })
+        XCTAssertFalse(malformedSource.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
 
         let savedPlace = try XCTUnwrap(response.fromYourSave.results.first { $0.objectType == .savedPlace })
         XCTAssertEqual(savedPlace.agentDrawer.primaryAction.kind, .planAround)

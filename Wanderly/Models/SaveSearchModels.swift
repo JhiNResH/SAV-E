@@ -165,7 +165,7 @@ struct SaveAgentActionDrawerModel: Hashable {
             actions = []
         }
 
-        if result.sourceURL == nil {
+        if !hasValidHTTPSourceURL(result.sourceURL) {
             actions.removeAll { $0 == .openSource }
         }
         actions.removeAll { $0 == primary || $0 == .none }
@@ -175,6 +175,19 @@ struct SaveAgentActionDrawerModel: Hashable {
             guard seen.insert(action).inserted else { return nil }
             return SaveAgentDrawerAction(kind: action)
         }
+    }
+
+    private static func hasValidHTTPSourceURL(_ sourceURL: String?) -> Bool {
+        guard
+            let rawValue = sourceURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+            let url = URL(string: rawValue),
+            let scheme = url.scheme?.lowercased(),
+            (scheme == "http" || scheme == "https"),
+            url.host?.isEmpty == false
+        else {
+            return false
+        }
+        return true
     }
 
     private static func evidenceSummary(for result: SaveSearchResult) -> String {
