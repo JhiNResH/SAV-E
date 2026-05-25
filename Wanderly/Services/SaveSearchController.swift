@@ -105,7 +105,7 @@ struct SaveSearchController {
 
     private func makeRecommendationShell(for query: SaveSearchQuery) -> SaveSearchResult {
         SaveSearchResult(
-            id: "new-recommendation-shell-\(query.normalizedRaw.hashValue)",
+            id: "new-recommendation-shell-\(query.stableIDFragment)",
             objectType: .newRecommendation,
             userState: .unsaved,
             title: "Search new places for “\(query.rawValue)”",
@@ -172,6 +172,7 @@ private struct SaveSearchQuery {
     let platforms: Set<SourcePlatform>
     let states: Set<SaveSearchUserState>
     let wantsNewRecommendations: Bool
+    let stableIDFragment: String
 
     init(rawValue: String) {
         self.rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -183,6 +184,7 @@ private struct SaveSearchQuery {
             normalizedRaw,
             keywords: ["recommend", "recommendation", "new", "discover", "nearby", "suggest", "推薦", "新的", "附近", "找新"]
         )
+        stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)
         terms = Self.parseTerms(from: normalizedRaw)
     }
 
@@ -295,5 +297,12 @@ private struct SaveSearchQuery {
         value
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
+    }
+
+    private static func makeStableIDFragment(from value: String) -> String {
+        let fragment = value
+            .split { !$0.isLetter && !$0.isNumber }
+            .joined(separator: "-")
+        return fragment.isEmpty ? "empty-query" : fragment
     }
 }

@@ -44,7 +44,7 @@ struct PlaceListView: View {
 
                 // Sort selector
                 HStack {
-                    Text("\(viewModel.filteredPlaces.count) memory cards")
+                    Text(resultsCountLabel)
                         .font(.caption)
                         .foregroundColor(.saveMutedText)
 
@@ -70,7 +70,7 @@ struct PlaceListView: View {
                 .padding(.vertical, 4)
 
                 // List
-                if !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if isSearching {
                     SaveSearchResultsList(response: viewModel.saveSearchResponse)
                 } else if viewModel.filteredPlaces.isEmpty {
                     EmptyStateView(
@@ -136,6 +136,19 @@ struct PlaceListView: View {
             loadPlacesTask?.cancel()
             loadPlacesTask = nil
         }
+    }
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var resultsCountLabel: String {
+        if isSearching {
+            let response = viewModel.saveSearchResponse
+            let count = response.fromYourSave.results.count + response.newRecommendations.results.count
+            return "\(count) \(count == 1 ? "result" : "results")"
+        }
+        return "\(viewModel.filteredPlaces.count) memory cards"
     }
 
     private func startLoadPlacesTask() {
