@@ -31,6 +31,7 @@ struct AIDrawerView: View {
     @State private var mapCandidateActionInFlight: String?
     @State private var showReviewInbox = false
     @State private var isImportingURL = false
+    @State private var showProfile = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +51,9 @@ struct AIDrawerView: View {
                 onSave: onSaveGoogleTakeoutImport
             )
         }
+        .sheet(isPresented: $showProfile) {
+            ProfileView(waitingClues: reviewCandidates.count)
+        }
         .onChange(of: viewModel.drawerState) { _, state in
             withAnimation(.spring(duration: 0.3)) {
                 switch state {
@@ -63,12 +67,6 @@ struct AIDrawerView: View {
                 case .displaying(let r):
                     drawerDetent = r.componentType == .tripItinerary ? .large : .medium
                 }
-            }
-        }
-        .onChange(of: drawerDetent) { _, detent in
-            guard case .idle = viewModel.drawerState else { return }
-            if detent != .height(72) {
-                searchFocused = true
             }
         }
         .onChange(of: voiceQuery.transcript) { _, transcript in
@@ -173,7 +171,14 @@ struct AIDrawerView: View {
 
     @ViewBuilder
     private var commandBarTrailingActions: some View {
-        if !viewModel.query.isEmpty {
+        if hasActiveDrawerContent {
+            Button(action: closeDrawerContent) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(commandBarSecondaryText)
+            }
+            .accessibilityLabel(languageSettings.text(.closeDrawerContent))
+        } else if !viewModel.query.isEmpty {
             Button(action: {
                 viewModel.returnToCommands()
                 showReviewInbox = false
@@ -213,7 +218,7 @@ struct AIDrawerView: View {
                 fill: commandIconFill,
                 stroke: commandBarStroke,
                 foreground: commandBarTextColor,
-                action: onOpenPassport
+                action: openProfile
             )
         }
     }
@@ -229,6 +234,7 @@ struct AIDrawerView: View {
 
             contentBody
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -346,15 +352,18 @@ struct AIDrawerView: View {
             }
 
         case .placeDetail(let place):
-            PlaceBottomSheet(place: place) {
-                try await onDeletePlace(place)
-                viewModel.removePlace(place)
-                withAnimation(.spring(duration: 0.3)) {
-                    drawerDetent = .height(72)
+            ScrollView {
+                PlaceBottomSheet(place: place) {
+                    try await onDeletePlace(place)
+                    viewModel.removePlace(place)
+                    withAnimation(.spring(duration: 0.3)) {
+                        drawerDetent = .height(72)
+                    }
+                } onPlanAround: {
+                    viewModel.query = "Plan around \(place.name)"
+                    Task { await viewModel.submit() }
                 }
-            } onPlanAround: {
-                viewModel.query = "Plan around \(place.name)"
-                Task { await viewModel.submit() }
+                .padding(14)
             }
 
         case .reviewCandidateDetail(let candidate):
@@ -565,6 +574,15 @@ struct AIDrawerView: View {
     private var showsContentArea: Bool {
         if case .idle = viewModel.drawerState, drawerDetent == .height(72), !showReviewInbox { return false }
         return true
+    }
+
+    private var hasActiveDrawerContent: Bool {
+        switch viewModel.drawerState {
+        case .idle:
+            return showReviewInbox
+        case .loading, .displaying, .saveSearchResults, .placeDetail, .reviewCandidateDetail, .mapCandidateDetail, .error:
+            return true
+        }
     }
 
     // MARK: - Idle suggestions
@@ -1001,6 +1019,8 @@ struct AIDrawerView: View {
     }
 
     private func submitSearchField() {
+        voiceQuery.stop()
+        searchFocused = false
         if let url = firstURL(in: viewModel.query) {
             importURLToReviewCandidates(url)
         } else {
@@ -1031,6 +1051,21 @@ struct AIDrawerView: View {
         withAnimation { drawerDetent = .medium }
         searchFocused = false
         voiceQuery.toggle()
+    }
+
+    private func openProfile() {
+        voiceQuery.stop()
+        searchFocused = false
+        showProfile = true
+        onOpenPassport()
+    }
+
+    private func closeDrawerContent() {
+        voiceQuery.stop()
+        viewModel.reset()
+        showReviewInbox = false
+        searchFocused = false
+        withAnimation { drawerDetent = .height(72) }
     }
 
     private func importURLToReviewCandidates(_ url: URL) {
@@ -1163,6 +1198,10 @@ private final class VoiceQueryController: NSObject, ObservableObject {
                 }
             }
         }
+    }
+
+    func stop() {
+        stopListening()
     }
 
     private func stopListening() {

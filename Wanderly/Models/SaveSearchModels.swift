@@ -445,6 +445,13 @@ struct SaveMapCandidate: Identifiable, Hashable {
 }
 
 extension SaveMapCandidate {
+    func matches(_ other: SaveMapCandidate) -> Bool {
+        let nearby = abs(latitude - other.latitude) < 0.0008 &&
+            abs(longitude - other.longitude) < 0.0008
+        let sameName = title.localizedCaseInsensitiveCompare(other.title) == .orderedSame
+        return sameName && nearby
+    }
+
     var shareSubject: String {
         "SAV-E Map Result: \(title)"
     }

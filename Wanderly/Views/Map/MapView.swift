@@ -7,7 +7,7 @@ struct MapView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Map(position: $viewModel.cameraPosition) {
+                Map(position: $viewModel.cameraPosition, selection: $viewModel.selectedMapFeature) {
                     UserAnnotation()
 
                     ForEach(viewModel.filteredPlaces) { place in
@@ -51,8 +51,14 @@ struct MapView: View {
                     }
                 }
                 .mapStyle(.standard)
+                .mapFeatureSelectionDisabled { feature in
+                    feature.kind != .pointOfInterest
+                }
                 .mapControls {
                     MapCompass()
+                }
+                .onChange(of: viewModel.selectedMapFeature) { _, feature in
+                    viewModel.selectMapFeature(feature)
                 }
 
                 VStack {
@@ -185,23 +191,23 @@ private struct DefaultMapPin: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(fill)
-                .frame(width: isSelected ? 31 : 24, height: isSelected ? 31 : 24)
+                .fill(fill.opacity(isSelected ? 1 : 0.92))
+                .frame(width: isSelected ? 26 : 20, height: isSelected ? 26 : 20)
                 .overlay(
                     Circle()
-                        .stroke(Color.saveNotebookPage, lineWidth: isSelected ? 3 : 2)
+                        .stroke(Color.white.opacity(isSelected ? 0.75 : 0.35), lineWidth: isSelected ? 1.5 : 1)
                 )
                 .overlay(
                     Circle()
-                        .stroke(Color.saveNotebookLine.opacity(isSelected ? 0.86 : 0.48), lineWidth: 1)
+                        .stroke(Color.black.opacity(0.10), lineWidth: 0.5)
                 )
-                .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.28 : 0.16), radius: isSelected ? 5 : 3, x: 0, y: isSelected ? 3 : 2)
+                .shadow(color: Color.black.opacity(isSelected ? 0.20 : 0.10), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
 
             Image(systemName: systemImage)
-                .font(.system(size: isSelected ? 13 : 10, weight: .black))
-                .foregroundColor(.saveNotebookPage)
+                .font(.system(size: isSelected ? 11 : 8, weight: .black))
+                .foregroundColor(.white)
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 32, height: 32)
         .contentShape(Rectangle())
     }
 }

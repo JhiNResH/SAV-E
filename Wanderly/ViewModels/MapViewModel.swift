@@ -235,6 +235,7 @@ final class MapViewModel: ObservableObject {
     @Published var selectedReviewCandidate: PlaceReviewCandidate?
     @Published var mapCandidates: [SaveMapCandidate] = []
     @Published var selectedMapCandidate: SaveMapCandidate?
+    @Published var selectedMapFeature: MapFeature?
     @Published var isLoadingMapCandidates = false
 
     private let supabaseService: SupabaseServiceProtocol
@@ -644,6 +645,7 @@ final class MapViewModel: ObservableObject {
         selectedPlace = place
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
+        selectedMapFeature = nil
         guard place.sourceImageUrl == nil || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
         Task {
             await enrichSelectedPlacePhoto(place)
@@ -725,16 +727,56 @@ final class MapViewModel: ObservableObject {
         selectedReviewCandidate = candidate
         selectedPlace = nil
         selectedMapCandidate = nil
+        selectedMapFeature = nil
     }
 
     func selectMapCandidate(_ candidate: SaveMapCandidate) {
         selectedMapCandidate = candidate
         selectedPlace = nil
         selectedReviewCandidate = nil
+        selectedMapFeature = nil
         cameraPosition = .region(MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
         ))
+    }
+
+    func selectMapFeature(_ feature: MapFeature?) {
+        guard let feature else { return }
+        guard feature.kind == .pointOfInterest else { return }
+        let title = (feature.title ?? "Map place").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+
+        var evidence = ["Apple Maps POI"]
+        if let category = feature.pointOfInterestCategory?.rawValue {
+            evidence.append("POI: \(category)")
+        }
+
+        let candidate = SaveMapCandidate(
+            title: title,
+            subtitle: "Selected on map",
+            latitude: feature.coordinate.latitude,
+            longitude: feature.coordinate.longitude,
+            category: PlaceCategory.inferred(from: "\(title) \(feature.pointOfInterestCategory?.rawValue ?? "")"),
+            sourceURL: appleMapsURL(title: title, coordinate: feature.coordinate),
+            sourcePlatform: .other,
+            evidence: evidence
+        )
+        let selectedCandidate: SaveMapCandidate
+        if let existingCandidate = mapCandidates.first(where: { $0.id == candidate.id || $0.matches(candidate) }) {
+            selectedCandidate = existingCandidate
+        } else {
+            mapCandidates = [candidate] + mapCandidates
+            selectedCandidate = candidate
+        }
+
+        selectedMapCandidate = selectedCandidate
+        selectedPlace = nil
+        selectedReviewCandidate = nil
+
+        Task {
+            await enrichSelectedMapCandidate(selectedCandidate)
+        }
     }
 
     func deletePlace(_ place: Place) async throws {
@@ -754,6 +796,70 @@ final class MapViewModel: ObservableObject {
             selectedPlace = place
             throw error
         }
+    }
+
+    private func enrichSelectedMapCandidate(_ candidate: SaveMapCandidate) async {
+        guard let update = await businessDetails(for: candidate) else { return }
+        guard selectedMapCandidate?.id == candidate.id else { return }
+
+        var updatedCandidate = candidate
+        if let photoURL = update.photoURL {
+            updatedCandidate.photoURL = photoURL.absoluteString
+        }
+        updatedCandidate.rating = updatedCandidate.rating ?? update.rating
+        updatedCandidate.reviewCount = updatedCandidate.reviewCount ?? update.reviewCount
+        if let priceRange = update.priceRange {
+            updatedCandidate.evidence.append("Price: \(priceRange)")
+        }
+        if let openingHours = update.openingHours {
+            updatedCandidate.evidence.append("Hours: \(openingHours)")
+        }
+
+        selectedMapCandidate = updatedCandidate
+        if let index = mapCandidates.firstIndex(where: { $0.id == candidate.id }) {
+            mapCandidates[index] = updatedCandidate
+        }
+    }
+
+    private func businessDetails(for candidate: SaveMapCandidate) async -> (photoURL: URL?, rating: Double?, reviewCount: Int?, priceRange: String?, openingHours: String?)? {
+        do {
+            let coordinate = CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
+            let matches = try await googlePlacesService.searchPlace(query: "\(candidate.title) \(candidate.subtitle)", near: coordinate)
+            let candidateLocation = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
+            guard let match = matches.first(where: { match in
+                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
+                let sameArea = candidateLocation.distance(from: matchLocation) < 250
+                let sameName = match.name.localizedCaseInsensitiveContains(candidate.title) ||
+                    candidate.title.localizedCaseInsensitiveContains(match.name)
+                return sameArea || sameName
+            }) else { return nil }
+
+            let details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
+            let photoReference = details?.photoReferences?.first ?? match.photoReference
+            let photoURL = photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
+            let priceLevel = details?.priceLevel ?? match.priceLevel
+            let hasDetails = photoURL != nil || details?.rating != nil || match.rating != nil || match.reviewCount != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
+            guard hasDetails else { return nil }
+
+            return (
+                photoURL,
+                details?.rating ?? match.rating,
+                match.reviewCount,
+                priceLevel.map { String(repeating: "$", count: max(1, $0)) },
+                details?.openingHours?.first
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    private func appleMapsURL(title: String, coordinate: CLLocationCoordinate2D) -> String? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: title),
+            URLQueryItem(name: "ll", value: "\(coordinate.latitude),\(coordinate.longitude)"),
+        ]
+        return components?.url?.absoluteString
     }
 
     func focusOnUserLocationOnLaunch() async {

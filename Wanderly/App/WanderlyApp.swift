@@ -28,7 +28,6 @@ struct WanderlyApp: App {
                 }
             }
             .environmentObject(languageSettings)
-            .preferredColorScheme(.light)
             .onOpenURL(perform: handleIncomingURL)
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 guard let url = activity.webpageURL else { return }
