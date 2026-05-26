@@ -14,11 +14,13 @@ struct AIDrawerView: View {
     var onConfirmCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onRejectCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onSaveCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
+    var onSaveMapCandidate: (SaveMapCandidate) async throws -> Void = { _ in }
     var onImportURLAsReviewCandidates: (URL) async throws -> Int = { _ in 0 }
     @FocusState private var searchFocused: Bool
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
     @State private var candidateActionInFlight: UUID?
+    @State private var mapCandidateActionInFlight: String?
     @State private var showReviewInbox = false
     @State private var isImportingURL = false
 
@@ -48,6 +50,7 @@ struct AIDrawerView: View {
                 case .error:            drawerDetent = .medium
                 case .placeDetail:      drawerDetent = .medium
                 case .reviewCandidateDetail: drawerDetent = .medium
+                case .mapCandidateDetail: drawerDetent = .medium
                 case .saveSearchResults: drawerDetent = .medium
                 case .displaying(let r):
                     drawerDetent = r.componentType == .tripItinerary ? .large : .medium
@@ -300,6 +303,22 @@ struct AIDrawerView: View {
                 .padding(14)
             }
 
+        case .mapCandidateDetail(let candidate):
+            ScrollView {
+                UnsavedMapCandidateCard(
+                    candidate: candidate,
+                    isWorking: mapCandidateActionInFlight == candidate.id,
+                    onSave: {
+                        performMapCandidateAction(candidate) {
+                            try await onSaveMapCandidate(candidate)
+                            viewModel.returnToCommands()
+                            showReviewInbox = false
+                        }
+                    }
+                )
+                .padding(14)
+            }
+
         case .error(let msg):
             VStack(spacing: 10) {
                 Spacer()
@@ -395,7 +414,7 @@ struct AIDrawerView: View {
         switch viewModel.drawerState {
         case .idle:
             return false
-        case .loading, .displaying, .saveSearchResults, .placeDetail, .reviewCandidateDetail, .error:
+        case .loading, .displaying, .saveSearchResults, .placeDetail, .reviewCandidateDetail, .mapCandidateDetail, .error:
             return true
         }
     }
@@ -414,6 +433,8 @@ struct AIDrawerView: View {
             return place.name
         case .reviewCandidateDetail(let candidate):
             return candidate.name
+        case .mapCandidateDetail(let candidate):
+            return candidate.title
         case .error:
             return languageSettings.text(.couldntFinish)
         }
@@ -433,6 +454,8 @@ struct AIDrawerView: View {
             return languageSettings.text(.placeDetailSubtitle)
         case .reviewCandidateDetail(let candidate):
             return candidate.hasReliableCoordinates ? "Map-ready Review Candidate" : "Needs address confirmation"
+        case .mapCandidateDetail:
+            return "Visible map place · not saved yet"
         case .error:
             return languageSettings.text(.errorSubtitle)
         }
@@ -795,6 +818,22 @@ struct AIDrawerView: View {
                 addSpotStatus = error.localizedDescription
             }
             candidateActionInFlight = nil
+        }
+    }
+
+    private func performMapCandidateAction(
+        _ candidate: SaveMapCandidate,
+        action: @escaping () async throws -> Void
+    ) {
+        mapCandidateActionInFlight = candidate.id
+        Task {
+            do {
+                try await action()
+                addSpotStatus = "Map Stamp saved · +1 \(candidate.category?.displayName.lowercased() ?? "place")"
+            } catch {
+                addSpotStatus = error.localizedDescription
+            }
+            mapCandidateActionInFlight = nil
         }
     }
 
@@ -1199,6 +1238,109 @@ private struct ReviewCandidateCard: View {
                         disabled: isWorking,
                         action: onReject
                     )
+                }
+            }
+            .padding(12)
+        }
+        .saveNotebookPage(cornerRadius: 16)
+        .opacity(isWorking ? 0.65 : 1)
+    }
+}
+
+private struct UnsavedMapCandidateCard: View {
+    var candidate: SaveMapCandidate
+    var isWorking: Bool
+    var onSave: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            NotebookSpine(color: .saveSignal)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 11) {
+                    SaveMemoryBadge(state: .ready, size: 40)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("UNSAVED MAP PLACE")
+                            .font(.caption2.weight(.black))
+                            .foregroundColor(.saveCocoa)
+                            .lineLimit(1)
+
+                        Text(candidate.title)
+                            .font(.headline)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .lineLimit(2)
+
+                        Text(candidate.subtitle)
+                            .font(.caption)
+                            .foregroundColor(.saveCocoa.opacity(0.74))
+                            .lineLimit(3)
+
+                        HStack(spacing: 6) {
+                            StampChip(text: candidate.category?.displayName ?? "Place", color: .saveHoney)
+                            StampChip(text: "not saved", color: .saveSky)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                Text("This is a visible map result from nearby search. Save it only after it looks like the place you want.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !candidate.evidence.isEmpty {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.caption2.weight(.bold))
+                            Text("Map clue")
+                                .font(.caption2.weight(.black))
+                            Spacer()
+                        }
+                        .foregroundColor(.saveCocoa)
+
+                        EvidenceLinkList(evidence: candidate.evidence, maxItems: 4)
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.saveSky.opacity(0.16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                            )
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    CandidateActionButton(
+                        title: isWorking ? "Saving" : "Save",
+                        systemImage: "bookmark.badge.plus",
+                        fill: .saveHoney,
+                        disabled: isWorking,
+                        action: onSave
+                    )
+
+                    if let sourceURL = candidate.sourceURL, let url = URL(string: sourceURL) {
+                        Link(destination: url) {
+                            Label("Maps", systemImage: "map")
+                                .font(.caption.weight(.black))
+                                .foregroundColor(.saveInk)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .background(Color.saveNotebookPage)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
                 }
             }
             .padding(12)

@@ -13,6 +13,158 @@ enum ReviewCandidateError: LocalizedError {
     }
 }
 
+protocol MapCandidateSearchServiceProtocol {
+    func searchCandidates(
+        near coordinate: CLLocationCoordinate2D,
+        span: MKCoordinateSpan,
+        excluding savedPlaces: [Place]
+    ) async -> [SaveMapCandidate]
+}
+
+struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
+    private struct SearchSeed {
+        let query: String
+        let category: PlaceCategory
+    }
+
+    private let seeds: [SearchSeed] = [
+        SearchSeed(query: "coffee", category: .cafe),
+        SearchSeed(query: "restaurant", category: .food),
+        SearchSeed(query: "bar", category: .bar),
+        SearchSeed(query: "museum park attraction", category: .attraction),
+        SearchSeed(query: "shop", category: .shopping),
+    ]
+
+    func searchCandidates(
+        near coordinate: CLLocationCoordinate2D,
+        span: MKCoordinateSpan,
+        excluding savedPlaces: [Place]
+    ) async -> [SaveMapCandidate] {
+        let region = MKCoordinateRegion(center: coordinate, span: span)
+        var candidates: [SaveMapCandidate] = []
+        var seenKeys: Set<String> = []
+
+        for seed in seeds {
+            let results = await search(seed: seed, region: region)
+            for candidate in results where !isAlreadySaved(candidate, in: savedPlaces) {
+                let key = dedupeKey(for: candidate)
+                guard !seenKeys.contains(key) else { continue }
+                seenKeys.insert(key)
+                candidates.append(candidate)
+            }
+        }
+
+        return Array(candidates.prefix(24))
+    }
+
+    private func search(seed: SearchSeed, region: MKCoordinateRegion) async -> [SaveMapCandidate] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = seed.query
+        request.region = region
+        request.resultTypes = .pointOfInterest
+
+        do {
+            let response = try await MKLocalSearch(request: request).start()
+            return response.mapItems
+                .prefix(8)
+                .compactMap { makeCandidate(from: $0, seed: seed) }
+        } catch {
+            print("MapCandidateSearchService: failed to search \(seed.query): \(error)")
+            return []
+        }
+    }
+
+    private func makeCandidate(from item: MKMapItem, seed: SearchSeed) -> SaveMapCandidate? {
+        let title = (item.name ?? item.placemark.name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return nil }
+
+        let coordinate = item.placemark.coordinate
+        let subtitle = subtitle(for: item.placemark)
+        var evidence = [
+            "Apple Maps result",
+            "Search: \(seed.query)",
+        ]
+        if !subtitle.isEmpty {
+            evidence.append("Address: \(subtitle)")
+        }
+        if let pointOfInterestCategory = item.pointOfInterestCategory?.rawValue {
+            evidence.append("POI: \(pointOfInterestCategory)")
+        }
+
+        return SaveMapCandidate(
+            title: title,
+            subtitle: subtitle.isEmpty ? "Nearby unsaved place" : subtitle,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            category: seed.category,
+            sourceURL: appleMapsURL(title: title, coordinate: coordinate),
+            sourcePlatform: .other,
+            evidence: evidence
+        )
+    }
+
+    private func subtitle(for placemark: MKPlacemark) -> String {
+        var pieces: [String] = []
+        let street = [placemark.subThoroughfare, placemark.thoroughfare]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        if !street.isEmpty {
+            pieces.append(street)
+        }
+        if let locality = placemark.locality?.trimmedNonEmpty {
+            pieces.append(locality)
+        }
+        if let administrativeArea = placemark.administrativeArea?.trimmedNonEmpty {
+            pieces.append(administrativeArea)
+        }
+        return pieces.joined(separator: ", ")
+    }
+
+    private func appleMapsURL(title: String, coordinate: CLLocationCoordinate2D) -> String? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: title),
+            URLQueryItem(name: "ll", value: "\(coordinate.latitude),\(coordinate.longitude)"),
+        ]
+        return components?.url?.absoluteString
+    }
+
+    private func dedupeKey(for candidate: SaveMapCandidate) -> String {
+        let normalizedTitle = candidate.title
+            .lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let lat = Int((candidate.latitude * 10_000).rounded())
+        let lon = Int((candidate.longitude * 10_000).rounded())
+        return "\(normalizedTitle)-\(lat)-\(lon)"
+    }
+
+    private func isAlreadySaved(_ candidate: SaveMapCandidate, in savedPlaces: [Place]) -> Bool {
+        let candidateLocation = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
+        return savedPlaces.contains { place in
+            let savedLocation = CLLocation(latitude: place.latitude, longitude: place.longitude)
+            let sameNearbyPlace = candidateLocation.distance(from: savedLocation) < 80
+            let sameName = place.name.localizedCaseInsensitiveCompare(candidate.title) == .orderedSame
+            return sameNearbyPlace || sameName
+        }
+    }
+}
+
+private extension String {
+    var trimmedForDraft: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var trimmedNonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 @MainActor
 final class MapViewModel: ObservableObject {
     private static let pendingReviewImportBatchLimit = 4
@@ -31,6 +183,9 @@ final class MapViewModel: ObservableObject {
     @Published var calculatedRoute: MKPolyline?
     @Published var reviewCandidates: [PlaceReviewCandidate] = []
     @Published var selectedReviewCandidate: PlaceReviewCandidate?
+    @Published var mapCandidates: [SaveMapCandidate] = []
+    @Published var selectedMapCandidate: SaveMapCandidate?
+    @Published var isLoadingMapCandidates = false
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
@@ -39,6 +194,8 @@ final class MapViewModel: ObservableObject {
     private let googlePlacesService: GooglePlacesServiceProtocol
     private let socialLinkReviewCandidateService: SocialLinkReviewCandidateService
     private let saveLocalVaultService: SaveLocalVaultService
+    private let mapCandidateSearchService: MapCandidateSearchServiceProtocol
+    private let saveSearchController: SaveSearchController
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
     private var isLoadingPlaces = false
@@ -50,7 +207,9 @@ final class MapViewModel: ObservableObject {
         locationService: LocationService? = nil,
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
         socialLinkReviewCandidateService: SocialLinkReviewCandidateService = .shared,
-        saveLocalVaultService: SaveLocalVaultService = .shared
+        saveLocalVaultService: SaveLocalVaultService = .shared,
+        mapCandidateSearchService: MapCandidateSearchServiceProtocol = MapCandidateSearchService(),
+        saveSearchController: SaveSearchController = SaveSearchController()
     ) {
         self.supabaseService = supabaseService
         self.authService = PrivyAuthService.shared
@@ -59,6 +218,8 @@ final class MapViewModel: ObservableObject {
         self.googlePlacesService = googlePlacesService
         self.socialLinkReviewCandidateService = socialLinkReviewCandidateService
         self.saveLocalVaultService = saveLocalVaultService
+        self.mapCandidateSearchService = mapCandidateSearchService
+        self.saveSearchController = saveSearchController
     }
 
     // MARK: - Computed
@@ -87,6 +248,14 @@ final class MapViewModel: ObservableObject {
         reviewCandidates.filter(\.hasReliableCoordinates)
     }
 
+    var visibleMapCandidates: [SaveMapCandidate] {
+        guard !selectedCategories.isEmpty else { return mapCandidates }
+        return mapCandidates.filter { candidate in
+            guard let category = candidate.category else { return false }
+            return selectedCategories.contains(category)
+        }
+    }
+
     // MARK: - Actions
 
     func loadPlaces(force: Bool = false) async {
@@ -99,6 +268,7 @@ final class MapViewModel: ObservableObject {
             isLoadingPlaces = false
             isLoading = false
             hasLoadedPlaces = true
+            Task { await refreshMapCandidates() }
         }
 
         guard let userId = authService.currentUserId else {
@@ -294,6 +464,38 @@ final class MapViewModel: ObservableObject {
         revealImportedPlaces([place])
     }
 
+    func saveMapCandidateAsPlace(_ candidate: SaveMapCandidate) async throws {
+        let draft = SavePlaceDraft(
+            title: candidate.title,
+            address: candidate.subtitle.trimmedForDraft,
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            category: candidate.category,
+            sourceURL: candidate.sourceURL,
+            sourcePlatform: candidate.sourcePlatform,
+            evidence: candidate.evidence,
+            externalRating: candidate.rating,
+            externalReviewCount: candidate.reviewCount
+        )
+        let place = try await saveSearchController.saveMapCandidate(draft)
+
+        if let userId = authService.currentUserId {
+            do {
+                try await supabaseService.savePlace(place, userId: userId)
+            } catch {
+                print("MapViewModel: failed to sync saved map candidate \(place.name): \(error)")
+            }
+        }
+
+        mirrorToLocalVault(place)
+        if !places.contains(where: { $0.matches(place) }) {
+            places = [place] + places
+        }
+        mapCandidates.removeAll { $0.id == candidate.id }
+        selectedMapCandidate = nil
+        revealImportedPlaces([place])
+    }
+
     private func refinedMatchIfNeeded(for candidate: PlaceReviewCandidate) async throws -> GooglePlaceMatch? {
         guard !candidate.hasReliableCoordinates else { return nil }
 
@@ -345,6 +547,7 @@ final class MapViewModel: ObservableObject {
         activeFilter = nil
         selectedCategories.removeAll()
         selectedPlace = first
+        selectedMapCandidate = nil
         if first.latitude != 0 || first.longitude != 0 {
             cameraPosition = .region(MKCoordinateRegion(
                 center: first.coordinate,
@@ -353,14 +556,54 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    func refreshMapCandidates(near coordinate: CLLocationCoordinate2D? = nil, span: MKCoordinateSpan? = nil) async {
+        guard !isLoadingMapCandidates else { return }
+        let searchCenter = coordinate ?? mapCandidateSearchCenter()
+        let searchSpan = span ?? MKCoordinateSpan(latitudeDelta: 0.035, longitudeDelta: 0.035)
+        isLoadingMapCandidates = true
+        defer { isLoadingMapCandidates = false }
+
+        let candidates = await mapCandidateSearchService.searchCandidates(
+            near: searchCenter,
+            span: searchSpan,
+            excluding: places
+        )
+        mapCandidates = candidates
+        if let selectedMapCandidate, !candidates.contains(where: { $0.id == selectedMapCandidate.id }) {
+            self.selectedMapCandidate = nil
+        }
+    }
+
+    private func mapCandidateSearchCenter() -> CLLocationCoordinate2D {
+        if let selectedPlace, selectedPlace.latitude != 0 || selectedPlace.longitude != 0 {
+            return selectedPlace.coordinate
+        }
+        if let firstPlace = places.first(where: { $0.latitude != 0 || $0.longitude != 0 }) {
+            return firstPlace.coordinate
+        }
+        return CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+    }
+
     func selectPlace(_ place: Place) {
         selectedPlace = place
         selectedReviewCandidate = nil
+        selectedMapCandidate = nil
     }
 
     func selectReviewCandidate(_ candidate: PlaceReviewCandidate) {
         selectedReviewCandidate = candidate
         selectedPlace = nil
+        selectedMapCandidate = nil
+    }
+
+    func selectMapCandidate(_ candidate: SaveMapCandidate) {
+        selectedMapCandidate = candidate
+        selectedPlace = nil
+        selectedReviewCandidate = nil
+        cameraPosition = .region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        ))
     }
 
     func deletePlace(_ place: Place) async throws {
@@ -399,6 +642,7 @@ final class MapViewModel: ObservableObject {
             center: location.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
         ))
+        await refreshMapCandidates(near: location.coordinate)
     }
 
     func toggleCategory(_ category: PlaceCategory) {

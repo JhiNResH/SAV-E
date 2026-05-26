@@ -29,6 +29,9 @@ struct ContentView: View {
                     onSaveCandidate: { candidate in
                         try await mapVM.saveReviewCandidateAsPlace(candidate)
                     },
+                    onSaveMapCandidate: { candidate in
+                        try await mapVM.saveMapCandidateAsPlace(candidate)
+                    },
                     onImportURLAsReviewCandidates: { url in
                         try await mapVM.importURLAsReviewCandidates(url)
                     }
@@ -48,8 +51,14 @@ struct ContentView: View {
             .onChange(of: mapVM.selectedReviewCandidate) { _, candidate in
                 if let candidate { drawerVM.showReviewCandidate(candidate) }
             }
+            .onChange(of: mapVM.selectedMapCandidate) { _, candidate in
+                if let candidate { drawerVM.showMapCandidate(candidate) }
+            }
             .onChange(of: mapVM.places) { _, places in
                 drawerVM.places = places
+            }
+            .onChange(of: mapVM.mapCandidates) { _, candidates in
+                drawerVM.mapCandidates = candidates
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
@@ -57,6 +66,7 @@ struct ContentView: View {
             }
             .task {
                 drawerVM.places = mapVM.places
+                drawerVM.mapCandidates = mapVM.mapCandidates
                 await mapVM.loadPlaces()
             }
     }
