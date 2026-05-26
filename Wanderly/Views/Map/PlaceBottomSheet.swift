@@ -65,6 +65,8 @@ struct PlaceBottomSheet: View {
 
             PlaceBusinessPhotoPreview(imageURL: place.sourceImageUrl)
 
+            PlaceBasicInfoPanel(place: place)
+
             Text(memorySummary)
                 .font(.subheadline)
                 .foregroundColor(.saveInk)
@@ -256,6 +258,93 @@ struct PlaceBottomSheet: View {
         return note
     }
 
+}
+
+private struct PlaceBasicInfoPanel: View {
+    let place: Place
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption.weight(.black))
+                Text("Basic info")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(spacing: 7) {
+                PlaceInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                if let reviewCountText {
+                    PlaceInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewCountText)
+                }
+                PlaceInfoRow(icon: place.category.iconName, title: "Category", value: place.category.displayName)
+                PlaceInfoRow(icon: "mappin.and.ellipse", title: "Address", value: place.address.isEmpty ? "No address saved" : place.address)
+                if let priceRange = place.priceRange {
+                    PlaceInfoRow(icon: "tag.fill", title: "Price", value: priceRange)
+                }
+                if let openingHours = place.openingHours?.trimmingCharacters(in: .whitespacesAndNewlines), !openingHours.isEmpty {
+                    PlaceInfoRow(icon: "clock.fill", title: "Hours", value: openingHours)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.saveSky.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var ratingText: String {
+        if let rating = place.googleRating ?? place.rating {
+            return String(format: "%.1f", rating)
+        }
+        return "No rating yet"
+    }
+
+    private var reviewCountText: String? {
+        for line in place.sourceEvidence {
+            let prefix = "External reviews:"
+            guard line.localizedCaseInsensitiveContains(prefix) else { continue }
+            let value = line
+                .replacingOccurrences(of: prefix, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            return "\(value) reviews"
+        }
+        return nil
+    }
+}
+
+private struct PlaceInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 16)
+                .padding(.top, 2)
+
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 58, alignment: .leading)
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
 }
 
 private struct PlaceMemoryChip: View {

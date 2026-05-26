@@ -18,6 +18,7 @@ struct GooglePlaceMatch: Identifiable, Codable {
     var latitude: Double
     var longitude: Double
     var rating: Double?
+    var reviewCount: Int? = nil
     var priceLevel: Int?
     var photoReference: String? = nil
 }
@@ -134,6 +135,7 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
                 latitude: lat,
                 longitude: lng,
                 rating: result["rating"] as? Double,
+                reviewCount: result["user_ratings_total"] as? Int,
                 priceLevel: result["price_level"] as? Int,
                 photoReference: (result["photos"] as? [[String: Any]])?.first?["photo_reference"] as? String
             )

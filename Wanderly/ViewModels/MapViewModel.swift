@@ -131,6 +131,7 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             enrichedCandidate.evidence.append("Business photo: Google Places")
         }
         enrichedCandidate.rating = enrichedCandidate.rating ?? match.rating
+        enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
         return enrichedCandidate
     }
 
@@ -638,18 +639,23 @@ final class MapViewModel: ObservableObject {
         selectedPlace = place
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
-        guard place.sourceImageUrl == nil else { return }
+        guard place.sourceImageUrl == nil || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
         Task {
             await enrichSelectedPlacePhoto(place)
         }
     }
 
     private func enrichSelectedPlacePhoto(_ place: Place) async {
-        guard let photoURL = await businessPhotoURL(for: place) else { return }
+        guard let update = await businessDetails(for: place) else { return }
         guard selectedPlace?.id == place.id else { return }
 
         var updatedPlace = place
-        updatedPlace.sourceImageUrl = photoURL.absoluteString
+        if let photoURL = update.photoURL {
+            updatedPlace.sourceImageUrl = photoURL.absoluteString
+        }
+        updatedPlace.googleRating = updatedPlace.googleRating ?? update.rating
+        updatedPlace.priceRange = updatedPlace.priceRange ?? update.priceRange
+        updatedPlace.openingHours = updatedPlace.openingHours ?? update.openingHours
         selectedPlace = updatedPlace
         if let index = places.firstIndex(where: { $0.id == place.id }) {
             places[index] = updatedPlace
@@ -665,21 +671,30 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    private func businessPhotoURL(for place: Place) async -> URL? {
-        let photoReference: String?
+    private func businessDetails(for place: Place) async -> (photoURL: URL?, rating: Double?, priceRange: String?, openingHours: String?)? {
+        let details: GooglePlaceDetails?
+        let fallbackMatch: GooglePlaceMatch?
         if let googlePlaceId = place.googlePlaceId {
-            photoReference = try? await googlePlacesService.getPlaceDetails(placeId: googlePlaceId).photoReferences?.first
+            details = try? await googlePlacesService.getPlaceDetails(placeId: googlePlaceId)
+            fallbackMatch = nil
         } else {
             guard let match = await bestGoogleMatch(for: place) else { return nil }
-            if let reference = match.photoReference {
-                photoReference = reference
-            } else {
-                photoReference = try? await googlePlacesService.getPlaceDetails(placeId: match.id).photoReferences?.first
-            }
+            details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
+            fallbackMatch = match
         }
 
-        guard let photoReference else { return nil }
-        return googlePlacesService.photoURL(reference: photoReference, maxWidth: 900)
+        let photoReference = details?.photoReferences?.first ?? fallbackMatch?.photoReference
+        let photoURL = photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
+        let priceLevel = details?.priceLevel ?? fallbackMatch?.priceLevel
+        let hasDetails = photoURL != nil || details?.rating != nil || fallbackMatch?.rating != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
+        guard hasDetails else { return nil }
+
+        return (
+            photoURL,
+            details?.rating ?? fallbackMatch?.rating,
+            priceLevel.map { String(repeating: "$", count: max(1, $0)) },
+            details?.openingHours?.first
+        )
     }
 
     private func bestGoogleMatch(for place: Place) async -> GooglePlaceMatch? {

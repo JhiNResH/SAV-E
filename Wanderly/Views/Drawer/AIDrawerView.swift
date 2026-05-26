@@ -1293,6 +1293,8 @@ private struct UnsavedMapCandidateCard: View {
 
                 UnsavedMapCandidateVisualPreview(candidate: candidate)
 
+                UnsavedMapCandidateBasicInfo(candidate: candidate)
+
                 if !candidate.evidence.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 6) {
@@ -1349,6 +1351,77 @@ private struct UnsavedMapCandidateCard: View {
         }
         .saveNotebookPage(cornerRadius: 16)
         .opacity(isWorking ? 0.65 : 1)
+    }
+}
+
+private struct UnsavedMapCandidateBasicInfo: View {
+    var candidate: SaveMapCandidate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption.weight(.black))
+                Text("Basic info")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(spacing: 7) {
+                UnsavedMapCandidateInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                if let reviewText {
+                    UnsavedMapCandidateInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewText)
+                }
+                UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
+                UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
+                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Maps result")
+            }
+        }
+        .padding(10)
+        .background(Color.saveSky.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var ratingText: String {
+        guard let rating = candidate.rating else { return "No rating yet" }
+        return String(format: "%.1f", rating)
+    }
+
+    private var reviewText: String? {
+        candidate.reviewCount.map { "\($0) reviews" }
+    }
+}
+
+private struct UnsavedMapCandidateInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 16)
+                .padding(.top, 2)
+
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 58, alignment: .leading)
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
     }
 }
 
