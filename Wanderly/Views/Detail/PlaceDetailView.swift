@@ -9,96 +9,34 @@ struct PlaceDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var enrichedPlace: Place?
+
+    private var detailPlace: Place {
+        guard enrichedPlace?.id == place.id else { return place }
+        return enrichedPlace ?? place
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 memoryHeader
 
-                // Info grid
-                VStack(spacing: 12) {
-                    HStack(spacing: 16) {
-                        if let rating = place.googleRating {
-                            InfoChip(icon: "star.fill", text: String(format: "%.1f", rating), color: .saveCocoa)
-                        }
-                        if let priceRange = place.priceRange {
-                            InfoChip(icon: "dollarsign.circle", text: priceRange, color: .saveSignal)
-                        }
-                        InfoChip(icon: place.status == .visited ? "checkmark.circle.fill" : "clock",
-                                 text: place.status.memoryCardLabel,
-                                 color: place.status == .visited ? .saveSignal : .saveCocoa)
-                    }
+                PlaceBusinessPhotoCarousel(imageURLs: detailPlace.businessPhotoURLStrings)
+                    .padding(.horizontal)
 
-                    // Source
-                    HStack {
-                        PlatformIcon(platform: place.sourcePlatform)
-                        Text("Saved from \(place.sourcePlatform.displayName)")
-                            .font(.subheadline)
-                            .foregroundColor(.saveMutedText)
+                PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
+                    .padding(.horizontal)
 
-                        if let recommender = place.recommender {
-                            Text("via \(recommender)")
-                                .font(.caption)
-                                .foregroundColor(.saveCocoa)
-                        }
+                PlaceBasicInfoPanel(place: detailPlace)
+                    .padding(.horizontal)
 
-                        Spacer()
-                    }
-                }
-                .padding(.horizontal)
-
-                if !place.sourceEvidence.isEmpty {
+                if !detailPlace.sourceEvidence.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Evidence receipt", systemImage: "doc.text.magnifyingglass")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(.saveInk)
-                        EvidenceLinkList(evidence: place.sourceEvidence, maxItems: 4)
-                    }
-                    .padding(.horizontal)
-                }
-
-                // Opening hours
-                if let hours = place.openingHours {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Opening Hours", systemImage: "clock")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.saveInk)
-                        Text(hours)
-                            .font(.subheadline)
-                            .foregroundColor(.saveMutedText)
-                    }
-                    .padding(.horizontal)
-                }
-
-                // Dishes
-                if let dishes = place.extractedDishes, !dishes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Must-Try Dishes")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.saveInk)
-
-                        FlowLayout(spacing: 8) {
-                            ForEach(dishes, id: \.self) { dish in
-                                HStack(spacing: 4) {
-                                    Image(systemName: "fork.knife")
-                                        .font(.caption2)
-                                    Text(dish)
-                                        .font(.subheadline)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.saveHoney.opacity(0.30))
-                                .foregroundColor(.saveInk)
-                                .cornerRadius(16)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
-                                )
-                            }
-                        }
+                        EvidenceLinkList(evidence: detailPlace.sourceEvidence, maxItems: 4)
                     }
                     .padding(.horizontal)
                 }
@@ -127,62 +65,28 @@ struct PlaceDetailView: View {
 
                 // Mini map
                 Map(position: .constant(.region(MKCoordinateRegion(
-                    center: place.coordinate,
+                    center: detailPlace.coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
                 )))) {
-                    Marker(place.name, coordinate: place.coordinate)
-                        .tint(Color.categoryColor(for: place.category))
+                    Marker(detailPlace.name, coordinate: detailPlace.coordinate)
+                        .tint(Color.categoryColor(for: detailPlace.category))
                 }
                 .frame(height: 160)
                 .cornerRadius(16)
                 .padding(.horizontal)
 
-                // Action buttons
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Button(action: { openInMaps() }) {
-                        Label("Navigate", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.subheadline)
-                            .fontWeight(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.saveHoney)
-                            .foregroundColor(.saveInk)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: .saveHoney)
                     }
 
-                    ShareLink(item: place.saveShareURL ?? place.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                            .font(.subheadline)
-                            .fontWeight(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.saveMint.opacity(0.42))
-                            .foregroundColor(.saveInk)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    ShareLink(item: detailPlace.saveShareURL ?? detailPlace.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
+                        PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveMint.opacity(0.36))
                     }
 
-                    if let url = place.primarySourceURL {
+                    if let url = detailPlace.primarySourceURL {
                         Button(action: { openURL(url) }) {
-                            Label("Source", systemImage: "link")
-                                .font(.subheadline)
-                                .fontWeight(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Color.saveNotebookPage)
-                                .foregroundColor(.saveInk)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(Color.saveNotebookLine, lineWidth: 1.6)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            PlaceDetailActionLabel(title: "Source", systemImage: "link", fill: Color.saveSky.opacity(0.22))
                         }
                     }
                 }
@@ -199,9 +103,12 @@ struct PlaceDetailView: View {
         }
         .background(SaveDottedBackground())
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: place.id) {
+            await enrichBusinessDetails()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: place.saveShareURL ?? place.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
+                ShareLink(item: detailPlace.saveShareURL ?? detailPlace.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
@@ -218,7 +125,7 @@ struct PlaceDetailView: View {
             }
         }
         .confirmationDialog(
-            "Delete \(place.name)?",
+            "Delete \(detailPlace.name)?",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
@@ -234,33 +141,33 @@ struct PlaceDetailView: View {
     private var memoryHeader: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
-                SaveMemoryBadge(state: .saved(place.category), size: 62)
+                SaveMemoryBadge(state: .saved(detailPlace.category), size: 62)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(place.status.memoryCardLabel.uppercased())
+                    Text(detailPlace.status.memoryCardLabel.uppercased())
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveCocoa)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(place.status == .visited ? Color.saveMint : Color.saveHoney.opacity(0.56))
+                        .background(detailPlace.status == .visited ? Color.saveMint : Color.saveHoney.opacity(0.56))
                         .clipShape(Capsule())
 
-                    Text(place.name)
+                    Text(detailPlace.name)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.saveInk)
                         .lineLimit(2)
 
                     HStack(spacing: 6) {
-                        PlatformIcon(platform: place.sourcePlatform, size: 14)
-                        Text("Saved from \(place.sourcePlatform.displayName)")
+                        PlatformIcon(platform: detailPlace.sourcePlatform, size: 14)
+                        Text("Saved from \(detailPlace.sourcePlatform.displayName)")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.saveCocoa)
                     }
 
                     HStack(spacing: 8) {
-                        CategoryPill(category: place.category, isSelected: true)
-                        if let priceRange = place.priceRange {
+                        CategoryPill(category: detailPlace.category, isSelected: true)
+                        if let priceRange = detailPlace.priceRange {
                             InfoChip(icon: "tag.fill", text: priceRange, color: .saveCocoa)
                         }
                     }
@@ -272,7 +179,7 @@ struct PlaceDetailView: View {
                 .foregroundColor(.saveInk)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(place.address)
+            Text(detailPlace.address)
                 .font(.subheadline)
                 .foregroundColor(.saveMutedText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -291,13 +198,13 @@ struct PlaceDetailView: View {
     }
 
     private func openInMaps() {
-        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
-        mapItem.name = place.name
+        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: detailPlace.coordinate))
+        mapItem.name = detailPlace.name
         mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
     }
 
     private var areaLabel: String? {
-        let parts = place.address
+        let parts = detailPlace.address
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -306,23 +213,98 @@ struct PlaceDetailView: View {
     }
 
     private var memorySummary: String {
-        if let areaLabel, place.sourcePlatform != .other {
-            return "Saved from \(place.sourcePlatform.displayName). SAV-E matched it to \(place.name) in \(areaLabel)."
+        if let areaLabel, detailPlace.sourcePlatform != .other {
+            return "Saved from \(detailPlace.sourcePlatform.displayName). SAV-E matched it to \(detailPlace.name) in \(areaLabel)."
         }
-        if place.sourcePlatform != .other {
-            return "Saved from \(place.sourcePlatform.displayName). SAV-E matched the source to this confirmed place."
+        if detailPlace.sourcePlatform != .other {
+            return "Saved from \(detailPlace.sourcePlatform.displayName). SAV-E matched the source to this confirmed place."
         }
         return "Saved as a confirmed place memory in SAV-E."
     }
 
     private var cleanUserNote: String? {
-        guard let note = place.note?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let note = detailPlace.note?.trimmingCharacters(in: .whitespacesAndNewlines),
               !note.isEmpty,
               !note.localizedCaseInsensitiveContains("Source URL:"),
               !note.localizedCaseInsensitiveContains("Analysis pipeline:"),
               !note.localizedCaseInsensitiveContains("Evidence tier:")
         else { return nil }
         return note
+    }
+
+    private func enrichBusinessDetails() async {
+        guard detailPlace.businessPhotoURLStrings.count < 2 ||
+                detailPlace.googleRating == nil ||
+                detailPlace.priceRange == nil ||
+                detailPlace.openingHours == nil
+        else { return }
+        guard let update = await businessDetails(for: detailPlace) else { return }
+        guard place.id == detailPlace.id else { return }
+
+        var updatedPlace = detailPlace
+        if !update.photoURLs.isEmpty {
+            let urls = update.photoURLs.map(\.absoluteString)
+            updatedPlace.sourceImageUrl = updatedPlace.sourceImageUrl ?? urls.first
+            updatedPlace.businessPhotoUrls = urls
+        }
+        updatedPlace.googleRating = updatedPlace.googleRating ?? update.rating
+        updatedPlace.priceRange = updatedPlace.priceRange ?? update.priceRange
+        updatedPlace.openingHours = updatedPlace.openingHours ?? update.openingHours
+        enrichedPlace = updatedPlace
+    }
+
+    private func businessDetails(for place: Place) async -> (photoURLs: [URL], rating: Double?, priceRange: String?, openingHours: String?)? {
+        let service = GooglePlacesService.shared
+        let details: GooglePlaceDetails?
+        let fallbackMatch: GooglePlaceMatch?
+        if let googlePlaceId = place.googlePlaceId {
+            details = try? await service.getPlaceDetails(placeId: googlePlaceId)
+            fallbackMatch = nil
+        } else {
+            guard let match = await bestGoogleMatch(for: place, service: service) else { return nil }
+            details = try? await service.getPlaceDetails(placeId: match.id)
+            fallbackMatch = match
+        }
+
+        let photoReferences = details?.photoReferences?.isEmpty == false
+            ? details?.photoReferences ?? []
+            : [fallbackMatch?.photoReference].compactMap { $0 }
+        let photoURLs = photoReferences
+            .prefix(6)
+            .compactMap { service.photoURL(reference: $0, maxWidth: 900) }
+        let priceLevel = details?.priceLevel ?? fallbackMatch?.priceLevel
+        let hasDetails = !photoURLs.isEmpty ||
+            details?.rating != nil ||
+            fallbackMatch?.rating != nil ||
+            priceLevel != nil ||
+            details?.openingHours?.isEmpty == false
+        guard hasDetails else { return nil }
+
+        return (
+            photoURLs,
+            details?.rating ?? fallbackMatch?.rating,
+            priceLevel.map { String(repeating: "$", count: max(1, $0)) },
+            details?.openingHours?.first
+        )
+    }
+
+    private func bestGoogleMatch(for place: Place, service: GooglePlacesServiceProtocol) async -> GooglePlaceMatch? {
+        do {
+            let matches = try await service.searchPlace(
+                query: "\(place.name) \(place.address)",
+                near: place.coordinate
+            )
+            let placeLocation = CLLocation(latitude: place.latitude, longitude: place.longitude)
+            return matches.first { match in
+                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
+                let sameArea = placeLocation.distance(from: matchLocation) < 250
+                let sameName = match.name.localizedCaseInsensitiveContains(place.name) ||
+                    place.name.localizedCaseInsensitiveContains(match.name)
+                return sameArea || sameName
+            }
+        } catch {
+            return nil
+        }
     }
 
     private func deletePlace() async {

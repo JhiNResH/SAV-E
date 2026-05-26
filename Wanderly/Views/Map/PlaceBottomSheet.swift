@@ -67,14 +67,10 @@ struct PlaceBottomSheet: View {
                 }
             }
 
-            PlaceBusinessPhotoPreview(imageURL: place.sourceImageUrl)
+            PlaceBusinessPhotoCarousel(imageURLs: place.businessPhotoURLStrings)
 
+            PlaceInsightSummaryPanel(place: place, fallbackSummary: memorySummary)
             PlaceBasicInfoPanel(place: place)
-
-            Text(memorySummary)
-                .font(.subheadline)
-                .foregroundColor(.saveInk)
-                .fixedSize(horizontal: false, vertical: true)
 
             FlowLayout(spacing: 8) {
                 CategoryPill(category: place.category, isSelected: true)
@@ -138,73 +134,31 @@ struct PlaceBottomSheet: View {
                 }
             }
 
-            // Action buttons
-            HStack(spacing: 12) {
-                Button(action: {
+            HStack(spacing: 8) {
+                Button {
                     NavigationService.navigate(to: place.coordinate, name: place.name)
-                }) {
-                    Label("Navigate", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
-                        .font(.subheadline)
-                        .fontWeight(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.saveHoney)
-                        .foregroundColor(.saveInk)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 2)
-                        )
+                } label: {
+                    PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: .saveHoney)
                 }
 
-                Button {
-                    onPlanAround?()
-                } label: {
-                    Label("Plan around this", systemImage: "sparkles")
-                        .font(.subheadline)
-                        .fontWeight(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.saveNotebookPage)
-                        .foregroundColor(.saveInk)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 2)
-                        )
+                ShareLink(item: place.saveShareURL ?? place.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
+                    PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveMint.opacity(0.36))
                 }
-                .disabled(onPlanAround == nil)
-            }
 
-            ShareLink(item: place.saveShareURL ?? place.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
-                Label("Share place", systemImage: "square.and.arrow.up")
-                    .font(.caption.weight(.black))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(Color.saveMint.opacity(0.34))
-                    .foregroundColor(.saveInk)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.4)
-                    )
-            }
-
-            if let sourceURL = place.primarySourceURL {
-                Button {
-                    openURL(sourceURL)
-                } label: {
-                    Label("View source", systemImage: "link")
-                        .font(.caption.weight(.black))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(Color.saveSky.opacity(0.20))
-                        .foregroundColor(.saveInk)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.4)
-                        )
+                if let sourceURL = place.primarySourceURL {
+                    Button {
+                        openURL(sourceURL)
+                    } label: {
+                        PlaceDetailActionLabel(title: "Source", systemImage: "link", fill: Color.saveSky.opacity(0.22))
+                    }
+                } else {
+                    Button {
+                        onPlanAround?()
+                    } label: {
+                        PlaceDetailActionLabel(title: "Plan", systemImage: "sparkles", fill: Color.saveNotebookPage)
+                    }
+                    .disabled(onPlanAround == nil)
+                    .opacity(onPlanAround == nil ? 0.55 : 1)
                 }
             }
 
@@ -278,7 +232,7 @@ struct PlaceBottomSheet: View {
 
 }
 
-private struct PlaceBasicInfoPanel: View {
+struct PlaceBasicInfoPanel: View {
     let place: Place
 
     var body: some View {
@@ -427,40 +381,185 @@ struct FlowLayout: Layout {
     }
 }
 
-private struct PlaceBusinessPhotoPreview: View {
-    var imageURL: String?
+struct PlaceDetailActionLabel: View {
+    var title: String
+    var systemImage: String
+    var fill: Color
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.black))
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(fill)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+            )
+    }
+}
+
+struct PlaceInsightSummaryPanel: View {
+    let place: Place
+    var fallbackSummary: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.badge.checkmark")
+                    .font(.caption.weight(.black))
+                Text("Place summary")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(alignment: .leading, spacing: 7) {
+                PlaceSummaryLine(icon: "sparkles", text: fallbackSummary)
+                PlaceSummaryLine(icon: "clock.fill", text: practicalInfo)
+                PlaceSummaryLine(icon: "star.fill", text: reviewSummary)
+                PlaceSummaryLine(icon: "hand.thumbsup.fill", text: recommendationSummary)
+            }
+        }
+        .padding(12)
+        .background(Color.saveNotebookPage)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.7), lineWidth: 1.2)
+        )
+    }
+
+    private var practicalInfo: String {
+        var parts: [String] = []
+        if let openingHours = cleaned(place.openingHours) {
+            parts.append(openingHours)
+        }
+        if let priceRange = cleaned(place.priceRange) {
+            parts.append(priceRange)
+        }
+        if parts.isEmpty {
+            parts.append(place.address.isEmpty ? "Address not saved yet" : place.address)
+        }
+        return "Practical info: \(parts.joined(separator: " · "))"
+    }
+
+    private var reviewSummary: String {
+        var parts: [String] = []
+        if let rating = place.googleRating ?? place.rating {
+            parts.append(String(format: "%.1f stars", rating))
+        }
+        if let reviewCountText = reviewCountText {
+            parts.append(reviewCountText)
+        }
+        return parts.isEmpty ? "Reviews: no rating or review count saved yet" : "Reviews: \(parts.joined(separator: " · "))"
+    }
+
+    private var recommendationSummary: String {
+        if let dishes = place.extractedDishes, !dishes.isEmpty {
+            return "Recommended: \(dishes.prefix(4).joined(separator: ", "))"
+        }
+        if let recommender = cleaned(place.recommender) {
+            return "Recommended by \(recommender)"
+        }
+        if let note = cleanMemoryNote {
+            return "Memory note: \(note)"
+        }
+        return "Recommendation: no saved dish or personal note yet"
+    }
+
+    private var cleanMemoryNote: String? {
+        guard let note = cleaned(place.note),
+              !note.localizedCaseInsensitiveContains("Source URL:"),
+              !note.localizedCaseInsensitiveContains("Analysis pipeline:"),
+              !note.localizedCaseInsensitiveContains("Evidence tier:")
+        else { return nil }
+        return note
+    }
+
+    private var reviewCountText: String? {
+        for line in place.sourceEvidence {
+            let prefix = "External reviews:"
+            guard line.localizedCaseInsensitiveContains(prefix) else { continue }
+            let value = line
+                .replacingOccurrences(of: prefix, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            return "\(value) reviews"
+        }
+        return nil
+    }
+
+    private func cleaned(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty
+        else { return nil }
+        return value
+    }
+}
+
+private struct PlaceSummaryLine: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 16)
+                .padding(.top, 2)
+            Text(text)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+struct PlaceBusinessPhotoCarousel: View {
+    var imageURLs: [String]
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Group {
-                if let url = imageURL.flatMap(URL.init(string:)) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            fallbackVisual
-                        case .empty:
-                            ProgressView()
-                                .tint(.saveInk)
-                        @unknown default:
-                            fallbackVisual
+            if photoURLs.isEmpty {
+                fallbackVisual
+                    .frame(height: 156)
+            } else {
+                TabView {
+                    ForEach(Array(photoURLs.enumerated()), id: \.offset) { index, url in
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                fallbackVisual
+                            case .empty:
+                                ProgressView()
+                                    .tint(.saveInk)
+                            @unknown default:
+                                fallbackVisual
+                            }
                         }
+                        .frame(height: 156)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .tag(index)
                     }
-                } else {
-                    fallbackVisual
                 }
+                .tabViewStyle(.page(indexDisplayMode: photoURLs.count > 1 ? .automatic : .never))
+                .frame(height: 156)
             }
-            .frame(height: 156)
-            .frame(maxWidth: .infinity)
-            .clipped()
 
             HStack(spacing: 6) {
-                Image(systemName: imageURL == nil ? "photo" : "camera.fill")
+                Image(systemName: photoURLs.isEmpty ? "photo" : "camera.fill")
                     .font(.caption2.weight(.black))
-                Text(imageURL == nil ? "Finding business photo" : "Business photo")
+                Text(photoURLs.isEmpty ? "Finding business photo" : photoLabel)
                     .font(.caption2.weight(.black))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -478,6 +577,14 @@ private struct PlaceBusinessPhotoPreview: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 1.2)
         )
+    }
+
+    private var photoURLs: [URL] {
+        imageURLs.compactMap(URL.init(string:))
+    }
+
+    private var photoLabel: String {
+        photoURLs.count > 1 ? "\(photoURLs.count) business photos" : "Business photo"
     }
 
     private var fallbackVisual: some View {
