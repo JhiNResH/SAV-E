@@ -12,22 +12,18 @@ struct SaveMemoryBadge: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+            Circle()
                 .fill(fillColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.9), lineWidth: 1.3)
+                    Circle()
+                        .stroke(strokeColor, lineWidth: 1.2)
                 )
-
-            if case .saved = state {
-                cardTabs
-            }
 
             icon
                 .font(.system(size: size * 0.34, weight: .black))
                 .foregroundColor(iconColor)
         }
-        .frame(width: size, height: size * 0.88)
+        .frame(width: size, height: size)
         .accessibilityLabel(accessibilityLabel)
     }
 
@@ -58,7 +54,7 @@ struct SaveMemoryBadge: View {
     private var iconColor: Color {
         switch state {
         case .clue:
-            return .saveInk
+            return .saveCocoa
         case .ready:
             return .saveInk
         case .saved(let category):
@@ -66,20 +62,15 @@ struct SaveMemoryBadge: View {
         }
     }
 
-    private var cardTabs: some View {
-        HStack(spacing: size * 0.04) {
-            ForEach([Color.saveSky, Color.saveHoney, Color.savePink], id: \.self) { color in
-                RoundedRectangle(cornerRadius: size * 0.035, style: .continuous)
-                    .fill(color)
-                    .frame(width: size * 0.12, height: size * 0.56)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: size * 0.035, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.55), lineWidth: 0.8)
-                    )
-            }
+    private var strokeColor: Color {
+        switch state {
+        case .clue:
+            return Color.saveNotebookLine.opacity(0.45)
+        case .ready:
+            return Color.saveCocoa.opacity(0.22)
+        case .saved:
+            return Color.white.opacity(0.72)
         }
-        .offset(x: size * 0.25)
-        .allowsHitTesting(false)
     }
 
     private var accessibilityLabel: String {

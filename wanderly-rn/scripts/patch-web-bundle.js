@@ -24,6 +24,7 @@ if (!fs.existsSync(distDir)) {
 }
 
 copyPublicAssets();
+writeTripRouteFallback();
 writeAppleAppSiteAssociation();
 
 for (const fileName of fs.readdirSync(distDir)) {
@@ -59,6 +60,15 @@ for (const fileName of fs.readdirSync(distDir)) {
 function copyPublicAssets() {
   if (!fs.existsSync(publicDir) || !fs.existsSync(distRoot)) return;
   fs.cpSync(publicDir, distRoot, { recursive: true });
+}
+
+function writeTripRouteFallback() {
+  const indexPath = path.join(distRoot, "index.html");
+  if (!fs.existsSync(indexPath)) return;
+
+  const tripDir = path.join(distRoot, "trip");
+  fs.mkdirSync(tripDir, { recursive: true });
+  fs.copyFileSync(indexPath, path.join(tripDir, "index.html"));
 }
 
 function writeAppleAppSiteAssociation() {
