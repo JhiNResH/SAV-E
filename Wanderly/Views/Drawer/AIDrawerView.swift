@@ -1248,26 +1248,41 @@ private struct ReviewCandidateCard: View {
                     )
                 }
 
-                ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
-                    Label("Share candidate", systemImage: "square.and.arrow.up")
-                        .font(.caption.weight(.black))
-                        .foregroundColor(.saveInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(Color.saveNotebookPage)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
+                reviewCandidateShareLink
             }
             .padding(12)
         }
         .saveNotebookPage(cornerRadius: 16)
         .opacity(isWorking ? 0.65 : 1)
+    }
+
+    @ViewBuilder
+    private var reviewCandidateShareLink: some View {
+        if let url = candidate.saveShareURL {
+            ShareLink(item: url, subject: Text(candidate.shareSubject), message: Text(candidate.shareText)) {
+                reviewCandidateShareLabel
+            }
+        } else {
+            ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                reviewCandidateShareLabel
+            }
+        }
+    }
+
+    private var reviewCandidateShareLabel: some View {
+        Label("Share candidate", systemImage: "square.and.arrow.up")
+            .font(.caption.weight(.black))
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .background(Color.saveNotebookPage)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -1352,7 +1367,7 @@ private struct UnsavedMapCandidateCard: View {
                         action: onSave
                     )
 
-                    ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                    ShareLink(item: candidate.saveShareURL ?? candidate.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(candidate.shareSubject), message: Text(candidate.shareText)) {
                         Label("Share", systemImage: "square.and.arrow.up")
                             .font(.caption.weight(.black))
                             .foregroundColor(.saveInk)
@@ -1392,6 +1407,7 @@ private struct UnsavedMapCandidateCard: View {
         .saveNotebookPage(cornerRadius: 16)
         .opacity(isWorking ? 0.65 : 1)
     }
+
 }
 
 private struct UnsavedMapCandidateBasicInfo: View {
