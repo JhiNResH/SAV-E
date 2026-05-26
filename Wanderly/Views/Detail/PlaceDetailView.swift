@@ -47,6 +47,17 @@ struct PlaceDetailView: View {
                 }
                 .padding(.horizontal)
 
+                if !place.sourceEvidence.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Evidence receipt", systemImage: "doc.text.magnifyingglass")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.saveInk)
+                        EvidenceLinkList(evidence: place.sourceEvidence, maxItems: 4)
+                    }
+                    .padding(.horizontal)
+                }
+
                 // Opening hours
                 if let hours = place.openingHours {
                     VStack(alignment: .leading, spacing: 6) {
@@ -143,7 +154,7 @@ struct PlaceDetailView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
 
-                    if let url = normalizedSourceURL {
+                    if let url = place.primarySourceURL {
                         Button(action: { openURL(url) }) {
                             Label("Source", systemImage: "link")
                                 .font(.subheadline)
@@ -262,18 +273,6 @@ struct PlaceDetailView: View {
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
         mapItem.name = place.name
         mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
-    }
-
-    private var normalizedSourceURL: URL? {
-        guard let raw = place.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty
-        else { return nil }
-
-        if let url = URL(string: raw), url.scheme != nil {
-            return url
-        }
-
-        return URL(string: "https://\(raw)")
     }
 
     private var areaLabel: String? {

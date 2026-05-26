@@ -179,7 +179,9 @@ private struct SaveSearchResultNotebookRow: View {
     }
 
     private var canOpenDetails: Bool {
-        result.objectType == .savedPlace || result.objectType == .triedMemory
+        result.objectType == .savedPlace ||
+            result.objectType == .triedMemory ||
+            result.objectType == .mapVisibleUnsavedPlace
     }
 
     private var iconName: String {

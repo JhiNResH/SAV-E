@@ -28,6 +28,67 @@ struct Place: Identifiable, Codable, Hashable {
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
+
+    var sourceEvidence: [String] {
+        var evidence: [String] = []
+        if let sourceUrl = sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !sourceUrl.isEmpty {
+            evidence.append("Source URL: \(sourceUrl)")
+        }
+        if let recommender = recommender?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !recommender.isEmpty {
+            evidence.append("Recommender: \(recommender)")
+        }
+        if let note {
+            evidence += note
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
+        return evidence.removingDuplicates()
+    }
+
+    var primarySourceURL: URL? {
+        if let sourceUrl = normalizedSourceURL(from: sourceUrl) {
+            return sourceUrl
+        }
+        return sourceEvidence
+            .flatMap(Self.urls)
+            .first
+    }
+
+    private func normalizedSourceURL(from rawValue: String?) -> URL? {
+        guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty
+        else { return nil }
+
+        if let url = URL(string: raw), url.scheme != nil {
+            return url
+        }
+
+        return URL(string: "https://\(raw)")
+    }
+
+    private static func urls(in text: String) -> [URL] {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector
+            .matches(in: text, options: [], range: range)
+            .compactMap(\.url)
+            .filter { url in
+                guard let scheme = url.scheme?.lowercased() else { return false }
+                return scheme == "http" || scheme == "https"
+            }
+    }
+}
+
+private extension Array where Element == String {
+    func removingDuplicates() -> [String] {
+        var seen: Set<String> = []
+        return filter { seen.insert($0).inserted }
+    }
 }
 
 // MARK: - Enums

@@ -35,14 +35,33 @@ struct MapView: View {
                         }
                     }
 
+                    ForEach(viewModel.visibleMapCandidates) { candidate in
+                        Annotation("", coordinate: candidate.coordinate) {
+                            UnsavedMapCandidatePin(
+                                candidate: candidate,
+                                isSelected: viewModel.selectedMapCandidate?.id == candidate.id
+                            ) {
+                                viewModel.selectMapCandidate(candidate)
+                            }
+                        }
+                    }
+
                     if let polyline = viewModel.routePolyline {
                         MapPolyline(polyline)
                             .stroke(Color.saveCocoa, lineWidth: 3)
                     }
                 }
-                .mapStyle(.standard(pointsOfInterest: .excludingAll))
+                .mapStyle(.standard)
                 .mapControls {
                     MapCompass()
+                }
+                .onMapCameraChange(frequency: .onEnd) { context in
+                    Task {
+                        await viewModel.refreshMapCandidates(
+                            near: context.region.center,
+                            span: context.region.span
+                        )
+                    }
                 }
 
                 VStack {
@@ -344,9 +363,67 @@ private struct ReviewCandidateMapPin: View {
     }
 }
 
+private struct UnsavedMapCandidatePin: View {
+    let candidate: SaveMapCandidate
+    var isSelected = false
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: -2) {
+                ZStack(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color.saveSignal)
+                        .frame(width: isSelected ? 48 : 42, height: isSelected ? 48 : 42)
+                        .overlay(
+                            Circle()
+                                .fill(Color.saveCream)
+                                .padding(isSelected ? 6 : 5)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
+                        )
+                        .overlay(
+                            Image(systemName: candidate.category?.iconName ?? "mappin.and.ellipse")
+                                .font(.system(size: isSelected ? 18 : 15, weight: .black))
+                                .foregroundColor(.saveInk)
+                        )
+                        .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.24 : 0.14), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
+
+                    Text("+")
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundColor(.saveInk)
+                        .frame(width: 17, height: 17)
+                        .background(Color.saveSky)
+                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1))
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
+
+                Image(systemName: "triangle.fill")
+                    .font(.system(size: isSelected ? 10 : 8))
+                    .foregroundColor(.saveCocoa)
+                    .rotationEffect(.degrees(180))
+                    .offset(y: -1)
+            }
+            .scaleEffect(isSelected ? 1.06 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(candidate.title) Unsaved Candidate")
+        .accessibilityHint("Opens this visible map place before saving it as a Map Stamp")
+    }
+}
+
 private extension PlaceReviewCandidate {
     var coordinate: CLLocationCoordinate2D? {
         guard hasReliableCoordinates, let latitude, let longitude else { return nil }
         return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+private extension SaveMapCandidate {
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }

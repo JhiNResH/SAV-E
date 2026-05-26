@@ -10,6 +10,7 @@ final class AIDrawerViewModel: ObservableObject {
         case saveSearchResults(SaveSearchResponse)
         case placeDetail(Place)
         case reviewCandidateDetail(PlaceReviewCandidate)
+        case mapCandidateDetail(SaveMapCandidate)
         case error(String)
     }
 
@@ -26,6 +27,7 @@ final class AIDrawerViewModel: ObservableObject {
     }
 
     @Published var places: [Place] = []
+    @Published var mapCandidates: [SaveMapCandidate] = []
 
     private let aiService: WanderlyAIService
     private let saveSearchController: SaveSearchController
@@ -43,7 +45,12 @@ final class AIDrawerViewModel: ObservableObject {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
-        let saveSearchResponse = saveSearchController.search(query: trimmed, places: places, localRecords: [])
+        let saveSearchResponse = saveSearchController.search(
+            query: trimmed,
+            places: places,
+            localRecords: [],
+            mapCandidates: mapCandidates
+        )
         if saveSearchResponse.hasVisibleResults {
             drawerState = .saveSearchResults(saveSearchResponse)
             mapAction = mapAction(for: saveSearchResponse)
@@ -90,10 +97,16 @@ final class AIDrawerViewModel: ObservableObject {
     }
 
     func showSearchResult(_ result: SaveSearchResult) {
-        guard result.objectType == .savedPlace || result.objectType == .triedMemory,
-              let place = place(for: result)
-        else { return }
-        showPlace(place)
+        switch result.objectType {
+        case .savedPlace, .triedMemory:
+            guard let place = place(for: result) else { return }
+            showPlace(place)
+        case .mapVisibleUnsavedPlace:
+            guard let candidate = mapCandidate(for: result) else { return }
+            showMapCandidate(candidate)
+        default:
+            return
+        }
     }
 
     func showReviewCandidate(_ candidate: PlaceReviewCandidate) {
@@ -102,6 +115,12 @@ final class AIDrawerViewModel: ObservableObject {
             mapAction = MapActionData(type: .focusRegion, placeIds: nil,
                                       lat: latitude, lng: longitude, span: 0.01)
         }
+    }
+
+    func showMapCandidate(_ candidate: SaveMapCandidate) {
+        drawerState = .mapCandidateDetail(candidate)
+        mapAction = MapActionData(type: .focusRegion, placeIds: nil,
+                                  lat: candidate.latitude, lng: candidate.longitude, span: 0.01)
     }
 
     func removePlace(_ place: Place) {
@@ -168,6 +187,12 @@ final class AIDrawerViewModel: ObservableObject {
         let rawID = String(result.id.dropFirst("place-".count))
         guard let uuid = UUID(uuidString: rawID) else { return nil }
         return places.first { $0.id == uuid }
+    }
+
+    private func mapCandidate(for result: SaveSearchResult) -> SaveMapCandidate? {
+        guard result.id.hasPrefix("map-candidate-") else { return nil }
+        let rawID = String(result.id.dropFirst("map-candidate-".count))
+        return mapCandidates.first { $0.id == rawID }
     }
 
     private func mapAction(for response: SaveSearchResponse) -> MapActionData? {
