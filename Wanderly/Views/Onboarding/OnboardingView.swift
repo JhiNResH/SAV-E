@@ -1,136 +1,253 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @State private var currentPage = 0
+    @State private var selectedState: FirstRunDemoState = .clue
     var onComplete: () -> Void
 
-    private let pages: [OnboardingPage] = [
-        OnboardingPage(
-            icon: "magnifyingglass.circle.fill",
-            title: "Save spots while you scroll",
-            subtitle: "Share an IG post, map link, screenshot, or note. Memo helps SAV-E turn messy clues into reviewable places.",
-            color: .saveHoney
-        ),
-        OnboardingPage(
-            icon: "checkmark.seal.fill",
-            title: "No more fake pins",
-            subtitle: "If SAV-E is unsure, it keeps the clue in Review until you confirm it.",
-            color: .saveSky
-        ),
-        OnboardingPage(
-            icon: "rectangle.stack.badge.plus",
-            title: "Turn memories into trips",
-            subtitle: "Your confirmed spots become a private travel memory SAV-E can plan from.",
-            color: .saveCocoa
-        ),
-    ]
-
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $currentPage) {
-                ForEach(pages.indices, id: \.self) { index in
-                    VStack(spacing: 30) {
-                        Spacer()
+        ZStack {
+            SaveDottedBackground()
+                .ignoresSafeArea()
 
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(Color.saveNotebookPage)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                        .stroke(Color.saveNotebookLine.opacity(0.86), lineWidth: 1.2)
-                                )
-                                .frame(width: 132, height: 132)
+            ScrollView {
+                VStack(spacing: 20) {
+                    Spacer(minLength: 28)
 
-                            if index == 0 {
-                                MemoMascotMark(size: 98, framed: false)
-                            } else {
-                                Image(systemName: pages[index].icon)
-                                    .font(.system(size: 64, weight: .semibold))
-                                    .foregroundColor(pages[index].color)
-                            }
-                        }
+                    MemoMascotMark(size: 92, framed: false)
 
-                        VStack(spacing: 12) {
-                            Text(pages[index].title)
-                                .font(.title2)
-                                .fontWeight(.black)
-                                .foregroundColor(.saveInk)
-                                .multilineTextAlignment(.center)
+                    VStack(spacing: 8) {
+                        Text("Drop a messy place link")
+                            .font(.title2)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .multilineTextAlignment(.center)
 
-                            Text(pages[index].subtitle)
-                                .font(.subheadline)
-                                .lineSpacing(3)
-                                .foregroundColor(.saveMutedText)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                        }
-
-                        Spacer()
+                        Text("SAV-E reads the source, shows what it knows, and keeps uncertain places in Review.")
+                            .font(.subheadline)
+                            .lineSpacing(3)
+                            .foregroundColor(.saveMutedText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
                     }
-                    .tag(index)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
 
-            // Bottom controls
-            VStack(spacing: 0) {
-                // Page indicators
-                HStack(spacing: 8) {
-                    ForEach(pages.indices, id: \.self) { index in
-                        Capsule()
-                            .fill(index == currentPage ? Color.saveCocoa : Color.saveCocoa.opacity(0.26))
-                            .frame(width: index == currentPage ? 24 : 8, height: 8)
-                            .animation(.easeInOut(duration: 0.2), value: currentPage)
+                    FirstRunProgressionChips(selectedState: $selectedState)
+
+                    FirstRunPlaceDemoCard(state: selectedState)
+
+                    Button(action: onComplete) {
+                        Text("Paste your first place")
+                            .font(.headline)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.saveHoney)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
-                }
-                .padding(.bottom, 32)
+                    .padding(.horizontal, 24)
 
-                // Button
-                Button(action: {
-                    if currentPage < pages.count - 1 {
-                        withAnimation { currentPage += 1 }
-                    } else {
-                        onComplete()
-                    }
-                }) {
-                    Text(currentPage < pages.count - 1 ? "Next" : "Start with SAV-E")
-                        .font(.headline)
-                        .fontWeight(.black)
-                        .foregroundColor(.saveInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.saveHoney)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 2)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
-
-                if currentPage < pages.count - 1 {
-                    Button("Skip") {
+                    Button("Skip for now") {
                         onComplete()
                     }
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.saveMutedText)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 24)
                 }
             }
         }
-        .background(SaveDottedBackground())
     }
 }
 
-// MARK: - Onboarding Page Model
+// MARK: - First Run Demo
 
-struct OnboardingPage {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let color: Color
+private enum FirstRunDemoState: String, CaseIterable {
+    case clue = "Clue"
+    case candidate = "Candidate"
+    case mapStamp = "Map Stamp"
+    case tripPlan = "Trip Plan"
+
+    var title: String {
+        switch self {
+        case .clue: return "Found a place clue"
+        case .candidate: return "Possible match"
+        case .mapStamp: return "Saved as Map Stamp"
+        case .tripPlan: return "Trip shell ready"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .clue: return "magnifyingglass"
+        case .candidate: return "checklist"
+        case .mapStamp: return "mappin.and.ellipse"
+        case .tripPlan: return "sparkles"
+        }
+    }
+
+    var input: String {
+        switch self {
+        case .clue: return "instagram.com/reel/..."
+        case .candidate: return "Speranza dinner clip"
+        case .mapStamp: return "Speranza · Silver Lake"
+        case .tripPlan: return "Weekend around Silver Lake"
+        }
+    }
+
+    var known: String {
+        switch self {
+        case .clue: return "food + neighborhood hint"
+        case .candidate: return "source text + map name + neighborhood"
+        case .mapStamp: return "confirmed place identity"
+        case .tripPlan: return "1 anchor + 2 nearby saved places"
+        }
+    }
+
+    var missing: String {
+        switch self {
+        case .clue: return "exact map place"
+        case .candidate: return "your confirmation"
+        case .mapStamp: return "nothing before saving"
+        case .tripPlan: return "final route review"
+        }
+    }
+
+    var primaryAction: String {
+        switch self {
+        case .clue: return "Find exact place"
+        case .candidate: return "Confirm candidate"
+        case .mapStamp: return "Plan around this"
+        case .tripPlan: return "Review plan"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .clue: return .saveHoney
+        case .candidate: return .saveSky
+        case .mapStamp: return .saveMint
+        case .tripPlan: return .savePink
+        }
+    }
+}
+
+private struct FirstRunProgressionChips: View {
+    @Binding var selectedState: FirstRunDemoState
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(FirstRunDemoState.allCases, id: \.self) { state in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedState = state
+                        }
+                    } label: {
+                        Text(state.rawValue)
+                            .font(.caption)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .background(selectedState == state ? state.tint : Color.saveNotebookPage)
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.saveNotebookLine, lineWidth: selectedState == state ? 1.8 : 1.1)
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+}
+
+private struct FirstRunPlaceDemoCard: View {
+    let state: FirstRunDemoState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: state.icon)
+                    .font(.title3.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 44, height: 44)
+                    .background(state.tint)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(state.title)
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
+
+                    Text("Clue -> Candidate -> Map Stamp -> Trip Plan")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.saveMutedText)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                FirstRunEvidenceRow(label: "Input", value: state.input)
+                FirstRunEvidenceRow(label: "Known", value: state.known)
+                FirstRunEvidenceRow(label: "Missing", value: state.missing)
+            }
+
+            Text("Next: \(state.primaryAction)")
+                .font(.subheadline)
+                .fontWeight(.black)
+                .foregroundColor(.saveInk)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.saveNotebookPage)
+                .overlay(
+                    Capsule()
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                )
+        }
+        .padding(18)
+        .background(Color.saveNotebookPage.opacity(0.96))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 24)
+    }
+}
+
+private struct FirstRunEvidenceRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label.uppercased())
+                .font(.caption2)
+                .fontWeight(.black)
+                .foregroundColor(.saveCocoa)
+                .frame(width: 54, alignment: .leading)
+
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
 }
 
 #Preview {
