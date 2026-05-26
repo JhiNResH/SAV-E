@@ -101,9 +101,9 @@ struct SaveSearchController {
             fromYourSave: SaveSearchSection(
                 id: "from-your-save",
                 title: "From your SAV-E",
-                subtitle: "Saved places, review clues, sources, and tried memories.",
+                subtitle: "Map Stamps, Review Candidates, source clues, and tried memories.",
                 results: localResults,
-                emptyMessage: "No matching memory yet. Try a city, category, source, or place name."
+                emptyMessage: "No matching Map Stamp yet. Try a city, category, source, or place name."
             ),
             newRecommendations: SaveSearchSection(
                 id: "new-recommendations",
@@ -152,15 +152,15 @@ struct SaveSearchController {
         case .sourceOnly:
             objectType = .sourceOnlyClue
             userState = .sourceOnly
-            statusLabel = "Needs one more clue"
+            statusLabel = "Clue · needs exact place"
         case .reviewCandidate:
             objectType = .pendingCandidate
             userState = .waitingReview
-            statusLabel = "Needs review"
+            statusLabel = "Review Candidate"
         case .confirmedPlace:
             objectType = .savedPlace
             userState = .wantToGo
-            statusLabel = "Memory card"
+            statusLabel = "Map Stamp"
         }
 
         return SaveSearchResult(
@@ -195,7 +195,7 @@ struct SaveSearchController {
             objectType: .newRecommendation,
             userState: .unsaved,
             title: "Search new places for “\(query.rawValue)”",
-            subtitle: "SAV-E will keep recommendations separate from your memory cards.",
+            subtitle: "SAV-E will keep recommendations separate from your Map Stamps.",
             statusLabel: "New recommendation · unsaved",
             sourceURL: nil,
             sourcePlatform: nil,
@@ -206,7 +206,7 @@ struct SaveSearchController {
             rating: nil,
             reviewCount: nil,
             confidence: nil,
-            missingInfo: ["Choose a result before it becomes a review clue or memory card"],
+            missingInfo: ["Choose a result before it becomes a Review Candidate or Map Stamp"],
             evidence: ["Recommendation shell only; no map pin or saved place was created"],
             recoveryQueries: [],
             createdAt: Date(),
@@ -223,7 +223,7 @@ struct SaveSearchController {
             userState: .unsaved,
             title: candidate.title,
             subtitle: candidate.subtitle,
-            statusLabel: "Unsaved map place",
+            statusLabel: "Unsaved Map Candidate",
             sourceURL: candidate.sourceURL,
             sourcePlatform: candidate.sourcePlatform,
             category: candidate.category,

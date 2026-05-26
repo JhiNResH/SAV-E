@@ -213,6 +213,8 @@ final class SaveSearchControllerTests: XCTestCase {
         let result = try XCTUnwrap(response.fromYourSave.results.first)
         XCTAssertEqual(result.title, "東京家庭義大利麵 士林店")
         XCTAssertEqual(result.objectType, .pendingCandidate)
+        XCTAssertEqual(result.objectType.displayName, "Review Candidate")
+        XCTAssertEqual(result.statusLabel, "Review Candidate")
         XCTAssertEqual(result.userState, .waitingReview)
         XCTAssertNil(result.confidence)
         XCTAssertFalse(result.isRecommendationShell)
@@ -294,8 +296,9 @@ final class SaveSearchControllerTests: XCTestCase {
         )
 
         let sourceOnly = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "Pasta reel clue" })
+        XCTAssertEqual(sourceOnly.objectType.displayName, "Clue")
         XCTAssertEqual(sourceOnly.agentDrawer.primaryAction.kind, .runRecovery)
-        XCTAssertEqual(sourceOnly.agentDrawer.heading, "Recover exact place")
+        XCTAssertEqual(sourceOnly.agentDrawer.heading, "Clue found")
         XCTAssertTrue(sourceOnly.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
         XCTAssertTrue(sourceOnly.agentDrawer.evidenceSummary.contains("Missing: exact place, coordinates"))
 
@@ -303,13 +306,16 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertFalse(malformedSource.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
 
         let savedPlace = try XCTUnwrap(response.fromYourSave.results.first { $0.objectType == .savedPlace })
+        XCTAssertEqual(savedPlace.objectType.displayName, "Map Stamp")
+        XCTAssertEqual(savedPlace.agentDrawer.heading, "Plan around this Map Stamp")
         XCTAssertEqual(savedPlace.agentDrawer.primaryAction.kind, .planAround)
         XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
         XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.addToTrip))
 
         let unsavedMapPlace = try XCTUnwrap(response.newRecommendations.results.first { $0.objectType == .mapVisibleUnsavedPlace })
+        XCTAssertEqual(unsavedMapPlace.objectType.displayName, "Map Candidate")
         XCTAssertEqual(unsavedMapPlace.agentDrawer.primaryAction.kind, .savePlace)
-        XCTAssertEqual(unsavedMapPlace.agentDrawer.heading, "Collect map place")
+        XCTAssertEqual(unsavedMapPlace.agentDrawer.heading, "Save Map Candidate")
         XCTAssertTrue(unsavedMapPlace.agentDrawer.secondaryActions.map(\.kind).contains(.planAround))
         XCTAssertTrue(unsavedMapPlace.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
     }
