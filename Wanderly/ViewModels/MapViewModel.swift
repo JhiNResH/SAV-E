@@ -107,7 +107,10 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             subtitle: subtitle.isEmpty ? "Nearby unsaved place" : subtitle,
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
-            category: seed.category,
+            category: PlaceCategory.poiFirst(
+                pointOfInterestCategory: item.pointOfInterestCategory,
+                fallbackText: "\(title) \(subtitle) \(seed.query)"
+            ),
             sourceURL: appleMapsURL(title: title, coordinate: coordinate),
             sourcePlatform: .other,
             evidence: evidence
@@ -129,6 +132,9 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
            let photoURL = googlePlacesService.photoURL(reference: photoReference, maxWidth: 800) {
             enrichedCandidate.photoURL = photoURL.absoluteString
             enrichedCandidate.evidence.append("Business photo: Google Places")
+        }
+        if let category = PlaceCategory.from(googleTypes: match.types) {
+            enrichedCandidate.category = category
         }
         enrichedCandidate.rating = enrichedCandidate.rating ?? match.rating
         enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
@@ -763,7 +769,10 @@ final class MapViewModel: ObservableObject {
             subtitle: "Selected on map",
             latitude: feature.coordinate.latitude,
             longitude: feature.coordinate.longitude,
-            category: PlaceCategory.inferred(from: "\(title) \(feature.pointOfInterestCategory?.rawValue ?? "")"),
+            category: PlaceCategory.poiFirst(
+                pointOfInterestCategory: feature.pointOfInterestCategory,
+                fallbackText: title
+            ),
             sourceURL: appleMapsURL(title: title, coordinate: feature.coordinate),
             sourcePlatform: .other,
             evidence: evidence
@@ -814,6 +823,9 @@ final class MapViewModel: ObservableObject {
         }
         updatedCandidate.rating = updatedCandidate.rating ?? update.rating
         updatedCandidate.reviewCount = updatedCandidate.reviewCount ?? update.reviewCount
+        if let category = update.category {
+            updatedCandidate.category = category
+        }
         if let priceRange = update.priceRange {
             updatedCandidate.evidence.append("Price: \(priceRange)")
         }
@@ -827,7 +839,7 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    private func businessDetails(for candidate: SaveMapCandidate) async -> (photoURL: URL?, rating: Double?, reviewCount: Int?, priceRange: String?, openingHours: String?)? {
+    private func businessDetails(for candidate: SaveMapCandidate) async -> (photoURL: URL?, rating: Double?, reviewCount: Int?, priceRange: String?, openingHours: String?, category: PlaceCategory?)? {
         do {
             let coordinate = CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
             let matches = try await googlePlacesService.searchPlace(query: "\(candidate.title) \(candidate.subtitle)", near: coordinate)
@@ -852,7 +864,8 @@ final class MapViewModel: ObservableObject {
                 details?.rating ?? match.rating,
                 match.reviewCount,
                 priceLevel.map { String(repeating: "$", count: max(1, $0)) },
-                details?.openingHours?.first
+                details?.openingHours?.first,
+                PlaceCategory.from(googleTypes: details?.types ?? match.types)
             )
         } catch {
             return nil

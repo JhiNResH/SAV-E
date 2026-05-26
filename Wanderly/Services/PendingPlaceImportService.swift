@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 
 enum WanderlySharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
@@ -363,7 +364,8 @@ extension Place {
             latitude: refinedMatch?.latitude ?? candidate.latitude ?? 0,
             longitude: refinedMatch?.longitude ?? candidate.longitude ?? 0,
             googlePlaceId: refinedMatch?.id,
-            category: PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)"),
+            category: PlaceCategory.from(googleTypes: refinedMatch?.types ?? []) ??
+                PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)"),
             status: .wantToGo,
             rating: nil,
             note: candidate.evidence.joined(separator: "\n"),
@@ -405,6 +407,111 @@ extension Place {
 }
 
 extension PlaceCategory {
+    static func from(pointOfInterestCategory category: MKPointOfInterestCategory?) -> PlaceCategory? {
+        guard let category else { return nil }
+        return fromPOITokens([category.rawValue])
+    }
+
+    static func from(googleTypes types: [String]) -> PlaceCategory? {
+        fromPOITokens(types)
+    }
+
+    static func poiFirst(
+        pointOfInterestCategory: MKPointOfInterestCategory?,
+        googleTypes: [String] = [],
+        fallbackText: String
+    ) -> PlaceCategory {
+        if let category = from(pointOfInterestCategory: pointOfInterestCategory) {
+            return category
+        }
+        if let category = from(googleTypes: googleTypes) {
+            return category
+        }
+        return inferred(from: fallbackText)
+    }
+
+    private static func fromPOITokens(_ tokens: [String]) -> PlaceCategory? {
+        let joined = tokens.joined(separator: " ").lowercased()
+        guard !joined.isEmpty else { return nil }
+
+        if joined.contains("cafe") ||
+            joined.contains("coffee") ||
+            joined.contains("bakery") ||
+            joined.contains("tea") {
+            return .cafe
+        }
+        if joined.contains("restaurant") ||
+            joined.contains("meal") ||
+            joined.contains("food") {
+            return .food
+        }
+        if joined.contains("bar") ||
+            joined.contains("nightlife") ||
+            joined.contains("brewery") ||
+            joined.contains("winery") ||
+            joined.contains("liquor") {
+            return .bar
+        }
+        if joined.contains("lodging") ||
+            joined.contains("hotel") ||
+            joined.contains("motel") ||
+            joined.contains("resort") ||
+            joined.contains("campground") {
+            return .stay
+        }
+        if joined.contains("store") ||
+            joined.contains("shop") ||
+            joined.contains("mall") ||
+            joined.contains("market") ||
+            joined.contains("pharmacy") ||
+            joined.contains("supermarket") {
+            return .shopping
+        }
+        if joined.contains("museum") ||
+            joined.contains("park") ||
+            joined.contains("tourist") ||
+            joined.contains("attraction") ||
+            joined.contains("gallery") ||
+            joined.contains("zoo") ||
+            joined.contains("aquarium") ||
+            joined.contains("theater") ||
+            joined.contains("cinema") ||
+            joined.contains("stadium") ||
+            joined.contains("airport") ||
+            joined.contains("spa") ||
+            joined.contains("beauty") ||
+            joined.contains("salon") ||
+            joined.contains("massage") ||
+            joined.contains("fitness") ||
+            joined.contains("gym") ||
+            joined.contains("school") ||
+            joined.contains("university") ||
+            joined.contains("library") ||
+            joined.contains("hospital") ||
+            joined.contains("doctor") ||
+            joined.contains("dentist") ||
+            joined.contains("parking") ||
+            joined.contains("station") ||
+            joined.contains("transit") ||
+            joined.contains("charger") ||
+            joined.contains("gas") ||
+            joined.contains("bank") ||
+            joined.contains("atm") ||
+            joined.contains("post") ||
+            joined.contains("courthouse") ||
+            joined.contains("government") ||
+            joined.contains("cityhall") ||
+            joined.contains("police") ||
+            joined.contains("fire") ||
+            joined.contains("religious") ||
+            joined.contains("church") ||
+            joined.contains("worship") {
+            return .attraction
+        }
+
+        return nil
+    }
+
     static func inferred(from content: String) -> PlaceCategory {
         let lowercased = content.lowercased()
         if lowercased.range(of: #"cafe|coffee|bakery|tea|boba"#, options: .regularExpression) != nil {
