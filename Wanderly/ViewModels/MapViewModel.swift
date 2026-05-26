@@ -753,6 +753,12 @@ final class MapViewModel: ObservableObject {
         let title = (feature.title ?? "Map place").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
 
+        if let savedPlace = places.first(where: { $0.matchesMapFeature(title: title, coordinate: feature.coordinate) }) {
+            selectPlace(savedPlace)
+            selectedMapFeature = nil
+            return
+        }
+
         var evidence = ["Apple Maps POI"]
         if let category = feature.pointOfInterestCategory?.rawValue {
             evidence.append("POI: \(category)")

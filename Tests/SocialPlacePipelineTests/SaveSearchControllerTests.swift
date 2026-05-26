@@ -1,7 +1,27 @@
 import XCTest
+import CoreLocation
 @testable import Wanderly
 
 final class SaveSearchControllerTests: XCTestCase {
+    func testSavedPlaceMatchesUnderlyingMapPOI() {
+        let savedPlace = place(
+            name: "Bright Coffee Bar",
+            address: "Irvine, CA",
+            category: .cafe,
+            latitude: 33.6849,
+            longitude: -117.8262
+        )
+
+        XCTAssertTrue(savedPlace.matchesMapFeature(
+            title: "Bright Coffee Bar",
+            coordinate: CLLocationCoordinate2D(latitude: 33.68491, longitude: -117.82619)
+        ))
+        XCTAssertFalse(savedPlace.matchesMapFeature(
+            title: "Different Coffee",
+            coordinate: CLLocationCoordinate2D(latitude: 33.6858, longitude: -117.8262)
+        ))
+    }
+
     func testChineseMilkTeaQueryUnderstandsCafeDrinkIntent() throws {
         let controller = SaveSearchController()
         let response = controller.search(
@@ -638,14 +658,16 @@ final class SaveSearchControllerTests: XCTestCase {
         status: PlaceStatus = .wantToGo,
         sourceUrl: String? = nil,
         note: String? = nil,
-        extractedDishes: [String]? = nil
+        extractedDishes: [String]? = nil,
+        latitude: Double = 34.0522,
+        longitude: Double = -118.2437
     ) -> Place {
         Place(
             id: UUID(),
             name: name,
             address: address,
-            latitude: 34.0522,
-            longitude: -118.2437,
+            latitude: latitude,
+            longitude: longitude,
             googlePlaceId: nil,
             category: category,
             status: status,
