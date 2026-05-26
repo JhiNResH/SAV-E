@@ -45,6 +45,9 @@ struct ContentView: View {
             .onChange(of: mapVM.selectedPlace) { _, place in
                 if let place { drawerVM.showPlace(place) }
             }
+            .onChange(of: mapVM.selectedReviewCandidate) { _, candidate in
+                if let candidate { drawerVM.showReviewCandidate(candidate) }
+            }
             .onChange(of: mapVM.places) { _, places in
                 drawerVM.places = places
             }

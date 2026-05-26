@@ -13,16 +13,34 @@ struct MapView: View {
 
                     ForEach(viewModel.filteredPlaces) { place in
                         Annotation("", coordinate: place.coordinate) {
-                            PlaceMapPin(place: place) {
+                            PlaceMapPin(
+                                place: place,
+                                isSelected: viewModel.selectedPlace?.id == place.id
+                            ) {
                                 viewModel.selectPlace(place)
                             }
                         }
                     }
+
+                    ForEach(viewModel.reviewCandidatesOnMap) { candidate in
+                        if let coordinate = candidate.coordinate {
+                            Annotation("", coordinate: coordinate) {
+                                ReviewCandidateMapPin(
+                                    candidate: candidate,
+                                    isSelected: viewModel.selectedReviewCandidate?.id == candidate.id
+                                ) {
+                                    viewModel.selectReviewCandidate(candidate)
+                                }
+                            }
+                        }
+                    }
+
                     if let polyline = viewModel.routePolyline {
                         MapPolyline(polyline)
                             .stroke(Color.saveCocoa, lineWidth: 3)
                     }
                 }
+                .mapStyle(.standard(pointsOfInterest: .excludingAll))
                 .mapControls {
                     MapCompass()
                 }
@@ -207,32 +225,49 @@ private struct CurrentLocationButton: View {
 
 struct PlaceMapPin: View {
     let place: Place
+    var isSelected = false
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 0) {
+            VStack(spacing: -2) {
                 ZStack(alignment: .topTrailing) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.saveCream)
-                            .frame(width: 40, height: 34)
+                        Circle()
+                            .fill(Color.saveHoney)
+                            .frame(width: isSelected ? 52 : 46, height: isSelected ? 52 : 46)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                                Circle()
+                                    .fill(Color.saveCream)
+                                    .padding(isSelected ? 6 : 5)
                             )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        Color.saveNotebookLine.opacity(0.42),
+                                        style: StrokeStyle(lineWidth: 1.2, dash: [3, 3])
+                                    )
+                                    .padding(isSelected ? 10 : 9)
+                            )
+                            .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.28 : 0.16), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
 
-                        HStack(spacing: 2) {
-                            Image(systemName: place.category.iconName)
-                                .font(.system(size: 16, weight: .black))
-                                .foregroundColor(.saveInk)
-                            Rectangle()
-                                .fill(Color.saveSky)
-                                .frame(width: 4, height: 18)
-                            Rectangle()
-                                .fill(Color.saveHoney)
-                                .frame(width: 4, height: 18)
-                        }
+                        Image(systemName: place.category.iconName)
+                            .font(.system(size: isSelected ? 21 : 18, weight: .black))
+                            .foregroundColor(.saveInk)
+
+                        Text("S")
+                            .font(.system(size: isSelected ? 8 : 7, weight: .black, design: .rounded))
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.saveCream)
+                            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                            .clipShape(Capsule())
+                            .offset(x: isSelected ? 16 : 14, y: isSelected ? 16 : 14)
                     }
 
                     if place.status == .visited {
@@ -245,13 +280,73 @@ struct PlaceMapPin: View {
                 }
 
                 Image(systemName: "triangle.fill")
-                    .font(.system(size: 8))
-                    .foregroundColor(.saveNotebookLine)
+                    .font(.system(size: isSelected ? 10 : 8))
+                    .foregroundColor(.saveCocoa)
                     .rotationEffect(.degrees(180))
-                    .offset(y: -2)
+                    .offset(y: -1)
             }
+            .scaleEffect(isSelected ? 1.06 : 1)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(place.name) map stamp")
+        .accessibilityLabel("\(place.name) Map Stamp")
+    }
+}
+
+private struct ReviewCandidateMapPin: View {
+    let candidate: PlaceReviewCandidate
+    var isSelected = false
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: -2) {
+                ZStack(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color.saveSky)
+                        .frame(width: isSelected ? 50 : 44, height: isSelected ? 50 : 44)
+                        .overlay(
+                            Circle()
+                                .fill(Color.saveNotebookPage)
+                                .padding(isSelected ? 6 : 5)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
+                        )
+                        .overlay(
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: isSelected ? 18 : 16, weight: .black))
+                                .foregroundColor(.saveInk)
+                        )
+                        .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.24 : 0.14), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
+
+                    Text("?")
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundColor(.saveInk)
+                        .frame(width: 17, height: 17)
+                        .background(Color.saveHoney)
+                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1))
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
+
+                Image(systemName: "triangle.fill")
+                    .font(.system(size: isSelected ? 10 : 8))
+                    .foregroundColor(.saveCocoa)
+                    .rotationEffect(.degrees(180))
+                    .offset(y: -1)
+            }
+            .scaleEffect(isSelected ? 1.06 : 1)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(candidate.name) Review Candidate")
+        .accessibilityHint("Opens the Review Candidate before saving it as a Map Stamp")
+    }
+}
+
+private extension PlaceReviewCandidate {
+    var coordinate: CLLocationCoordinate2D? {
+        guard hasReliableCoordinates, let latitude, let longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }
