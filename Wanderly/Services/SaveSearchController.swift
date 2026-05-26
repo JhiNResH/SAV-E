@@ -1,6 +1,10 @@
 import Foundation
 
 struct SaveSearchController {
+    func shouldPrepareMapCandidates(for rawQuery: String) -> Bool {
+        SaveSearchQuery(rawValue: rawQuery).wantsNewRecommendations
+    }
+
     func makeSaveDraft(from result: SaveSearchResult) -> SavePlaceDraft? {
         let title = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard
@@ -329,10 +333,15 @@ private struct SaveSearchQuery {
         categories = Self.parseCategories(from: normalizedRaw).union(intent?.categories ?? [])
         platforms = Self.parsePlatforms(from: normalizedRaw)
         states = Self.parseStates(from: normalizedRaw)
-        wantsNewRecommendations = Self.containsAny(
+        let containsRecommendationKeyword = Self.containsAny(
             normalizedRaw,
-            keywords: ["recommend", "recommendation", "new", "discover", "nearby", "suggest", "推薦", "新的", "附近", "找新"]
+            keywords: ["recommend", "recommendation", "new", "discover", "nearby", "nearest", "suggest", "search", "looking for", "推薦", "新的", "附近", "找", "找新"]
         )
+        let containsCravingIntent = intent != nil && Self.containsAny(
+            normalizedRaw,
+            keywords: ["want", "craving", "feel like", "想", "想喝", "想吃", "喝", "吃"]
+        )
+        wantsNewRecommendations = containsRecommendationKeyword || containsCravingIntent
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)
         terms = Self.parseTerms(from: normalizedRaw, intent: intent)
     }
@@ -376,6 +385,10 @@ private struct SaveSearchQuery {
         if let sourcePlatform = result.sourcePlatform, platforms.contains(sourcePlatform) { value += 6 }
         if states.contains(result.userState) { value += 6 }
         value += intent?.score(result) ?? 0
+        if wantsNewRecommendations {
+            value += Int((result.rating ?? 0) * 2)
+            value += min(result.reviewCount ?? 0, 5_000) / 500
+        }
         switch result.objectType {
         case .savedPlace, .triedMemory: value += 4
         case .pendingCandidate, .mapVisibleUnsavedPlace: value += 3

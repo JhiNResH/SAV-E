@@ -625,6 +625,12 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    func prepareMapCandidatesForDrawerQuery(_ query: String) async -> [SaveMapCandidate] {
+        guard saveSearchController.shouldPrepareMapCandidates(for: query) else { return mapCandidates }
+        await refreshMapCandidates()
+        return mapCandidates
+    }
+
     private func mapCandidateSearchCenter() -> CLLocationCoordinate2D {
         if let selectedPlace, selectedPlace.latitude != 0 || selectedPlace.longitude != 0 {
             return selectedPlace.coordinate

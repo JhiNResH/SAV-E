@@ -16,6 +16,7 @@ struct AIDrawerView: View {
     var onSaveCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onSaveMapCandidate: (SaveMapCandidate) async throws -> Void = { _ in }
     var onImportURLAsReviewCandidates: (URL) async throws -> Int = { _ in 0 }
+    var onPrepareMapSearch: (String) async -> [SaveMapCandidate] = { _ in [] }
     @FocusState private var searchFocused: Bool
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
@@ -531,7 +532,7 @@ struct AIDrawerView: View {
                     ForEach(viewModel.chatHistory.prefix(5)) { entry in
                         Button(action: {
                             viewModel.query = entry.query
-                            Task { await viewModel.submit() }
+                            submitSearchField()
                         }) {
                             DrawerSuggestionRow(icon: "clock.arrow.circlepath", text: entry.query)
                         }
@@ -547,7 +548,7 @@ struct AIDrawerView: View {
                 ForEach(suggestions, id: \.self) { suggestion in
                     Button(action: {
                         viewModel.query = suggestion
-                        Task { await viewModel.submit() }
+                        submitSearchField()
                     }) {
                         DrawerSuggestionRow(icon: "arrow.up.left", text: suggestion)
                     }
@@ -559,6 +560,7 @@ struct AIDrawerView: View {
     }
 
     private let suggestions = [
+        "I want coffee today",
         "Show my food spots on the map",
         "Navigate to the nearest cafe",
         "Plan a day from my Map Stamps",
@@ -875,7 +877,13 @@ struct AIDrawerView: View {
         if let url = firstURL(in: viewModel.query) {
             importURLToReviewCandidates(url)
         } else {
-            Task { await viewModel.submit() }
+            Task {
+                let candidates = await onPrepareMapSearch(viewModel.query)
+                if !candidates.isEmpty {
+                    viewModel.mapCandidates = candidates
+                }
+                await viewModel.submit()
+            }
         }
     }
 
