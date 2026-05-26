@@ -214,7 +214,6 @@ struct AIDrawerView: View {
             .accessibilityLabel(voiceQuery.isListening ? "Stop talking to SAV-E" : "Talk to SAV-E")
 
             PassportDrawerButton(
-                reviewCount: reviewCandidates.count,
                 fill: commandIconFill,
                 stroke: commandBarStroke,
                 foreground: commandBarTextColor,
@@ -1920,7 +1919,6 @@ private struct CandidateActionLabel: View {
 }
 
 private struct PassportDrawerButton: View {
-    var reviewCount: Int
     var fill: Color
     var stroke: Color
     var foreground: Color
@@ -1928,34 +1926,16 @@ private struct PassportDrawerButton: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title3.weight(.black))
-                    .foregroundColor(foreground)
-
-                if reviewCount > 0 {
-                    Text("\(reviewCount)")
-                        .font(.system(size: 8, weight: .black))
-                        .foregroundColor(.saveInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(Color.saveHoney)
-                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.7), lineWidth: 1))
-                        .clipShape(Capsule())
-                        .frame(maxWidth: 24)
-                        .offset(x: 12, y: -12)
-                }
-            }
-            .frame(width: 30, height: 30)
-            .background(fill)
-            .overlay(Circle().stroke(stroke, lineWidth: 1))
-            .clipShape(Circle())
+            Image(systemName: "person.crop.circle.fill")
+                .font(.title3.weight(.black))
+                .foregroundColor(foreground)
+                .frame(width: 30, height: 30)
+                .background(fill)
+                .overlay(Circle().stroke(stroke, lineWidth: 1))
+                .clipShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open SAV-E Passport")
-        .accessibilityValue(reviewCount > 0 ? "\(reviewCount) waiting clues" : "No waiting clues")
     }
 }
 
