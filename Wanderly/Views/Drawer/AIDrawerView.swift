@@ -368,7 +368,7 @@ struct AIDrawerView: View {
 
         case .reviewCandidateDetail(let candidate):
             ScrollView {
-                ReviewCandidateCard(
+                ReviewCandidateDetailCard(
                     candidate: candidate,
                     isWorking: candidateActionInFlight == candidate.id,
                     onConfirm: {
@@ -816,22 +816,7 @@ struct AIDrawerView: View {
             ReviewCandidatesSection(
                 candidates: reviewCandidates,
                 limit: 2,
-                actionInFlight: candidateActionInFlight,
-                onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
-                        try await onConfirmCandidate(candidate)
-                    }
-                },
-                onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
-                        try await onRejectCandidate(candidate)
-                    }
-                },
-                onSave: { candidate in
-                    performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
-                        try await onSaveCandidate(candidate)
-                    }
-                }
+                onSelect: openReviewCandidateDetail
             )
 
             if let addSpotStatus {
@@ -874,22 +859,7 @@ struct AIDrawerView: View {
                 ReviewCandidatesSection(
                     candidates: reviewCandidates,
                     limit: nil,
-                    actionInFlight: candidateActionInFlight,
-                    onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
-                            try await onConfirmCandidate(candidate)
-                        }
-                    },
-                    onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
-                            try await onRejectCandidate(candidate)
-                        }
-                    },
-                    onSave: { candidate in
-                        performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
-                            try await onSaveCandidate(candidate)
-                        }
-                    }
+                    onSelect: openReviewCandidateDetail
                 )
 
                 if let addSpotStatus {
@@ -1016,6 +986,13 @@ struct AIDrawerView: View {
         showReviewInbox = true
         searchFocused = false
         withAnimation { drawerDetent = .large }
+    }
+
+    private func openReviewCandidateDetail(_ candidate: PlaceReviewCandidate) {
+        showReviewInbox = false
+        searchFocused = false
+        viewModel.showReviewCandidate(candidate)
+        withAnimation { drawerDetent = .medium }
     }
 
     private func submitSearchField() {
@@ -1391,10 +1368,7 @@ private struct NotebookBandLabel: View {
 private struct ReviewCandidatesSection: View {
     var candidates: [PlaceReviewCandidate]
     var limit: Int? = 4
-    var actionInFlight: UUID?
-    var onConfirm: (PlaceReviewCandidate) -> Void
-    var onReject: (PlaceReviewCandidate) -> Void
-    var onSave: (PlaceReviewCandidate) -> Void
+    var onSelect: (PlaceReviewCandidate) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1416,13 +1390,10 @@ private struct ReviewCandidatesSection: View {
                 ReviewCandidatesEmptyState()
             } else {
                 ForEach(displayedCandidates) { candidate in
-                    ReviewCandidateCard(
-                        candidate: candidate,
-                        isWorking: actionInFlight == candidate.id,
-                        onConfirm: { onConfirm(candidate) },
-                        onReject: { onReject(candidate) },
-                        onSave: { onSave(candidate) }
-                    )
+                    Button(action: { onSelect(candidate) }) {
+                        ReviewCandidatePlaceRow(candidate: candidate)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -1431,6 +1402,103 @@ private struct ReviewCandidatesSection: View {
     private var displayedCandidates: [PlaceReviewCandidate] {
         guard let limit else { return candidates }
         return Array(candidates.prefix(limit))
+    }
+}
+
+private struct ReviewCandidatePlaceRow: View {
+    var candidate: PlaceReviewCandidate
+
+    private var inferredCategory: PlaceCategory {
+        PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
+    }
+
+    private var addressText: String {
+        if !candidate.address.isEmpty { return candidate.address }
+        if let city = candidate.city, !city.isEmpty { return city }
+        return "Needs address confirmation"
+    }
+
+    private var statusText: String {
+        candidate.hasReliableCoordinates ? "Ready to review" : "Needs info"
+    }
+
+    private var statusIcon: String {
+        candidate.hasReliableCoordinates ? "checkmark.seal.fill" : "questionmark.folder.fill"
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 4) {
+                SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 44)
+                Text(candidate.hasReliableCoordinates ? "PLACE" : "CLUE")
+                    .font(.system(size: 7, weight: .black))
+                    .foregroundColor(.saveCocoa)
+            }
+            .frame(width: 54)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(candidate.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    statusBadge
+                }
+
+                Text(addressText)
+                    .font(.caption)
+                    .foregroundColor(.saveMutedText)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Label(inferredCategory.displayName, systemImage: inferredCategory.iconName)
+                        .font(.caption2)
+                        .foregroundColor(.saveMutedText)
+                        .lineLimit(1)
+
+                    if let confidence = candidate.confidence {
+                        Text("\(Int(confidence * 100))%")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundColor(.saveMutedText)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(.saveCocoa.opacity(0.48))
+                }
+            }
+        }
+        .padding(12)
+        .saveNotebookPage(cornerRadius: 16)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(candidate.name), \(statusText)")
+        .accessibilityHint("Open review details before saving")
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: statusIcon)
+                .font(.caption2.weight(.black))
+            Text(statusText)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundColor(.saveCocoa)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Color.saveNotebookPage)
+        .overlay(
+            Capsule()
+                .stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1)
+        )
+        .clipShape(Capsule())
     }
 }
 
@@ -1467,7 +1535,7 @@ private struct ReviewCandidatesEmptyState: View {
     }
 }
 
-private struct ReviewCandidateCard: View {
+private struct ReviewCandidateDetailCard: View {
     var candidate: PlaceReviewCandidate
     var isWorking: Bool
     var onConfirm: () -> Void
