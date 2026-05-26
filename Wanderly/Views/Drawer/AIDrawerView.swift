@@ -47,6 +47,7 @@ struct AIDrawerView: View {
                 case .loading:          drawerDetent = .medium
                 case .error:            drawerDetent = .medium
                 case .placeDetail:      drawerDetent = .medium
+                case .reviewCandidateDetail: drawerDetent = .medium
                 case .displaying(let r):
                     drawerDetent = r.componentType == .tripItinerary ? .large : .medium
                 }
@@ -243,6 +244,34 @@ struct AIDrawerView: View {
                 }
             }
 
+        case .reviewCandidateDetail(let candidate):
+            ScrollView {
+                ReviewCandidateCard(
+                    candidate: candidate,
+                    isWorking: candidateActionInFlight == candidate.id,
+                    onConfirm: {
+                        performCandidateAction(candidate, successMessage: "Marked as confirmed. Save it as a Map Stamp when ready.") {
+                            try await onConfirmCandidate(candidate)
+                        }
+                    },
+                    onReject: {
+                        performCandidateAction(candidate, successMessage: "Removed from Review.") {
+                            try await onRejectCandidate(candidate)
+                            viewModel.returnToCommands()
+                            showReviewInbox = true
+                        }
+                    },
+                    onSave: {
+                        performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
+                            try await onSaveCandidate(candidate)
+                            viewModel.returnToCommands()
+                            showReviewInbox = false
+                        }
+                    }
+                )
+                .padding(14)
+            }
+
         case .error(let msg):
             VStack(spacing: 10) {
                 Spacer()
@@ -338,7 +367,7 @@ struct AIDrawerView: View {
         switch viewModel.drawerState {
         case .idle:
             return false
-        case .loading, .displaying, .placeDetail, .error:
+        case .loading, .displaying, .placeDetail, .reviewCandidateDetail, .error:
             return true
         }
     }
@@ -353,6 +382,8 @@ struct AIDrawerView: View {
             return response.title ?? languageSettings.text(.answer)
         case .placeDetail(let place):
             return place.name
+        case .reviewCandidateDetail(let candidate):
+            return candidate.name
         case .error:
             return languageSettings.text(.couldntFinish)
         }
@@ -368,6 +399,8 @@ struct AIDrawerView: View {
             return languageSettings.text(.answerSubtitle)
         case .placeDetail:
             return languageSettings.text(.placeDetailSubtitle)
+        case .reviewCandidateDetail(let candidate):
+            return candidate.hasReliableCoordinates ? "Map-ready Review Candidate" : "Needs address confirmation"
         case .error:
             return languageSettings.text(.errorSubtitle)
         }

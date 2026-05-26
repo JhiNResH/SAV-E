@@ -30,6 +30,7 @@ final class MapViewModel: ObservableObject {
     @Published var isLocatingUser = false
     @Published var calculatedRoute: MKPolyline?
     @Published var reviewCandidates: [PlaceReviewCandidate] = []
+    @Published var selectedReviewCandidate: PlaceReviewCandidate?
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
@@ -80,6 +81,10 @@ final class MapViewModel: ObservableObject {
             return MKPolyline(coordinates: routeCoordinates, count: routeCoordinates.count)
         }
         return polyline
+    }
+
+    var reviewCandidatesOnMap: [PlaceReviewCandidate] {
+        reviewCandidates.filter(\.hasReliableCoordinates)
     }
 
     // MARK: - Actions
@@ -261,6 +266,9 @@ final class MapViewModel: ObservableObject {
     func rejectReviewCandidate(_ candidate: PlaceReviewCandidate) async throws {
         try await supabaseService.updatePlaceCandidateStatus(candidate.id, status: "rejected", placeId: nil)
         reviewCandidates.removeAll { $0.id == candidate.id }
+        if selectedReviewCandidate?.id == candidate.id {
+            selectedReviewCandidate = nil
+        }
     }
 
     func saveReviewCandidateAsPlace(_ candidate: PlaceReviewCandidate) async throws {
@@ -280,6 +288,9 @@ final class MapViewModel: ObservableObject {
         mirrorToLocalVault(place)
         places = [place] + places
         reviewCandidates.removeAll { $0.id == candidate.id }
+        if selectedReviewCandidate?.id == candidate.id {
+            selectedReviewCandidate = nil
+        }
         revealImportedPlaces([place])
     }
 
@@ -300,6 +311,9 @@ final class MapViewModel: ObservableObject {
     private func updateLocalCandidate(_ candidateId: UUID, status: String) {
         guard let index = reviewCandidates.firstIndex(where: { $0.id == candidateId }) else { return }
         reviewCandidates[index].status = status
+        if selectedReviewCandidate?.id == candidateId {
+            selectedReviewCandidate = reviewCandidates[index]
+        }
     }
 
     private func mirrorToLocalVault(_ candidate: PendingReviewCandidate) {
@@ -341,6 +355,12 @@ final class MapViewModel: ObservableObject {
 
     func selectPlace(_ place: Place) {
         selectedPlace = place
+        selectedReviewCandidate = nil
+    }
+
+    func selectReviewCandidate(_ candidate: PlaceReviewCandidate) {
+        selectedReviewCandidate = candidate
+        selectedPlace = nil
     }
 
     func deletePlace(_ place: Place) async throws {

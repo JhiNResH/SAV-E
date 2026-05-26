@@ -8,6 +8,7 @@ final class AIDrawerViewModel: ObservableObject {
         case loading
         case displaying(WanderlyAIResponse)
         case placeDetail(Place)
+        case reviewCandidateDetail(PlaceReviewCandidate)
         case error(String)
     }
 
@@ -75,6 +76,14 @@ final class AIDrawerViewModel: ObservableObject {
         drawerState = .placeDetail(place)
         mapAction = MapActionData(type: .focusRegion, placeIds: nil,
                                   lat: place.latitude, lng: place.longitude, span: 0.01)
+    }
+
+    func showReviewCandidate(_ candidate: PlaceReviewCandidate) {
+        drawerState = .reviewCandidateDetail(candidate)
+        if let latitude = candidate.latitude, let longitude = candidate.longitude {
+            mapAction = MapActionData(type: .focusRegion, placeIds: nil,
+                                      lat: latitude, lng: longitude, span: 0.01)
+        }
     }
 
     func removePlace(_ place: Place) {
