@@ -37,6 +37,10 @@ struct PlaceBottomSheet: View {
                 Spacer()
 
                 Menu {
+                    ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+
                     if let sourceURL = place.primarySourceURL {
                         Button {
                             openURL(sourceURL)
@@ -62,6 +66,10 @@ struct PlaceBottomSheet: View {
                         .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.4))
                 }
             }
+
+            PlaceBusinessPhotoPreview(imageURL: place.sourceImageUrl)
+
+            PlaceBasicInfoPanel(place: place)
 
             Text(memorySummary)
                 .font(.subheadline)
@@ -168,6 +176,20 @@ struct PlaceBottomSheet: View {
                 .disabled(onPlanAround == nil)
             }
 
+            ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                Label("Share place", systemImage: "square.and.arrow.up")
+                    .font(.caption.weight(.black))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Color.saveMint.opacity(0.34))
+                    .foregroundColor(.saveInk)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.4)
+                    )
+            }
+
             if let sourceURL = place.primarySourceURL {
                 Button {
                     openURL(sourceURL)
@@ -256,6 +278,93 @@ struct PlaceBottomSheet: View {
 
 }
 
+private struct PlaceBasicInfoPanel: View {
+    let place: Place
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption.weight(.black))
+                Text("Basic info")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(spacing: 7) {
+                PlaceInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                if let reviewCountText {
+                    PlaceInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewCountText)
+                }
+                PlaceInfoRow(icon: place.category.iconName, title: "Category", value: place.category.displayName)
+                PlaceInfoRow(icon: "mappin.and.ellipse", title: "Address", value: place.address.isEmpty ? "No address saved" : place.address)
+                if let priceRange = place.priceRange {
+                    PlaceInfoRow(icon: "tag.fill", title: "Price", value: priceRange)
+                }
+                if let openingHours = place.openingHours?.trimmingCharacters(in: .whitespacesAndNewlines), !openingHours.isEmpty {
+                    PlaceInfoRow(icon: "clock.fill", title: "Hours", value: openingHours)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.saveSky.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var ratingText: String {
+        if let rating = place.googleRating ?? place.rating {
+            return String(format: "%.1f", rating)
+        }
+        return "No rating yet"
+    }
+
+    private var reviewCountText: String? {
+        for line in place.sourceEvidence {
+            let prefix = "External reviews:"
+            guard line.localizedCaseInsensitiveContains(prefix) else { continue }
+            let value = line
+                .replacingOccurrences(of: prefix, with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            return "\(value) reviews"
+        }
+        return nil
+    }
+}
+
+private struct PlaceInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 16)
+                .padding(.top, 2)
+
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 58, alignment: .leading)
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 private struct PlaceMemoryChip: View {
     let icon: String
     let text: String
@@ -315,6 +424,70 @@ struct FlowLayout: Layout {
 
         let totalHeight = y + rowHeight
         return (CGSize(width: maxWidth, height: totalHeight), frames)
+    }
+}
+
+private struct PlaceBusinessPhotoPreview: View {
+    var imageURL: String?
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let url = imageURL.flatMap(URL.init(string:)) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            fallbackVisual
+                        case .empty:
+                            ProgressView()
+                                .tint(.saveInk)
+                        @unknown default:
+                            fallbackVisual
+                        }
+                    }
+                } else {
+                    fallbackVisual
+                }
+            }
+            .frame(height: 156)
+            .frame(maxWidth: .infinity)
+            .clipped()
+
+            HStack(spacing: 6) {
+                Image(systemName: imageURL == nil ? "photo" : "camera.fill")
+                    .font(.caption2.weight(.black))
+                Text(imageURL == nil ? "Finding business photo" : "Business photo")
+                    .font(.caption2.weight(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .foregroundColor(.saveInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.saveNotebookPage.opacity(0.9))
+            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+            .clipShape(Capsule())
+            .padding(8)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+        )
+    }
+
+    private var fallbackVisual: some View {
+        Rectangle()
+            .fill(Color.saveNotebookPage)
+            .overlay {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.66))
+            }
     }
 }
 

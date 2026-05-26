@@ -16,6 +16,7 @@ struct AIDrawerView: View {
     var onSaveCandidate: (PlaceReviewCandidate) async throws -> Void = { _ in }
     var onSaveMapCandidate: (SaveMapCandidate) async throws -> Void = { _ in }
     var onImportURLAsReviewCandidates: (URL) async throws -> Int = { _ in 0 }
+    var onPrepareMapSearch: (String) async -> [SaveMapCandidate] = { _ in [] }
     @FocusState private var searchFocused: Bool
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
@@ -531,7 +532,7 @@ struct AIDrawerView: View {
                     ForEach(viewModel.chatHistory.prefix(5)) { entry in
                         Button(action: {
                             viewModel.query = entry.query
-                            Task { await viewModel.submit() }
+                            submitSearchField()
                         }) {
                             DrawerSuggestionRow(icon: "clock.arrow.circlepath", text: entry.query)
                         }
@@ -547,7 +548,7 @@ struct AIDrawerView: View {
                 ForEach(suggestions, id: \.self) { suggestion in
                     Button(action: {
                         viewModel.query = suggestion
-                        Task { await viewModel.submit() }
+                        submitSearchField()
                     }) {
                         DrawerSuggestionRow(icon: "arrow.up.left", text: suggestion)
                     }
@@ -559,6 +560,7 @@ struct AIDrawerView: View {
     }
 
     private let suggestions = [
+        "I want coffee today",
         "Show my food spots on the map",
         "Navigate to the nearest cafe",
         "Plan a day from my Map Stamps",
@@ -875,7 +877,13 @@ struct AIDrawerView: View {
         if let url = firstURL(in: viewModel.query) {
             importURLToReviewCandidates(url)
         } else {
-            Task { await viewModel.submit() }
+            Task {
+                let candidates = await onPrepareMapSearch(viewModel.query)
+                if !candidates.isEmpty {
+                    viewModel.mapCandidates = candidates
+                }
+                await viewModel.submit()
+            }
         }
     }
 
@@ -1239,6 +1247,22 @@ private struct ReviewCandidateCard: View {
                         action: onReject
                     )
                 }
+
+                ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                    Label("Share candidate", systemImage: "square.and.arrow.up")
+                        .font(.caption.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Color.saveNotebookPage)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
             .padding(12)
         }
@@ -1291,6 +1315,10 @@ private struct UnsavedMapCandidateCard: View {
                     .foregroundColor(.saveCocoa.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
 
+                UnsavedMapCandidateVisualPreview(candidate: candidate)
+
+                UnsavedMapCandidateBasicInfo(candidate: candidate)
+
                 if !candidate.evidence.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 6) {
@@ -1324,6 +1352,22 @@ private struct UnsavedMapCandidateCard: View {
                         action: onSave
                     )
 
+                    ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.saveNotebookPage)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
                     if let sourceURL = candidate.sourceURL, let url = URL(string: sourceURL) {
                         Link(destination: url) {
                             Label("Maps", systemImage: "map")
@@ -1347,6 +1391,141 @@ private struct UnsavedMapCandidateCard: View {
         }
         .saveNotebookPage(cornerRadius: 16)
         .opacity(isWorking ? 0.65 : 1)
+    }
+}
+
+private struct UnsavedMapCandidateBasicInfo: View {
+    var candidate: SaveMapCandidate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle.fill")
+                    .font(.caption.weight(.black))
+                Text("Basic info")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(spacing: 7) {
+                UnsavedMapCandidateInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                if let reviewText {
+                    UnsavedMapCandidateInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewText)
+                }
+                UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
+                UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
+                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Maps result")
+            }
+        }
+        .padding(10)
+        .background(Color.saveSky.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var ratingText: String {
+        guard let rating = candidate.rating else { return "No rating yet" }
+        return String(format: "%.1f", rating)
+    }
+
+    private var reviewText: String? {
+        candidate.reviewCount.map { "\($0) reviews" }
+    }
+}
+
+private struct UnsavedMapCandidateInfoRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 16)
+                .padding(.top, 2)
+
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 58, alignment: .leading)
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct UnsavedMapCandidateVisualPreview: View {
+    var candidate: SaveMapCandidate
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let photoURL = candidate.photoURL.flatMap(URL.init(string:)) {
+                    AsyncImage(url: photoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            fallbackVisual
+                        case .empty:
+                            ProgressView()
+                                .tint(.saveInk)
+                        @unknown default:
+                            fallbackVisual
+                        }
+                    }
+                } else {
+                    fallbackVisual
+                }
+            }
+            .frame(height: 138)
+            .frame(maxWidth: .infinity)
+            .clipped()
+
+            HStack(spacing: 6) {
+                Image(systemName: candidate.photoURL == nil ? "photo" : "camera.fill")
+                    .font(.caption2.weight(.black))
+                Text(candidate.photoURL == nil ? "No business photo available" : "Business photo")
+                    .font(.caption2.weight(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .foregroundColor(.saveInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.saveNotebookPage.opacity(0.9))
+            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+            .clipShape(Capsule())
+            .padding(8)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+        )
+    }
+
+    private var fallbackVisual: some View {
+        Rectangle()
+            .fill(Color.saveNotebookPage)
+            .overlay {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.66))
+            }
     }
 }
 

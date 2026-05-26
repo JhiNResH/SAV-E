@@ -409,6 +409,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
     var reviewCount: Int?
     var sourceURL: String?
     var sourcePlatform: SourcePlatform?
+    var photoURL: String?
     var evidence: [String]
     var createdAt: Date
 
@@ -423,6 +424,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         reviewCount: Int? = nil,
         sourceURL: String? = nil,
         sourcePlatform: SourcePlatform? = nil,
+        photoURL: String? = nil,
         evidence: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -436,8 +438,50 @@ struct SaveMapCandidate: Identifiable, Hashable {
         self.reviewCount = reviewCount
         self.sourceURL = sourceURL
         self.sourcePlatform = sourcePlatform
+        self.photoURL = photoURL
         self.evidence = evidence
         self.createdAt = createdAt
+    }
+}
+
+extension SaveMapCandidate {
+    var shareSubject: String {
+        "SAV-E Map Result: \(title)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "SAV-E Map Result",
+            title,
+            subtitle
+        ]
+
+        if let category {
+            lines.append("Category: \(category.displayName)")
+        }
+        if let rating {
+            lines.append("Rating: \(String(format: "%.1f", rating))")
+        }
+        if let reviewCount {
+            lines.append("Reviews: \(reviewCount)")
+        }
+        if let sourceURL, !sourceURL.isEmpty {
+            lines.append("Source: \(sourceURL)")
+        }
+        if let mapsURL = appleMapsURL {
+            lines.append("Map: \(mapsURL.absoluteString)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    var appleMapsURL: URL? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: title),
+            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
+        ]
+        return components?.url
     }
 }
 
@@ -590,6 +634,40 @@ struct SaveSearchResult: Identifiable, Hashable {
 
     var evidenceDrawer: SaveEvidenceDrawerModel {
         SaveEvidenceDrawerModel(result: self)
+    }
+}
+
+extension SaveSearchResult {
+    var shareSubject: String {
+        "SAV-E Place: \(title)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "SAV-E Place",
+            title,
+            subtitle,
+            "Type: \(objectType.displayName)",
+            "State: \(userState.displayName)"
+        ]
+
+        if let category {
+            lines.append("Category: \(category.displayName)")
+        }
+        if let rating {
+            lines.append("Rating: \(String(format: "%.1f", rating))")
+        }
+        if let reviewCount {
+            lines.append("Reviews: \(reviewCount)")
+        }
+        if let sourceURL, !sourceURL.isEmpty {
+            lines.append("Source: \(sourceURL)")
+        }
+        if !missingInfo.isEmpty {
+            lines.append("Needs: \(missingInfo.joined(separator: ", "))")
+        }
+
+        return lines.joined(separator: "\n")
     }
 }
 

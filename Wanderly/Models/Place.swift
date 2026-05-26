@@ -57,6 +57,50 @@ struct Place: Identifiable, Codable, Hashable {
             .first
     }
 
+    var shareSubject: String {
+        "SAV-E Map Stamp: \(name)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "SAV-E Map Stamp",
+            name,
+            address,
+            "Category: \(category.displayName)",
+            "Status: \(status.memoryCardLabel)"
+        ]
+
+        if let rating = googleRating ?? rating {
+            lines.append("Rating: \(String(format: "%.1f", rating))")
+        }
+        if let priceRange, !priceRange.isEmpty {
+            lines.append("Price: \(priceRange)")
+        }
+        if let recommender, !recommender.isEmpty {
+            lines.append("Recommended by: \(recommender)")
+        }
+        if let note = note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            lines.append("Note: \(note)")
+        }
+        if let sourceURL = primarySourceURL {
+            lines.append("Source: \(sourceURL.absoluteString)")
+        }
+        if let mapsURL = appleMapsURL {
+            lines.append("Map: \(mapsURL.absoluteString)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    var appleMapsURL: URL? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: name),
+            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
+        ]
+        return components?.url
+    }
+
     private func normalizedSourceURL(from rawValue: String?) -> URL? {
         guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
               !raw.isEmpty

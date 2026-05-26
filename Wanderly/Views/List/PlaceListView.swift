@@ -94,6 +94,11 @@ struct PlaceListView: View {
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                             .swipeActions(edge: .leading) {
+                                ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                                    Label("Share", systemImage: "square.and.arrow.up")
+                                }
+                                .tint(.saveSky)
+
                                 Button {
                                     Task { await viewModel.markVisited(place) }
                                 } label: {
@@ -313,6 +318,18 @@ private struct SaveSearchResultCard: View {
                 onSaveMapCandidate: onSaveMapCandidate,
                 onPlanAround: onPlanAround
             )
+            ShareLink(item: result.shareText, subject: Text(result.shareSubject)) {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.saveNotebookPage)
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.1))
+                    .clipShape(Capsule())
+            }
             SaveEvidenceDrawerPreview(model: result.evidenceDrawer)
         }
         .padding(12)

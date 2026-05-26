@@ -56,6 +56,48 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(shell.evidence.contains { $0.contains("no map pin or saved memory") })
     }
 
+    func testCoffeeCravingQueryReturnsNearbyUnsavedCafeCandidate() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "我今天想喝咖啡推薦一家咖啡給我",
+            places: [],
+            localRecords: [],
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "Quiet Coffee",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6846,
+                    longitude: -117.8265,
+                    category: .cafe,
+                    rating: 4.2,
+                    reviewCount: 80,
+                    sourceURL: "https://maps.google.com/?q=Quiet+Coffee",
+                    sourcePlatform: .googleMaps,
+                    evidence: ["Visible on map"]
+                ),
+                SaveMapCandidate(
+                    title: "Bright Coffee Bar",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6849,
+                    longitude: -117.8262,
+                    category: .cafe,
+                    rating: 4.8,
+                    reviewCount: 1200,
+                    sourceURL: "https://maps.google.com/?q=Bright+Coffee+Bar",
+                    sourcePlatform: .googleMaps,
+                    evidence: ["Visible on map"]
+                )
+            ]
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.count, 0)
+        XCTAssertEqual(response.newRecommendations.results.first?.title, "Bright Coffee Bar")
+        XCTAssertEqual(response.newRecommendations.results.first?.objectType, .mapVisibleUnsavedPlace)
+        XCTAssertEqual(response.newRecommendations.results.first?.primaryAction, .savePlace)
+        XCTAssertEqual(response.newRecommendations.results.first?.rating, 4.8)
+        XCTAssertEqual(response.newRecommendations.results.first?.reviewCount, 1200)
+    }
+
     func testReviewCandidateMilkTeaMatchStaysReviewScoped() throws {
         let controller = SaveSearchController()
         let response = controller.search(
@@ -542,6 +584,48 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(result.sourcePlatform, .other)
         XCTAssertNotEqual(result.evidenceDrawer.sourcePlatform, .instagram)
         XCTAssertFalse(result.evidenceDrawer.evidenceAtoms.contains { $0.label == "Platform" && $0.value == "Instagram" })
+    }
+
+    func testSavedPlaceShareTextIncludesPlaceBasicsAndLinks() throws {
+        let savedPlace = place(
+            name: "Kato",
+            address: "777 S Alameda St, Los Angeles, CA",
+            category: .food,
+            sourceUrl: "https://www.instagram.com/reel/kato/",
+            note: "Try the tasting menu"
+        )
+
+        let shareText = savedPlace.shareText
+
+        XCTAssertTrue(shareText.contains("SAV-E Map Stamp"))
+        XCTAssertTrue(shareText.contains("Kato"))
+        XCTAssertTrue(shareText.contains("777 S Alameda St, Los Angeles, CA"))
+        XCTAssertTrue(shareText.contains("Source: https://www.instagram.com/reel/kato/"))
+        XCTAssertTrue(shareText.contains("Map: https://maps.apple.com"))
+    }
+
+    func testUnsavedMapCandidateShareTextIncludesRatingReviewsAndMapLink() throws {
+        let candidate = SaveMapCandidate(
+            title: "Bright Coffee Bar",
+            subtitle: "Irvine, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            category: .cafe,
+            rating: 4.8,
+            reviewCount: 1200,
+            sourceURL: "https://maps.google.com/?q=Bright+Coffee+Bar",
+            sourcePlatform: .googleMaps,
+            evidence: ["Visible on map"]
+        )
+
+        let shareText = candidate.shareText
+
+        XCTAssertTrue(shareText.contains("SAV-E Map Result"))
+        XCTAssertTrue(shareText.contains("Bright Coffee Bar"))
+        XCTAssertTrue(shareText.contains("Rating: 4.8"))
+        XCTAssertTrue(shareText.contains("Reviews: 1200"))
+        XCTAssertTrue(shareText.contains("Source: https://maps.google.com/?q=Bright+Coffee+Bar"))
+        XCTAssertTrue(shareText.contains("Map: https://maps.apple.com"))
     }
 
     private func place(

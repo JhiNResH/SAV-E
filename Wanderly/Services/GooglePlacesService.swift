@@ -6,6 +6,7 @@ import CoreLocation
 protocol GooglePlacesServiceProtocol {
     func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [GooglePlaceMatch]
     func getPlaceDetails(placeId: String) async throws -> GooglePlaceDetails
+    func photoURL(reference: String, maxWidth: Int) -> URL?
 }
 
 // MARK: - Models
@@ -17,7 +18,9 @@ struct GooglePlaceMatch: Identifiable, Codable {
     var latitude: Double
     var longitude: Double
     var rating: Double?
+    var reviewCount: Int? = nil
     var priceLevel: Int?
+    var photoReference: String? = nil
 }
 
 struct GooglePlaceDetails: Codable {
@@ -132,7 +135,9 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
                 latitude: lat,
                 longitude: lng,
                 rating: result["rating"] as? Double,
-                priceLevel: result["price_level"] as? Int
+                reviewCount: result["user_ratings_total"] as? Int,
+                priceLevel: result["price_level"] as? Int,
+                photoReference: (result["photos"] as? [[String: Any]])?.first?["photo_reference"] as? String
             )
         }
     }

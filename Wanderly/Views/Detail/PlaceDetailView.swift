@@ -154,6 +154,21 @@ struct PlaceDetailView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     }
 
+                    ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .font(.subheadline)
+                            .fontWeight(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.saveMint.opacity(0.42))
+                            .foregroundColor(.saveInk)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+
                     if let url = place.primarySourceURL {
                         Button(action: { openURL(url) }) {
                             Label("Source", systemImage: "link")
@@ -185,6 +200,12 @@ struct PlaceDetailView: View {
         .background(SaveDottedBackground())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+
             if onDelete != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {

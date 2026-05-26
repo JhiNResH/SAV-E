@@ -34,6 +34,11 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         SearchSeed(query: "museum park attraction", category: .attraction),
         SearchSeed(query: "shop", category: .shopping),
     ]
+    private let googlePlacesService: GooglePlacesServiceProtocol
+
+    init(googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared) {
+        self.googlePlacesService = googlePlacesService
+    }
 
     func searchCandidates(
         near coordinate: CLLocationCoordinate2D,
@@ -65,9 +70,14 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
 
         do {
             let response = try await MKLocalSearch(request: request).start()
-            return response.mapItems
+            let candidates = response.mapItems
                 .prefix(8)
                 .compactMap { makeCandidate(from: $0, seed: seed) }
+            var enrichedCandidates: [SaveMapCandidate] = []
+            for candidate in candidates {
+                enrichedCandidates.append(await enrichWithBusinessPhoto(candidate))
+            }
+            return enrichedCandidates
         } catch {
             print("MapCandidateSearchService: failed to search \(seed.query): \(error)")
             return []
@@ -102,6 +112,46 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             sourcePlatform: .other,
             evidence: evidence
         )
+    }
+
+    private func enrichWithBusinessPhoto(_ candidate: SaveMapCandidate) async -> SaveMapCandidate {
+        var enrichedCandidate = candidate
+        guard let match = await bestGoogleMatch(for: candidate) else { return enrichedCandidate }
+
+        let photoReference: String?
+        if let reference = match.photoReference {
+            photoReference = reference
+        } else {
+            photoReference = try? await googlePlacesService.getPlaceDetails(placeId: match.id).photoReferences?.first
+        }
+
+        if let photoReference,
+           let photoURL = googlePlacesService.photoURL(reference: photoReference, maxWidth: 800) {
+            enrichedCandidate.photoURL = photoURL.absoluteString
+            enrichedCandidate.evidence.append("Business photo: Google Places")
+        }
+        enrichedCandidate.rating = enrichedCandidate.rating ?? match.rating
+        enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
+        return enrichedCandidate
+    }
+
+    private func bestGoogleMatch(for candidate: SaveMapCandidate) async -> GooglePlaceMatch? {
+        do {
+            let matches = try await googlePlacesService.searchPlace(
+                query: "\(candidate.title) \(candidate.subtitle)",
+                near: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
+            )
+            let candidateLocation = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
+            return matches.first { match in
+                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
+                let sameArea = candidateLocation.distance(from: matchLocation) < 250
+                let sameName = match.name.localizedCaseInsensitiveContains(candidate.title) ||
+                    candidate.title.localizedCaseInsensitiveContains(match.name)
+                return sameArea || sameName
+            }
+        } catch {
+            return nil
+        }
     }
 
     private func subtitle(for placemark: MKPlacemark) -> String {
@@ -477,7 +527,8 @@ final class MapViewModel: ObservableObject {
             externalRating: candidate.rating,
             externalReviewCount: candidate.reviewCount
         )
-        let place = try await saveSearchController.saveMapCandidate(draft)
+        var place = try await saveSearchController.saveMapCandidate(draft)
+        place.sourceImageUrl = candidate.photoURL
 
         if let userId = authService.currentUserId {
             do {
@@ -574,6 +625,12 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    func prepareMapCandidatesForDrawerQuery(_ query: String) async -> [SaveMapCandidate] {
+        guard saveSearchController.shouldPrepareMapCandidates(for: query) else { return mapCandidates }
+        await refreshMapCandidates()
+        return mapCandidates
+    }
+
     private func mapCandidateSearchCenter() -> CLLocationCoordinate2D {
         if let selectedPlace, selectedPlace.latitude != 0 || selectedPlace.longitude != 0 {
             return selectedPlace.coordinate
@@ -588,6 +645,81 @@ final class MapViewModel: ObservableObject {
         selectedPlace = place
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
+        guard place.sourceImageUrl == nil || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
+        Task {
+            await enrichSelectedPlacePhoto(place)
+        }
+    }
+
+    private func enrichSelectedPlacePhoto(_ place: Place) async {
+        guard let update = await businessDetails(for: place) else { return }
+        guard selectedPlace?.id == place.id else { return }
+
+        var updatedPlace = place
+        if let photoURL = update.photoURL {
+            updatedPlace.sourceImageUrl = photoURL.absoluteString
+        }
+        updatedPlace.googleRating = updatedPlace.googleRating ?? update.rating
+        updatedPlace.priceRange = updatedPlace.priceRange ?? update.priceRange
+        updatedPlace.openingHours = updatedPlace.openingHours ?? update.openingHours
+        selectedPlace = updatedPlace
+        if let index = places.firstIndex(where: { $0.id == place.id }) {
+            places[index] = updatedPlace
+        }
+        mirrorToLocalVault(updatedPlace)
+
+        if let userId = authService.currentUserId {
+            do {
+                try await supabaseService.savePlace(updatedPlace, userId: userId)
+            } catch {
+                print("MapViewModel: failed to sync business photo for \(place.name): \(error)")
+            }
+        }
+    }
+
+    private func businessDetails(for place: Place) async -> (photoURL: URL?, rating: Double?, priceRange: String?, openingHours: String?)? {
+        let details: GooglePlaceDetails?
+        let fallbackMatch: GooglePlaceMatch?
+        if let googlePlaceId = place.googlePlaceId {
+            details = try? await googlePlacesService.getPlaceDetails(placeId: googlePlaceId)
+            fallbackMatch = nil
+        } else {
+            guard let match = await bestGoogleMatch(for: place) else { return nil }
+            details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
+            fallbackMatch = match
+        }
+
+        let photoReference = details?.photoReferences?.first ?? fallbackMatch?.photoReference
+        let photoURL = photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
+        let priceLevel = details?.priceLevel ?? fallbackMatch?.priceLevel
+        let hasDetails = photoURL != nil || details?.rating != nil || fallbackMatch?.rating != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
+        guard hasDetails else { return nil }
+
+        return (
+            photoURL,
+            details?.rating ?? fallbackMatch?.rating,
+            priceLevel.map { String(repeating: "$", count: max(1, $0)) },
+            details?.openingHours?.first
+        )
+    }
+
+    private func bestGoogleMatch(for place: Place) async -> GooglePlaceMatch? {
+        do {
+            let matches = try await googlePlacesService.searchPlace(
+                query: "\(place.name) \(place.address)",
+                near: place.coordinate
+            )
+            let placeLocation = CLLocation(latitude: place.latitude, longitude: place.longitude)
+            return matches.first { match in
+                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
+                let sameArea = placeLocation.distance(from: matchLocation) < 250
+                let sameName = match.name.localizedCaseInsensitiveContains(place.name) ||
+                    place.name.localizedCaseInsensitiveContains(match.name)
+                return sameArea || sameName
+            }
+        } catch {
+            return nil
+        }
     }
 
     func selectReviewCandidate(_ candidate: PlaceReviewCandidate) {

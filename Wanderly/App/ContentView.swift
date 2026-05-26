@@ -34,6 +34,9 @@ struct ContentView: View {
                     },
                     onImportURLAsReviewCandidates: { url in
                         try await mapVM.importURLAsReviewCandidates(url)
+                    },
+                    onPrepareMapSearch: { query in
+                        await mapVM.prepareMapCandidatesForDrawerQuery(query)
                     }
                 )
                     .presentationDetents([.height(72), .medium, .large], selection: $drawerDetent)

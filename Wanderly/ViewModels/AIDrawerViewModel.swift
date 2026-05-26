@@ -209,6 +209,6 @@ final class AIDrawerViewModel: ObservableObject {
 
 private extension SaveSearchResponse {
     var hasVisibleResults: Bool {
-        !fromYourSave.results.isEmpty || newRecommendations.results.contains { !$0.isRecommendationShell }
+        !fromYourSave.results.isEmpty || !newRecommendations.results.isEmpty
     }
 }
