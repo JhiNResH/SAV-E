@@ -42,7 +42,7 @@ state.
 
 - `UIUserInterfaceStyle` no longer forces light mode.
 - Map first view has no persistent SAV-E/Passport top chrome.
-- Passport remains reachable from the drawer search bar.
+- Passport remains reachable from the drawer command bar.
 - Drawer background and command bar use adaptive translucent material.
 - Idle drawer does not show the full command console by default.
 - Build and targeted saved-search tests pass.
