@@ -249,62 +249,10 @@ struct PlaceMapPin: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: -2) {
-                ZStack(alignment: .topTrailing) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.saveHoney)
-                            .frame(width: isSelected ? 52 : 46, height: isSelected ? 52 : 46)
-                            .overlay(
-                                Circle()
-                                    .fill(Color.saveCream)
-                                    .padding(isSelected ? 6 : 5)
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        Color.saveNotebookLine.opacity(0.42),
-                                        style: StrokeStyle(lineWidth: 1.2, dash: [3, 3])
-                                    )
-                                    .padding(isSelected ? 10 : 9)
-                            )
-                            .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.28 : 0.16), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
-
-                        Image(systemName: place.category.iconName)
-                            .font(.system(size: isSelected ? 21 : 18, weight: .black))
-                            .foregroundColor(.saveInk)
-
-                        Text("S")
-                            .font(.system(size: isSelected ? 8 : 7, weight: .black, design: .rounded))
-                            .foregroundColor(.saveInk)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.saveCream)
-                            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
-                            .clipShape(Capsule())
-                            .offset(x: isSelected ? 16 : 14, y: isSelected ? 16 : 14)
-                    }
-
-                    if place.status == .visited {
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.saveSignal)
-                            .background(Circle().fill(Color.saveNotebookPage))
-                            .offset(x: 5, y: -5)
-                    }
-                }
-
-                Image(systemName: "triangle.fill")
-                    .font(.system(size: isSelected ? 10 : 8))
-                    .foregroundColor(.saveCocoa)
-                    .rotationEffect(.degrees(180))
-                    .offset(y: -1)
-            }
-            .scaleEffect(isSelected ? 1.06 : 1)
+            DefaultMapPin(
+                fill: place.status == .visited ? .saveMint : .saveHoney,
+                isSelected: isSelected
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(place.name) Map Stamp")
@@ -318,44 +266,7 @@ private struct ReviewCandidateMapPin: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: -2) {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.saveSky)
-                        .frame(width: isSelected ? 50 : 44, height: isSelected ? 50 : 44)
-                        .overlay(
-                            Circle()
-                                .fill(Color.saveNotebookPage)
-                                .padding(isSelected ? 6 : 5)
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
-                        )
-                        .overlay(
-                            Image(systemName: "doc.text.magnifyingglass")
-                                .font(.system(size: isSelected ? 18 : 16, weight: .black))
-                                .foregroundColor(.saveInk)
-                        )
-                        .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.24 : 0.14), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
-
-                    Text("?")
-                        .font(.system(size: 9, weight: .black, design: .rounded))
-                        .foregroundColor(.saveInk)
-                        .frame(width: 17, height: 17)
-                        .background(Color.saveHoney)
-                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1))
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
-                }
-
-                Image(systemName: "triangle.fill")
-                    .font(.system(size: isSelected ? 10 : 8))
-                    .foregroundColor(.saveCocoa)
-                    .rotationEffect(.degrees(180))
-                    .offset(y: -1)
-            }
-            .scaleEffect(isSelected ? 1.06 : 1)
+            DefaultMapPin(fill: .saveSky, isSelected: isSelected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(candidate.name) Review Candidate")
@@ -370,48 +281,33 @@ private struct UnsavedMapCandidatePin: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: -2) {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.saveSignal)
-                        .frame(width: isSelected ? 48 : 42, height: isSelected ? 48 : 42)
-                        .overlay(
-                            Circle()
-                                .fill(Color.saveCream)
-                                .padding(isSelected ? 6 : 5)
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color.saveNotebookLine, lineWidth: isSelected ? 3 : 2)
-                        )
-                        .overlay(
-                            Image(systemName: candidate.category?.iconName ?? "mappin.and.ellipse")
-                                .font(.system(size: isSelected ? 18 : 15, weight: .black))
-                                .foregroundColor(.saveInk)
-                        )
-                        .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.24 : 0.14), radius: isSelected ? 8 : 4, x: 0, y: isSelected ? 5 : 3)
-
-                    Text("+")
-                        .font(.system(size: 9, weight: .black, design: .rounded))
-                        .foregroundColor(.saveInk)
-                        .frame(width: 17, height: 17)
-                        .background(Color.saveSky)
-                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1))
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
-                }
-
-                Image(systemName: "triangle.fill")
-                    .font(.system(size: isSelected ? 10 : 8))
-                    .foregroundColor(.saveCocoa)
-                    .rotationEffect(.degrees(180))
-                    .offset(y: -1)
-            }
-            .scaleEffect(isSelected ? 1.06 : 1)
+            DefaultMapPin(fill: .saveSignal, isSelected: isSelected)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(candidate.title) Unsaved Candidate")
         .accessibilityHint("Opens this visible map place before saving it as a Map Stamp")
+    }
+}
+
+private struct DefaultMapPin: View {
+    var fill: Color
+    var isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: isSelected ? 34 : 29, weight: .semibold))
+                .foregroundStyle(fill)
+                .shadow(color: Color.saveCocoa.opacity(isSelected ? 0.28 : 0.18), radius: isSelected ? 5 : 3, x: 0, y: isSelected ? 3 : 2)
+
+            Circle()
+                .fill(Color.saveNotebookPage)
+                .frame(width: isSelected ? 7 : 6, height: isSelected ? 7 : 6)
+                .offset(y: isSelected ? -5 : -4)
+        }
+        .frame(width: 36, height: 36)
+        .scaleEffect(isSelected ? 1.08 : 1)
+        .contentShape(Rectangle())
     }
 }
 
