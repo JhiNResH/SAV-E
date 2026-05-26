@@ -17,6 +17,7 @@ struct Place: Identifiable, Codable, Hashable {
     var sourceUrl: String?
     var sourcePlatform: SourcePlatform
     var sourceImageUrl: String?
+    var businessPhotoUrls: [String]? = nil
     var extractedDishes: [String]?
     var priceRange: String?
     var recommender: String?
@@ -123,6 +124,17 @@ struct Place: Identifiable, Codable, Hashable {
             URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
         ]
         return components?.url
+    }
+
+    var businessPhotoURLStrings: [String] {
+        var values = businessPhotoUrls ?? []
+        if let sourceImageUrl {
+            values.insert(sourceImageUrl, at: 0)
+        }
+        return values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .removingDuplicates()
     }
 
     private func normalizedSourceURL(from rawValue: String?) -> URL? {

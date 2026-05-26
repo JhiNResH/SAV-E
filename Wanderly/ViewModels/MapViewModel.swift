@@ -646,7 +646,7 @@ final class MapViewModel: ObservableObject {
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
         selectedMapFeature = nil
-        guard place.sourceImageUrl == nil || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
+        guard place.businessPhotoURLStrings.count < 2 || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
         Task {
             await enrichSelectedPlacePhoto(place)
         }
@@ -657,8 +657,10 @@ final class MapViewModel: ObservableObject {
         guard selectedPlace?.id == place.id else { return }
 
         var updatedPlace = place
-        if let photoURL = update.photoURL {
-            updatedPlace.sourceImageUrl = photoURL.absoluteString
+        if !update.photoURLs.isEmpty {
+            let urls = update.photoURLs.map(\.absoluteString)
+            updatedPlace.sourceImageUrl = updatedPlace.sourceImageUrl ?? urls.first
+            updatedPlace.businessPhotoUrls = urls
         }
         updatedPlace.googleRating = updatedPlace.googleRating ?? update.rating
         updatedPlace.priceRange = updatedPlace.priceRange ?? update.priceRange
@@ -678,7 +680,7 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    private func businessDetails(for place: Place) async -> (photoURL: URL?, rating: Double?, priceRange: String?, openingHours: String?)? {
+    private func businessDetails(for place: Place) async -> (photoURLs: [URL], rating: Double?, priceRange: String?, openingHours: String?)? {
         let details: GooglePlaceDetails?
         let fallbackMatch: GooglePlaceMatch?
         if let googlePlaceId = place.googlePlaceId {
@@ -690,14 +692,18 @@ final class MapViewModel: ObservableObject {
             fallbackMatch = match
         }
 
-        let photoReference = details?.photoReferences?.first ?? fallbackMatch?.photoReference
-        let photoURL = photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
+        let photoReferences = details?.photoReferences?.isEmpty == false
+            ? details?.photoReferences ?? []
+            : [fallbackMatch?.photoReference].compactMap { $0 }
+        let photoURLs = photoReferences
+            .prefix(6)
+            .compactMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
         let priceLevel = details?.priceLevel ?? fallbackMatch?.priceLevel
-        let hasDetails = photoURL != nil || details?.rating != nil || fallbackMatch?.rating != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
+        let hasDetails = !photoURLs.isEmpty || details?.rating != nil || fallbackMatch?.rating != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
         guard hasDetails else { return nil }
 
         return (
-            photoURL,
+            photoURLs,
             details?.rating ?? fallbackMatch?.rating,
             priceLevel.map { String(repeating: "$", count: max(1, $0)) },
             details?.openingHours?.first

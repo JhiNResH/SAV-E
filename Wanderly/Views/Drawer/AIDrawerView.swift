@@ -1696,36 +1696,20 @@ private struct UnsavedMapCandidateCard: View {
                     )
 
                     ShareLink(item: candidate.saveShareURL ?? candidate.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(candidate.shareSubject), message: Text(candidate.shareText)) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                            .font(.caption.weight(.black))
-                            .foregroundColor(.saveInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .background(Color.saveNotebookPage)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        CandidateActionLabel(
+                            title: "Share",
+                            systemImage: "square.and.arrow.up",
+                            fill: .saveNotebookPage
+                        )
                     }
 
                     if let sourceURL = candidate.sourceURL, let url = URL(string: sourceURL) {
                         Link(destination: url) {
-                            Label("Maps", systemImage: "map")
-                                .font(.caption.weight(.black))
-                                .foregroundColor(.saveInk)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
-                                .background(Color.saveNotebookPage)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            CandidateActionLabel(
+                                title: "Maps",
+                                systemImage: "map",
+                                fill: .saveNotebookPage
+                            )
                         }
                     }
                 }
@@ -1901,24 +1885,37 @@ private struct CandidateActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.caption2)
-                .fontWeight(.black)
-                .foregroundColor(foreground)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity)
-                .background(fill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            CandidateActionLabel(
+                title: title,
+                systemImage: systemImage,
+                fill: fill,
+                foreground: foreground
+            )
         }
         .buttonStyle(.plain)
         .disabled(disabled)
+    }
+}
+
+private struct CandidateActionLabel: View {
+    var title: String
+    var systemImage: String
+    var fill: Color = .saveNotebookPage
+    var foreground: Color = .saveInk
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.black))
+            .foregroundColor(foreground)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(fill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
