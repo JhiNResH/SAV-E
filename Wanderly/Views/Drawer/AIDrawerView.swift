@@ -1054,6 +1054,7 @@ struct AIDrawerView: View {
     }
 
     private func openProfile() {
+        voiceQuery.stop()
         searchFocused = false
         showProfile = true
         onOpenPassport()

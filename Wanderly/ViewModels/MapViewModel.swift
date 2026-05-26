@@ -762,15 +762,20 @@ final class MapViewModel: ObservableObject {
             sourcePlatform: .other,
             evidence: evidence
         )
-        selectedMapCandidate = candidate
-        selectedPlace = nil
-        selectedReviewCandidate = nil
-        if !mapCandidates.contains(where: { $0.id == candidate.id || $0.matches(candidate) }) {
+        let selectedCandidate: SaveMapCandidate
+        if let existingCandidate = mapCandidates.first(where: { $0.id == candidate.id || $0.matches(candidate) }) {
+            selectedCandidate = existingCandidate
+        } else {
             mapCandidates = [candidate] + mapCandidates
+            selectedCandidate = candidate
         }
 
+        selectedMapCandidate = selectedCandidate
+        selectedPlace = nil
+        selectedReviewCandidate = nil
+
         Task {
-            await enrichSelectedMapCandidate(candidate)
+            await enrichSelectedMapCandidate(selectedCandidate)
         }
     }
 
