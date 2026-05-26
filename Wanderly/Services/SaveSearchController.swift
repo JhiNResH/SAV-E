@@ -251,6 +251,9 @@ struct SaveSearchController {
         if let note = place.note, !note.isEmpty {
             evidence.append("Note: \(note)")
         }
+        if let dishes = place.extractedDishes, !dishes.isEmpty {
+            evidence.append("Saved clues: \(dishes.joined(separator: ", "))")
+        }
         if let rating = place.rating {
             evidence.append("Your rating: \(rating)")
         }
@@ -315,13 +318,15 @@ private struct SaveSearchQuery {
     let categories: Set<PlaceCategory>
     let platforms: Set<SourcePlatform>
     let states: Set<SaveSearchUserState>
+    let intent: SaveIntentQuery?
     let wantsNewRecommendations: Bool
     let stableIDFragment: String
 
     init(rawValue: String) {
         self.rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         normalizedRaw = Self.normalize(rawValue)
-        categories = Self.parseCategories(from: normalizedRaw)
+        intent = SaveIntentQuery.parse(from: normalizedRaw)
+        categories = Self.parseCategories(from: normalizedRaw).union(intent?.categories ?? [])
         platforms = Self.parsePlatforms(from: normalizedRaw)
         states = Self.parseStates(from: normalizedRaw)
         wantsNewRecommendations = Self.containsAny(
@@ -329,14 +334,16 @@ private struct SaveSearchQuery {
             keywords: ["recommend", "recommendation", "new", "discover", "nearby", "suggest", "推薦", "新的", "附近", "找新"]
         )
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)
-        terms = Self.parseTerms(from: normalizedRaw)
+        terms = Self.parseTerms(from: normalizedRaw, intent: intent)
     }
 
     func matches(_ result: SaveSearchResult) -> Bool {
+        let intentMatches = intent?.matches(result) ?? false
+        let intentCategoryMatches = intent?.categoryMatches(result) ?? false
         if !categories.isEmpty, let category = result.category, !categories.contains(category) {
             return false
         }
-        if !categories.isEmpty, result.category == nil {
+        if !categories.isEmpty, result.category == nil, !intentMatches {
             return false
         }
         if !platforms.isEmpty, let sourcePlatform = result.sourcePlatform, !platforms.contains(sourcePlatform) {
@@ -349,10 +356,14 @@ private struct SaveSearchQuery {
             return false
         }
         guard !terms.isEmpty else {
-            return !categories.isEmpty || !platforms.isEmpty || !states.isEmpty || normalizedRaw.isEmpty
+            return !categories.isEmpty || !platforms.isEmpty || !states.isEmpty || normalizedRaw.isEmpty || intentMatches || intentCategoryMatches
         }
         let haystack = Self.normalize(result.searchText)
-        return terms.allSatisfy { Self.term($0, matches: haystack) }
+        let termMatches = terms.allSatisfy { Self.term($0, matches: haystack) }
+        if intent != nil {
+            return termMatches && (intentMatches || intentCategoryMatches)
+        }
+        return termMatches
     }
 
     func score(_ result: SaveSearchResult) -> Int {
@@ -364,6 +375,7 @@ private struct SaveSearchQuery {
         if let category = result.category, categories.contains(category) { value += 8 }
         if let sourcePlatform = result.sourcePlatform, platforms.contains(sourcePlatform) { value += 6 }
         if states.contains(result.userState) { value += 6 }
+        value += intent?.score(result) ?? 0
         switch result.objectType {
         case .savedPlace, .triedMemory: value += 4
         case .pendingCandidate, .mapVisibleUnsavedPlace: value += 3
@@ -373,17 +385,19 @@ private struct SaveSearchQuery {
         return value
     }
 
-    private static func parseTerms(from value: String) -> [String] {
+    private static func parseTerms(from value: String, intent: SaveIntentQuery?) -> [String] {
         let stopwords: Set<String> = [
             "my", "your", "save", "saved", "place", "places", "memory", "memories",
             "card", "cards", "review", "source", "only", "want", "to", "go", "visited",
             "tried", "recommend", "recommendation", "new", "discover", "nearby", "suggest",
-            "找", "我的", "儲存", "地點", "記憶", "推薦", "附近", "新的", "待確認"
+            "today", "tonight", "now", "找", "我的", "儲存", "地點", "記憶", "推薦", "附近", "新的", "待確認",
+            "今天", "今晚", "想", "想要", "喝", "吃", "店"
         ]
         return value
             .split { !$0.isLetter && !$0.isNumber }
             .map(String.init)
             .filter { $0.count > 1 && !stopwords.contains($0) }
+            .filter { token in intent?.isIntentToken(token) != true }
             .filter { token in
                 PlaceCategory.allCases.allSatisfy { $0.rawValue != token && $0.displayName.lowercased() != token } &&
                     SourcePlatform.allCases.allSatisfy { $0.rawValue.lowercased() != token && $0.displayName.lowercased() != token }
@@ -429,7 +443,7 @@ private struct SaveSearchQuery {
         keywords.contains { value.contains($0.lowercased()) }
     }
 
-    private static func term(_ term: String, matches haystack: String) -> Bool {
+    fileprivate static func term(_ term: String, matches haystack: String) -> Bool {
         if haystack.contains(term) { return true }
         if term == "la", haystack.contains("los angeles") { return true }
         if term == "sf", haystack.contains("san francisco") { return true }
@@ -437,7 +451,7 @@ private struct SaveSearchQuery {
         return false
     }
 
-    private static func normalize(_ value: String) -> String {
+    fileprivate static func normalize(_ value: String) -> String {
         value
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
@@ -448,5 +462,71 @@ private struct SaveSearchQuery {
             .split { !$0.isLetter && !$0.isNumber }
             .joined(separator: "-")
         return fragment.isEmpty ? "empty-query" : fragment
+    }
+}
+
+private struct SaveIntentQuery {
+    let id: String
+    let categories: Set<PlaceCategory>
+    let needles: [String]
+
+    static func parse(from normalizedQuery: String) -> SaveIntentQuery? {
+        let specs: [SaveIntentQuery] = [
+            SaveIntentQuery(
+                id: "milk-tea",
+                categories: [.cafe],
+                needles: ["milk tea", "boba", "bubble tea", "奶茶", "珍奶", "珍珠奶茶"]
+            ),
+            SaveIntentQuery(
+                id: "coffee",
+                categories: [.cafe],
+                needles: ["coffee", "cafe", "咖啡"]
+            ),
+            SaveIntentQuery(
+                id: "food",
+                categories: [.food],
+                needles: ["food", "restaurant", "dinner", "lunch", "餐廳", "餐厅", "吃飯", "吃饭", "美食"]
+            ),
+            SaveIntentQuery(
+                id: "bar",
+                categories: [.bar],
+                needles: ["bar", "cocktail", "drink", "喝酒", "酒吧", "調酒", "调酒"]
+            ),
+            SaveIntentQuery(
+                id: "attraction",
+                categories: [.attraction],
+                needles: ["museum", "gallery", "exhibition", "展覽", "展览", "美術館", "美术馆", "博物館", "博物馆"]
+            ),
+            SaveIntentQuery(
+                id: "stay",
+                categories: [.stay],
+                needles: ["hotel", "stay", "住宿", "飯店", "酒店"]
+            )
+        ]
+        return specs.first { spec in
+            spec.needles.contains { normalizedQuery.contains($0) }
+        }
+    }
+
+    func matches(_ result: SaveSearchResult) -> Bool {
+        let haystack = SaveSearchQuery.normalize(result.searchText)
+        return needles.contains { SaveSearchQuery.term($0, matches: haystack) }
+    }
+
+    func categoryMatches(_ result: SaveSearchResult) -> Bool {
+        guard let category = result.category else { return false }
+        return categories.contains(category)
+    }
+
+    func score(_ result: SaveSearchResult) -> Int {
+        if matches(result) { return 40 }
+        if categoryMatches(result) { return 10 }
+        return 0
+    }
+
+    func isIntentToken(_ token: String) -> Bool {
+        needles.contains { needle in
+            token == needle || token.contains(needle) || needle.contains(token)
+        }
     }
 }

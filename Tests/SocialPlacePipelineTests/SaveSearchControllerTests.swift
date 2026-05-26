@@ -2,6 +2,111 @@ import XCTest
 @testable import Wanderly
 
 final class SaveSearchControllerTests: XCTestCase {
+    func testChineseMilkTeaQueryUnderstandsCafeDrinkIntent() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "今天想喝奶茶",
+            places: [
+                place(
+                    name: "Sunright Tea Studio",
+                    address: "Irvine, CA",
+                    category: .cafe,
+                    note: "Brown sugar boba and milk tea"
+                ),
+                place(name: "Sushi Gen", address: "Los Angeles, CA", category: .food)
+            ],
+            localRecords: []
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Sunright Tea Studio"])
+        XCTAssertEqual(response.fromYourSave.results.first?.category, .cafe)
+        XCTAssertEqual(response.newRecommendations.results.count, 0)
+    }
+
+    func testMilkTeaQueryMatchesSavedBobaEvidenceBeforeGenericCafe() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "milk tea",
+            places: [
+                place(name: "Generic Coffee", address: "Taipei, Taiwan", category: .cafe),
+                place(
+                    name: "Half and Half Tea Express",
+                    address: "San Gabriel, CA",
+                    category: .cafe,
+                    extractedDishes: ["honey boba", "milk tea"]
+                )
+            ],
+            localRecords: []
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Half and Half Tea Express", "Generic Coffee"])
+        XCTAssertTrue(response.fromYourSave.results.first?.evidence.contains { $0.contains("milk tea") } == true)
+    }
+
+    func testNewRecommendationQueryShowsUnsavedShellWhenNoSavedMatch() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(query: "推薦新的奶茶店", places: [], localRecords: [])
+
+        XCTAssertEqual(response.fromYourSave.results.count, 0)
+        let shell = try XCTUnwrap(response.newRecommendations.results.first)
+        XCTAssertEqual(shell.objectType, .newRecommendation)
+        XCTAssertEqual(shell.userState, .unsaved)
+        XCTAssertEqual(shell.category, .cafe)
+        XCTAssertTrue(shell.isRecommendationShell)
+        XCTAssertTrue(shell.evidence.contains { $0.contains("no map pin or saved memory") })
+    }
+
+    func testReviewCandidateMilkTeaMatchStaysReviewScoped() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "珍珠奶茶",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .reviewCandidate,
+                    sourceURL: "https://www.instagram.com/reel/boba/",
+                    title: "Possible boba place",
+                    placeName: "Possible Tea Shop",
+                    evidence: ["Caption clue: 珍珠奶茶 with fresh taro"]
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.fromYourSave.results.first)
+        XCTAssertEqual(result.title, "Possible Tea Shop")
+        XCTAssertEqual(result.objectType, .pendingCandidate)
+        XCTAssertEqual(result.userState, .waitingReview)
+        XCTAssertEqual(result.primaryAction, .openSource)
+    }
+
+    func testSourceOnlyMilkTeaClueRequiresRecovery() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "boba",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "https://www.instagram.com/reel/boba-source/",
+                    title: "Boba reel clue",
+                    evidence: ["Caption says boba near Taipei"],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source URL: https://www.instagram.com/reel/boba-source/"],
+                        attempts: ["Checked caption text"],
+                        missingFields: ["exact place", "verified address", "coordinates"],
+                        nextBestClue: "Run source recovery search"
+                    )
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.fromYourSave.results.first)
+        XCTAssertEqual(result.objectType, .sourceOnlyClue)
+        XCTAssertEqual(result.userState, .sourceOnly)
+        XCTAssertEqual(result.primaryAction, .runRecovery)
+        XCTAssertTrue(result.missingInfo.contains("exact place"))
+    }
+
     func testSearchSeparatesSavedPlacesAndRecommendationShell() {
         let controller = SaveSearchController()
         let response = controller.search(
@@ -444,7 +549,9 @@ final class SaveSearchControllerTests: XCTestCase {
         address: String,
         category: PlaceCategory,
         status: PlaceStatus = .wantToGo,
-        sourceUrl: String? = nil
+        sourceUrl: String? = nil,
+        note: String? = nil,
+        extractedDishes: [String]? = nil
     ) -> Place {
         Place(
             id: UUID(),
@@ -456,11 +563,11 @@ final class SaveSearchControllerTests: XCTestCase {
             category: category,
             status: status,
             rating: nil,
-            note: nil,
+            note: note,
             sourceUrl: sourceUrl,
             sourcePlatform: .instagram,
             sourceImageUrl: nil,
-            extractedDishes: nil,
+            extractedDishes: extractedDishes,
             priceRange: nil,
             recommender: nil,
             googleRating: nil,
