@@ -149,7 +149,7 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(result.missingInfo.contains("exact place"))
     }
 
-    func testSearchSeparatesSavedPlacesAndRecommendationShell() {
+    func testSearchPrioritizesSavedPlacesBeforeRecommendationShell() {
         let controller = SaveSearchController()
         let response = controller.search(
             query: "recommend new food in LA",
@@ -160,10 +160,7 @@ final class SaveSearchControllerTests: XCTestCase {
         )
 
         XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Quarter Sheets Pizza Club"])
-        XCTAssertEqual(response.newRecommendations.results.count, 1)
-        XCTAssertEqual(response.newRecommendations.results.first?.objectType, .newRecommendation)
-        XCTAssertEqual(response.newRecommendations.results.first?.userState, .unsaved)
-        XCTAssertTrue(response.newRecommendations.results.first?.isRecommendationShell == true)
+        XCTAssertEqual(response.newRecommendations.results.count, 0)
     }
 
     func testVisitedPlaceBecomesTriedMemorySearchResult() {

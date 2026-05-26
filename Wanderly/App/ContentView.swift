@@ -37,6 +37,10 @@ struct ContentView: View {
                     },
                     onPrepareMapSearch: { query in
                         await mapVM.prepareMapCandidatesForDrawerQuery(query)
+                    },
+                    selectedCategories: mapVM.selectedCategories,
+                    onToggleCategory: { category in
+                        mapVM.toggleCategory(category)
                     }
                 )
                     .presentationDetents([.height(72), .medium, .large], selection: $drawerDetent)

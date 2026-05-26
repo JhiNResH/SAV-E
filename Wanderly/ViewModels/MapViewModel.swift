@@ -318,7 +318,6 @@ final class MapViewModel: ObservableObject {
             isLoadingPlaces = false
             isLoading = false
             hasLoadedPlaces = true
-            Task { await refreshMapCandidates() }
         }
 
         guard let userId = authService.currentUserId else {
@@ -774,7 +773,6 @@ final class MapViewModel: ObservableObject {
             center: location.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
         ))
-        await refreshMapCandidates(near: location.coordinate)
     }
 
     func toggleCategory(_ category: PlaceCategory) {
