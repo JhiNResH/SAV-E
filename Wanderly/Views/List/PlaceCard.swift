@@ -88,7 +88,7 @@ struct PlaceCard: View {
 
     @ViewBuilder
     private var sourceBadge: some View {
-        if let url = normalizedSourceURL {
+        if let url = place.primarySourceURL {
             Button {
                 openURL(url)
             } label: {
@@ -118,17 +118,6 @@ struct PlaceCard: View {
         .cornerRadius(8)
     }
 
-    private var normalizedSourceURL: URL? {
-        guard let raw = place.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty
-        else { return nil }
-
-        if let url = URL(string: raw), url.scheme != nil {
-            return url
-        }
-
-        return URL(string: "https://\(raw)")
-    }
 }
 
 #Preview {

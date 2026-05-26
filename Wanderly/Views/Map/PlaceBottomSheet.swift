@@ -37,9 +37,9 @@ struct PlaceBottomSheet: View {
                 Spacer()
 
                 Menu {
-                    if let normalizedSourceURL {
+                    if let sourceURL = place.primarySourceURL {
                         Button {
-                            openURL(normalizedSourceURL)
+                            openURL(sourceURL)
                         } label: {
                             Label("View source", systemImage: "link")
                         }
@@ -119,10 +119,14 @@ struct PlaceBottomSheet: View {
                 Text("Evidence receipt")
                     .font(.caption.weight(.black))
                     .foregroundColor(.saveCocoa)
-                FlowLayout(spacing: 8) {
-                    PlaceMemoryChip(icon: "link", text: sourceChipLabel)
-                    PlaceMemoryChip(icon: "mappin", text: "Address saved")
-                    PlaceMemoryChip(icon: "checkmark.seal.fill", text: "Map ready")
+                if !place.sourceEvidence.isEmpty {
+                    EvidenceLinkList(evidence: place.sourceEvidence, maxItems: 4)
+                } else {
+                    FlowLayout(spacing: 8) {
+                        PlaceMemoryChip(icon: "link", text: sourceChipLabel)
+                        PlaceMemoryChip(icon: "mappin", text: "Address saved")
+                        PlaceMemoryChip(icon: "checkmark.seal.fill", text: "Map ready")
+                    }
                 }
             }
 
@@ -164,9 +168,9 @@ struct PlaceBottomSheet: View {
                 .disabled(onPlanAround == nil)
             }
 
-            if let normalizedSourceURL {
+            if let sourceURL = place.primarySourceURL {
                 Button {
-                    openURL(normalizedSourceURL)
+                    openURL(sourceURL)
                 } label: {
                     Label("View source", systemImage: "link")
                         .font(.caption.weight(.black))
@@ -250,17 +254,6 @@ struct PlaceBottomSheet: View {
         return note
     }
 
-    private var normalizedSourceURL: URL? {
-        guard let raw = place.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !raw.isEmpty
-        else { return nil }
-
-        if let url = URL(string: raw), url.scheme != nil {
-            return url
-        }
-
-        return URL(string: "https://\(raw)")
-    }
 }
 
 private struct PlaceMemoryChip: View {
