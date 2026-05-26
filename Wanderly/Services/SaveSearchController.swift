@@ -98,7 +98,7 @@ struct SaveSearchController {
 
         let recommendationResults = !mapRecommendationResults.isEmpty
             ? mapRecommendationResults
-            : (query.wantsNewRecommendations ? [makeRecommendationShell(for: query)] : [])
+            : (query.wantsNewRecommendations && localResults.isEmpty ? [makeRecommendationShell(for: query)] : [])
 
         return SaveSearchResponse(
             query: rawQuery,

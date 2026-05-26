@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import AVFoundation
+import Speech
 
 struct AIDrawerView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
@@ -17,7 +19,10 @@ struct AIDrawerView: View {
     var onSaveMapCandidate: (SaveMapCandidate) async throws -> Void = { _ in }
     var onImportURLAsReviewCandidates: (URL) async throws -> Int = { _ in 0 }
     var onPrepareMapSearch: (String) async -> [SaveMapCandidate] = { _ in [] }
+    var selectedCategories: Set<PlaceCategory> = []
+    var onToggleCategory: (PlaceCategory) -> Void = { _ in }
     @FocusState private var searchFocused: Bool
+    @StateObject private var voiceQuery = VoiceQueryController()
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
     @State private var candidateActionInFlight: UUID?
@@ -64,13 +69,29 @@ struct AIDrawerView: View {
                 searchFocused = true
             }
         }
+        .onChange(of: voiceQuery.transcript) { _, transcript in
+            guard voiceQuery.isListening else { return }
+            viewModel.query = transcript
+        }
+        .onChange(of: voiceQuery.state) { _, state in
+            switch state {
+            case .denied:
+                addSpotStatus = "Microphone or speech permission is off. Enable it in Settings to talk to SAV-E."
+            case .unavailable:
+                addSpotStatus = "Voice input is not available on this device right now."
+            case .failed(let message):
+                addSpotStatus = message
+            default:
+                break
+            }
+        }
     }
 
     // MARK: - Search Bar
 
     private var searchBar: some View {
         HStack(spacing: 10) {
-            Image(systemName: isLoading ? "hourglass" : "sparkles")
+            Image(systemName: commandBarIcon)
                 .foregroundColor(.saveInk)
                 .font(.caption.weight(.black))
                 .frame(width: 28, height: 28)
@@ -103,16 +124,53 @@ struct AIDrawerView: View {
                 }) {
                     Image(systemName: "xmark.circle.fill").foregroundColor(.saveCocoa.opacity(0.72))
                 }
-            } else if !viewModel.query.isEmpty {
-                Button(action: {
-                    viewModel.returnToCommands()
-                    showReviewInbox = false
-                    searchFocused = true
-                    withAnimation { drawerDetent = .medium }
-                }) {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.saveCocoa.opacity(0.72))
-                }
-            } else if !reviewCandidates.isEmpty {
+            } else {
+                commandBarTrailingActions
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .background(Color.saveNotebookPage)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(height: 72)
+        .background(Color.saveNotebookPage)
+    }
+
+    private var commandBarIcon: String {
+        if isLoading { return "hourglass" }
+        if voiceQuery.isListening { return "waveform" }
+        return "sparkles"
+    }
+
+    @ViewBuilder
+    private var commandBarTrailingActions: some View {
+        if !viewModel.query.isEmpty {
+            Button(action: {
+                viewModel.returnToCommands()
+                showReviewInbox = false
+                searchFocused = true
+                withAnimation { drawerDetent = .medium }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.72))
+            }
+            .accessibilityLabel("Clear command")
+
+            Button(action: submitSearchField) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.title3.weight(.black))
+                    .foregroundColor(.saveInk)
+            }
+            .accessibilityLabel("Ask SAV-E")
+        } else {
+            if !reviewCandidates.isEmpty {
                 Button(action: openReviewInbox) {
                     HStack(spacing: 4) {
                         Image(systemName: "checklist.unchecked")
@@ -128,19 +186,22 @@ struct AIDrawerView: View {
                 }
                 .accessibilityLabel(languageSettings.text(.openReviewCandidates))
             }
+
+            Button(action: toggleVoiceInput) {
+                Image(systemName: voiceQuery.buttonIconName)
+                    .font(.subheadline.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 30, height: 30)
+                    .background(voiceQuery.isListening ? Color.saveSignal.opacity(0.82) : Color.saveCream)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+                    .clipShape(Circle())
+                    .symbolEffect(.pulse, isActive: voiceQuery.isListening)
+            }
+            .accessibilityLabel(voiceQuery.isListening ? "Stop talking to SAV-E" : "Talk to SAV-E")
         }
-        .padding(.horizontal, 12)
-        .frame(height: 52)
-        .background(Color.saveNotebookPage)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 2)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(height: 72)
-        .background(Color.saveNotebookPage)
     }
 
     // MARK: - Content
@@ -243,9 +304,15 @@ struct AIDrawerView: View {
         case .saveSearchResults(let response):
             ScrollView {
                 VStack(spacing: 16) {
-                    SaveSearchResultsComponent(response: response) { result in
-                        viewModel.showSearchResult(result)
-                    }
+                    SaveSearchResultsComponent(
+                        response: response,
+                        onSelectResult: { result in
+                            viewModel.showSearchResult(result)
+                        },
+                        onSearchNearby: {
+                            searchNearbyUnsavedCandidates(for: response.query)
+                        }
+                    )
 
                     AIResultActionBar(
                         onFollowUp: {
@@ -491,6 +558,8 @@ struct AIDrawerView: View {
     private var suggestionsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
+                categoryFilterStrip
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         DrawerActionChip(
@@ -520,7 +589,7 @@ struct AIDrawerView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 2)
                 }
-                .padding(.top, 14)
+                .padding(.top, 10)
 
                 addSpotsHub
 
@@ -560,12 +629,34 @@ struct AIDrawerView: View {
     }
 
     private let suggestions = [
-        "I want coffee today",
-        "Show my food spots on the map",
-        "Navigate to the nearest cafe",
+        "I want boba today",
+        "Coffee from my Map Stamps",
         "Plan a day from my Map Stamps",
-        "What haven't I visited yet?",
+        "Navigate to the nearest cafe",
+        "Show waiting clues",
     ]
+
+    private var categoryFilterStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            NotebookBandLabel("Map filters")
+                .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(PlaceCategory.allCases, id: \.self) { category in
+                        CategoryPill(
+                            category: category,
+                            isSelected: selectedCategories.contains(category)
+                        )
+                        .onTapGesture { onToggleCategory(category) }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(.top, 14)
+    }
 
     // MARK: - Add Spots
 
@@ -877,14 +968,33 @@ struct AIDrawerView: View {
         if let url = firstURL(in: viewModel.query) {
             importURLToReviewCandidates(url)
         } else {
-            Task {
-                let candidates = await onPrepareMapSearch(viewModel.query)
-                if !candidates.isEmpty {
-                    viewModel.mapCandidates = candidates
-                }
-                await viewModel.submit()
-            }
+            Task { await viewModel.submit() }
         }
+    }
+
+    private func searchNearbyUnsavedCandidates(for query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        viewModel.query = trimmed
+        addSpotStatus = "Looking for nearby unsaved candidates. Your SAV-E results stay separate."
+        withAnimation { drawerDetent = .medium }
+
+        Task {
+            let candidates = await onPrepareMapSearch(trimmed)
+            if candidates.isEmpty {
+                addSpotStatus = "No nearby unsaved candidates found yet. Try a more specific place type or city."
+            } else {
+                viewModel.mapCandidates = candidates
+                addSpotStatus = "Found \(candidates.count) nearby unsaved candidates. Save only the ones that look right."
+            }
+            await viewModel.submit()
+        }
+    }
+
+    private func toggleVoiceInput() {
+        withAnimation { drawerDetent = .medium }
+        searchFocused = false
+        voiceQuery.toggle()
     }
 
     private func importURLToReviewCandidates(_ url: URL) {
@@ -914,6 +1024,149 @@ struct AIDrawerView: View {
     private func saveFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
         return "Map Stamp saved · +1 \(category.displayName.lowercased()) place"
+    }
+}
+
+@MainActor
+private final class VoiceQueryController: NSObject, ObservableObject {
+    enum VoiceState: Equatable {
+        case idle
+        case requestingPermission
+        case listening
+        case denied
+        case unavailable
+        case failed(String)
+    }
+
+    @Published var state: VoiceState = .idle
+    @Published var transcript = ""
+
+    private let recognizer = SFSpeechRecognizer()
+    private let audioEngine = AVAudioEngine()
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+
+    var isListening: Bool {
+        state == .listening
+    }
+
+    var buttonIconName: String {
+        isListening ? "stop.fill" : "mic.fill"
+    }
+
+    override init() {
+        super.init()
+        recognizer?.delegate = self
+    }
+
+    func toggle() {
+        if isListening {
+            stopListening()
+        } else {
+            Task { await startListening() }
+        }
+    }
+
+    private func startListening() async {
+        guard recognizer?.isAvailable == true else {
+            state = .unavailable
+            return
+        }
+
+        state = .requestingPermission
+        let speechStatus = await requestSpeechAuthorization()
+        let micGranted = await requestMicrophoneAuthorization()
+        guard speechStatus == .authorized, micGranted else {
+            state = .denied
+            return
+        }
+
+        do {
+            try beginRecognition()
+        } catch {
+            state = .failed(error.localizedDescription)
+            stopListening()
+        }
+    }
+
+    private func beginRecognition() throws {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        recognitionRequest = request
+
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        inputNode.removeTap(onBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak request] buffer, _ in
+            request?.append(buffer)
+        }
+
+        audioEngine.prepare()
+        try audioEngine.start()
+        state = .listening
+
+        recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let result {
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        self.stopListening()
+                    }
+                }
+                if let error {
+                    self.state = .failed(error.localizedDescription)
+                    self.stopListening()
+                }
+            }
+        }
+    }
+
+    private func stopListening() {
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionRequest = nil
+        recognitionTask = nil
+        if isListening {
+            state = .idle
+        }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
+        }
+    }
+
+    private func requestMicrophoneAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+}
+
+extension VoiceQueryController: SFSpeechRecognizerDelegate {
+    nonisolated func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
+        Task { @MainActor in
+            if !available, self.state == .listening {
+                self.state = .unavailable
+                self.stopListening()
+            }
+        }
     }
 }
 

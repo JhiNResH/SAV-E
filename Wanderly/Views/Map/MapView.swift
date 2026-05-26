@@ -55,14 +55,6 @@ struct MapView: View {
                 .mapControls {
                     MapCompass()
                 }
-                .onMapCameraChange(frequency: .onEnd) { context in
-                    Task {
-                        await viewModel.refreshMapCandidates(
-                            near: context.region.center,
-                            span: context.region.span
-                        )
-                    }
-                }
 
                 VStack {
                     Spacer()
@@ -79,12 +71,8 @@ struct MapView: View {
                     }
                 }
 
-                TopNotebookNavBar(
-                    selectedCategories: viewModel.selectedCategories,
+                CompactMapHeader(
                     reviewCount: viewModel.reviewCandidates.count,
-                    onToggleCategory: { category in
-                        viewModel.toggleCategory(category)
-                    },
                     onOpenProfile: {
                         showProfile = true
                     }
@@ -103,66 +91,39 @@ struct MapView: View {
     }
 }
 
-private struct TopNotebookNavBar: View {
-    let selectedCategories: Set<PlaceCategory>
+private struct CompactMapHeader: View {
     let reviewCount: Int
-    let onToggleCategory: (PlaceCategory) -> Void
     let onOpenProfile: () -> Void
 
     var body: some View {
-        HStack(spacing: 9) {
-            HStack(spacing: 6) {
-                MemoMascotMark(size: 24, framed: false)
-                Text("SAV-E")
-                    .font(.caption.weight(.black))
-                    .lineLimit(1)
-            }
-            .foregroundColor(.saveInk)
-            .padding(.horizontal, 10)
-            .frame(height: 38)
-            .background(Color.saveCream.opacity(0.98))
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-            .accessibilityHidden(true)
+        HStack {
+            BrandMapChip()
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    ForEach(PlaceCategory.allCases, id: \.self) { category in
-                        CategoryPill(
-                            category: category,
-                            isSelected: selectedCategories.contains(category)
-                        )
-                        .onTapGesture { onToggleCategory(category) }
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .black, location: 0.04),
-                        .init(color: .black, location: 0.94),
-                        .init(color: .clear, location: 1),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            Spacer(minLength: 0)
 
             PassportNavButton(reviewCount: reviewCount, action: onOpenProfile)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(Color.saveNotebookPage.opacity(0.96))
+    }
+}
+
+private struct BrandMapChip: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            MemoMascotMark(size: 22, framed: false)
+            Text("SAV-E")
+                .font(.caption.weight(.black))
+                .lineLimit(1)
+        }
+        .foregroundColor(.saveInk)
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(Color.saveNotebookPage.opacity(0.94))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 2)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.6)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 

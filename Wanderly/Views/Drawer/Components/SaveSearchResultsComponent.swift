@@ -3,6 +3,7 @@ import SwiftUI
 struct SaveSearchResultsComponent: View {
     let response: SaveSearchResponse
     var onSelectResult: (SaveSearchResult) -> Void = { _ in }
+    var onSearchNearby: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -47,17 +48,27 @@ struct SaveSearchResultsComponent: View {
             }
 
             if section.results.isEmpty {
-                Text(section.emptyMessage ?? "No results yet.")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.saveCocoa)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(Color.saveNotebookPage.opacity(0.72))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(section.emptyMessage ?? "No results yet.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.saveCocoa)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if label == "FROM YOUR SAV-E" {
+                        Button(action: onSearchNearby) {
+                            Label("Search nearby unsaved candidates", systemImage: "location.magnifyingglass")
+                                .saveSearchActionPill(isPrimary: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(12)
+                .background(Color.saveNotebookPage.opacity(0.72))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
                 VStack(spacing: 8) {
                     ForEach(section.results) { result in
