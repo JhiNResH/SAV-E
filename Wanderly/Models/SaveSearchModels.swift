@@ -444,6 +444,47 @@ struct SaveMapCandidate: Identifiable, Hashable {
     }
 }
 
+extension SaveMapCandidate {
+    var shareSubject: String {
+        "SAV-E Map Result: \(title)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "SAV-E Map Result",
+            title,
+            subtitle
+        ]
+
+        if let category {
+            lines.append("Category: \(category.displayName)")
+        }
+        if let rating {
+            lines.append("Rating: \(String(format: "%.1f", rating))")
+        }
+        if let reviewCount {
+            lines.append("Reviews: \(reviewCount)")
+        }
+        if let sourceURL, !sourceURL.isEmpty {
+            lines.append("Source: \(sourceURL)")
+        }
+        if let mapsURL = appleMapsURL {
+            lines.append("Map: \(mapsURL.absoluteString)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    var appleMapsURL: URL? {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: title),
+            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
+        ]
+        return components?.url
+    }
+}
+
 struct SavePlaceDraft: Hashable {
     var title: String
     var address: String?
@@ -593,6 +634,40 @@ struct SaveSearchResult: Identifiable, Hashable {
 
     var evidenceDrawer: SaveEvidenceDrawerModel {
         SaveEvidenceDrawerModel(result: self)
+    }
+}
+
+extension SaveSearchResult {
+    var shareSubject: String {
+        "SAV-E Place: \(title)"
+    }
+
+    var shareText: String {
+        var lines = [
+            "SAV-E Place",
+            title,
+            subtitle,
+            "Type: \(objectType.displayName)",
+            "State: \(userState.displayName)"
+        ]
+
+        if let category {
+            lines.append("Category: \(category.displayName)")
+        }
+        if let rating {
+            lines.append("Rating: \(String(format: "%.1f", rating))")
+        }
+        if let reviewCount {
+            lines.append("Reviews: \(reviewCount)")
+        }
+        if let sourceURL, !sourceURL.isEmpty {
+            lines.append("Source: \(sourceURL)")
+        }
+        if !missingInfo.isEmpty {
+            lines.append("Needs: \(missingInfo.joined(separator: ", "))")
+        }
+
+        return lines.joined(separator: "\n")
     }
 }
 

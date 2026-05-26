@@ -1247,6 +1247,22 @@ private struct ReviewCandidateCard: View {
                         action: onReject
                     )
                 }
+
+                ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                    Label("Share candidate", systemImage: "square.and.arrow.up")
+                        .font(.caption.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(Color.saveNotebookPage)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
             .padding(12)
         }
@@ -1335,6 +1351,22 @@ private struct UnsavedMapCandidateCard: View {
                         disabled: isWorking,
                         action: onSave
                     )
+
+                    ShareLink(item: candidate.shareText, subject: Text(candidate.shareSubject)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .font(.caption.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.saveNotebookPage)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
 
                     if let sourceURL = candidate.sourceURL, let url = URL(string: sourceURL) {
                         Link(destination: url) {

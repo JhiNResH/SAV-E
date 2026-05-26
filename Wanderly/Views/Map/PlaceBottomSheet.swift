@@ -37,6 +37,10 @@ struct PlaceBottomSheet: View {
                 Spacer()
 
                 Menu {
+                    ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+
                     if let sourceURL = place.primarySourceURL {
                         Button {
                             openURL(sourceURL)
@@ -170,6 +174,20 @@ struct PlaceBottomSheet: View {
                         )
                 }
                 .disabled(onPlanAround == nil)
+            }
+
+            ShareLink(item: place.shareText, subject: Text(place.shareSubject)) {
+                Label("Share place", systemImage: "square.and.arrow.up")
+                    .font(.caption.weight(.black))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Color.saveMint.opacity(0.34))
+                    .foregroundColor(.saveInk)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1.4)
+                    )
             }
 
             if let sourceURL = place.primarySourceURL {

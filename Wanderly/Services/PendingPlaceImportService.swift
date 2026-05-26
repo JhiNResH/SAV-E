@@ -174,6 +174,47 @@ struct PlaceReviewCandidate: Identifiable, Codable, Hashable {
             }
             .joined(separator: " ")
     }
+
+    var shareSubject: String {
+        "SAV-E Review Candidate: \(name)"
+    }
+
+    var shareText: String {
+        var lines = [
+            hasReliableCoordinates ? "SAV-E Review Candidate" : "SAV-E Source Clue",
+            name
+        ]
+
+        if !address.isEmpty {
+            lines.append(address)
+        }
+        if let city, !city.isEmpty {
+            lines.append("City: \(city)")
+        }
+        if let confidence {
+            lines.append("Confidence: \(Int(confidence * 100))%")
+        }
+        if !missingInfo.isEmpty {
+            lines.append("Needs: \(missingInfo.joined(separator: ", "))")
+        }
+        if let mapsURL = appleMapsURL {
+            lines.append("Map: \(mapsURL.absoluteString)")
+        }
+        let sourceLines = evidence.filter { $0.localizedCaseInsensitiveContains("source") }.prefix(2)
+        lines.append(contentsOf: sourceLines)
+
+        return lines.joined(separator: "\n")
+    }
+
+    var appleMapsURL: URL? {
+        guard let latitude, let longitude, latitude != 0 || longitude != 0 else { return nil }
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: name),
+            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
+        ]
+        return components?.url
+    }
 }
 
 final class PendingPlaceImportService {

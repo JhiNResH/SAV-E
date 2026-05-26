@@ -141,6 +141,10 @@ private struct SaveSearchResultNotebookRow: View {
             }
 
             primaryActionLabel
+            ShareLink(item: result.shareText, subject: Text(result.shareSubject)) {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .saveSearchActionPill(isPrimary: false)
+            }
         }
         .padding(12)
         .background(Color.saveCream.opacity(0.72))
