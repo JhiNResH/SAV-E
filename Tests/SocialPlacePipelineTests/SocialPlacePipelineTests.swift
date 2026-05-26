@@ -86,6 +86,27 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
 }
 
 final class SocialPlacePipelineTests: XCTestCase {
+    func testGoogleMapsSavedListExtractsEmbeddedPlaceLinks() {
+        let html = """
+        <a href=\"https://www.google.com/maps/place/Quarter+Sheets+Pizza+Club/@34.0779,-118.2543,17z\">Quarter Sheets Pizza Club</a>
+        <a href=\"/maps/place/Courage+Bagels/@34.105,-118.287,17z\">Courage Bagels</a>
+        """
+
+        let candidates = GoogleMapsListPlaceExtractor.extractCandidates(
+            sourceURL: "https://www.google.com/maps/placelists/list/CA-Foodie",
+            title: "CA Foodie · Jerry Chen",
+            text: nil,
+            metadataTitle: "CA Foodie · Jerry Chen - Google Maps",
+            metadataDescription: nil,
+            htmlText: html
+        )
+
+        XCTAssertEqual(candidates.map(\.name), ["Quarter Sheets Pizza Club", "Courage Bagels"])
+        XCTAssertEqual(candidates.first?.latitude, 34.0779)
+        XCTAssertEqual(candidates.first?.longitude, -118.2543)
+        XCTAssertFalse(candidates.contains { $0.name == "CA Foodie · Jerry Chen" })
+    }
+
     private var douyinFoodListFixture: String {
         """
         叫我Wendii 的图文作品：🇺🇸LA必吃美食！都是我的宝藏店！
