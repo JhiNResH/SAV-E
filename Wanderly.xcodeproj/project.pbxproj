@@ -896,7 +896,7 @@
 				CODE_SIGN_ENTITLEMENTS = Wanderly/Wanderly.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				INFOPLIST_FILE = Wanderly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -916,7 +916,7 @@
 				CODE_SIGN_ENTITLEMENTS = WanderlyShareExtension/WanderlyShareExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WanderlyShareExtension/Info.plist;
@@ -1083,7 +1083,7 @@
 				CODE_SIGN_ENTITLEMENTS = WanderlyShareExtension/WanderlyShareExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WanderlyShareExtension/Info.plist;
@@ -1106,7 +1106,7 @@
 				CODE_SIGN_ENTITLEMENTS = WanderlyClip/WanderlyClip.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
@@ -1146,7 +1146,7 @@
 				CODE_SIGN_ENTITLEMENTS = Wanderly/Wanderly.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				INFOPLIST_FILE = Wanderly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1187,7 +1187,7 @@
 				CODE_SIGN_ENTITLEMENTS = WanderlyClip/WanderlyClip.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = JC6858UYM9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
