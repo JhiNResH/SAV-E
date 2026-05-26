@@ -409,6 +409,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
     var reviewCount: Int?
     var sourceURL: String?
     var sourcePlatform: SourcePlatform?
+    var photoURL: String?
     var evidence: [String]
     var createdAt: Date
 
@@ -423,6 +424,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         reviewCount: Int? = nil,
         sourceURL: String? = nil,
         sourcePlatform: SourcePlatform? = nil,
+        photoURL: String? = nil,
         evidence: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -436,6 +438,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         self.reviewCount = reviewCount
         self.sourceURL = sourceURL
         self.sourcePlatform = sourcePlatform
+        self.photoURL = photoURL
         self.evidence = evidence
         self.createdAt = createdAt
     }

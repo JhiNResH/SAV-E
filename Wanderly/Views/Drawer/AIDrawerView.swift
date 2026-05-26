@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import MapKit
 
 struct AIDrawerView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
@@ -1355,30 +1354,28 @@ private struct UnsavedMapCandidateCard: View {
 
 private struct UnsavedMapCandidateVisualPreview: View {
     var candidate: SaveMapCandidate
-    @State private var image: UIImage?
-    @State private var caption = "Loading nearby visual..."
-    @State private var isLoading = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Group {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Rectangle()
-                        .fill(Color.saveNotebookPage)
-                        .overlay {
-                            if isLoading {
-                                ProgressView()
-                                    .tint(.saveInk)
-                            } else {
-                                Image(systemName: "photo.on.rectangle.angled")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundColor(.saveCocoa.opacity(0.66))
-                            }
+                if let photoURL = candidate.photoURL.flatMap(URL.init(string:)) {
+                    AsyncImage(url: photoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            fallbackVisual
+                        case .empty:
+                            ProgressView()
+                                .tint(.saveInk)
+                        @unknown default:
+                            fallbackVisual
                         }
+                    }
+                } else {
+                    fallbackVisual
                 }
             }
             .frame(height: 138)
@@ -1386,9 +1383,9 @@ private struct UnsavedMapCandidateVisualPreview: View {
             .clipped()
 
             HStack(spacing: 6) {
-                Image(systemName: image == nil ? "map" : "binoculars.fill")
+                Image(systemName: candidate.photoURL == nil ? "photo" : "camera.fill")
                     .font(.caption2.weight(.black))
-                Text(caption)
+                Text(candidate.photoURL == nil ? "No business photo available" : "Business photo")
                     .font(.caption2.weight(.black))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -1406,65 +1403,16 @@ private struct UnsavedMapCandidateVisualPreview: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 1.2)
         )
-        .task(id: candidate.id) {
-            await loadPreview()
-        }
     }
 
-    private func loadPreview() async {
-        guard !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
-
-        if let lookAroundImage = await lookAroundSnapshot() {
-            image = lookAroundImage
-            caption = "Look Around preview"
-            return
-        }
-
-        if let mapImage = await mapSnapshot() {
-            image = mapImage
-            caption = "Map preview"
-            return
-        }
-
-        caption = "No visual preview available"
-    }
-
-    private func lookAroundSnapshot() async -> UIImage? {
-        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-        mapItem.name = candidate.title
-        let request = MKLookAroundSceneRequest(mapItem: mapItem)
-
-        do {
-            guard let scene = try await request.scene else { return nil }
-            let options = MKLookAroundSnapshotter.Options()
-            options.size = CGSize(width: 640, height: 360)
-            let snapshot = try await MKLookAroundSnapshotter(scene: scene, options: options).snapshot
-            return snapshot.image
-        } catch {
-            return nil
-        }
-    }
-
-    private func mapSnapshot() async -> UIImage? {
-        let options = MKMapSnapshotter.Options()
-        options.region = MKCoordinateRegion(
-            center: coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.004, longitudeDelta: 0.004)
-        )
-        options.size = CGSize(width: 640, height: 360)
-        options.pointOfInterestFilter = .includingAll
-
-        do {
-            return try await MKMapSnapshotter(options: options).start().image
-        } catch {
-            return nil
-        }
-    }
-
-    private var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
+    private var fallbackVisual: some View {
+        Rectangle()
+            .fill(Color.saveNotebookPage)
+            .overlay {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.66))
+            }
     }
 }
 

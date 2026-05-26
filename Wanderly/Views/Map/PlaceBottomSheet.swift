@@ -63,6 +63,8 @@ struct PlaceBottomSheet: View {
                 }
             }
 
+            PlaceBusinessPhotoPreview(imageURL: place.sourceImageUrl)
+
             Text(memorySummary)
                 .font(.subheadline)
                 .foregroundColor(.saveInk)
@@ -315,6 +317,70 @@ struct FlowLayout: Layout {
 
         let totalHeight = y + rowHeight
         return (CGSize(width: maxWidth, height: totalHeight), frames)
+    }
+}
+
+private struct PlaceBusinessPhotoPreview: View {
+    var imageURL: String?
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let url = imageURL.flatMap(URL.init(string:)) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            fallbackVisual
+                        case .empty:
+                            ProgressView()
+                                .tint(.saveInk)
+                        @unknown default:
+                            fallbackVisual
+                        }
+                    }
+                } else {
+                    fallbackVisual
+                }
+            }
+            .frame(height: 156)
+            .frame(maxWidth: .infinity)
+            .clipped()
+
+            HStack(spacing: 6) {
+                Image(systemName: imageURL == nil ? "photo" : "camera.fill")
+                    .font(.caption2.weight(.black))
+                Text(imageURL == nil ? "Finding business photo" : "Business photo")
+                    .font(.caption2.weight(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .foregroundColor(.saveInk)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.saveNotebookPage.opacity(0.9))
+            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+            .clipShape(Capsule())
+            .padding(8)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+        )
+    }
+
+    private var fallbackVisual: some View {
+        Rectangle()
+            .fill(Color.saveNotebookPage)
+            .overlay {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.66))
+            }
     }
 }
 

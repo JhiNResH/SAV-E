@@ -44,6 +44,10 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
     func getPlaceDetails(placeId: String) async throws -> GooglePlaceDetails {
         throw GooglePlacesError.noResults
     }
+
+    func photoURL(reference: String, maxWidth: Int) -> URL? {
+        nil
+    }
 }
 
 @main
