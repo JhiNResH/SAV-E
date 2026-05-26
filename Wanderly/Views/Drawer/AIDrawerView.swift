@@ -473,7 +473,7 @@ struct AIDrawerView: View {
     private let suggestions = [
         "Show my food spots on the map",
         "Navigate to the nearest cafe",
-        "Plan a day from my memory cards",
+        "Plan a day from my Map Stamps",
         "What haven't I visited yet?",
     ]
 
@@ -501,7 +501,7 @@ struct AIDrawerView: View {
                     AgentCommandCard(
                         icon: "circle.hexagongrid.fill",
                         title: "Review",
-                        subtitle: "Turn clues into memory cards",
+                        subtitle: "Turn Review Candidates into Map Stamps",
                         commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
                         tone: .honey
                     ) {
@@ -565,15 +565,15 @@ struct AIDrawerView: View {
 
                 AgentCommandRow(
                     icon: "map.fill",
-                    title: "Plan from memories",
-                    subtitle: "Build a route from verified memory cards.",
+                    title: "Plan around Map Stamps",
+                    subtitle: "Build a route from confirmed saved places.",
                     commandLabel: "uses saved spots",
                     tone: .sky
                 ) {
                     focusAgentPrompt("""
                     Help me organize my saved places into a practical plan.
 
-                    Use only verified memory cards unless I explicitly ask you to investigate new candidates. Start with:
+                    Use only Map Stamps unless I explicitly ask you to investigate new candidates. Start with:
                     """)
                 }
             }
@@ -588,7 +588,7 @@ struct AIDrawerView: View {
                     }
                 },
                 onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Review clue cleared.") {
+                    performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
                         try await onRejectCandidate(candidate)
                     }
                 },
@@ -646,7 +646,7 @@ struct AIDrawerView: View {
                         }
                     },
                     onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Review clue cleared.") {
+                        performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
                             try await onRejectCandidate(candidate)
                         }
                     },
@@ -801,7 +801,7 @@ struct AIDrawerView: View {
 
     private func saveFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
-        return "Memory saved · +1 \(category.displayName.lowercased()) card"
+        return "Map Stamp saved · +1 \(category.displayName.lowercased()) place"
     }
 }
 
@@ -856,7 +856,7 @@ private struct FieldNotebookHeader: View {
 
                 HStack(spacing: 8) {
                     FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
-                    FieldNotebookStat(title: "EGGS", value: "\(clueCount)", color: .saveHoney)
+                    FieldNotebookStat(title: "CLUES", value: "\(clueCount)", color: .saveHoney)
                     FieldNotebookStat(title: "HELPER", value: "MEMO", color: .saveSky)
                 }
             }
@@ -1014,7 +1014,7 @@ private struct ReviewCandidatesEmptyState: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.saveInk)
 
-                Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as clues until you save them as memory cards.")
+                Text("Share a post, screenshot, or map link for SAV-E to investigate. Uncertain places wait here as Review Candidates until you save them as Map Stamps.")
                     .font(.caption)
                     .foregroundColor(.saveCocoa.opacity(0.74))
                     .fixedSize(horizontal: false, vertical: true)
@@ -1071,7 +1071,7 @@ private struct ReviewCandidateCard: View {
                 }
 
                 Text(candidate.hasReliableCoordinates
-                     ? "I found enough map evidence. Save it as a memory card when this looks right."
+                     ? "I found enough map evidence. Save it as a Map Stamp when this looks right."
                      : "I found the likely place, but I still need the exact address before saving it as a map pin.")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.82))

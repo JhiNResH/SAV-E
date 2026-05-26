@@ -12,13 +12,13 @@ enum SaveSearchObjectType: String, Codable, CaseIterable, Hashable {
 
     var displayName: String {
         switch self {
-        case .savedPlace: return "Memory card"
-        case .pendingCandidate: return "Review clue"
-        case .sourceOnlyClue: return "Source clue"
+        case .savedPlace: return "Map Stamp"
+        case .pendingCandidate: return "Review Candidate"
+        case .sourceOnlyClue: return "Clue"
         case .triedMemory: return "Tried memory"
         case .review: return "Private review"
         case .tripStop: return "Trip stop"
-        case .mapVisibleUnsavedPlace: return "Map place"
+        case .mapVisibleUnsavedPlace: return "Map Candidate"
         case .newRecommendation: return "New recommendation"
         }
     }
@@ -100,10 +100,10 @@ struct SaveAgentActionDrawerModel: Hashable {
 
     private static func heading(for result: SaveSearchResult) -> String {
         switch result.objectType {
-        case .sourceOnlyClue: return "Recover exact place"
-        case .pendingCandidate: return "Confirm candidate"
-        case .mapVisibleUnsavedPlace: return "Collect map place"
-        case .savedPlace: return "Plan from memory"
+        case .sourceOnlyClue: return "Clue found"
+        case .pendingCandidate: return "Review Candidate"
+        case .mapVisibleUnsavedPlace: return "Save Map Candidate"
+        case .savedPlace: return "Plan around this Map Stamp"
         case .triedMemory: return "Capture tried memory"
         case .review: return "Upgrade review proof"
         case .tripStop: return "Use trip stop"
@@ -116,7 +116,7 @@ struct SaveAgentActionDrawerModel: Hashable {
         case .sourceOnlyClue:
             return "SAV-E has a source clue but still needs a confirmed map match."
         case .pendingCandidate:
-            return "SAV-E found a likely place; confirm it before it becomes a memory card."
+            return "SAV-E found a likely place; confirm it before it becomes a Map Stamp."
         case .mapVisibleUnsavedPlace:
             return "This place is visible on the map but is not saved to your SAV-E yet."
         case .savedPlace:
@@ -231,13 +231,13 @@ struct SaveEvidenceDrawerModel: Hashable {
     private static func provenanceLabel(for result: SaveSearchResult) -> String? {
         switch result.objectType {
         case .sourceOnlyClue:
-            return result.sourcePlatform.map { "Source-only clue from \($0.displayName)" } ?? "Source-only clue"
+            return result.sourcePlatform.map { "Clue from \($0.displayName)" } ?? "Source Clue"
         case .pendingCandidate:
-            return "Review candidate; confirm before saving"
+            return "Review Candidate; confirm before Map Stamp"
         case .mapVisibleUnsavedPlace:
             return "Map-visible candidate; not saved to SAV-E"
         case .savedPlace:
-            return "Saved SAV-E memory"
+            return "Map Stamp saved in SAV-E"
         case .triedMemory:
             return "Visited SAV-E memory"
         case .review:
@@ -260,8 +260,10 @@ struct SaveEvidenceDrawerModel: Hashable {
             return "Candidate needs review"
         case .mapVisibleUnsavedPlace:
             return "Map evidence present"
-        case .savedPlace, .triedMemory, .tripStop:
-            return "Saved memory"
+        case .savedPlace:
+            return "Map Stamp"
+        case .triedMemory, .tripStop:
+            return "Saved place"
         case .review:
             return "Review evidence"
         case .newRecommendation:
@@ -274,11 +276,11 @@ struct SaveEvidenceDrawerModel: Hashable {
         case .sourceOnlyClue:
             return "SAV-E is preserving the source clue without creating a saved place."
         case .pendingCandidate:
-            return "This can become a memory only after the place evidence is confirmed."
+            return "This can become a Map Stamp only after the place evidence is confirmed."
         case .mapVisibleUnsavedPlace:
             return "This is a map result, not a SAV-E memory yet."
         case .savedPlace:
-            return "This is already saved in SAV-E."
+            return "This Map Stamp is already saved in SAV-E."
         case .newRecommendation:
             return "Choose a concrete place before saving anything to SAV-E."
         case .triedMemory, .review, .tripStop:
@@ -368,7 +370,7 @@ struct SaveEvidenceAtom: Identifiable, Hashable {
         } else if lowered.contains("rating") {
             self.init(kind: .rating, label: "Rating", value: line)
         } else if lowered.contains("review") {
-            self.init(kind: .reviewCount, label: "Review clue", value: line)
+            self.init(kind: .reviewCount, label: "Review count", value: line)
         } else if lowered.contains("receipt") {
             self.init(kind: .receipt, label: "Receipt", value: line)
         } else {

@@ -70,7 +70,7 @@ enum PlaceStatus: String, Codable, Hashable {
 
     var memoryCardLabel: String {
         switch self {
-        case .wantToGo: return "Verified"
+        case .wantToGo: return "Map Stamp"
         case .visited: return "Visited"
         }
     }

@@ -85,11 +85,11 @@ struct SaveMemoryBadge: View {
     private var accessibilityLabel: String {
         switch state {
         case .clue:
-            return "Place clue"
+            return "Clue"
         case .ready:
-            return "Map-ready place"
+            return "Review Candidate"
         case .saved:
-            return "Saved memory card"
+            return "Map Stamp"
         }
     }
 }
