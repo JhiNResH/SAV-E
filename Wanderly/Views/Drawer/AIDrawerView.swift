@@ -488,9 +488,9 @@ struct AIDrawerView: View {
 
                 AgentCommandRow(
                     icon: "sparkle.magnifyingglass",
-                    title: "Investigate a link",
-                    subtitle: "IG, TikTok, XHS, article, or map URL",
-                    commandLabel: "returns review clues",
+                    title: "Paste your first place",
+                    subtitle: "IG, TikTok, Google Maps, Apple Maps, blog, or note",
+                    commandLabel: "evidence first",
                     tone: .cocoa,
                     isPrimary: true
                 ) {
@@ -676,7 +676,7 @@ struct AIDrawerView: View {
            let url = firstURL(in: clipboardText) {
             importURLToReviewCandidates(url)
         } else {
-            addSpotStatus = "Paste a public social/video link after the prompt, or share it into SAV-E."
+            addSpotStatus = "Paste a place link, or share to SAV-E from another app. SAV-E will show evidence before saving anything."
             focusAgentPrompt(socialInvestigationPrompt(for: ""))
         }
     }
