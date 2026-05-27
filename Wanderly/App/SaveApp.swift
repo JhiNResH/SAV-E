@@ -9,6 +9,9 @@ struct SaveApp: App {
     @State private var openedTrip: SharedTripData?
     @State private var openedList: SaveCollaborativeList?
     @State private var openedReferral: SaveReferralProfile?
+    @State private var minimumOpeningAnimationCompleted = false
+
+    private let minimumOpeningAnimationDuration: UInt64 = 1_800_000_000
 
     var body: some Scene {
         WindowGroup {
@@ -16,7 +19,13 @@ struct SaveApp: App {
                 if !hasCompletedOnboarding {
                     OnboardingView {
                         hasCompletedOnboarding = true
+                        minimumOpeningAnimationCompleted = false
                     }
+                } else if shouldShowOpeningAnimation {
+                    AuthLoadingView()
+                        .task {
+                            await completeMinimumOpeningAnimation()
+                        }
                 } else {
                     switch authService.authState {
                     case .unknown:
@@ -69,6 +78,17 @@ struct SaveApp: App {
                 }
             }
         }
+    }
+
+    private var shouldShowOpeningAnimation: Bool {
+        !minimumOpeningAnimationCompleted || authService.authState == .unknown
+    }
+
+    @MainActor
+    private func completeMinimumOpeningAnimation() async {
+        guard !minimumOpeningAnimationCompleted else { return }
+        try? await Task.sleep(nanoseconds: minimumOpeningAnimationDuration)
+        minimumOpeningAnimationCompleted = true
     }
 
     private func handleIncomingURL(_ url: URL) {
