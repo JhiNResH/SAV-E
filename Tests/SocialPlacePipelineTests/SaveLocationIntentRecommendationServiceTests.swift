@@ -206,6 +206,11 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertTrue(intent.mustMatchCategory)
         XCTAssertTrue(intent.mustMatchLocation)
         XCTAssertEqual(intent.locationMode, .currentLocation(radiusMeters: 2_000))
+
+        let restaurantSearch = try XCTUnwrap(parser.parse("我想找餐廳"))
+        XCTAssertEqual(restaurantSearch.requiredCategories, [.food])
+        XCTAssertTrue(restaurantSearch.mustMatchLocation)
+        XCTAssertEqual(restaurantSearch.locationMode, .currentLocation(radiusMeters: 2_000))
     }
 
     func testDeterministicParserHandlesMilkTeaWithoutLocationAndNamedArea() throws {
