@@ -82,6 +82,21 @@ extension View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
+    func saveNotebookSurface(
+        cornerRadius: CGFloat = 16,
+        fill: Color = .saveNotebookPage,
+        opacity: Double = 0.76,
+        strokeOpacity: Double = 0.58,
+        lineWidth: CGFloat = 1.2
+    ) -> some View {
+        background(fill.opacity(opacity))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: lineWidth)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
     func saveOutlinedButton(
         fill: Color = .saveHoney,
         foreground: Color = .saveInk,
@@ -97,6 +112,33 @@ extension View {
                     .stroke(Color.saveNotebookLine, lineWidth: 1.6)
             )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+}
+
+struct SaveIconTile: View {
+    let systemName: String
+    var size: CGFloat = 32
+    var iconSize: CGFloat? = nil
+    var fill: Color = .saveNotebookPage
+    var foreground: Color = .saveCocoa
+    var strokeOpacity: Double = 0.56
+    var cornerRadius: CGFloat? = nil
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: iconSize ?? size * 0.42, weight: .bold))
+            .foregroundColor(foreground)
+            .frame(width: size, height: size)
+            .background(fill)
+            .overlay(
+                RoundedRectangle(cornerRadius: resolvedCornerRadius, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: resolvedCornerRadius, style: .continuous))
+    }
+
+    private var resolvedCornerRadius: CGFloat {
+        cornerRadius ?? max(size * 0.28, 7)
     }
 }
 

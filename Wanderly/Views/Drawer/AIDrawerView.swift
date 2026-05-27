@@ -101,7 +101,7 @@ struct AIDrawerView: View {
             )
         }
         .sheet(isPresented: $showProfile) {
-            ProfileView(waitingClues: reviewCandidates.count)
+            ProfileView(savedPlaces: viewModel.places, waitingClues: reviewCandidates.count)
         }
         .onChange(of: viewModel.drawerState) { _, state in
             guard mapDetailDrawerItem == nil else { return }
@@ -233,7 +233,7 @@ struct AIDrawerView: View {
         .frame(height: 52)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.90) : Color.saveNotebookPage.opacity(0.86))
                 .overlay(commandBarFill)
         }
         .overlay(
@@ -632,16 +632,15 @@ struct AIDrawerView: View {
                 searchFocused = false
                 withAnimation { drawerDetent = .height(72) }
             }) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.saveCocoa.opacity(0.72))
-                    .frame(width: 30, height: 30)
-                    .background(Color.saveNotebookPage.opacity(0.62))
-                    .overlay(
-                        Circle()
-                            .stroke(Color.saveNotebookLine, lineWidth: 2)
-                    )
-                    .clipShape(Circle())
+                SaveIconTile(
+                    systemName: "xmark",
+                    size: 30,
+                    iconSize: 11,
+                    fill: Color.saveNotebookPage.opacity(0.72),
+                    foreground: Color.saveCocoa.opacity(0.78),
+                    strokeOpacity: 0.54,
+                    cornerRadius: 9
+                )
             }
             .accessibilityLabel(languageSettings.text(.closeDrawerContent))
         }
@@ -649,7 +648,7 @@ struct AIDrawerView: View {
         .padding(.vertical, 10)
         .background {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.92) : Color.saveNotebookPage.opacity(0.86))
                 .overlay(navigationHeaderTint)
         }
         .overlay(alignment: .bottom) {
@@ -972,15 +971,8 @@ struct AIDrawerView: View {
                     }
                 }
                 .padding(12)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(savedPanelTint)
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
-                )
+                .saveNotebookSurface(cornerRadius: 16, fill: .saveNotebookPage, opacity: colorScheme == .dark ? 0.72 : 0.66, strokeOpacity: 0.36, lineWidth: 1)
+                .overlay(savedPanelTint)
 
                 HStack(spacing: 9) {
                     Button {
@@ -1702,13 +1694,15 @@ private struct MapDetailDrawerView: View {
             Spacer(minLength: 0)
 
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.saveCocoa.opacity(0.72))
-                    .frame(width: 30, height: 30)
-                    .background(Color.saveNotebookPage.opacity(0.62))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.5), lineWidth: 1))
+                SaveIconTile(
+                    systemName: "xmark",
+                    size: 30,
+                    iconSize: 11,
+                    fill: Color.saveNotebookPage.opacity(0.72),
+                    foreground: Color.saveCocoa.opacity(0.78),
+                    strokeOpacity: 0.54,
+                    cornerRadius: 9
+                )
             }
             .accessibilityLabel("Close place detail")
         }
@@ -1887,12 +1881,15 @@ private struct SelectedPlaceCapsuleIcon: View {
 
     var body: some View {
         Image(systemName: systemImage)
-            .font(.system(size: 15, weight: .black))
+            .font(.system(size: 15, weight: .bold))
             .foregroundColor(.saveInk)
             .frame(width: 38, height: 38)
-            .background(Color.saveNotebookPage.opacity(0.34))
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1))
+            .background(Color.saveNotebookPage.opacity(0.72))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -2004,16 +2001,7 @@ private struct SocialPlaceRow: View {
             .accessibilityLabel("Save \(place.name) to my SAV-E")
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(Color.white.opacity(0.12))
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
-        )
+        .saveNotebookSurface(cornerRadius: 14, fill: .saveNotebookPage, opacity: 0.62, strokeOpacity: 0.34, lineWidth: 1)
     }
 }
 
@@ -2022,7 +2010,7 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(.ultraThinMaterial)
+            .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.94) : Color.saveNotebookPage.opacity(0.90))
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2041,13 +2029,13 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.04),
-                Color.black.opacity(0.12)
+                Color.black.opacity(0.02),
+                Color.black.opacity(0.08)
             ]
         }
         return [
-            Color.white.opacity(0.04),
-            Color.saveCream.opacity(0.08)
+            Color.saveCream.opacity(0.18),
+            Color.saveNotebookPage.opacity(0.12)
         ]
     }
 }
@@ -3213,16 +3201,19 @@ private struct UnsavedMapCandidateBasicInfo: View {
             .foregroundColor(.saveCocoa)
 
             VStack(spacing: 7) {
-                UnsavedMapCandidateInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                UnsavedMapCandidateInfoRow(icon: "star", title: "Rating", value: ratingText)
                 if let reviewText {
-                    UnsavedMapCandidateInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewText)
+                    UnsavedMapCandidateInfoRow(icon: "text.bubble", title: "Reviews", value: reviewText)
                 }
                 if let hoursText {
-                    UnsavedMapCandidateInfoRow(icon: "clock.fill", title: "Hours", value: hoursText)
+                    UnsavedMapCandidateInfoRow(icon: "clock", title: "Hours", value: hoursText)
                 }
-                UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
-                UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
-                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map search")
+                if let distanceText = candidate.distanceLabel {
+                    UnsavedMapCandidateInfoRow(icon: "location", title: "Distance", value: distanceText)
+                }
+                UnsavedMapCandidateInfoRow(icon: candidate.category?.outlineIconName ?? "mappin", title: "Category", value: candidate.category?.displayName ?? "Place")
+                UnsavedMapCandidateInfoRow(icon: "mappin", title: "Address", value: candidate.subtitle)
+                UnsavedMapCandidateInfoRow(icon: "map", title: "Source", value: "Map search")
             }
         }
         .padding(10)
@@ -3258,25 +3249,26 @@ private struct UnsavedMapCandidateSummaryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "text.badge.magnifyingglass")
+                Image(systemName: "text.alignleft")
                     .font(.caption.weight(.black))
-                Text("Map result summary")
+                Text("Quick take")
                     .font(.caption.weight(.black))
                 Spacer()
             }
             .foregroundColor(.saveCocoa)
 
             VStack(alignment: .leading, spacing: 7) {
-                UnsavedMapCandidateSummaryLine(icon: "sparkles", text: candidateSummary)
-                if let practicalInfo {
-                    UnsavedMapCandidateSummaryLine(icon: "mappin.and.ellipse", text: practicalInfo)
+                UnsavedMapCandidateSummaryLine(icon: candidate.category?.outlineIconName ?? "mappin", text: candidateSummary)
+                if let distanceSummary {
+                    UnsavedMapCandidateSummaryLine(icon: "location", text: distanceSummary)
                 }
                 if let reviewSummary {
-                    UnsavedMapCandidateSummaryLine(icon: "star.fill", text: reviewSummary)
+                    UnsavedMapCandidateSummaryLine(icon: "star", text: reviewSummary)
                 }
-                if let sourceSummary {
-                    UnsavedMapCandidateSummaryLine(icon: "magnifyingglass", text: sourceSummary)
+                if let practicalInfo {
+                    UnsavedMapCandidateSummaryLine(icon: "mappin", text: practicalInfo)
                 }
+                UnsavedMapCandidateSummaryLine(icon: "bookmark", text: saveReminder)
             }
         }
         .padding(10)
@@ -3291,7 +3283,7 @@ private struct UnsavedMapCandidateSummaryPanel: View {
     private var candidateSummary: String {
         let category = candidate.category?.displayName.lowercased() ?? "place"
         if let searchQuery {
-            return "\(candidate.title) appeared in nearby \(searchQuery) results."
+            return "\(candidate.title) matches your \(searchQuery) search as an unsaved \(category)."
         }
         if !candidate.shareAreaLabel.isEmpty {
             return "\(candidate.title) is an unsaved \(category) in \(candidate.shareAreaLabel)."
@@ -3299,34 +3291,31 @@ private struct UnsavedMapCandidateSummaryPanel: View {
         return "\(candidate.title) is an unsaved \(category) selected from the map."
     }
 
+    private var distanceSummary: String? {
+        candidate.distanceLabel.map { "About \($0) from your search area." }
+    }
+
     private var practicalInfo: String? {
         let address = candidate.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !address.isEmpty, address != "Nearby unsaved place", address != "Selected on map" else {
             return nil
         }
-        return "Address: \(address)"
+        return address
     }
 
     private var reviewSummary: String? {
         var parts: [String] = []
         if let rating = candidate.rating {
-            parts.append(String(format: "%.1f stars", rating))
+            parts.append(String(format: "%.1f", rating))
         }
         if let reviewCount = candidate.reviewCount {
             parts.append("\(reviewCount) reviews")
         }
-        return parts.isEmpty ? nil : "Reviews: \(parts.joined(separator: " · "))"
+        return parts.isEmpty ? nil : "Public rating \(parts.joined(separator: " · "))."
     }
 
-    private var sourceSummary: String? {
-        var parts: [String] = []
-        if let searchQuery {
-            parts.append("Search: \(searchQuery)")
-        }
-        if !candidate.businessPhotoURLStrings.isEmpty {
-            parts.append("Business photos available")
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    private var saveReminder: String {
+        "Save only after the photo, address, and map pin match the place you want."
     }
 
     private var searchQuery: String? {
@@ -3346,11 +3335,8 @@ private struct UnsavedMapCandidateSummaryLine: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .font(.caption2.weight(.black))
-                .foregroundColor(.saveCocoa)
-                .frame(width: 16)
-                .padding(.top, 2)
+            UnsavedMapCandidateRowIcon(icon: icon, fill: Color.saveNotebookPage.opacity(0.72))
+                .padding(.top, 1)
 
             Text(text)
                 .font(.caption.weight(.semibold))
@@ -3369,11 +3355,8 @@ private struct UnsavedMapCandidateInfoRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .font(.caption2.weight(.black))
-                .foregroundColor(.saveInk)
-                .frame(width: 16)
-                .padding(.top, 2)
+            UnsavedMapCandidateRowIcon(icon: icon, fill: Color.saveCream.opacity(0.74))
+                .padding(.top, 1)
 
             Text(title)
                 .font(.caption2.weight(.black))
@@ -3390,11 +3373,42 @@ private struct UnsavedMapCandidateInfoRow: View {
     }
 }
 
+private struct UnsavedMapCandidateRowIcon: View {
+    let icon: String
+    var fill: Color
+
+    var body: some View {
+        Image(systemName: icon)
+            .font(.caption2.weight(.bold))
+            .foregroundColor(.saveCocoa)
+            .frame(width: 22, height: 22)
+            .background(fill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.54), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+}
+
 private struct UnsavedMapCandidateVisualPreview: View {
     var candidate: SaveMapCandidate
 
     var body: some View {
         PlaceBusinessPhotoCarousel(imageURLs: candidate.businessPhotoURLStrings)
+    }
+}
+
+private extension PlaceCategory {
+    var outlineIconName: String {
+        switch self {
+        case .food: return "fork.knife"
+        case .cafe: return "cup.and.saucer"
+        case .bar: return "wineglass"
+        case .attraction: return "star"
+        case .stay: return "bed.double"
+        case .shopping: return "bag"
+        }
     }
 }
 

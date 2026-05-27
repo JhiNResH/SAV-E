@@ -202,6 +202,8 @@ final class SaveSearchControllerTests: XCTestCase {
                     reviewCount: 420,
                     sourceURL: "https://maps.apple.com/?q=Unsaved+Coffee",
                     sourcePlatform: .other,
+                    photoURL: "https://example.com/coffee.jpg",
+                    distanceMeters: 350,
                     evidence: ["Apple Maps result", "Search: coffee"]
                 )
             ]
@@ -211,6 +213,40 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Coffee"])
         XCTAssertEqual(response.newRecommendations.results.first?.objectType, .mapVisibleUnsavedPlace)
         XCTAssertEqual(response.newRecommendations.results.first?.userState, .unsaved)
+        XCTAssertEqual(response.newRecommendations.results.first?.photoURL, "https://example.com/coffee.jpg")
+        XCTAssertEqual(response.newRecommendations.results.first?.distanceLabel, "350 m away")
+        XCTAssertEqual(SharedPlaceData.from(result: try XCTUnwrap(response.newRecommendations.results.first))?.photoURLs, ["https://example.com/coffee.jpg"])
+    }
+
+    func testUnsavedMapCandidatesSortByDistanceWhenScoresTie() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "咖啡廳",
+            places: [],
+            localRecords: [],
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "Far Coffee",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6800,
+                    longitude: -117.8200,
+                    category: .cafe,
+                    distanceMeters: 1_200,
+                    evidence: ["Distance: 1.2 km away"]
+                ),
+                SaveMapCandidate(
+                    title: "Near Coffee",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6846,
+                    longitude: -117.8265,
+                    category: .cafe,
+                    distanceMeters: 120,
+                    evidence: ["Distance: 120 m away"]
+                )
+            ]
+        )
+
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Near Coffee", "Far Coffee"])
     }
 
     func testRestaurantSearchReturnsSavedAndUnsavedCandidatesWhenPrepared() throws {
@@ -840,6 +876,24 @@ final class SaveSearchControllerTests: XCTestCase {
         let place = Place.from(candidate, refinedMatch: match)
 
         XCTAssertEqual(place.category, .cafe)
+    }
+
+    func testPassportStatsDeriveFromSavedPlaces() {
+        let profile = UserProfile.empty
+        let places = [
+            place(name: "Irvine Coffee", address: "1 Main St, Irvine, CA", category: .cafe, status: .visited),
+            place(name: "Irvine Dinner", address: "2 Main St, Irvine, CA", category: .food),
+            place(name: "Tokyo Ramen", address: "Shibuya, Tokyo, Japan", category: .food, status: .visited)
+        ]
+
+        let stats = PassportStats(profile: profile, savedPlaces: places, waitingClues: 2)
+
+        XCTAssertEqual(stats.savedCount, 3)
+        XCTAssertEqual(stats.visitedCount, 2)
+        XCTAssertEqual(stats.citiesCount, 2)
+        XCTAssertEqual(stats.cityNames, ["Irvine", "Tokyo"])
+        XCTAssertEqual(stats.waitingClues, 2)
+        XCTAssertTrue(stats.usesSavedPlaces)
     }
 
     private func place(

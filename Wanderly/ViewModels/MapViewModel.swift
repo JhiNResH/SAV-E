@@ -17,7 +17,8 @@ protocol MapCandidateSearchServiceProtocol {
     func searchCandidates(
         near coordinate: CLLocationCoordinate2D,
         span: MKCoordinateSpan,
-        excluding savedPlaces: [Place]
+        excluding savedPlaces: [Place],
+        categories: Set<PlaceCategory>
     ) async -> [SaveMapCandidate]
 }
 
@@ -27,12 +28,38 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         let category: PlaceCategory
     }
 
-    private let seeds: [SearchSeed] = [
-        SearchSeed(query: "coffee", category: .cafe),
-        SearchSeed(query: "restaurant", category: .food),
-        SearchSeed(query: "bar", category: .bar),
-        SearchSeed(query: "museum park attraction", category: .attraction),
-        SearchSeed(query: "shop", category: .shopping),
+    private let categorySeeds: [PlaceCategory: [SearchSeed]] = [
+        .cafe: [
+            SearchSeed(query: "coffee", category: .cafe),
+            SearchSeed(query: "cafe", category: .cafe),
+            SearchSeed(query: "coffee shop", category: .cafe),
+            SearchSeed(query: "bakery cafe", category: .cafe),
+        ],
+        .food: [
+            SearchSeed(query: "restaurant", category: .food),
+            SearchSeed(query: "food", category: .food),
+            SearchSeed(query: "lunch dinner", category: .food),
+            SearchSeed(query: "brunch", category: .food),
+        ],
+        .bar: [
+            SearchSeed(query: "bar", category: .bar),
+            SearchSeed(query: "cocktail bar", category: .bar),
+            SearchSeed(query: "wine bar", category: .bar),
+        ],
+        .attraction: [
+            SearchSeed(query: "museum", category: .attraction),
+            SearchSeed(query: "park attraction", category: .attraction),
+            SearchSeed(query: "things to do", category: .attraction),
+        ],
+        .stay: [
+            SearchSeed(query: "hotel", category: .stay),
+            SearchSeed(query: "lodging", category: .stay),
+        ],
+        .shopping: [
+            SearchSeed(query: "shop", category: .shopping),
+            SearchSeed(query: "shopping", category: .shopping),
+            SearchSeed(query: "mall", category: .shopping),
+        ],
     ]
     private let googlePlacesService: GooglePlacesServiceProtocol
 
@@ -43,15 +70,18 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
     func searchCandidates(
         near coordinate: CLLocationCoordinate2D,
         span: MKCoordinateSpan,
-        excluding savedPlaces: [Place]
+        excluding savedPlaces: [Place],
+        categories: Set<PlaceCategory> = []
     ) async -> [SaveMapCandidate] {
         let region = MKCoordinateRegion(center: coordinate, span: span)
         var candidates: [SaveMapCandidate] = []
         var seenKeys: Set<String> = []
 
-        for seed in seeds {
-            let results = await search(seed: seed, region: region)
-            for candidate in results where !isAlreadySaved(candidate, in: savedPlaces) {
+        for seed in seeds(for: categories) {
+            let googleResults = await googleSearch(seed: seed, near: coordinate)
+            let appleResults = await search(seed: seed, region: region)
+            let results = googleResults + appleResults
+            for candidate in results where !isAlreadySaved(candidate, in: savedPlaces) && categoryAllowed(candidate, categories: categories) {
                 let key = dedupeKey(for: candidate)
                 guard !seenKeys.contains(key) else { continue }
                 seenKeys.insert(key)
@@ -59,7 +89,7 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             }
         }
 
-        return Array(candidates.prefix(24))
+        return Array(candidates.prefix(categories.isEmpty ? 48 : 60))
     }
 
     private func search(seed: SearchSeed, region: MKCoordinateRegion) async -> [SaveMapCandidate] {
@@ -70,30 +100,36 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
 
         do {
             let response = try await MKLocalSearch(request: request).start()
-            let candidates = response.mapItems
-                .prefix(8)
-                .compactMap { makeCandidate(from: $0, seed: seed) }
-            var enrichedCandidates: [SaveMapCandidate] = []
-            for candidate in candidates {
-                enrichedCandidates.append(await enrichWithBusinessPhoto(candidate))
-            }
-            return enrichedCandidates
+            return response.mapItems
+                .prefix(20)
+                .compactMap { makeCandidate(from: $0, seed: seed, searchCenter: region.center) }
         } catch {
             print("MapCandidateSearchService: failed to search \(seed.query): \(error)")
             return []
         }
     }
 
-    private func makeCandidate(from item: MKMapItem, seed: SearchSeed) -> SaveMapCandidate? {
+    private func googleSearch(seed: SearchSeed, near coordinate: CLLocationCoordinate2D) async -> [SaveMapCandidate] {
+        do {
+            let matches = try await googlePlacesService.searchPlace(query: seed.query, near: coordinate)
+            return matches.compactMap { makeCandidate(from: $0, seed: seed, searchCenter: coordinate) }
+        } catch {
+            return []
+        }
+    }
+
+    private func makeCandidate(from item: MKMapItem, seed: SearchSeed, searchCenter: CLLocationCoordinate2D) -> SaveMapCandidate? {
         let title = (item.name ?? item.placemark.name ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return nil }
 
         let coordinate = item.placemark.coordinate
+        let distance = distanceMeters(from: searchCenter, to: coordinate)
         let subtitle = subtitle(for: item.placemark)
         var evidence = [
             "Apple Maps result",
             "Search: \(seed.query)",
+            "Distance: \(distanceLabel(distance))",
         ]
         if !subtitle.isEmpty {
             evidence.append("Address: \(subtitle)")
@@ -116,56 +152,40 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             ),
             sourceURL: appleMapsURL(title: title, coordinate: coordinate),
             sourcePlatform: .other,
+            distanceMeters: distance,
             evidence: evidence
         )
     }
 
-    private func enrichWithBusinessPhoto(_ candidate: SaveMapCandidate) async -> SaveMapCandidate {
-        var enrichedCandidate = candidate
-        guard let match = await bestGoogleMatch(for: candidate) else { return enrichedCandidate }
+    private func makeCandidate(from match: GooglePlaceMatch, seed: SearchSeed, searchCenter: CLLocationCoordinate2D) -> SaveMapCandidate {
+        let coordinate = CLLocationCoordinate2D(latitude: match.latitude, longitude: match.longitude)
+        let distance = distanceMeters(from: searchCenter, to: coordinate)
+        let photoURL = match.photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900)?.absoluteString }
+        var evidence = [
+            "Google Places result",
+            "Search: \(seed.query)",
+            "Distance: \(distanceLabel(distance))",
+        ]
+        if let rating = match.rating {
+            evidence.append(String(format: "Google rating: %.1f", rating))
+        }
 
-        let details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
-        let photoReferences = details?.photoReferences?.isEmpty == false
-            ? details?.photoReferences ?? []
-            : [match.photoReference].compactMap { $0 }
-        let photoURLs = photoReferences
-            .prefix(6)
-            .compactMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
-
-        if !photoURLs.isEmpty {
-            let urls = photoURLs.map(\.absoluteString)
-            enrichedCandidate.photoURL = enrichedCandidate.photoURL ?? urls.first
-            enrichedCandidate.businessPhotoURLs = urls
-            enrichedCandidate.evidence.append(photoURLs.count > 1 ? "Business photos: Google Places" : "Business photo: Google Places")
-        }
-        if let category = PlaceCategory.from(googleTypes: details?.types ?? match.types) {
-            enrichedCandidate.category = category
-        }
-        enrichedCandidate.rating = enrichedCandidate.rating ?? details?.rating ?? match.rating
-        enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
-        if let openingHours = details?.openingHours?.first {
-            enrichedCandidate.evidence.append("Hours: \(openingHours)")
-        }
-        return enrichedCandidate
-    }
-
-    private func bestGoogleMatch(for candidate: SaveMapCandidate) async -> GooglePlaceMatch? {
-        do {
-            let matches = try await googlePlacesService.searchPlace(
-                query: "\(candidate.title) \(candidate.subtitle)",
-                near: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
-            )
-            let candidateLocation = CLLocation(latitude: candidate.latitude, longitude: candidate.longitude)
-            return matches.first { match in
-                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
-                let sameArea = candidateLocation.distance(from: matchLocation) < 250
-                let sameName = match.name.localizedCaseInsensitiveContains(candidate.title) ||
-                    candidate.title.localizedCaseInsensitiveContains(match.name)
-                return sameArea || sameName
-            }
-        } catch {
-            return nil
-        }
+        return SaveMapCandidate(
+            id: match.id,
+            title: match.name,
+            subtitle: match.address.isEmpty ? "Nearby unsaved place" : match.address,
+            latitude: match.latitude,
+            longitude: match.longitude,
+            category: PlaceCategory.from(googleTypes: match.types) ?? PlaceCategory.inferred(from: "\(match.name) \(match.address)", fallback: seed.category),
+            rating: match.rating,
+            reviewCount: match.reviewCount,
+            sourceURL: googleMapsURL(title: match.name, placeID: match.id, coordinate: coordinate),
+            sourcePlatform: .googleMaps,
+            photoURL: photoURL,
+            businessPhotoURLs: photoURL.map { [$0] },
+            distanceMeters: distance,
+            evidence: evidence
+        )
     }
 
     private func subtitle(for placemark: MKPlacemark) -> String {
@@ -195,6 +215,16 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         return components?.url?.absoluteString
     }
 
+    private func googleMapsURL(title: String, placeID: String, coordinate: CLLocationCoordinate2D) -> String? {
+        var components = URLComponents(string: "https://www.google.com/maps/search/")
+        components?.queryItems = [
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "query", value: "\(title) \(coordinate.latitude),\(coordinate.longitude)"),
+            URLQueryItem(name: "query_place_id", value: placeID),
+        ]
+        return components?.url?.absoluteString
+    }
+
     private func dedupeKey(for candidate: SaveMapCandidate) -> String {
         let normalizedTitle = candidate.title
             .lowercased()
@@ -214,6 +244,31 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             let sameName = place.name.localizedCaseInsensitiveCompare(candidate.title) == .orderedSame
             return sameNearbyPlace || sameName
         }
+    }
+
+    private func seeds(for categories: Set<PlaceCategory>) -> [SearchSeed] {
+        if categories.isEmpty {
+            return PlaceCategory.allCases.compactMap { categorySeeds[$0]?.first }
+        }
+        return categories.flatMap { categorySeeds[$0] ?? [] }
+    }
+
+    private func categoryAllowed(_ candidate: SaveMapCandidate, categories: Set<PlaceCategory>) -> Bool {
+        guard !categories.isEmpty else { return true }
+        guard let category = candidate.category else { return false }
+        return categories.contains(category)
+    }
+
+    private func distanceMeters(from lhs: CLLocationCoordinate2D, to rhs: CLLocationCoordinate2D) -> Double {
+        CLLocation(latitude: lhs.latitude, longitude: lhs.longitude)
+            .distance(from: CLLocation(latitude: rhs.latitude, longitude: rhs.longitude))
+    }
+
+    private func distanceLabel(_ meters: Double) -> String {
+        if meters >= 1_000 {
+            return String(format: "%.1f km away", meters / 1_000)
+        }
+        return "\(Int(meters.rounded())) m away"
     }
 }
 
@@ -824,7 +879,11 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    func refreshMapCandidates(near coordinate: CLLocationCoordinate2D? = nil, span: MKCoordinateSpan? = nil) async {
+    func refreshMapCandidates(
+        near coordinate: CLLocationCoordinate2D? = nil,
+        span: MKCoordinateSpan? = nil,
+        categories: Set<PlaceCategory> = []
+    ) async {
         guard !isLoadingMapCandidates else { return }
         let searchCenter = coordinate ?? mapCandidateSearchCenter()
         let searchSpan = span ?? MKCoordinateSpan(latitudeDelta: 0.035, longitudeDelta: 0.035)
@@ -834,7 +893,8 @@ final class MapViewModel: ObservableObject {
         let candidates = await mapCandidateSearchService.searchCandidates(
             near: searchCenter,
             span: searchSpan,
-            excluding: places
+            excluding: places,
+            categories: categories
         )
         mapCandidates = candidates
         if let selectedMapCandidate, !candidates.contains(where: { $0.id == selectedMapCandidate.id }) {
@@ -856,8 +916,12 @@ final class MapViewModel: ObservableObject {
         } else {
             searchCenter = nil
         }
-        await refreshMapCandidates(near: searchCenter)
         let categories = saveSearchController.mapCandidateCategories(for: query)
+        await refreshMapCandidates(
+            near: searchCenter,
+            span: MKCoordinateSpan(latitudeDelta: 0.06, longitudeDelta: 0.06),
+            categories: categories
+        )
         if !categories.isEmpty {
             mapCandidates = mapCandidates.filter { candidate in
                 guard let category = candidate.category else { return false }
@@ -1230,6 +1294,13 @@ final class MapViewModel: ObservableObject {
         case .focusRegion:
             guard let lat = action.lat, let lng = action.lng else { return }
             let span = action.span ?? 0.03
+            if let candidate = mapCandidate(nearLatitude: lat, longitude: lng) {
+                selectedMapCandidate = candidate
+                selectedPlace = nil
+                selectedReviewCandidate = nil
+                selectedSocialPlace = nil
+                selectedMapFeature = nil
+            }
             cameraPosition = .region(MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: lat, longitude: lng),
                 span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span)
@@ -1308,6 +1379,18 @@ final class MapViewModel: ObservableObject {
             longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.01)
         )
         return MKCoordinateRegion(center: center, span: span)
+    }
+
+    private func mapCandidate(nearLatitude latitude: Double, longitude: Double) -> SaveMapCandidate? {
+        let target = CLLocation(latitude: latitude, longitude: longitude)
+        guard let nearest = mapCandidates.min(by: { lhs, rhs in
+            let lhsDistance = target.distance(from: CLLocation(latitude: lhs.latitude, longitude: lhs.longitude))
+            let rhsDistance = target.distance(from: CLLocation(latitude: rhs.latitude, longitude: rhs.longitude))
+            return lhsDistance < rhsDistance
+        }) else { return nil }
+
+        let distance = target.distance(from: CLLocation(latitude: nearest.latitude, longitude: nearest.longitude))
+        return distance < 80 ? nearest : nil
     }
 
 }

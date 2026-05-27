@@ -122,7 +122,7 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
             throw GooglePlacesError.noResults
         }
 
-        return results.prefix(5).compactMap { result in
+        return results.prefix(20).compactMap { result in
             guard let placeId = result["place_id"] as? String,
                   let name = result["name"] as? String,
                   let geometry = result["geometry"] as? [String: Any],

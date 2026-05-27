@@ -2,18 +2,17 @@ import SwiftUI
 
 struct StatsView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
-    let profile: UserProfile
-    var waitingClues: Int = 0
+    let stats: PassportStats
 
     var body: some View {
         LazyVGrid(columns: [
             GridItem(.flexible(), spacing: 8),
             GridItem(.flexible(), spacing: 8),
         ], spacing: 8) {
-            StatItem(value: "\(profile.savedCount)", label: languageSettings.text(.memoryCards), color: .saveCocoa, icon: "rectangle.stack.fill")
-            StatItem(value: "\(profile.visitedCount)", label: languageSettings.text(.verified), color: .saveSuccess, icon: "checkmark.seal.fill")
-            StatItem(value: "\(profile.citiesCount)", label: languageSettings.text(.cities), color: .saveHoney, icon: "building.2.fill")
-            StatItem(value: "\(waitingClues)", label: languageSettings.text(.waitingClues), color: .saveSignal, icon: "circle.hexagongrid.fill")
+            StatItem(value: "\(stats.savedCount)", label: languageSettings.text(.memoryCards), color: .saveCocoa, icon: "rectangle.stack")
+            StatItem(value: "\(stats.visitedCount)", label: languageSettings.text(.verified), color: .saveSuccess, icon: "figure.walk")
+            StatItem(value: "\(stats.citiesCount)", label: languageSettings.text(.cities), color: .saveHoney, icon: "building.2")
+            StatItem(value: "\(stats.waitingClues)", label: languageSettings.text(.waitingClues), color: .saveSignal, icon: "circle.hexagongrid")
         }
         .padding(12)
         .saveNotebookPage(cornerRadius: 18)
@@ -32,7 +31,14 @@ struct StatItem: View {
             HStack {
                 Image(systemName: icon)
                     .font(.caption.weight(.black))
-                    .foregroundColor(color)
+                    .foregroundColor(.saveCocoa)
+                    .frame(width: 24, height: 24)
+                    .background(color.opacity(0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.7), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 Spacer()
                 Text(value)
                     .font(.title3.monospacedDigit().weight(.black))
@@ -51,18 +57,12 @@ struct StatItem: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 1.4)
         )
-        .overlay(alignment: .topLeading) {
-            Circle()
-                .fill(color.opacity(0.42))
-                .frame(width: 28, height: 28)
-                .offset(x: -8, y: -8)
-        }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
 #Preview {
-    StatsView(profile: .mock)
+    StatsView(stats: PassportStats(profile: .mock, savedPlaces: Place.mockList, waitingClues: 2))
         .environmentObject(AppLanguageSettings())
         .padding()
         .background(SaveDottedBackground())

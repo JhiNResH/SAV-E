@@ -58,13 +58,14 @@ struct PlaceBottomSheet: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.headline.weight(.black))
-                        .foregroundColor(.saveInk)
-                        .frame(width: 36, height: 36)
-                        .background(Color.saveNotebookPage.opacity(0.62))
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.4))
+                    SaveIconTile(
+                        systemName: "ellipsis",
+                        size: 36,
+                        fill: Color.saveNotebookPage.opacity(0.72),
+                        foreground: .saveInk,
+                        strokeOpacity: 0.62,
+                        cornerRadius: 12
+                    )
                 }
             }
 
@@ -190,10 +191,10 @@ private struct PlaceDetailGlassBackground: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(.ultraThinMaterial)
+            .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.88) : Color.saveNotebookPage.opacity(0.82))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.black.opacity(0.16) : Color.saveNotebookPage.opacity(0.46))
+                    .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.42 : 0.52), lineWidth: 1.2)
             )
     }
 }
@@ -213,28 +214,23 @@ struct PlaceBasicInfoPanel: View {
             .foregroundColor(.saveCocoa)
 
             VStack(spacing: 7) {
-                PlaceInfoRow(icon: "star.fill", title: "Rating", value: ratingText)
+                PlaceInfoRow(icon: "star", title: "Rating", value: ratingText)
                 if let reviewCountText {
-                    PlaceInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewCountText)
+                    PlaceInfoRow(icon: "text.bubble", title: "Reviews", value: reviewCountText)
                 }
-                PlaceInfoRow(icon: place.category.iconName, title: "Category", value: place.category.displayName)
-                PlaceInfoRow(icon: "mappin.and.ellipse", title: "Address", value: place.address.isEmpty ? "No address saved" : place.address)
+                PlaceInfoRow(icon: place.category.detailIconName, title: "Category", value: place.category.displayName)
+                PlaceInfoRow(icon: "mappin", title: "Address", value: place.address.isEmpty ? "No address saved" : place.address)
                 PlaceInfoRow(icon: "link", title: "Source", value: place.sourceConfirmationLabel)
                 if let priceRange = place.priceRange {
-                    PlaceInfoRow(icon: "tag.fill", title: "Price", value: priceRange)
+                    PlaceInfoRow(icon: "tag", title: "Price", value: priceRange)
                 }
                 if let openingHours = place.openingHours?.trimmingCharacters(in: .whitespacesAndNewlines), !openingHours.isEmpty {
-                    PlaceInfoRow(icon: "clock.fill", title: "Hours", value: openingHours)
+                    PlaceInfoRow(icon: "clock", title: "Hours", value: openingHours)
                 }
             }
         }
         .padding(10)
-        .background(Color.saveSky.opacity(0.10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .saveNotebookSurface(cornerRadius: 12, fill: .saveNotebookPage, opacity: 0.64)
     }
 
     private var ratingText: String {
@@ -265,11 +261,15 @@ private struct PlaceInfoRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .font(.caption2.weight(.black))
-                .foregroundColor(.saveInk)
-                .frame(width: 16)
-                .padding(.top, 2)
+            SaveIconTile(
+                systemName: icon,
+                size: 22,
+                iconSize: 10,
+                fill: Color.saveCream.opacity(0.74),
+                foreground: .saveCocoa,
+                strokeOpacity: 0.54
+            )
+            .padding(.top, 1)
 
             Text(title)
                 .font(.caption2.weight(.black))
@@ -282,6 +282,19 @@ private struct PlaceInfoRow: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
+        }
+    }
+}
+
+private extension PlaceCategory {
+    var detailIconName: String {
+        switch self {
+        case .food: return "fork.knife"
+        case .cafe: return "cup.and.saucer"
+        case .bar: return "wineglass"
+        case .attraction: return "star"
+        case .stay: return "bed.double"
+        case .shopping: return "bag"
         }
     }
 }

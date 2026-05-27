@@ -111,8 +111,10 @@ The Passport is the user's memory archive and control surface.
 
 Rules:
 
-- Use Passport for profile, language, local memory, saved count, verified count,
+- Use Passport for profile, language, local memory, saved count, visited count,
   cities, waiting clues, and account controls.
+- Do not label a self-marked visited place as proof-verified. Real-world
+  verification requires receipt, photo, or location evidence.
 - Do not call it a profile unless referring to the implementation file.
 - Passport should look like a notebook cover plus stamp ledger, not a settings table.
 
@@ -255,6 +257,18 @@ States:
 
 Do not introduce new badge states without updating this document first.
 
+### Shared Primitives
+
+Source: `Wanderly/Extensions/Color+Theme.swift`.
+
+- Use `saveNotebookSurface` for drawer/detail panels that belong to SAV-E's
+  memory layer.
+- Use `SaveIconTile` for small icon-only controls and row icons.
+- Avoid ad hoc circular icon buttons inside Passport, detail drawers, and
+  notebook cards unless the object is explicitly a map pin or avatar.
+- Avoid `.ultraThinMaterial` as the primary drawer/card surface for memory UI;
+  use notebook surfaces with visible ink strokes.
+
 ### Map Pins
 
 Source: `Wanderly/Views/Map/MapView.swift`.
@@ -329,7 +343,7 @@ Required content:
 - Memo identity.
 - Passport name.
 - Map Stamps count.
-- Verified count.
+- Visited count; proof verification is a separate future evidence state.
 - Cities count.
 - Waiting clues count.
 - Member since.
@@ -442,6 +456,9 @@ Rules:
 - Keep settings subordinate to memory stats.
 - Local Memory debug surfaces must not dominate the default Passport.
 - Waiting clues should be visible but not alarming.
+- Cities come from saved place addresses.
+- Visited comes from places the user marked as visited; do not imply SAV-E has
+  verified real-world attendance without proof evidence.
 
 ### Share Extension
 
