@@ -1,0 +1,168 @@
+import CoreLocation
+import XCTest
+@testable import Wanderly
+
+final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
+    func testNearbyCafeExcludesWrongCategoryAndFarCafeFromPrimaryResults() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 34.0522, longitude: -118.2437)
+        let nearbyCafe = place(
+            name: "Cafe A",
+            category: .cafe,
+            latitude: 34.0580,
+            longitude: -118.2440
+        )
+        let nearbyNonCafe = place(
+            name: "Gym B",
+            category: .attraction,
+            latitude: 34.0530,
+            longitude: -118.2438
+        )
+        let farCafe = place(
+            name: "Cafe C",
+            category: .cafe,
+            latitude: 34.2000,
+            longitude: -118.2437
+        )
+
+        let response = try XCTUnwrap(service.recommendationResponse(
+            for: "附近咖啡廳",
+            places: [nearbyCafe, nearbyNonCafe, farCafe],
+            currentLocation: currentLocation
+        ))
+
+        XCTAssertEqual(response.componentType, .placeList)
+        XCTAssertEqual(response.placeIds, [nearbyCafe.id.uuidString])
+        XCTAssertEqual(response.mapAction?.type, .filterPins)
+        XCTAssertEqual(response.mapAction?.placeIds, [nearbyCafe.id.uuidString])
+    }
+
+    func testNoNearbyCafeDoesNotRecommendWrongCategory() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 34.0522, longitude: -118.2437)
+        let nearbyNonCafe = place(
+            name: "Gym B",
+            category: .attraction,
+            latitude: 34.0530,
+            longitude: -118.2438
+        )
+        let farCafe = place(
+            name: "Cafe C",
+            category: .cafe,
+            latitude: 34.2000,
+            longitude: -118.2437
+        )
+
+        let response = try XCTUnwrap(service.recommendationResponse(
+            for: "附近咖啡廳",
+            places: [nearbyNonCafe, farCafe],
+            currentLocation: currentLocation
+        ))
+
+        XCTAssertEqual(response.componentType, .message)
+        XCTAssertEqual(response.placeIds, [])
+        XCTAssertNil(response.mapAction)
+        XCTAssertTrue(response.messageText?.contains("附近沒有咖啡廳") == true)
+        XCTAssertTrue(response.messageText?.contains("did not recommend other categories") == true)
+    }
+
+    func testNearbyCafeWithoutCurrentLocationReturnsLocationNeededMessage() throws {
+        let service = SaveLocationIntentRecommendationService()
+
+        let response = try XCTUnwrap(service.recommendationResponse(
+            for: "coffee near me",
+            places: [place(name: "Cafe A", category: .cafe)],
+            currentLocation: nil
+        ))
+
+        XCTAssertEqual(response.componentType, .message)
+        XCTAssertEqual(response.title, "Location needed")
+        XCTAssertEqual(response.placeIds, [])
+    }
+
+    func testMilkTeaWithoutLocationRanksSpecificEvidenceBeforeGenericCafe() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let genericCafe = place(
+            name: "Generic Coffee",
+            category: .cafe,
+            note: "Espresso and pastries"
+        )
+        let bobaCafe = place(
+            name: "Half and Half Tea Express",
+            category: .cafe,
+            note: "Honey boba and milk tea",
+            extractedDishes: ["milk tea", "boba"]
+        )
+        let dinner = place(name: "Dinner C", category: .food)
+
+        let response = try XCTUnwrap(service.recommendationResponse(
+            for: "我今天想喝奶茶",
+            places: [genericCafe, bobaCafe, dinner],
+            currentLocation: nil
+        ))
+
+        XCTAssertEqual(response.componentType, .placeList)
+        XCTAssertEqual(response.placeIds, [bobaCafe.id.uuidString, genericCafe.id.uuidString])
+        XCTAssertFalse(response.placeIds.contains(dinner.id.uuidString))
+    }
+
+    func testUnsupportedGymQueryDoesNotMapToFoodOrCafe() throws {
+        let service = SaveLocationIntentRecommendationService()
+
+        let response = try XCTUnwrap(service.recommendationResponse(
+            for: "附近健身房",
+            places: [
+                place(name: "Nearby Cafe", category: .cafe),
+                place(name: "Nearby Restaurant", category: .food)
+            ],
+            currentLocation: CLLocation(latitude: 34.0522, longitude: -118.2437)
+        ))
+
+        XCTAssertEqual(response.componentType, .message)
+        XCTAssertEqual(response.title, "Unsupported category")
+        XCTAssertEqual(response.placeIds, [])
+        XCTAssertTrue(response.messageText?.contains("won't map this to food or cafe") == true)
+    }
+
+    func testDeterministicParserRecognizesNearbyCafeIntent() throws {
+        let parser = SaveSearchIntentParser()
+        let intent = try XCTUnwrap(parser.parse("附近咖啡廳"))
+
+        XCTAssertEqual(intent.requiredCategories, [.cafe])
+        XCTAssertTrue(intent.mustMatchCategory)
+        XCTAssertTrue(intent.mustMatchLocation)
+        XCTAssertEqual(intent.locationMode, .currentLocation(radiusMeters: 2_000))
+    }
+
+    private func place(
+        name: String,
+        category: PlaceCategory,
+        latitude: Double = 34.0522,
+        longitude: Double = -118.2437,
+        note: String? = nil,
+        extractedDishes: [String]? = nil
+    ) -> Place {
+        Place(
+            id: UUID(),
+            name: name,
+            address: "Los Angeles, CA",
+            latitude: latitude,
+            longitude: longitude,
+            googlePlaceId: nil,
+            category: category,
+            status: .wantToGo,
+            rating: nil,
+            note: note,
+            sourceUrl: nil,
+            sourcePlatform: .other,
+            sourceImageUrl: nil,
+            extractedDishes: extractedDishes,
+            priceRange: nil,
+            recommender: nil,
+            googleRating: nil,
+            googlePriceLevel: nil,
+            openingHours: nil,
+            createdAt: Date()
+        )
+    }
+}
