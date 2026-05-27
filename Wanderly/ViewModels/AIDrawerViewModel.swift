@@ -198,6 +198,11 @@ final class AIDrawerViewModel: ObservableObject {
         saveSearchController.shouldPrepareMapCandidates(for: query)
     }
 
+    func shouldAutoSearchNearbyUnsavedCandidates() -> Bool {
+        guard case .saveSearchResults(let response) = drawerState else { return false }
+        return response.shouldAutoSearchNearbyUnsavedCandidates
+    }
+
     func showCollaborativeListPlan(_ list: SaveCollaborativeList) {
         drawerState = .displaying(list.itineraryResponse())
     }

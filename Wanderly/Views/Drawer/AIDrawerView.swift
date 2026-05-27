@@ -1454,7 +1454,13 @@ struct AIDrawerView: View {
         } else if viewModel.shouldSearchNearbyUnsavedCandidates(for: viewModel.query) {
             searchNearbyUnsavedCandidates(for: viewModel.query)
         } else {
-            Task { await viewModel.submit() }
+            let submittedQuery = viewModel.query
+            Task {
+                await viewModel.submit()
+                if viewModel.shouldAutoSearchNearbyUnsavedCandidates() {
+                    searchNearbyUnsavedCandidates(for: submittedQuery)
+                }
+            }
         }
     }
 
@@ -3056,6 +3062,9 @@ private struct UnsavedMapCandidateBasicInfo: View {
                 if let reviewText {
                     UnsavedMapCandidateInfoRow(icon: "text.bubble.fill", title: "Reviews", value: reviewText)
                 }
+                if let hoursText {
+                    UnsavedMapCandidateInfoRow(icon: "clock.fill", title: "Hours", value: hoursText)
+                }
                 UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
                 UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
                 UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map clue")
@@ -3077,6 +3086,14 @@ private struct UnsavedMapCandidateBasicInfo: View {
 
     private var reviewText: String? {
         candidate.reviewCount.map { "\($0) reviews" }
+    }
+
+    private var hoursText: String? {
+        candidate.evidence.compactMap { evidence -> String? in
+            guard let range = evidence.range(of: "Hours:", options: [.caseInsensitive]) else { return nil }
+            let value = evidence[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }.first
     }
 }
 

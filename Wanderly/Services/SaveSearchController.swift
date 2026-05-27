@@ -5,6 +5,10 @@ struct SaveSearchController {
         SaveSearchQuery(rawValue: rawQuery).wantsPublicDiscovery
     }
 
+    func mapCandidateCategories(for rawQuery: String) -> Set<PlaceCategory> {
+        SaveSearchQuery(rawValue: rawQuery).categories
+    }
+
     func makeSaveDraft(from result: SaveSearchResult) -> SavePlaceDraft? {
         let title = result.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard

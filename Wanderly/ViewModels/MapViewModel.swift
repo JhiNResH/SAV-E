@@ -143,6 +143,9 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         }
         enrichedCandidate.rating = enrichedCandidate.rating ?? details?.rating ?? match.rating
         enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
+        if let openingHours = details?.openingHours?.first {
+            enrichedCandidate.evidence.append("Hours: \(openingHours)")
+        }
         return enrichedCandidate
     }
 
@@ -262,6 +265,7 @@ final class MapViewModel: ObservableObject {
     private let saveLocalVaultService: SaveLocalVaultService
     private let mapCandidateSearchService: MapCandidateSearchServiceProtocol
     private let saveSearchController: SaveSearchController
+    private let saveSearchIntentParser: SaveSearchIntentParser
     private let collaborativeListStore: SaveCollaborativeListStore
     private var importedPendingKeys: Set<String> = []
     private var didRequestInitialLocation = false
@@ -277,6 +281,7 @@ final class MapViewModel: ObservableObject {
         saveLocalVaultService: SaveLocalVaultService = .shared,
         mapCandidateSearchService: MapCandidateSearchServiceProtocol = MapCandidateSearchService(),
         saveSearchController: SaveSearchController = SaveSearchController(),
+        saveSearchIntentParser: SaveSearchIntentParser = SaveSearchIntentParser(),
         collaborativeListStore: SaveCollaborativeListStore = .shared
     ) {
         self.supabaseService = supabaseService
@@ -288,6 +293,7 @@ final class MapViewModel: ObservableObject {
         self.saveLocalVaultService = saveLocalVaultService
         self.mapCandidateSearchService = mapCandidateSearchService
         self.saveSearchController = saveSearchController
+        self.saveSearchIntentParser = saveSearchIntentParser
         self.collaborativeListStore = collaborativeListStore
         self.collaborativeLists = collaborativeListStore.load()
     }
@@ -838,8 +844,22 @@ final class MapViewModel: ObservableObject {
 
     func prepareMapCandidatesForDrawerQuery(_ query: String) async -> [SaveMapCandidate] {
         guard saveSearchController.shouldPrepareMapCandidates(for: query) else { return mapCandidates }
-        await refreshMapCandidates()
+        let searchCenter = await mapCandidateSearchCenter(for: query)
+        await refreshMapCandidates(near: searchCenter)
+        let categories = saveSearchController.mapCandidateCategories(for: query)
+        if !categories.isEmpty {
+            mapCandidates = mapCandidates.filter { candidate in
+                guard let category = candidate.category else { return false }
+                return categories.contains(category)
+            }
+        }
         return mapCandidates
+    }
+
+    private func mapCandidateSearchCenter(for query: String) async -> CLLocationCoordinate2D? {
+        guard saveSearchIntentParser.parse(query)?.mustMatchLocation == true else { return nil }
+        let currentLocation = await locationService.requestCurrentLocation()
+        return currentLocation?.coordinate
     }
 
     private func mapCandidateSearchCenter() -> CLLocationCoordinate2D {

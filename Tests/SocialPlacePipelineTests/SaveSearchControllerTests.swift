@@ -171,6 +171,7 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "New York"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "Search nearby unsaved cafes"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "找附近新的咖啡廳"))
+        XCTAssertEqual(controller.mapCandidateCategories(for: "search nearby unsaved candidates for 我今天想喝咖啡推薦一家"), [.cafe])
     }
 
     func testReviewCandidateMilkTeaMatchStaysReviewScoped() throws {

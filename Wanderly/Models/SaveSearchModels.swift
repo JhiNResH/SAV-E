@@ -815,3 +815,11 @@ struct SaveSearchResponse: Equatable {
         self.newRecommendations = newRecommendations
     }
 }
+
+extension SaveSearchResponse {
+    var shouldAutoSearchNearbyUnsavedCandidates: Bool {
+        fromYourSave.results.isEmpty &&
+            newRecommendations.showsNearbySearchAction &&
+            newRecommendations.results.isEmpty
+    }
+}
