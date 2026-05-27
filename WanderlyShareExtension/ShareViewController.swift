@@ -344,6 +344,7 @@ private struct ShareMetadata {
     var title: String?
     var description: String?
     var imageURL: URL?
+    var htmlText: String?
 }
 
 private let shareMetadataHTMLByteLimit = 2_000_000
@@ -1063,6 +1064,27 @@ struct ShareExtensionView: View {
         let metadata = await shareMetadata(from: sharedURL)
         let parseContent = metadata.resolvedURL.flatMap { $0.isEmpty ? nil : $0 } ?? content
 
+        if GoogleMapsListPlaceExtractor.looksLikeGoogleMapsList(
+            sourceURL: parseContent,
+            title: sharedTitle,
+            text: sharedText,
+            metadataTitle: metadata.title,
+            metadataDescription: metadata.description
+        ) {
+            let listCandidates = googleMapsListReviewCandidates(
+                from: metadata,
+                sourceURLString: parseContent,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText
+            )
+            if !listCandidates.isEmpty {
+                reviewCandidates = listCandidates
+                selectedCategory = reviewCandidates.first?.category ?? "food"
+                isParsing = false
+                return
+            }
+        }
+
         if let mapPlace = deterministicMapPlace(from: parseContent, title: sharedTitle, text: sharedText) {
             parsedPlace = mapPlace
             selectedCategory = mapPlace.category
@@ -1226,7 +1248,8 @@ struct ShareExtensionView: View {
                 resolvedURL: resolvedURL,
                 title: metadataValue(in: html, keys: ["og:title", "twitter:title", "title"]),
                 description: metadataValue(in: html, keys: ["og:description", "twitter:description", "description"]),
-                imageURL: metadataImageURL(in: html, baseURL: response.url ?? url)
+                imageURL: metadataImageURL(in: html, baseURL: response.url ?? url),
+                htmlText: html
             )
         } catch {
             return ShareMetadata(resolvedURL: url.absoluteString, title: nil, description: nil)
@@ -1343,6 +1366,62 @@ struct ShareExtensionView: View {
         }
 
         return decoded
+    }
+
+    private func googleMapsListReviewCandidates(
+        from metadata: ShareMetadata,
+        sourceURLString: String,
+        sharedTitle: String,
+        sharedText: String
+    ) -> [PendingReviewCandidate] {
+        let extracted = GoogleMapsListPlaceExtractor.extractCandidates(
+            sourceURL: sourceURLString,
+            title: sharedTitle,
+            text: sharedText,
+            metadataTitle: metadata.title,
+            metadataDescription: metadata.description,
+            htmlText: metadata.htmlText
+        )
+        guard !extracted.isEmpty else { return [] }
+
+        let listTitle = [sharedTitle, metadata.title]
+            .compactMap { $0 }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? "Google Maps saved list"
+        let listEvidence = "Google Maps saved list: \(listTitle)"
+
+        return extracted.prefix(30).map { place in
+            let hasCoordinates = place.latitude != nil && place.longitude != nil
+            let hasAddress = !place.address.isEmpty
+            var evidence = [
+                "Source URL: \(sourceURLString)",
+                listEvidence,
+                "Extracted from Google Maps list share"
+            ]
+            evidence.append(contentsOf: place.evidence)
+            if hasCoordinates { evidence.append("Verified coordinates found in shared list HTML") }
+            if hasAddress { evidence.append("Address found near list place: \(place.address)") }
+
+            return PendingReviewCandidate(
+                candidateName: place.name,
+                address: place.address,
+                category: fallbackCategory(from: [place.name, place.address, sharedText, metadata.description ?? ""].joined(separator: " ")),
+                sourceURL: sourceURLString,
+                sourceText: publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText),
+                evidence: evidence,
+                confidence: hasCoordinates ? 0.78 : (hasAddress ? 0.68 : 0.56),
+                missingInfo: hasCoordinates ? [] : ["Confirm exact address / coordinates before saving as a Map Stamp"],
+                savedAt: Date(),
+                evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                    found: evidence,
+                    attempts: ["Scanned Google Maps saved-list share metadata/HTML for embedded place links"],
+                    missingFields: hasCoordinates ? [] : ["coordinates", hasAddress ? "" : "address"].filter { !$0.isEmpty },
+                    nextBestClue: hasCoordinates ? "Ready to confirm as a Map Stamp." : "Open the candidate or run Google Places match before saving this as a Map Stamp."
+                ),
+                isSourceOnly: false,
+                reviewState: hasCoordinates ? "map_match_ready" : "google_maps_list_candidate"
+            )
+        }
     }
 
     private func socialReviewCandidate(

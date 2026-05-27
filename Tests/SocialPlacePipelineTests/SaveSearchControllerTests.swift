@@ -23,6 +23,30 @@ final class SaveSearchControllerTests: XCTestCase {
         ])
     }
 
+    func testCategoryInferenceUsesPOIAndAvoidsSubstringFalsePositives() {
+        XCTAssertEqual(PlaceCategory.inferred(from: "Heritage Barbecue Chicken"), .food)
+        XCTAssertEqual(PlaceCategory.inferred(from: "Bright Barber Shop"), .shopping)
+        XCTAssertEqual(PlaceCategory.inferred(from: "Disneyland Park"), .attraction)
+        XCTAssertEqual(
+            PlaceCategory.inferredMapCategory(
+                title: "Kung Fu Foot Massage",
+                subtitle: "Westminster, CA",
+                pointOfInterestCategory: "MKPOICategorySpa",
+                fallback: .food
+            ),
+            .shopping
+        )
+        XCTAssertEqual(
+            PlaceCategory.inferredMapCategory(
+                title: "Sushi Gen",
+                subtitle: "Little Tokyo",
+                pointOfInterestCategory: "MKPOICategoryRestaurant",
+                fallback: .attraction
+            ),
+            .food
+        )
+    }
+
     func testChineseMilkTeaQueryUnderstandsCafeDrinkIntent() throws {
         let controller = SaveSearchController()
         let response = controller.search(

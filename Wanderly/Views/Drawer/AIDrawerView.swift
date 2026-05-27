@@ -41,7 +41,9 @@ struct AIDrawerView: View {
                 contentArea
             }
         }
-        .background(.ultraThinMaterial)
+        .background {
+            DrawerGlassBackground(colorScheme: colorScheme)
+        }
         .sheet(isPresented: $viewModel.showPlaceList) {
             PlaceListView()
         }
@@ -150,15 +152,15 @@ struct AIDrawerView: View {
     }
 
     private var commandBarFill: Color {
-        colorScheme == .dark ? Color.black.opacity(0.52) : Color.white.opacity(0.72)
+        colorScheme == .dark ? Color.black.opacity(0.34) : Color.white.opacity(0.44)
     }
 
     private var commandIconFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.12) : Color.saveCream.opacity(0.92)
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.48)
     }
 
     private var commandBarStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.16) : Color.saveNotebookLine.opacity(0.28)
+        colorScheme == .dark ? Color.white.opacity(0.18) : Color.saveNotebookLine.opacity(0.18)
     }
 
     private var commandBarTextColor: Color {
@@ -214,7 +216,6 @@ struct AIDrawerView: View {
             .accessibilityLabel(voiceQuery.isListening ? "Stop talking to SAV-E" : "Talk to SAV-E")
 
             PassportDrawerButton(
-                reviewCount: reviewCandidates.count,
                 fill: commandIconFill,
                 stroke: commandBarStroke,
                 foreground: commandBarTextColor,
@@ -368,7 +369,7 @@ struct AIDrawerView: View {
 
         case .reviewCandidateDetail(let candidate):
             ScrollView {
-                ReviewCandidateCard(
+                ReviewCandidateDetailCard(
                     candidate: candidate,
                     isWorking: candidateActionInFlight == candidate.id,
                     onConfirm: {
@@ -493,12 +494,20 @@ struct AIDrawerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color.saveNotebookPage.opacity(0.96))
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(navigationHeaderTint)
+        }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.saveNotebookLine)
-                .frame(height: 2)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.13) : Color.saveNotebookLine.opacity(0.18))
+                .frame(height: 1)
         }
+    }
+
+    private var navigationHeaderTint: Color {
+        colorScheme == .dark ? Color.black.opacity(0.26) : Color.saveCream.opacity(0.18)
     }
 
     private var showsNavigationHeader: Bool {
@@ -816,22 +825,7 @@ struct AIDrawerView: View {
             ReviewCandidatesSection(
                 candidates: reviewCandidates,
                 limit: 2,
-                actionInFlight: candidateActionInFlight,
-                onConfirm: { candidate in
-                    performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
-                        try await onConfirmCandidate(candidate)
-                    }
-                },
-                onReject: { candidate in
-                    performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
-                        try await onRejectCandidate(candidate)
-                    }
-                },
-                onSave: { candidate in
-                    performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
-                        try await onSaveCandidate(candidate)
-                    }
-                }
+                onSelect: openReviewCandidateDetail
             )
 
             if let addSpotStatus {
@@ -874,22 +868,7 @@ struct AIDrawerView: View {
                 ReviewCandidatesSection(
                     candidates: reviewCandidates,
                     limit: nil,
-                    actionInFlight: candidateActionInFlight,
-                    onConfirm: { candidate in
-                        performCandidateAction(candidate, successMessage: "Place confirmed. Save it when the address is ready.") {
-                            try await onConfirmCandidate(candidate)
-                        }
-                    },
-                    onReject: { candidate in
-                        performCandidateAction(candidate, successMessage: "Review Candidate cleared.") {
-                            try await onRejectCandidate(candidate)
-                        }
-                    },
-                    onSave: { candidate in
-                        performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
-                            try await onSaveCandidate(candidate)
-                        }
-                    }
+                    onSelect: openReviewCandidateDetail
                 )
 
                 if let addSpotStatus {
@@ -1018,6 +997,13 @@ struct AIDrawerView: View {
         withAnimation { drawerDetent = .large }
     }
 
+    private func openReviewCandidateDetail(_ candidate: PlaceReviewCandidate) {
+        showReviewInbox = false
+        searchFocused = false
+        viewModel.showReviewCandidate(candidate)
+        withAnimation { drawerDetent = .medium }
+    }
+
     private func submitSearchField() {
         voiceQuery.stop()
         searchFocused = false
@@ -1095,6 +1081,45 @@ struct AIDrawerView: View {
     private func saveFeedback(for candidate: PlaceReviewCandidate) -> String {
         let category = PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
         return "Map Stamp saved · +1 \(category.displayName.lowercased()) place"
+    }
+}
+
+private struct DrawerGlassBackground: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay {
+                LinearGradient(
+                    colors: tintStops,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(topStroke)
+                    .frame(height: 1)
+            }
+            .ignoresSafeArea()
+    }
+
+    private var tintStops: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color.black.opacity(0.20),
+                Color.black.opacity(0.32)
+            ]
+        }
+        return [
+            Color.white.opacity(0.16),
+            Color.saveCream.opacity(0.26)
+        ]
+    }
+
+    private var topStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.16) : Color.white.opacity(0.58)
     }
 }
 
@@ -1391,10 +1416,7 @@ private struct NotebookBandLabel: View {
 private struct ReviewCandidatesSection: View {
     var candidates: [PlaceReviewCandidate]
     var limit: Int? = 4
-    var actionInFlight: UUID?
-    var onConfirm: (PlaceReviewCandidate) -> Void
-    var onReject: (PlaceReviewCandidate) -> Void
-    var onSave: (PlaceReviewCandidate) -> Void
+    var onSelect: (PlaceReviewCandidate) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1416,13 +1438,10 @@ private struct ReviewCandidatesSection: View {
                 ReviewCandidatesEmptyState()
             } else {
                 ForEach(displayedCandidates) { candidate in
-                    ReviewCandidateCard(
-                        candidate: candidate,
-                        isWorking: actionInFlight == candidate.id,
-                        onConfirm: { onConfirm(candidate) },
-                        onReject: { onReject(candidate) },
-                        onSave: { onSave(candidate) }
-                    )
+                    Button(action: { onSelect(candidate) }) {
+                        ReviewCandidatePlaceRow(candidate: candidate)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -1431,6 +1450,103 @@ private struct ReviewCandidatesSection: View {
     private var displayedCandidates: [PlaceReviewCandidate] {
         guard let limit else { return candidates }
         return Array(candidates.prefix(limit))
+    }
+}
+
+private struct ReviewCandidatePlaceRow: View {
+    var candidate: PlaceReviewCandidate
+
+    private var inferredCategory: PlaceCategory {
+        PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
+    }
+
+    private var addressText: String {
+        if !candidate.address.isEmpty { return candidate.address }
+        if let city = candidate.city, !city.isEmpty { return city }
+        return "Needs address confirmation"
+    }
+
+    private var statusText: String {
+        candidate.hasReliableCoordinates ? "Ready to review" : "Needs info"
+    }
+
+    private var statusIcon: String {
+        candidate.hasReliableCoordinates ? "checkmark.seal.fill" : "questionmark.folder.fill"
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 4) {
+                SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 44)
+                Text(candidate.hasReliableCoordinates ? "PLACE" : "CLUE")
+                    .font(.system(size: 7, weight: .black))
+                    .foregroundColor(.saveCocoa)
+            }
+            .frame(width: 54)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(candidate.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    statusBadge
+                }
+
+                Text(addressText)
+                    .font(.caption)
+                    .foregroundColor(.saveMutedText)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Label(inferredCategory.displayName, systemImage: inferredCategory.iconName)
+                        .font(.caption2)
+                        .foregroundColor(.saveMutedText)
+                        .lineLimit(1)
+
+                    if let confidence = candidate.confidence {
+                        Text("\(Int(confidence * 100))%")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundColor(.saveMutedText)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(.saveCocoa.opacity(0.48))
+                }
+            }
+        }
+        .padding(12)
+        .saveNotebookPage(cornerRadius: 16)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(candidate.name), \(statusText)")
+        .accessibilityHint("Open review details before saving")
+    }
+
+    private var statusBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: statusIcon)
+                .font(.caption2.weight(.black))
+            Text(statusText)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundColor(.saveCocoa)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Color.saveNotebookPage)
+        .overlay(
+            Capsule()
+                .stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1)
+        )
+        .clipShape(Capsule())
     }
 }
 
@@ -1467,7 +1583,7 @@ private struct ReviewCandidatesEmptyState: View {
     }
 }
 
-private struct ReviewCandidateCard: View {
+private struct ReviewCandidateDetailCard: View {
     var candidate: PlaceReviewCandidate
     var isWorking: Bool
     var onConfirm: () -> Void
@@ -1628,7 +1744,7 @@ private struct UnsavedMapCandidateCard: View {
                     SaveMemoryBadge(state: .ready, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("UNSAVED MAP PLACE")
+                        Text("UNSAVED CANDIDATE")
                             .font(.caption2.weight(.black))
                             .foregroundColor(.saveCocoa)
                             .lineLimit(1)
@@ -1653,7 +1769,7 @@ private struct UnsavedMapCandidateCard: View {
                     Spacer(minLength: 0)
                 }
 
-                Text("This is a visible map result from nearby search. Save it only after it looks like the place you want.")
+                Text("This is a map result, not one of your SAV-E memories yet. Save it only after it looks like the place you want.")
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
@@ -1662,29 +1778,32 @@ private struct UnsavedMapCandidateCard: View {
 
                 UnsavedMapCandidateBasicInfo(candidate: candidate)
 
-                if !candidate.evidence.isEmpty {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption2.weight(.bold))
-                            Text("Map clue")
-                                .font(.caption2.weight(.black))
-                            Spacer()
-                        }
-                        .foregroundColor(.saveCocoa)
-
-                        EvidenceLinkList(evidence: candidate.evidence, maxItems: 4)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption2.weight(.bold))
+                        Text("Map clue")
+                            .font(.caption2.weight(.black))
+                        Spacer()
                     }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.saveSky.opacity(0.16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                            )
-                    )
+                    .foregroundColor(.saveCocoa)
+
+                    Text("Map clue means this came from a map search result. It is not a Map Stamp or memory until you save it.")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.saveCocoa.opacity(0.78))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    EvidenceLinkList(evidence: mapClueEvidence, maxItems: 4)
                 }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.saveSky.opacity(0.16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        )
+                )
 
                 HStack(spacing: 8) {
                     CandidateActionButton(
@@ -1720,6 +1839,15 @@ private struct UnsavedMapCandidateCard: View {
         .opacity(isWorking ? 0.65 : 1)
     }
 
+    private var mapClueEvidence: [String] {
+        let fallback = [
+            "Visible map result; not a SAV-E memory",
+            "State: unsaved candidate",
+            "Source: Maps result"
+        ]
+        return candidate.evidence.isEmpty ? fallback : candidate.evidence
+    }
+
 }
 
 private struct UnsavedMapCandidateBasicInfo: View {
@@ -1743,7 +1871,7 @@ private struct UnsavedMapCandidateBasicInfo: View {
                 }
                 UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
                 UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
-                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Maps result")
+                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map clue")
             }
         }
         .padding(10)
@@ -1864,7 +1992,6 @@ private struct CandidateActionLabel: View {
 }
 
 private struct PassportDrawerButton: View {
-    var reviewCount: Int
     var fill: Color
     var stroke: Color
     var foreground: Color
@@ -1872,34 +1999,16 @@ private struct PassportDrawerButton: View {
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title3.weight(.black))
-                    .foregroundColor(foreground)
-
-                if reviewCount > 0 {
-                    Text("\(reviewCount)")
-                        .font(.system(size: 8, weight: .black))
-                        .foregroundColor(.saveInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(Color.saveHoney)
-                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.7), lineWidth: 1))
-                        .clipShape(Capsule())
-                        .frame(maxWidth: 24)
-                        .offset(x: 12, y: -12)
-                }
-            }
-            .frame(width: 30, height: 30)
-            .background(fill)
-            .overlay(Circle().stroke(stroke, lineWidth: 1))
-            .clipShape(Circle())
+            Image(systemName: "person.crop.circle.fill")
+                .font(.title3.weight(.black))
+                .foregroundColor(foreground)
+                .frame(width: 30, height: 30)
+                .background(fill)
+                .overlay(Circle().stroke(stroke, lineWidth: 1))
+                .clipShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open SAV-E Passport")
-        .accessibilityValue(reviewCount > 0 ? "\(reviewCount) waiting clues" : "No waiting clues")
     }
 }
 

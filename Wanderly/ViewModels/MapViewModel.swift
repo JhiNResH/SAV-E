@@ -98,7 +98,8 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         if !subtitle.isEmpty {
             evidence.append("Address: \(subtitle)")
         }
-        if let pointOfInterestCategory = item.pointOfInterestCategory?.rawValue {
+        let poiCategory = item.pointOfInterestCategory?.rawValue
+        if let pointOfInterestCategory = poiCategory {
             evidence.append("POI: \(pointOfInterestCategory)")
         }
 
@@ -107,7 +108,12 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
             subtitle: subtitle.isEmpty ? "Nearby unsaved place" : subtitle,
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
-            category: seed.category,
+            category: PlaceCategory.inferredMapCategory(
+                title: title,
+                subtitle: subtitle,
+                pointOfInterestCategory: poiCategory,
+                fallback: seed.category
+            ),
             sourceURL: appleMapsURL(title: title, coordinate: coordinate),
             sourcePlatform: .other,
             evidence: evidence
@@ -766,7 +772,12 @@ final class MapViewModel: ObservableObject {
             subtitle: "Selected on map",
             latitude: feature.coordinate.latitude,
             longitude: feature.coordinate.longitude,
-            category: PlaceCategory.inferred(from: "\(title) \(feature.pointOfInterestCategory?.rawValue ?? "")"),
+            category: PlaceCategory.inferredMapCategory(
+                title: title,
+                subtitle: "Selected on map",
+                pointOfInterestCategory: feature.pointOfInterestCategory?.rawValue,
+                fallback: .attraction
+            ),
             sourceURL: appleMapsURL(title: title, coordinate: feature.coordinate),
             sourcePlatform: .other,
             evidence: evidence

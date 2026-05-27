@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -7,6 +9,7 @@ struct ProfileView: View {
     @State private var showEditProfile = false
     @State private var showLanguageSettings = false
     @State private var draftDisplayName = ""
+    @State private var draftAvatarData: Data?
     var waitingClues: Int = 0
 
     var body: some View {
@@ -18,6 +21,7 @@ struct ProfileView: View {
                         onClose: { dismiss() },
                         onEdit: {
                             draftDisplayName = viewModel.profile.displayName
+                            draftAvatarData = nil
                             showEditProfile = true
                         }
                     )
@@ -28,6 +32,7 @@ struct ProfileView: View {
                         profile: viewModel.profile,
                         onEdit: {
                             draftDisplayName = viewModel.profile.displayName
+                            draftAvatarData = nil
                             showEditProfile = true
                         }
                     )
@@ -93,11 +98,13 @@ struct ProfileView: View {
         .sheet(isPresented: $showEditProfile) {
             EditProfileSheet(
                 displayName: $draftDisplayName,
+                avatarURLString: viewModel.profile.avatarUrl,
+                selectedAvatarData: $draftAvatarData,
                 isSaving: viewModel.isSaving,
                 errorMessage: viewModel.errorMessage,
                 onCancel: { showEditProfile = false },
                 onSave: {
-                    let saved = await viewModel.updateDisplayName(draftDisplayName)
+                    let saved = await viewModel.updateProfile(displayName: draftDisplayName, avatarData: draftAvatarData)
                     if saved { showEditProfile = false }
                 }
             )
@@ -113,11 +120,15 @@ struct ProfileView: View {
 private struct EditProfileSheet: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     @Binding var displayName: String
+    let avatarURLString: String?
+    @Binding var selectedAvatarData: Data?
     let isSaving: Bool
     let errorMessage: String?
     let onCancel: () -> Void
     let onSave: () async -> Void
     @FocusState private var isNameFocused: Bool
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var photoError: String?
 
     var body: some View {
         NavigationStack {
@@ -168,6 +179,38 @@ private struct EditProfileSheet: View {
                 .padding(.horizontal)
                 .padding(.top, 18)
 
+                VStack(spacing: 10) {
+                    EditableProfileAvatar(
+                        avatarURLString: avatarURLString,
+                        selectedAvatarData: selectedAvatarData
+                    )
+
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        Label("Upload photo", systemImage: "camera.fill")
+                            .font(.caption.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 12)
+                            .frame(height: 36)
+                            .background(Color.saveSky.opacity(0.42))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSaving)
+
+                    if let photoError {
+                        Text(photoError)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(16)
+                .saveNotebookPage(cornerRadius: 20)
+                .padding(.horizontal)
+
                 VStack(alignment: .leading, spacing: 10) {
                     Text(languageSettings.text(.passportName))
                         .font(.caption2.weight(.black))
@@ -207,6 +250,23 @@ private struct EditProfileSheet: View {
         }
         .onAppear {
             isNameFocused = true
+        }
+        .onChange(of: selectedPhotoItem) { _, item in
+            guard let item else { return }
+            Task { await loadSelectedPhoto(item) }
+        }
+    }
+
+    private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                photoError = "Couldn’t load that photo."
+                return
+            }
+            selectedAvatarData = data
+            photoError = nil
+        } catch {
+            photoError = error.localizedDescription
         }
     }
 }
@@ -295,7 +355,7 @@ private struct PassportHero: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 14) {
-                    MemoMascotMark(size: 78)
+                    ProfileAvatarView(avatarURLString: profile.avatarUrl, size: 78)
                         .overlay(alignment: .bottomTrailing) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 18, weight: .black))
@@ -344,6 +404,83 @@ private struct PassportHero: View {
             .padding(16)
         }
         .saveNotebookPage(cornerRadius: 22)
+    }
+}
+
+private struct EditableProfileAvatar: View {
+    let avatarURLString: String?
+    let selectedAvatarData: Data?
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let selectedAvatarData, let image = UIImage(data: selectedAvatarData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ProfileAvatarView(avatarURLString: avatarURLString, size: 92)
+            }
+
+            Image(systemName: "camera.fill")
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 28, height: 28)
+                .background(Color.saveHoney)
+                .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.2))
+                .clipShape(Circle())
+                .offset(x: 2, y: 2)
+        }
+        .frame(width: 92, height: 92)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 2))
+        .shadow(color: Color.saveCocoa.opacity(0.12), radius: 8, x: 0, y: 4)
+    }
+}
+
+private struct ProfileAvatarView: View {
+    let avatarURLString: String?
+    var size: CGFloat
+
+    var body: some View {
+        Group {
+            if let localImage {
+                Image(uiImage: localImage)
+                    .resizable()
+                    .scaledToFill()
+            } else if let remoteURL {
+                AsyncImage(url: remoteURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        MemoMascotMark(size: size)
+                    }
+                }
+            } else {
+                MemoMascotMark(size: size)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.6))
+    }
+
+    private var remoteURL: URL? {
+        guard let avatarURLString,
+              let url = URL(string: avatarURLString),
+              url.isFileURL == false
+        else { return nil }
+        return url
+    }
+
+    private var localImage: UIImage? {
+        guard let avatarURLString,
+              let url = URL(string: avatarURLString),
+              url.isFileURL
+        else { return nil }
+        return UIImage(contentsOfFile: url.path)
     }
 }
 
