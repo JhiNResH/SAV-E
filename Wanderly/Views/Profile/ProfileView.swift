@@ -34,12 +34,7 @@ struct ProfileView: View {
                     .padding(.top, 16)
 
                     PassportHero(
-                        profile: viewModel.profile,
-                        onEdit: {
-                            draftDisplayName = viewModel.profile.displayName
-                            draftAvatarData = nil
-                            showEditProfile = true
-                        }
+                        profile: viewModel.profile
                     )
                     .padding(.horizontal)
 
@@ -372,7 +367,6 @@ private struct PassportIconButton: View {
 private struct PassportHero: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     let profile: UserProfile
-    let onEdit: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -413,20 +407,6 @@ private struct PassportHero: View {
                     PassportBadge(text: languageSettings.text(.memoHelper), color: .saveHoney)
                     PassportBadge(text: visitedBadgeText, color: .saveSignal)
                     Spacer()
-                    Button(action: onEdit) {
-                        Image(systemName: "pencil")
-                            .font(.caption.weight(.black))
-                            .foregroundColor(.saveInk)
-                            .frame(width: 32, height: 32)
-                            .background(Color.saveCream)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 1.6)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(languageSettings.text(.editPassportAccessibility))
                 }
             }
             .padding(16)
