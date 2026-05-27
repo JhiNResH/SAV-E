@@ -57,13 +57,13 @@ final class AIDrawerViewModel: ObservableObject {
         let currentLocation = locationIntentRecommendationService.requiresCurrentLocation(for: trimmed)
             ? await locationService.requestCurrentLocation()
             : locationService.currentLocation
-        if let gatedResponse = locationIntentRecommendationService.recommendationResponse(
+        if let gatedResponse = locationIntentRecommendationService.recommendationSearchResponse(
             for: trimmed,
             places: places,
             currentLocation: currentLocation
         ) {
-            drawerState = .displaying(gatedResponse)
-            mapAction = gatedResponse.mapAction
+            drawerState = .saveSearchResults(gatedResponse)
+            mapAction = mapAction(for: gatedResponse)
             return
         }
 
@@ -192,6 +192,10 @@ final class AIDrawerViewModel: ObservableObject {
             mapAction: nil,
             aiMessage: message
         ))
+    }
+
+    func shouldSearchNearbyUnsavedCandidates(for query: String) -> Bool {
+        saveSearchController.shouldPrepareMapCandidates(for: query)
     }
 
     func resolvePlaces(from ids: [String]) -> [Place] {

@@ -2,7 +2,7 @@ import Foundation
 
 struct SaveSearchController {
     func shouldPrepareMapCandidates(for rawQuery: String) -> Bool {
-        SaveSearchQuery(rawValue: rawQuery).wantsNewRecommendations
+        SaveSearchQuery(rawValue: rawQuery).wantsPublicDiscovery
     }
 
     func makeSaveDraft(from result: SaveSearchResult) -> SavePlaceDraft? {
@@ -88,7 +88,12 @@ struct SaveSearchController {
             }
         let mapRecommendationResults = mapCandidates
             .map(makeMapCandidateResult)
-            .filter { query.matches($0) || (query.wantsNewRecommendations && query.terms.isEmpty) }
+            .filter { result in
+                if !query.categories.isEmpty, let category = result.category {
+                    return query.categories.contains(category)
+                }
+                return query.matches(result) || query.terms.isEmpty
+            }
             .sorted { lhs, rhs in
                 let lhsScore = query.score(lhs)
                 let rhsScore = query.score(rhs)
@@ -98,7 +103,7 @@ struct SaveSearchController {
 
         let recommendationResults = !mapRecommendationResults.isEmpty
             ? mapRecommendationResults
-            : (query.wantsNewRecommendations && localResults.isEmpty ? [makeRecommendationShell(for: query)] : [])
+            : (query.wantsPublicDiscovery && localResults.isEmpty ? [makeRecommendationShell(for: query)] : [])
 
         return SaveSearchResponse(
             query: rawQuery,
@@ -324,6 +329,7 @@ private struct SaveSearchQuery {
     let states: Set<SaveSearchUserState>
     let intent: SaveIntentQuery?
     let wantsNewRecommendations: Bool
+    let wantsPublicDiscovery: Bool
     let stableIDFragment: String
 
     init(rawValue: String) {
@@ -340,6 +346,10 @@ private struct SaveSearchQuery {
         let containsCravingIntent = intent != nil && Self.containsAny(
             normalizedRaw,
             keywords: ["want", "craving", "feel like", "想", "想喝", "想吃", "喝", "吃"]
+        )
+        wantsPublicDiscovery = Self.containsAny(
+            normalizedRaw,
+            keywords: ["new", "unsaved", "public", "discover", "search nearby unsaved", "新的", "沒存", "未儲存", "找新"]
         )
         wantsNewRecommendations = containsRecommendationKeyword || containsCravingIntent
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)

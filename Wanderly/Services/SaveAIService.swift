@@ -9,19 +9,21 @@ struct ConversationTurn: Equatable {
 final class SaveAIService {
     static let shared = SaveAIService()
 
-    private static let modelFallbacks = [
-        "gemini-2.5-flash-lite",
+    static let defaultModelFallbacks = [
         "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
         "gemini-flash-lite-latest"
     ]
 
     private let apiKey: String?
+    private let modelFallbacks: [String]
 
-    init(apiKey: String? = nil) {
+    init(apiKey: String? = nil, modelFallbacks: [String] = SaveAIService.defaultModelFallbacks) {
         let resolved = apiKey
             ?? ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
             ?? Self.keyFromPlist("GEMINI_API_KEY")
         self.apiKey = resolved
+        self.modelFallbacks = modelFallbacks
         print("[SaveAI] API key resolved: \(resolved != nil ? "yes" : "nil")")
     }
 
@@ -97,7 +99,7 @@ final class SaveAIService {
         let requestBody = try JSONSerialization.data(withJSONObject: body)
 
         var lastError: SaveAIError?
-        for model in Self.modelFallbacks {
+        for model in modelFallbacks {
             let endpoint = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
             var request = URLRequest(url: endpoint)
             request.httpMethod = "POST"

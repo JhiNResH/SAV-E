@@ -35,6 +35,17 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertEqual(response.placeIds, [nearbyCafe.id.uuidString])
         XCTAssertEqual(response.mapAction?.type, .filterPins)
         XCTAssertEqual(response.mapAction?.placeIds, [nearbyCafe.id.uuidString])
+
+        let sectioned = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "附近咖啡廳",
+            places: [nearbyCafe, nearbyNonCafe, farCafe],
+            currentLocation: currentLocation
+        ))
+        XCTAssertEqual(sectioned.fromYourSave.title, "From your SAV-E nearby")
+        XCTAssertEqual(sectioned.fromYourSave.results.map(\.title), ["Cafe A"])
+        XCTAssertEqual(sectioned.additionalSections.first?.title, "Saved but not nearby")
+        XCTAssertEqual(sectioned.additionalSections.first?.results.map(\.title), ["Cafe C"])
+        XCTAssertFalse(sectioned.newRecommendations.showsNearbySearchAction)
     }
 
     func testNoNearbyCafeDoesNotRecommendWrongCategory() throws {
@@ -64,6 +75,16 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertNil(response.mapAction)
         XCTAssertTrue(response.messageText?.contains("附近沒有咖啡廳") == true)
         XCTAssertTrue(response.messageText?.contains("did not recommend other categories") == true)
+
+        let sectioned = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "附近咖啡廳",
+            places: [nearbyNonCafe, farCafe],
+            currentLocation: currentLocation
+        ))
+        XCTAssertTrue(sectioned.fromYourSave.results.isEmpty)
+        XCTAssertTrue(sectioned.fromYourSave.showsNearbySearchAction)
+        XCTAssertEqual(sectioned.additionalSections.first?.results.map(\.title), ["Cafe C"])
+        XCTAssertTrue(sectioned.newRecommendations.showsNearbySearchAction)
     }
 
     func testNearbyCafeWithoutCurrentLocationReturnsLocationNeededMessage() throws {
@@ -106,6 +127,21 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertFalse(response.placeIds.contains(dinner.id.uuidString))
     }
 
+    func testCoffeeCravingWithoutSavedCafeOffersExplicitUnsavedFallback() throws {
+        let service = SaveLocationIntentRecommendationService()
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "我今天想喝咖啡推薦一家咖啡給我",
+            places: [],
+            currentLocation: nil
+        ))
+
+        XCTAssertEqual(response.fromYourSave.title, "No saved cafe")
+        XCTAssertTrue(response.fromYourSave.results.isEmpty)
+        XCTAssertTrue(response.newRecommendations.showsNearbySearchAction)
+        XCTAssertTrue(response.newRecommendations.results.isEmpty)
+    }
+
     func testUnsupportedGymQueryDoesNotMapToFoodOrCafe() throws {
         let service = SaveLocationIntentRecommendationService()
 
@@ -132,6 +168,46 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertTrue(intent.mustMatchCategory)
         XCTAssertTrue(intent.mustMatchLocation)
         XCTAssertEqual(intent.locationMode, .currentLocation(radiusMeters: 2_000))
+    }
+
+    func testDeterministicParserHandlesMilkTeaWithoutLocationAndNamedArea() throws {
+        let parser = SaveSearchIntentParser()
+        let milkTea = try XCTUnwrap(parser.parse("我今天想喝奶茶"))
+        XCTAssertEqual(milkTea.requiredCategories, [.cafe])
+        XCTAssertEqual(milkTea.locationMode, .savedAnywhere)
+        XCTAssertFalse(milkTea.mustMatchLocation)
+
+        let laCoffee = try XCTUnwrap(parser.parse("coffee in LA"))
+        XCTAssertEqual(laCoffee.requiredCategories, [.cafe])
+        XCTAssertEqual(laCoffee.locationMode, .namedArea("Los Angeles"))
+    }
+
+    func testIntentJSONValidatorRejectsUnsafeModelOutput() throws {
+        let validator = SaveSearchIntentJSONValidator()
+        let valid = """
+        {
+          "kind": "categoryRecommendation",
+          "requiredCategories": ["cafe"],
+          "optionalCategories": [],
+          "locationMode": {"type": "currentLocation", "radiusMeters": 2000},
+          "sourceScope": "savedFirstAllowPublicFallback",
+          "mustMatchCategory": true,
+          "mustMatchLocation": true,
+          "confidence": 0.94
+        }
+        """
+        let intent = try validator.parseIntentJSON(valid, rawText: "附近咖啡廳")
+        XCTAssertEqual(intent.requiredCategories, [.cafe])
+        XCTAssertEqual(intent.locationMode, .currentLocation(radiusMeters: 2_000))
+
+        let unknownCategory = valid.replacingOccurrences(of: #""cafe""#, with: #""gym""#)
+        XCTAssertThrowsError(try validator.parseIntentJSON(unknownCategory, rawText: "附近健身房"))
+
+        let unsafeLocationGate = valid.replacingOccurrences(of: #""mustMatchLocation": true"#, with: #""mustMatchLocation": false"#)
+        XCTAssertThrowsError(try validator.parseIntentJSON(unsafeLocationGate, rawText: "附近咖啡廳"))
+
+        let unsafeRadius = valid.replacingOccurrences(of: #""radiusMeters": 2000"#, with: #""radiusMeters": 100000"#)
+        XCTAssertThrowsError(try validator.parseIntentJSON(unsafeRadius, rawText: "附近咖啡廳"))
     }
 
     private func place(

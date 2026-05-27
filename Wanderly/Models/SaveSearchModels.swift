@@ -774,14 +774,47 @@ extension SaveSearchResult {
 
 struct SaveSearchSection: Identifiable, Hashable {
     var id: String
+    var label: String?
     var title: String
     var subtitle: String
     var results: [SaveSearchResult]
     var emptyMessage: String?
+    var showsNearbySearchAction: Bool
+
+    init(
+        id: String,
+        label: String? = nil,
+        title: String,
+        subtitle: String,
+        results: [SaveSearchResult],
+        emptyMessage: String? = nil,
+        showsNearbySearchAction: Bool = false
+    ) {
+        self.id = id
+        self.label = label
+        self.title = title
+        self.subtitle = subtitle
+        self.results = results
+        self.emptyMessage = emptyMessage
+        self.showsNearbySearchAction = showsNearbySearchAction
+    }
 }
 
 struct SaveSearchResponse: Equatable {
     var query: String
     var fromYourSave: SaveSearchSection
+    var additionalSections: [SaveSearchSection]
     var newRecommendations: SaveSearchSection
+
+    init(
+        query: String,
+        fromYourSave: SaveSearchSection,
+        additionalSections: [SaveSearchSection] = [],
+        newRecommendations: SaveSearchSection
+    ) {
+        self.query = query
+        self.fromYourSave = fromYourSave
+        self.additionalSections = additionalSections
+        self.newRecommendations = newRecommendations
+    }
 }

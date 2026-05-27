@@ -13,18 +13,20 @@ struct SaveLocationIntentRecommendationService {
         return intent.mustMatchLocation
     }
 
-    func recommendationResponse(
+    func recommendationSearchResponse(
         for query: String,
         places: [Place],
         currentLocation: CLLocation?
-    ) -> SaveAIResponse? {
+    ) -> SaveSearchResponse? {
         guard let intent = parser.parse(query),
               intent.kind == .categoryRecommendation || intent.kind == .craving || intent.mustMatchLocation else {
             return nil
         }
+        guard intent.sourceScope != .publicOnly else { return nil }
 
         if let unsupportedCategoryLabel = intent.unsupportedCategoryLabel {
-            return messageResponse(
+            return emptyResponse(
+                query: query,
                 title: "Unsupported category",
                 message: "SAV-E doesn't have a \(unsupportedCategoryLabel) category yet, so I won't map this to food or cafe by accident. You can search saved names/notes, or ask to search public nearby places."
             )
@@ -33,7 +35,8 @@ struct SaveLocationIntentRecommendationService {
         guard !intent.requiredCategories.isEmpty else { return nil }
 
         if intent.mustMatchLocation, currentLocation == nil {
-            return messageResponse(
+            return emptyResponse(
+                query: query,
                 title: "Location needed",
                 message: "I need your current location before I can answer nearby requests. Or ask for saved \(categoryLabel(for: intent)) anywhere."
             )
@@ -58,30 +61,67 @@ struct SaveLocationIntentRecommendationService {
                 let farContext = far.isEmpty
                     ? ""
                     : " You do have saved \(categoryLabel(for: intent)) places, but the closest one is outside the nearby radius."
-                return messageResponse(
-                    title: "No nearby \(categoryLabel(for: intent))",
-                    message: "你的 SAV-E 裡附近沒有\(localizedCategoryLabel(for: intent))。I did not recommend other categories because you asked for \(categoryLabel(for: intent)).\(farContext)"
+                return sectionedResponse(
+                    query: query,
+                    message: "你的 SAV-E 裡附近沒有\(localizedCategoryLabel(for: intent))。I did not recommend other categories because you asked for \(categoryLabel(for: intent)).\(farContext)",
+                    nearby: [],
+                    far: far,
+                    intent: intent,
+                    currentLocation: currentLocation,
+                    showFallbackAction: true
                 )
             }
 
-            return placeListResponse(
-                title: "Nearby \(categoryLabel(for: intent))",
-                places: nearby,
-                aiMessage: "Found \(nearby.count) saved nearby \(categoryLabel(for: intent)) place\(nearby.count == 1 ? "" : "s") from your SAV-E."
+            return sectionedResponse(
+                query: query,
+                message: "Found \(nearby.count) saved nearby \(categoryLabel(for: intent)) place\(nearby.count == 1 ? "" : "s") from your SAV-E.",
+                nearby: nearby,
+                far: far,
+                intent: intent,
+                currentLocation: currentLocation,
+                showFallbackAction: false
             )
         }
 
         guard !rankedCategoryMatches.isEmpty else {
-            return messageResponse(
+            return emptyResponse(
+                query: query,
                 title: "No saved \(categoryLabel(for: intent))",
-                message: "Your SAV-E does not have saved \(categoryLabel(for: intent)) places yet."
+                message: "Your SAV-E does not have saved \(categoryLabel(for: intent)) places yet.",
+                showFallbackAction: true
             )
         }
 
-        return placeListResponse(
-            title: "Saved \(categoryLabel(for: intent))",
-            places: rankedCategoryMatches,
-            aiMessage: "Showing saved \(categoryLabel(for: intent)) places from your SAV-E."
+        return sectionedResponse(
+            query: query,
+            message: "Showing saved \(categoryLabel(for: intent)) places from your SAV-E.",
+            nearby: rankedCategoryMatches,
+            far: [],
+            intent: intent,
+            currentLocation: currentLocation,
+            showFallbackAction: false
+        )
+    }
+
+    func recommendationResponse(
+        for query: String,
+        places: [Place],
+        currentLocation: CLLocation?
+    ) -> SaveAIResponse? {
+        guard let response = recommendationSearchResponse(for: query, places: places, currentLocation: currentLocation) else {
+            return nil
+        }
+        let ids = response.fromYourSave.results.map { rawPlaceId(from: $0.id) }.compactMap { $0 }
+        return SaveAIResponse(
+            componentType: ids.isEmpty ? .message : .placeList,
+            title: response.fromYourSave.title,
+            placeIds: ids,
+            navigationPlaceId: nil,
+            transportMode: .walking,
+            itineraryDays: [],
+            messageText: response.fromYourSave.emptyMessage,
+            mapAction: ids.isEmpty ? nil : MapActionData(type: .filterPins, placeIds: ids, lat: nil, lng: nil, span: nil),
+            aiMessage: response.fromYourSave.subtitle
         )
     }
 
@@ -117,33 +157,131 @@ struct SaveLocationIntentRecommendationService {
         currentLocation.distance(from: CLLocation(latitude: place.latitude, longitude: place.longitude))
     }
 
-    private func placeListResponse(title: String, places: [Place], aiMessage: String) -> SaveAIResponse {
-        let ids = places.map { $0.id.uuidString }
-        return SaveAIResponse(
-            componentType: .placeList,
-            title: title,
-            placeIds: ids,
-            navigationPlaceId: nil,
-            transportMode: .walking,
-            itineraryDays: [],
-            messageText: nil,
-            mapAction: MapActionData(type: .filterPins, placeIds: ids, lat: nil, lng: nil, span: nil),
-            aiMessage: aiMessage
+    private func sectionedResponse(
+        query: String,
+        message: String,
+        nearby: [Place],
+        far: [Place],
+        intent: SaveSearchIntent,
+        currentLocation: CLLocation?,
+        showFallbackAction: Bool
+    ) -> SaveSearchResponse {
+        let nearbySection = SaveSearchSection(
+                id: "from-your-save-nearby",
+                label: "FROM YOUR SAV-E",
+                title: "From your SAV-E nearby",
+                subtitle: message,
+                results: searchResults(for: nearby, intent: intent, currentLocation: currentLocation, isNearby: true),
+                emptyMessage: nearby.isEmpty ? message : nil,
+                showsNearbySearchAction: showFallbackAction
+        )
+
+        var additional: [SaveSearchSection] = []
+        if !far.isEmpty {
+            additional.append(SaveSearchSection(
+                id: "saved-but-not-nearby",
+                label: "SAVED, FAR",
+                title: "Saved but not nearby",
+                subtitle: "Same category, outside the current nearby radius. Not used as a primary recommendation.",
+                results: searchResults(for: Array(far.prefix(5)), intent: intent, currentLocation: currentLocation, isNearby: false),
+                emptyMessage: nil
+            ))
+        }
+
+        return SaveSearchResponse(
+            query: query,
+            fromYourSave: nearbySection,
+            additionalSections: additional,
+            newRecommendations: SaveSearchSection(
+                id: "nearby-unsaved-candidates",
+                label: "NEW / UNSAVED",
+                title: "Nearby unsaved candidates",
+                subtitle: "Public map results stay separate until you explicitly save one.",
+                results: [],
+                emptyMessage: showFallbackAction ? "Search public nearby candidates only if you want places outside your SAV-E." : nil,
+                showsNearbySearchAction: showFallbackAction
+            )
         )
     }
 
-    private func messageResponse(title: String, message: String) -> SaveAIResponse {
-        SaveAIResponse(
-            componentType: .message,
-            title: title,
-            placeIds: [],
-            navigationPlaceId: nil,
-            transportMode: .walking,
-            itineraryDays: [],
-            messageText: message,
-            mapAction: nil,
-            aiMessage: message
+    private func emptyResponse(query: String, title: String, message: String, showFallbackAction: Bool = false) -> SaveSearchResponse {
+        SaveSearchResponse(
+            query: query,
+            fromYourSave: SaveSearchSection(
+                id: "from-your-save-nearby",
+                label: "FROM YOUR SAV-E",
+                title: title,
+                subtitle: message,
+                results: [],
+                emptyMessage: message
+            ),
+            newRecommendations: SaveSearchSection(
+                id: "nearby-unsaved-candidates",
+                label: "NEW / UNSAVED",
+                title: "Nearby unsaved candidates",
+                subtitle: "Public results are explicit fallback only.",
+                results: [],
+                emptyMessage: showFallbackAction ? "Search public nearby candidates only if you want places outside your SAV-E." : nil,
+                showsNearbySearchAction: showFallbackAction
+            )
         )
+    }
+
+    private func searchResults(
+        for places: [Place],
+        intent: SaveSearchIntent,
+        currentLocation: CLLocation?,
+        isNearby: Bool
+    ) -> [SaveSearchResult] {
+        places.map { place in
+            let reasons = reasons(for: place, intent: intent, currentLocation: currentLocation, isNearby: isNearby)
+            return SaveSearchResult(
+                id: "place-\(place.id.uuidString)",
+                objectType: place.status == .visited ? .triedMemory : .savedPlace,
+                userState: place.status == .visited ? .visited : .wantToGo,
+                title: place.name,
+                subtitle: place.address,
+                statusLabel: place.status.memoryCardLabel,
+                sourceURL: place.sourceUrl,
+                sourcePlatform: place.sourcePlatform,
+                category: place.category,
+                cityOrArea: nil,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                rating: place.googleRating ?? place.rating,
+                reviewCount: nil,
+                confidence: nil,
+                missingInfo: [],
+                evidence: reasons,
+                recoveryQueries: [],
+                createdAt: place.createdAt,
+                canRunRecovery: false,
+                isRecommendationShell: false,
+                primaryAction: place.sourceUrl == nil ? .planAround : .openSource
+            )
+        }
+    }
+
+    private func reasons(for place: Place, intent: SaveSearchIntent, currentLocation: CLLocation?, isNearby: Bool) -> [String] {
+        var values = ["\(place.category.displayName) Map Stamp"]
+        if !intent.categoryNeedles.isEmpty, evidenceScore(place, needles: intent.categoryNeedles) > 0 {
+            values.append("Saved evidence matches \(intent.categoryNeedles.prefix(2).joined(separator: " / "))")
+        }
+        if let currentLocation {
+            let meters = distanceMeters(from: currentLocation, to: place)
+            values.append(isNearby ? "\(distanceLabel(meters)) away" : "\(distanceLabel(meters)) away, outside nearby radius")
+        }
+        if place.sourceUrl != nil {
+            values.append("Has source receipt")
+        }
+        return values
+    }
+
+    private func distanceLabel(_ meters: CLLocationDistance) -> String {
+        if meters >= 1_000 {
+            return String(format: "%.1f km", meters / 1_000)
+        }
+        return "\(Int(meters.rounded())) m"
     }
 
     private func categoryLabel(for intent: SaveSearchIntent) -> String {
@@ -161,5 +299,10 @@ struct SaveLocationIntentRecommendationService {
         case .stay: return "住宿"
         case .shopping: return "購物地點"
         }
+    }
+
+    private func rawPlaceId(from resultId: String) -> String? {
+        guard resultId.hasPrefix("place-") else { return nil }
+        return String(resultId.dropFirst("place-".count))
     }
 }
