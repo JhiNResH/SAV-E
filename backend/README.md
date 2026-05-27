@@ -35,6 +35,10 @@ Persistence routes accept either `Authorization: Bearer <Privy access token>` or
 - `POST /places`
 - `PATCH /places/:id`
 - `DELETE /places/:id`
+- `PATCH /places/:id/visibility` — opt a saved place into friends/public social signals; `private` disables all social signal flags.
+- `POST /follows` — follow another profile by `following_id`, `handle`, or `referral_code`.
+- `GET /social/signals?lens=forYou|friends|trending` — returns friend/trending social place rows from explicit follows and visibility opt-ins only.
+- `GET /referrals/:code` or `GET /referrals?handle=:handle` — public referral profile preview with opted-in featured places.
 - `GET /trips`
 - `POST /trips`
 - `PATCH /trips/:id`
