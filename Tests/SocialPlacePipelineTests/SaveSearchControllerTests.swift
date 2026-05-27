@@ -4,6 +4,80 @@ import CoreLocation
 @testable import Wanderly
 
 final class SaveSearchControllerTests: XCTestCase {
+    func testSavePlaceDrawerPresentationMapsCoreStates() {
+        let savedPlace = place(
+            name: "Bright Coffee Bar",
+            address: "Irvine, CA",
+            category: .cafe
+        )
+        let savedPresentation = SavePlaceDrawerPresentation(place: savedPlace)
+
+        XCTAssertEqual(savedPresentation.state, .mapStamp)
+        XCTAssertEqual(savedPresentation.eyebrow, "Map Stamp · From your SAV-E")
+        XCTAssertEqual(savedPresentation.primaryActionTitle, "Plan around this")
+
+        let reviewCandidate = PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: "Quarter Sheets",
+            address: "1305 Portia St",
+            city: "Los Angeles",
+            latitude: 34.083,
+            longitude: -118.254,
+            evidence: ["Google Places match"],
+            confidence: 0.86,
+            missingInfo: [],
+            status: "pending",
+            createdAt: Date()
+        )
+        let reviewPresentation = SavePlaceDrawerPresentation(reviewCandidate: reviewCandidate)
+
+        XCTAssertEqual(reviewPresentation.state, .reviewCandidate)
+        XCTAssertEqual(reviewPresentation.eyebrow, "Review Candidate · Check before saving")
+        XCTAssertEqual(reviewPresentation.primaryActionTitle, "Confirm place")
+
+        let sourceClue = PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: "Brunch reel",
+            address: "",
+            city: "Irvine",
+            latitude: nil,
+            longitude: nil,
+            evidence: ["Instagram source clue"],
+            confidence: 0.42,
+            missingInfo: ["Confirm address", "Confirm coordinates"],
+            status: "pending",
+            createdAt: Date()
+        )
+        let cluePresentation = SavePlaceDrawerPresentation(reviewCandidate: sourceClue)
+
+        XCTAssertEqual(cluePresentation.state, .clue)
+        XCTAssertEqual(cluePresentation.eyebrow, "Clue · Needs exact place")
+        XCTAssertEqual(cluePresentation.primaryActionTitle, "Find exact place")
+    }
+
+    func testSavePlaceDrawerPresentationLabelsUnsavedMapCandidatesSeparately() {
+        let candidate = SaveMapCandidate(
+            title: "Costco Wholesale",
+            subtitle: "Selected on map",
+            latitude: 33.69,
+            longitude: -117.83,
+            category: .shopping,
+            distanceMeters: 1_700,
+            evidence: ["Apple Maps POI"]
+        )
+
+        let presentation = SavePlaceDrawerPresentation(mapCandidate: candidate)
+
+        XCTAssertEqual(presentation.state, .unsavedMapCandidate)
+        XCTAssertEqual(presentation.eyebrow, "Not saved yet")
+        XCTAssertEqual(presentation.primaryActionTitle, "Save this place")
+        XCTAssertTrue(presentation.contextLine.contains("Shopping"))
+        XCTAssertTrue(presentation.contextLine.contains("1.7 km away"))
+        XCTAssertFalse(presentation.trustLine.contains("Map Stamp"))
+    }
+
     func testSavedPlaceMatchesUnderlyingMapPOI() {
         let savedPlace = place(
             name: "Bright Coffee Bar",
@@ -654,9 +728,9 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.addToTrip))
 
         let unsavedMapPlace = try XCTUnwrap(response.newRecommendations.results.first { $0.objectType == .mapVisibleUnsavedPlace })
-        XCTAssertEqual(unsavedMapPlace.objectType.displayName, "Unsaved Candidate")
+        XCTAssertEqual(unsavedMapPlace.objectType.displayName, "Not saved yet")
         XCTAssertEqual(unsavedMapPlace.agentDrawer.primaryAction.kind, .savePlace)
-        XCTAssertEqual(unsavedMapPlace.agentDrawer.heading, "Save unsaved candidate")
+        XCTAssertEqual(unsavedMapPlace.agentDrawer.heading, "Not saved yet")
         XCTAssertTrue(unsavedMapPlace.agentDrawer.secondaryActions.map(\.kind).contains(.planAround))
         XCTAssertTrue(unsavedMapPlace.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
     }
