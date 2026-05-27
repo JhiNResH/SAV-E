@@ -367,7 +367,7 @@ private struct SaveSearchQuery {
             keywords: ["find", "search", "looking for", "nearby", "nearest", "near me", "around here", "找", "搜尋", "搜索", "附近"]
         )
         wantsMapCandidatePreparation = wantsPublicDiscovery ||
-            (intent != nil && containsPlaceSearchLanguage)
+            (intent != nil && (containsPlaceSearchLanguage || !categories.isEmpty))
         wantsNewRecommendations = containsRecommendationKeyword || containsCravingIntent
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)
         terms = Self.parseTerms(from: normalizedRaw, intent: intent)
