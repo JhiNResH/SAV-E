@@ -164,14 +164,62 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.newRecommendations.results.first?.reviewCount, 1200)
     }
 
-    func testPublicFallbackPreparationRequiresExplicitUnsavedIntent() {
+    func testMapCandidatePreparationRecognizesPlaceSearchIntent() {
         let controller = SaveSearchController()
 
-        XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "附近咖啡廳"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "附近咖啡廳"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "我想找餐廳"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "find restaurants"))
         XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "New York"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "Search nearby unsaved cafes"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "找附近新的咖啡廳"))
         XCTAssertEqual(controller.mapCandidateCategories(for: "search nearby unsaved candidates for 我今天想喝咖啡推薦一家"), [.cafe])
+    }
+
+    func testRestaurantSearchReturnsSavedAndUnsavedCandidatesWhenPrepared() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "我想找餐廳",
+            places: [
+                place(
+                    name: "Saved Sushi",
+                    address: "Irvine, CA",
+                    category: .food
+                )
+            ],
+            localRecords: [],
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "Unsaved Ramen",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6846,
+                    longitude: -117.8265,
+                    category: .food,
+                    rating: 4.6,
+                    reviewCount: 420,
+                    sourceURL: "https://maps.apple.com/?q=Unsaved+Ramen",
+                    sourcePlatform: .other,
+                    evidence: ["Apple Maps result", "Search: restaurant"]
+                ),
+                SaveMapCandidate(
+                    title: "Unsaved Coffee",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6848,
+                    longitude: -117.8267,
+                    category: .cafe,
+                    rating: 4.8,
+                    reviewCount: 1200,
+                    sourceURL: "https://maps.apple.com/?q=Unsaved+Coffee",
+                    sourcePlatform: .other,
+                    evidence: ["Apple Maps result", "Search: coffee"]
+                )
+            ]
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Saved Sushi"])
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Ramen"])
+        XCTAssertEqual(response.newRecommendations.results.first?.objectType, .mapVisibleUnsavedPlace)
+        XCTAssertEqual(response.newRecommendations.results.first?.userState, .unsaved)
     }
 
     func testReviewCandidateMilkTeaMatchStaysReviewScoped() throws {
@@ -674,9 +722,9 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(shareText.contains("Kato"))
         XCTAssertTrue(shareText.contains("777 S Alameda St, Los Angeles, CA"))
         XCTAssertTrue(shareText.contains("Source: https://www.instagram.com/reel/kato/"))
-        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e.app/p/"))
+        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e-app.vercel.app/p/"))
         XCTAssertFalse(shareText.contains("Map fallback: https://maps.apple.com"))
-        XCTAssertEqual(savedPlace.saveShareURL?.host, "sav-e.app")
+        XCTAssertEqual(savedPlace.saveShareURL?.host, "sav-e-app.vercel.app")
         XCTAssertTrue(savedPlace.saveShareURL?.path.hasPrefix("/p/") == true)
     }
 
@@ -701,9 +749,9 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(shareText.contains("Rating: 4.8"))
         XCTAssertTrue(shareText.contains("Reviews: 1200"))
         XCTAssertTrue(shareText.contains("Source: https://maps.google.com/?q=Bright+Coffee+Bar"))
-        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e.app/p/"))
+        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e-app.vercel.app/p/"))
         XCTAssertFalse(shareText.contains("Map fallback: https://maps.apple.com"))
-        XCTAssertEqual(candidate.saveShareURL?.host, "sav-e.app")
+        XCTAssertEqual(candidate.saveShareURL?.host, "sav-e-app.vercel.app")
         XCTAssertTrue(candidate.saveShareURL?.path.hasPrefix("/p/") == true)
     }
 

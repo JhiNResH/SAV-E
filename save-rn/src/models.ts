@@ -51,6 +51,23 @@ export type SharedTripData = {
   stops: SharedStop[];
 };
 
+export type SharedPlaceData = {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  category: string;
+  rating?: number | null;
+  reviewCount?: number | null;
+  priceRange?: string | null;
+  hours?: string | null;
+  sourceLabel: string;
+  sourceURL?: string | null;
+  photoURLs: string[];
+  note?: string | null;
+};
+
 export type TripStop = {
   id: string;
   placeId?: string | null;

@@ -2,7 +2,7 @@ import Foundation
 
 struct SaveSearchController {
     func shouldPrepareMapCandidates(for rawQuery: String) -> Bool {
-        SaveSearchQuery(rawValue: rawQuery).wantsPublicDiscovery
+        SaveSearchQuery(rawValue: rawQuery).wantsMapCandidatePreparation
     }
 
     func mapCandidateCategories(for rawQuery: String) -> Set<PlaceCategory> {
@@ -334,6 +334,7 @@ private struct SaveSearchQuery {
     let intent: SaveIntentQuery?
     let wantsNewRecommendations: Bool
     let wantsPublicDiscovery: Bool
+    let wantsMapCandidatePreparation: Bool
     let stableIDFragment: String
 
     init(rawValue: String) {
@@ -361,6 +362,12 @@ private struct SaveSearchQuery {
                 "新的", "沒存", "未儲存", "找新"
             ]
         )
+        let containsPlaceSearchLanguage = Self.containsAny(
+            normalizedRaw,
+            keywords: ["find", "search", "looking for", "nearby", "nearest", "near me", "around here", "找", "搜尋", "搜索", "附近"]
+        )
+        wantsMapCandidatePreparation = wantsPublicDiscovery ||
+            (intent != nil && containsPlaceSearchLanguage)
         wantsNewRecommendations = containsRecommendationKeyword || containsCravingIntent
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)
         terms = Self.parseTerms(from: normalizedRaw, intent: intent)

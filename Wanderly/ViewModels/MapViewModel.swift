@@ -844,7 +844,16 @@ final class MapViewModel: ObservableObject {
 
     func prepareMapCandidatesForDrawerQuery(_ query: String) async -> [SaveMapCandidate] {
         guard saveSearchController.shouldPrepareMapCandidates(for: query) else { return mapCandidates }
-        let searchCenter = await mapCandidateSearchCenter(for: query)
+        let searchCenter: CLLocationCoordinate2D?
+        if saveSearchIntentParser.parse(query)?.mustMatchLocation == true {
+            guard let currentLocationCenter = await mapCandidateSearchCenter(for: query) else {
+                mapCandidates = []
+                return []
+            }
+            searchCenter = currentLocationCenter
+        } else {
+            searchCenter = nil
+        }
         await refreshMapCandidates(near: searchCenter)
         let categories = saveSearchController.mapCandidateCategories(for: query)
         if !categories.isEmpty {

@@ -106,6 +106,10 @@ struct SaveSearchIntentParser {
         if let namedArea = namedArea(in: normalized) {
             return .namedArea(namedArea)
         }
+        if categoryMatch(in: normalized) != nil,
+           containsAny(normalized, keywords: ["find", "search", "looking for", "找", "搜尋", "搜索"]) {
+            return .currentLocation(radiusMeters: 2_000)
+        }
         if containsAny(normalized, keywords: ["today", "tonight", "now", "right now", "今天", "今晚", "現在", "现在"]) {
             return .currentLocation(radiusMeters: 2_000)
         }

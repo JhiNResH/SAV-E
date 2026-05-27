@@ -115,6 +115,47 @@ final class SocialPlacePipelineTests: XCTestCase {
         ))
     }
 
+    func testGoogleMapsSavedListExtractsEscapedQueryPlaceLinks() {
+        let html = #"""
+        <a aria-label="Gem Dining" href="https:\/\/www.google.com\/maps?cid=123456789\u0026query_place_id=ChIJ123">Open</a>
+        <a title="Stereoscope Coffee" href="/maps?cid=987654321&amp;ftid=0x80c2">Open</a>
+        """#
+
+        let candidates = GoogleMapsListPlaceExtractor.extractCandidates(
+            sourceURL: "https://maps.app.goo.gl/saved-list",
+            title: "Dinner ideas · Google Maps",
+            text: nil,
+            metadataTitle: "Dinner ideas - Google Maps",
+            metadataDescription: nil,
+            htmlText: html
+        )
+
+        XCTAssertEqual(candidates.map(\.name), ["Gem Dining", "Stereoscope Coffee"])
+    }
+
+    func testGoogleMapsSavedListPrivateShellHasNoInventedCandidates() {
+        let html = """
+        <title>Private list - Google Maps</title>
+        <meta name="description" content="Saved places">
+        """
+
+        XCTAssertTrue(GoogleMapsListPlaceExtractor.looksLikeGoogleMapsList(
+            sourceURL: "https://maps.app.goo.gl/private-list",
+            title: "Private list - Google Maps",
+            text: nil,
+            metadataTitle: "Private list - Google Maps",
+            metadataDescription: "Saved places"
+        ))
+        XCTAssertTrue(GoogleMapsListPlaceExtractor.extractCandidates(
+            sourceURL: "https://maps.app.goo.gl/private-list",
+            title: "Private list - Google Maps",
+            text: nil,
+            metadataTitle: "Private list - Google Maps",
+            metadataDescription: "Saved places",
+            htmlText: html
+        ).isEmpty)
+    }
+
     func testGoogleTakeoutImportParsesBulkFileFormatsSeparatelyFromSavedListLinks() async throws {
         let json = """
         [

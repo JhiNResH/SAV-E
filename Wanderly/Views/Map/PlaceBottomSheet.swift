@@ -179,20 +179,8 @@ struct PlaceBottomSheet: View {
         place.verificationChips(sourceLabel: sourceConfirmationLabel)
     }
 
-    private var areaLabel: String? {
-        let parts = place.address
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 { return parts[parts.count - 2] }
-        return parts.first
-    }
-
     private var memorySummary: String {
-        if let areaLabel {
-            return "Map verified for \(place.name) in \(areaLabel). Address confirmed for this SAV-E memory."
-        }
-        return "Map verified and address confirmed for this SAV-E memory."
+        place.memorySummary
     }
 
 }
@@ -366,17 +354,33 @@ extension Place {
     }
 
     func verificationChips(sourceLabel: String? = nil) -> [PlaceVerificationChip] {
-        var chips = [
-            PlaceVerificationChip(icon: "checkmark.seal.fill", text: "Map verified")
-        ]
+        var chips: [PlaceVerificationChip] = []
         if !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            chips.append(PlaceVerificationChip(icon: "mappin.and.ellipse", text: "Address confirmed"))
+            chips.append(PlaceVerificationChip(icon: "mappin.and.ellipse", text: "Address saved"))
         }
         chips.append(PlaceVerificationChip(icon: "link", text: sourceLabel ?? sourceConfirmationLabel))
         if googlePlaceId != nil || googleRating != nil || googlePriceLevel != nil || openingHours != nil {
             chips.append(PlaceVerificationChip(icon: "building.2.fill", text: "Google Places details"))
         }
         return chips
+    }
+
+    var memorySummary: String {
+        if let note = cleanMemoryNote {
+            return note
+        }
+        if let dishes = extractedDishes, !dishes.isEmpty {
+            return "\(name) is saved for \(dishes.prefix(3).joined(separator: ", "))."
+        }
+        let category = category.displayName.lowercased()
+        if !shareAreaLabel.isEmpty {
+            return "\(name) is a saved \(category) in \(shareAreaLabel)."
+        }
+        let addressText = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !addressText.isEmpty {
+            return "\(name) is a saved \(category) at \(addressText)."
+        }
+        return "\(name) is saved in SAV-E as \(status.memoryCardLabel.lowercased())."
     }
 }
 
@@ -451,7 +455,7 @@ struct PlaceInsightSummaryPanel: View {
             HStack(spacing: 6) {
                 Image(systemName: "text.badge.checkmark")
                     .font(.caption.weight(.black))
-                Text("Place summary")
+                Text("Memory summary")
                     .font(.caption.weight(.black))
                 Spacer()
             }
@@ -459,9 +463,15 @@ struct PlaceInsightSummaryPanel: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 PlaceSummaryLine(icon: "sparkles", text: fallbackSummary)
-                PlaceSummaryLine(icon: "clock.fill", text: practicalInfo)
-                PlaceSummaryLine(icon: "star.fill", text: reviewSummary)
-                PlaceSummaryLine(icon: "hand.thumbsup.fill", text: recommendationSummary)
+                if let practicalInfo {
+                    PlaceSummaryLine(icon: "clock.fill", text: practicalInfo)
+                }
+                if let reviewSummary {
+                    PlaceSummaryLine(icon: "star.fill", text: reviewSummary)
+                }
+                if let recommendationSummary {
+                    PlaceSummaryLine(icon: "fork.knife", text: recommendationSummary)
+                }
             }
         }
         .padding(12)
@@ -473,21 +483,22 @@ struct PlaceInsightSummaryPanel: View {
         )
     }
 
-    private var practicalInfo: String {
+    private var practicalInfo: String? {
         var parts: [String] = []
         if let openingHours = cleaned(place.openingHours) {
-            parts.append(openingHours)
+            parts.append("Hours: \(openingHours)")
         }
         if let priceRange = cleaned(place.priceRange) {
-            parts.append(priceRange)
+            parts.append("Price: \(priceRange)")
         }
-        if parts.isEmpty {
-            parts.append(place.address.isEmpty ? "Address not saved yet" : place.address)
+        let address = place.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !address.isEmpty {
+            parts.append("Address: \(address)")
         }
-        return "Practical info: \(parts.joined(separator: " · "))"
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    private var reviewSummary: String {
+    private var reviewSummary: String? {
         var parts: [String] = []
         if let rating = place.googleRating ?? place.rating {
             parts.append(String(format: "%.1f stars", rating))
@@ -495,29 +506,17 @@ struct PlaceInsightSummaryPanel: View {
         if let reviewCountText = reviewCountText {
             parts.append(reviewCountText)
         }
-        return parts.isEmpty ? "Reviews: no rating or review count saved yet" : "Reviews: \(parts.joined(separator: " · "))"
+        return parts.isEmpty ? nil : "Reviews: \(parts.joined(separator: " · "))"
     }
 
-    private var recommendationSummary: String {
+    private var recommendationSummary: String? {
         if let dishes = place.extractedDishes, !dishes.isEmpty {
-            return "Recommended: \(dishes.prefix(4).joined(separator: ", "))"
+            return "Saved for: \(dishes.prefix(4).joined(separator: ", "))"
         }
         if let recommender = cleaned(place.recommender) {
-            return "Recommended by \(recommender)"
+            return "Recommended by: \(recommender)"
         }
-        if let note = cleanMemoryNote {
-            return "Memory note: \(note)"
-        }
-        return "Recommendation: no saved dish or personal note yet"
-    }
-
-    private var cleanMemoryNote: String? {
-        guard let note = cleaned(place.note),
-              !note.localizedCaseInsensitiveContains("Source URL:"),
-              !note.localizedCaseInsensitiveContains("Analysis pipeline:"),
-              !note.localizedCaseInsensitiveContains("Evidence tier:")
-        else { return nil }
-        return note
+        return nil
     }
 
     private var reviewCountText: String? {

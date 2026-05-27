@@ -173,7 +173,7 @@ enum SaveReferralLink {
 
     static func isReferralLink(_ url: URL) -> Bool {
         if url.scheme == "wanderly", url.host == "referral" { return true }
-        guard url.scheme == "https", url.host == "sav-e-app.vercel.app" else { return false }
+        guard url.scheme == "https", ["sav-e-app.vercel.app", "sav-e.app"].contains(url.host ?? "") else { return false }
         return url.path.hasPrefix("/r/") || url.path.hasPrefix("/u/")
     }
 }
