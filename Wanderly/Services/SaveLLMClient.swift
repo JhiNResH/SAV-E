@@ -62,13 +62,17 @@ final class GeminiSaveLLMClient: SaveLLMClient {
 
     func parseIntent(_ request: IntentParseRequest) async throws -> SaveSearchIntent {
         let allowed = request.allowedCategories.map(\.rawValue)
+        let payload: [String: Any] = [
+            "task": "parse_user_place_query",
+            "allowedCategories": allowed,
+            "query": request.query
+        ]
+        let payloadData = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        let payloadJSON = String(data: payloadData, encoding: .utf8) ?? "{}"
         let prompt = """
         Respond ONLY with strict JSON. No markdown.
-        {
-          "task": "parse_user_place_query",
-          "allowedCategories": \(allowed),
-          "query": "\(request.query)"
-        }
+        Input:
+        \(payloadJSON)
 
         Output schema:
         {

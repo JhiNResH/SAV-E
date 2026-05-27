@@ -349,7 +349,13 @@ private struct SaveSearchQuery {
         )
         wantsPublicDiscovery = Self.containsAny(
             normalizedRaw,
-            keywords: ["new", "unsaved", "public", "discover", "search nearby unsaved", "新的", "沒存", "未儲存", "找新"]
+            keywords: [
+                "unsaved", "public", "discover", "search nearby unsaved",
+                "new cafe", "new cafes", "new restaurant", "new restaurants",
+                "new place", "new places", "new spot", "new spots",
+                "new recommendation", "recommend new", "find new", "search new",
+                "新的", "沒存", "未儲存", "找新"
+            ]
         )
         wantsNewRecommendations = containsRecommendationKeyword || containsCravingIntent
         stableIDFragment = Self.makeStableIDFragment(from: normalizedRaw)

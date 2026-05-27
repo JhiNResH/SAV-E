@@ -147,6 +147,8 @@ enum SaveSearchIntentValidationError: Error, Equatable {
     case malformedJSON
     case unknownCategory(String)
     case invalidLocationMode
+    case invalidKind
+    case invalidSourceScope
     case unsafeRadius
     case unsafeCategoryGate
     case unsafeLocationGate
@@ -181,9 +183,10 @@ struct SaveSearchIntentJSONValidator {
         let requiredCategories = try categories(from: dto.requiredCategories ?? [])
         let optionalCategories = try categories(from: dto.optionalCategories ?? [])
         let locationMode = try locationMode(from: dto.locationMode)
-        let sourceScope = sourceScope(from: dto.sourceScope)
+        let sourceScope = try sourceScope(from: dto.sourceScope)
+        let kind = try kind(from: dto.kind)
 
-        if containsNearbyLanguage(normalized), dto.mustMatchLocation == false {
+        if deterministic?.mustMatchLocation == true, dto.mustMatchLocation == false {
             throw SaveSearchIntentValidationError.unsafeLocationGate
         }
         if deterministic?.mustMatchCategory == true, dto.mustMatchCategory == false {
@@ -193,7 +196,7 @@ struct SaveSearchIntentJSONValidator {
         return SaveSearchIntent(
             rawText: rawText.trimmingCharacters(in: .whitespacesAndNewlines),
             normalizedText: normalized,
-            kind: kind(from: dto.kind),
+            kind: kind,
             requiredCategories: Set(requiredCategories),
             optionalCategories: Set(optionalCategories),
             locationMode: locationMode,
@@ -239,26 +242,24 @@ struct SaveSearchIntentJSONValidator {
         }
     }
 
-    private func kind(from value: String) -> SaveSearchIntent.Kind {
+    private func kind(from value: String) throws -> SaveSearchIntent.Kind {
         switch value {
         case "explicitPlaceSearch": return .explicitPlaceSearch
         case "categoryRecommendation": return .categoryRecommendation
         case "craving": return .craving
         case "tripPlanning": return .tripPlanning
         case "publicDiscovery": return .publicDiscovery
-        default: return .unknown
+        case "unknown": return .unknown
+        default: throw SaveSearchIntentValidationError.invalidKind
         }
     }
 
-    private func sourceScope(from value: String) -> SaveSearchIntent.SourceScope {
+    private func sourceScope(from value: String) throws -> SaveSearchIntent.SourceScope {
         switch value {
         case "savedOnly": return .savedOnly
+        case "savedFirstAllowPublicFallback": return .savedFirstAllowPublicFallback
         case "publicOnly": return .publicOnly
-        default: return .savedFirstAllowPublicFallback
+        default: throw SaveSearchIntentValidationError.invalidSourceScope
         }
-    }
-
-    private func containsNearbyLanguage(_ normalized: String) -> Bool {
-        SaveSearchIntentParser.containsAny(normalized, keywords: ["nearby", "nearest", "near me", "around here", "附近", "周邊", "周边", "身邊", "身边"])
     }
 }

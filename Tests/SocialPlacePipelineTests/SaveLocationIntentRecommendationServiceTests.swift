@@ -208,6 +208,12 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
 
         let unsafeRadius = valid.replacingOccurrences(of: #""radiusMeters": 2000"#, with: #""radiusMeters": 100000"#)
         XCTAssertThrowsError(try validator.parseIntentJSON(unsafeRadius, rawText: "附近咖啡廳"))
+
+        let invalidKind = valid.replacingOccurrences(of: #""categoryRecommendation""#, with: #""venueMagic""#)
+        XCTAssertThrowsError(try validator.parseIntentJSON(invalidKind, rawText: "附近咖啡廳"))
+
+        let invalidSourceScope = valid.replacingOccurrences(of: #""savedFirstAllowPublicFallback""#, with: #""anythingGoes""#)
+        XCTAssertThrowsError(try validator.parseIntentJSON(invalidSourceScope, rawText: "附近咖啡廳"))
     }
 
     private func place(

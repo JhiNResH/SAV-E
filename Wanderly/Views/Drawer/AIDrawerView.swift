@@ -1182,6 +1182,7 @@ struct AIDrawerView: View {
         Task {
             let candidates = await onPrepareMapSearch(fallbackQuery)
             if candidates.isEmpty {
+                viewModel.mapCandidates = []
                 addSpotStatus = "No nearby unsaved candidates found yet. Try a more specific place type or city."
             } else {
                 viewModel.mapCandidates = candidates

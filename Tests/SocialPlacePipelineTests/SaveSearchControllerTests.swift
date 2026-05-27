@@ -168,6 +168,7 @@ final class SaveSearchControllerTests: XCTestCase {
         let controller = SaveSearchController()
 
         XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "附近咖啡廳"))
+        XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "New York"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "Search nearby unsaved cafes"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "找附近新的咖啡廳"))
     }
