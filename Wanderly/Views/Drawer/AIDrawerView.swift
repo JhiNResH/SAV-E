@@ -3120,18 +3120,18 @@ private struct UnsavedMapCandidateCard: View {
                     HStack(spacing: 6) {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.caption2.weight(.bold))
-                        Text("Map clue")
+                        Text("Source")
                             .font(.caption2.weight(.black))
                         Spacer()
                     }
                     .foregroundColor(.saveCocoa)
 
-                    Text("Map clue means this came from a map search result. It is not a Map Stamp or memory until you save it.")
+                    Text("Found from map search. It is not a Map Stamp or memory until you save it.")
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.saveCocoa.opacity(0.78))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    EvidenceLinkList(evidence: mapClueEvidence, maxItems: 4)
+                    EvidenceLinkList(evidence: sourceEvidence, maxItems: 4)
                 }
                 .padding(10)
                 .background(
@@ -3177,11 +3177,11 @@ private struct UnsavedMapCandidateCard: View {
         .opacity(isWorking ? 0.65 : 1)
     }
 
-    private var mapClueEvidence: [String] {
+    private var sourceEvidence: [String] {
         let fallback = [
-            "Visible map result; not a SAV-E memory",
+            "Found in map search",
             "State: unsaved candidate",
-            "Source: Maps result"
+            "Source: Maps"
         ]
         return candidate.evidence.isEmpty ? fallback : candidate.evidence
     }
@@ -3212,7 +3212,7 @@ private struct UnsavedMapCandidateBasicInfo: View {
                 }
                 UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
                 UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
-                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map clue")
+                UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map search")
             }
         }
         .padding(10)
@@ -3298,7 +3298,7 @@ private struct UnsavedMapCandidateSummaryPanel: View {
 
     private var recommendationSummary: String {
         if candidate.businessPhotoURLStrings.isEmpty {
-            return "Recommendation: check the map clue and address before saving."
+            return "Recommendation: confirm the address before saving."
         }
         return "Recommendation: compare the business photos, rating, and address before saving."
     }
