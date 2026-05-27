@@ -104,16 +104,7 @@ private struct SaveSearchResultNotebookRow: View {
                 onSelectResult(result)
             } label: {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: iconName)
-                        .font(.subheadline.weight(.black))
-                        .foregroundColor(.saveInk)
-                        .frame(width: 36, height: 36)
-                        .background(iconFill)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 1.5)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    resultThumbnail
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(result.title)
@@ -140,6 +131,9 @@ private struct SaveSearchResultNotebookRow: View {
                 SaveSearchStateChip(text: result.userState.displayName, fill: result.userState == .unsaved ? .saveSky : .saveMint)
                 if let category = result.category {
                     SaveSearchStateChip(text: category.displayName, fill: .saveSignal)
+                }
+                if let distanceLabel = result.distanceLabel {
+                    SaveSearchStateChip(text: distanceLabel, fill: .saveHoney)
                 }
             }
 
@@ -168,6 +162,44 @@ private struct SaveSearchResultNotebookRow: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 1.4)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var resultThumbnail: some View {
+        if result.objectType == .mapVisibleUnsavedPlace,
+           let url = result.businessPhotoURLStrings.first.flatMap(URL.init(string:)) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    fallbackIcon
+                }
+            }
+            .frame(width: 52, height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.5)
+            )
+        } else {
+            fallbackIcon
+        }
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: iconName)
+            .font(.subheadline.weight(.black))
+            .foregroundColor(.saveInk)
+            .frame(width: 36, height: 36)
+            .background(iconFill)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 1.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder

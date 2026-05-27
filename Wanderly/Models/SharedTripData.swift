@@ -87,7 +87,7 @@ struct SharedPlaceData: Codable {
             hours: nil,
             sourceLabel: result.sourcePlatform?.displayName ?? result.userState.displayName,
             sourceURL: result.sourceURL,
-            photoURLs: [],
+            photoURLs: result.businessPhotoURLStrings,
             note: result.shareNote
         )
     }

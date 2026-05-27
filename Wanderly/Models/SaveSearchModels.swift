@@ -411,6 +411,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
     var sourcePlatform: SourcePlatform?
     var photoURL: String?
     var businessPhotoURLs: [String]?
+    var distanceMeters: Double?
     var evidence: [String]
     var createdAt: Date
 
@@ -427,6 +428,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         sourcePlatform: SourcePlatform? = nil,
         photoURL: String? = nil,
         businessPhotoURLs: [String]? = nil,
+        distanceMeters: Double? = nil,
         evidence: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -442,6 +444,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         self.sourcePlatform = sourcePlatform
         self.photoURL = photoURL
         self.businessPhotoURLs = businessPhotoURLs
+        self.distanceMeters = distanceMeters
         self.evidence = evidence
         self.createdAt = createdAt
     }
@@ -464,6 +467,10 @@ extension SaveMapCandidate {
             abs(longitude - other.longitude) < 0.0008
         let sameName = title.localizedCaseInsensitiveCompare(other.title) == .orderedSame
         return sameName && nearby
+    }
+
+    var distanceLabel: String? {
+        distanceMeters.map(Self.distanceLabel)
     }
 
     var shareSubject: String {
@@ -490,6 +497,9 @@ extension SaveMapCandidate {
         if let reviewCount {
             lines.append("Reviews: \(reviewCount)")
         }
+        if let distanceLabel {
+            lines.append("Distance: \(distanceLabel)")
+        }
         if let sourceURL, !sourceURL.isEmpty {
             lines.append("Source: \(sourceURL)")
         }
@@ -511,6 +521,9 @@ extension SaveMapCandidate {
         if let reviewCount {
             parts.append("\(reviewCount) reviews")
         }
+        if let distanceLabel {
+            parts.append(distanceLabel)
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -531,6 +544,9 @@ extension SaveMapCandidate {
         if let reviewCount {
             parts.append("\(reviewCount) reviews")
         }
+        if let distanceLabel {
+            parts.append(distanceLabel)
+        }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -541,6 +557,13 @@ extension SaveMapCandidate {
             URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
         ]
         return components?.url
+    }
+
+    private static func distanceLabel(_ meters: Double) -> String {
+        if meters >= 1_000 {
+            return String(format: "%.1f km away", meters / 1_000)
+        }
+        return "\(Int(meters.rounded())) m away"
     }
 }
 
@@ -674,6 +697,9 @@ struct SaveSearchResult: Identifiable, Hashable {
     var canRunRecovery: Bool
     var isRecommendationShell: Bool
     var primaryAction: SaveSearchPrimaryAction
+    var distanceMeters: Double? = nil
+    var photoURL: String? = nil
+    var businessPhotoURLs: [String]? = nil
 
     var searchText: String {
         [
@@ -704,6 +730,21 @@ struct SaveSearchResult: Identifiable, Hashable {
 }
 
 extension SaveSearchResult {
+    var businessPhotoURLStrings: [String] {
+        var values = businessPhotoURLs ?? []
+        if let photoURL {
+            values.insert(photoURL, at: 0)
+        }
+        return values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .removingDuplicates()
+    }
+
+    var distanceLabel: String? {
+        distanceMeters.map(Self.distanceLabel)
+    }
+
     var shareSubject: String {
         "SAV-E Place: \(title)"
     }
@@ -766,6 +807,13 @@ extension SaveSearchResult {
             parts.append("\(reviewCount) reviews")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private static func distanceLabel(_ meters: Double) -> String {
+        if meters >= 1_000 {
+            return String(format: "%.1f km away", meters / 1_000)
+        }
+        return "\(Int(meters.rounded())) m away"
     }
 }
 

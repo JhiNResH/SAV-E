@@ -3220,6 +3220,9 @@ private struct UnsavedMapCandidateBasicInfo: View {
                 if let hoursText {
                     UnsavedMapCandidateInfoRow(icon: "clock.fill", title: "Hours", value: hoursText)
                 }
+                if let distanceText = candidate.distanceLabel {
+                    UnsavedMapCandidateInfoRow(icon: "location.fill", title: "Distance", value: distanceText)
+                }
                 UnsavedMapCandidateInfoRow(icon: candidate.category?.iconName ?? "mappin.and.ellipse", title: "Category", value: candidate.category?.displayName ?? "Place")
                 UnsavedMapCandidateInfoRow(icon: "mappin.and.ellipse", title: "Address", value: candidate.subtitle)
                 UnsavedMapCandidateInfoRow(icon: "map.fill", title: "Source", value: "Map search")
@@ -3294,7 +3297,13 @@ private struct UnsavedMapCandidateSummaryPanel: View {
             return "\(candidate.title) appeared in nearby \(searchQuery) results."
         }
         if !candidate.shareAreaLabel.isEmpty {
+            if let distance = candidate.distanceLabel {
+                return "\(candidate.title) is an unsaved \(category) in \(candidate.shareAreaLabel), \(distance)."
+            }
             return "\(candidate.title) is an unsaved \(category) in \(candidate.shareAreaLabel)."
+        }
+        if let distance = candidate.distanceLabel {
+            return "\(candidate.title) is an unsaved \(category), \(distance)."
         }
         return "\(candidate.title) is an unsaved \(category) selected from the map."
     }

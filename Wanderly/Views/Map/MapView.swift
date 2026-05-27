@@ -203,11 +203,28 @@ private struct UnsavedMapCandidatePin: View {
 
     var body: some View {
         Button(action: onTap) {
-            DefaultMapPin(
-                systemImage: candidate.category?.iconName ?? "mappin.and.ellipse",
-                fill: .saveSignal,
-                isSelected: isSelected
-            )
+            VStack(spacing: 3) {
+                if isSelected {
+                    Text(candidate.title)
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .frame(maxWidth: 132)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.saveNotebookPage.opacity(0.94))
+                        .overlay(Capsule().stroke(Color.saveSignal, lineWidth: 1.5))
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+
+                DefaultMapPin(
+                    systemImage: candidate.category?.iconName ?? "mappin.and.ellipse",
+                    fill: .saveSignal,
+                    isSelected: isSelected
+                )
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(candidate.title) Unsaved Candidate")
@@ -225,19 +242,19 @@ private struct DefaultMapPin: View {
         ZStack {
             Circle()
                 .fill(fill.opacity(isSelected ? 1 : 0.92))
-                .frame(width: isSelected ? 26 : 20, height: isSelected ? 26 : 20)
+                .frame(width: isSelected ? 36 : 20, height: isSelected ? 36 : 20)
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(isSelected ? 0.75 : 0.35), lineWidth: isSelected ? 1.5 : 1)
+                        .stroke(Color.white.opacity(isSelected ? 0.95 : 0.35), lineWidth: isSelected ? 2.5 : 1)
                 )
                 .overlay(
                     Circle()
                         .stroke(Color.black.opacity(0.10), lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(isSelected ? 0.20 : 0.10), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
+                .shadow(color: Color.black.opacity(isSelected ? 0.30 : 0.10), radius: isSelected ? 8 : 2, x: 0, y: isSelected ? 4 : 1)
 
             Image(systemName: systemImage)
-                .font(.system(size: isSelected ? 11 : 8, weight: .black))
+                .font(.system(size: isSelected ? 15 : 8, weight: .black))
                 .foregroundColor(.white)
 
             if let sourceImage {
@@ -255,7 +272,14 @@ private struct DefaultMapPin: View {
                     )
             }
         }
-        .frame(width: 32, height: 32)
+        .overlay {
+            if isSelected {
+                Circle()
+                    .stroke(fill.opacity(0.35), lineWidth: 8)
+                    .frame(width: 52, height: 52)
+            }
+        }
+        .frame(width: isSelected ? 64 : 32, height: isSelected ? 64 : 32)
         .contentShape(Rectangle())
     }
 }

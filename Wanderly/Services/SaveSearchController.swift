@@ -87,7 +87,12 @@ struct SaveSearchController {
             .sorted { lhs, rhs in
                 let lhsScore = query.score(lhs)
                 let rhsScore = query.score(rhs)
-                if lhsScore == rhsScore { return lhs.createdAt > rhs.createdAt }
+                if lhsScore == rhsScore {
+                    if let lhsDistance = lhs.distanceMeters, let rhsDistance = rhs.distanceMeters, lhsDistance != rhsDistance {
+                        return lhsDistance < rhsDistance
+                    }
+                    return lhs.createdAt > rhs.createdAt
+                }
                 return lhsScore > rhsScore
             }
         let mapRecommendationResults = mapCandidates
@@ -252,7 +257,10 @@ struct SaveSearchController {
             createdAt: candidate.createdAt,
             canRunRecovery: false,
             isRecommendationShell: false,
-            primaryAction: .savePlace
+            primaryAction: .savePlace,
+            distanceMeters: candidate.distanceMeters,
+            photoURL: candidate.photoURL,
+            businessPhotoURLs: candidate.businessPhotoURLs
         )
     }
 
