@@ -200,35 +200,119 @@ private struct UnsavedMapCandidatePin: View {
     let candidate: SaveMapCandidate
     var isSelected = false
     let onTap: () -> Void
+    @State private var isWiggling = false
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 if isSelected {
-                    Text(candidate.title)
-                        .font(.caption2.weight(.black))
-                        .foregroundColor(.saveInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .frame(maxWidth: 132)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.saveNotebookPage.opacity(0.94))
-                        .overlay(Capsule().stroke(Color.saveSignal, lineWidth: 1.5))
-                        .clipShape(Capsule())
-                        .shadow(color: Color.black.opacity(0.18), radius: 4, x: 0, y: 2)
+                    UnsavedPOILabel(candidate: candidate)
                 }
 
-                DefaultMapPin(
-                    systemImage: candidate.category?.iconName ?? "mappin.and.ellipse",
-                    fill: .saveSignal,
+                UnsavedPOIBadge(
+                    systemImage: candidate.category?.poiSymbolName ?? "mappin",
+                    fill: candidate.category?.poiFill ?? .saveSignal,
                     isSelected: isSelected
                 )
             }
+            .offset(y: isSelected ? -12 : 0)
+            .scaleEffect(isSelected ? 1.08 : 1)
+            .rotationEffect(.degrees(isWiggling ? -3.5 : 0))
+            .animation(.spring(response: 0.34, dampingFraction: 0.58), value: isSelected)
+            .animation(.easeInOut(duration: 0.09), value: isWiggling)
         }
         .buttonStyle(.plain)
+        .zIndex(isSelected ? 10 : 0)
+        .task(id: isSelected) {
+            guard isSelected else {
+                isWiggling = false
+                return
+            }
+            await runSelectionWiggle()
+        }
         .accessibilityLabel("\(candidate.title) Unsaved Candidate")
         .accessibilityHint("Opens this visible map place before saving it as a Map Stamp")
+    }
+
+    @MainActor
+    private func runSelectionWiggle() async {
+        isWiggling = false
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        for _ in 0..<2 {
+            isWiggling = true
+            try? await Task.sleep(nanoseconds: 90_000_000)
+            isWiggling = false
+            try? await Task.sleep(nanoseconds: 90_000_000)
+        }
+    }
+}
+
+private struct UnsavedPOILabel: View {
+    let candidate: SaveMapCandidate
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(candidate.title)
+                .font(.caption2.weight(.black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            if let distanceLabel = candidate.distanceLabel {
+                Text(distanceLabel)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.saveCocoa)
+                    .lineLimit(1)
+            }
+        }
+        .foregroundColor(.saveInk)
+        .frame(maxWidth: 138)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.saveNotebookPage.opacity(0.96))
+        .overlay(Capsule().stroke(candidate.category?.poiFill ?? .saveSignal, lineWidth: 1.5))
+        .clipShape(Capsule())
+        .shadow(color: Color.black.opacity(0.20), radius: 5, x: 0, y: 3)
+    }
+}
+
+private struct UnsavedPOIBadge: View {
+    var systemImage: String
+    var fill: Color
+    var isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(fill.opacity(isSelected ? 1 : 0.94))
+                .frame(width: isSelected ? 42 : 28, height: isSelected ? 42 : 28)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(isSelected ? 0.96 : 0.74), lineWidth: isSelected ? 2.2 : 1.2)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.13), lineWidth: 0.6)
+                )
+                .shadow(color: Color.black.opacity(isSelected ? 0.30 : 0.16), radius: isSelected ? 9 : 3, x: 0, y: isSelected ? 5 : 2)
+
+            Image(systemName: systemImage)
+                .font(.system(size: isSelected ? 18 : 12, weight: .black))
+                .foregroundColor(.white)
+
+            Circle()
+                .fill(Color.saveNotebookPage)
+                .frame(width: isSelected ? 11 : 7, height: isSelected ? 11 : 7)
+                .overlay(Circle().stroke(Color.saveCocoa.opacity(0.24), lineWidth: 0.6))
+                .offset(x: isSelected ? 15 : 10, y: isSelected ? -14 : -9)
+        }
+        .overlay {
+            if isSelected {
+                Circle()
+                    .stroke(fill.opacity(0.26), lineWidth: 8)
+                    .frame(width: 58, height: 58)
+            }
+        }
+        .frame(width: isSelected ? 70 : 38, height: isSelected ? 70 : 38)
+        .contentShape(Rectangle())
     }
 }
 
@@ -290,6 +374,30 @@ private extension PlaceSocialSignal {
         case .friendSaved: return .saveSky
         case .trending: return .saveSignal
         case .referralGuide: return .savePink
+        }
+    }
+}
+
+private extension PlaceCategory {
+    var poiSymbolName: String {
+        switch self {
+        case .food: return "fork.knife"
+        case .cafe: return "cup.and.saucer.fill"
+        case .bar: return "wineglass.fill"
+        case .attraction: return "star.fill"
+        case .stay: return "bed.double.fill"
+        case .shopping: return "bag.fill"
+        }
+    }
+
+    var poiFill: Color {
+        switch self {
+        case .food: return .saveHoney
+        case .cafe: return .saveCocoa
+        case .bar: return .savePink
+        case .attraction: return .saveSky
+        case .stay: return .saveMint
+        case .shopping: return .saveSignal
         }
     }
 }
