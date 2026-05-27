@@ -156,6 +156,39 @@ final class SocialPlacePipelineTests: XCTestCase {
         ).isEmpty)
     }
 
+    func testInstagramTaiwanCaptionUsesAngleBracketVenueBeforeHoursLine() {
+        let metadata = """
+        煦那皮、台北美食、台中美食、國外旅遊 on Instagram: "<Standard Bread>  #新開幕
+        *杜拜巧克力吐司 $399
+        *香辣奶油香腸義大利麵 $330
+        📢5/29正式營運
+        ——————————————
+        韓國超紅的Standard Bread ，在台北A11開幕了
+        ——————————————
+        🏠日～四 11:00～21:30 五六 11:00～22:00 5/29正式營運
+        🚇捷運台北101站，步行約10分鐘
+        📍臺北市信義區松壽路11號B2F
+        #信義區美食 #台北美食 #美食 #reels"
+        """
+
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/DY1w2qGSiRT/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: nil,
+                metadataTitle: metadata,
+                metadataDescription: metadata,
+                ocrLines: []
+            )
+        )
+
+        XCTAssertTrue(analysis.placesFound.contains { $0.displayName == "Standard Bread" })
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName.contains("11:00") })
+        XCTAssertEqual(analysis.placesFound.first?.displayName, "Standard Bread")
+        XCTAssertEqual(analysis.placesFound.first?.locationClues.first, "臺北市信義區松壽路11號B2F")
+    }
+
     func testGoogleTakeoutImportParsesBulkFileFormatsSeparatelyFromSavedListLinks() async throws {
         let json = """
         [

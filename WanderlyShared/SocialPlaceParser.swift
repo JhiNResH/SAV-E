@@ -827,6 +827,7 @@ struct SocialPlaceParser {
 
     private func bracketedCandidates(from text: String, sourceURL: String) -> [SocialPlaceCandidateDraft] {
         let patterns = [
+            #"<\s*([A-Za-z0-9][A-Za-z0-9 &'._\-\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]{1,80})\s*>"#,
             #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
             #"(?i)\b(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#,
             #"(?i)\b(?:new\s+)?(?:brunch\s+)?(?:spot|place|restaurant|cafe)\s*:\s*([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n|$)"#
