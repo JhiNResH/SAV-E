@@ -200,6 +200,7 @@ private struct UnsavedMapCandidatePin: View {
     let candidate: SaveMapCandidate
     var isSelected = false
     let onTap: () -> Void
+    @State private var isWiggling = false
 
     var body: some View {
         Button(action: onTap) {
@@ -215,11 +216,32 @@ private struct UnsavedMapCandidatePin: View {
                 )
             }
             .offset(y: isSelected ? -5 : 0)
+            .rotationEffect(.degrees(isWiggling ? -3 : 0))
+            .animation(.easeInOut(duration: 0.08), value: isWiggling)
         }
         .buttonStyle(.plain)
         .zIndex(isSelected ? 10 : 0)
+        .task(id: isSelected) {
+            guard isSelected else {
+                isWiggling = false
+                return
+            }
+            await runSelectionWiggle()
+        }
         .accessibilityLabel("\(candidate.title) Unsaved Candidate")
         .accessibilityHint("Opens this visible map place before saving it as a Map Stamp")
+    }
+
+    @MainActor
+    private func runSelectionWiggle() async {
+        isWiggling = false
+        try? await Task.sleep(nanoseconds: 70_000_000)
+        for _ in 0..<2 {
+            isWiggling = true
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            isWiggling = false
+            try? await Task.sleep(nanoseconds: 80_000_000)
+        }
     }
 }
 
