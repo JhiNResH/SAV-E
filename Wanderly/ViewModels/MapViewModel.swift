@@ -1145,7 +1145,12 @@ final class MapViewModel: ObservableObject {
         )
         let selectedCandidate: SaveMapCandidate
         if let existingCandidate = mapCandidates.first(where: { $0.id == candidate.id || $0.matches(candidate) }) {
-            selectedCandidate = existingCandidate
+            var nativeSelectedCandidate = existingCandidate
+            if !nativeSelectedCandidate.evidence.contains(where: { $0.localizedCaseInsensitiveCompare("Apple Maps POI") == .orderedSame }) {
+                nativeSelectedCandidate.evidence.insert("Apple Maps POI", at: 0)
+            }
+            mapCandidates = mapCandidates.map { $0.id == nativeSelectedCandidate.id ? nativeSelectedCandidate : $0 }
+            selectedCandidate = nativeSelectedCandidate
         } else {
             mapCandidates = [candidate] + mapCandidates
             selectedCandidate = candidate

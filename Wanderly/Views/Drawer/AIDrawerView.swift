@@ -1852,7 +1852,7 @@ private struct SelectedPlaceCapsule: View {
                 .frame(width: 44, height: 44)
 
             Button(action: onExpand) {
-                VStack(spacing: 4) {
+                VStack(spacing: 2) {
                     Text(item.title)
                         .font(.subheadline.weight(.black))
                         .foregroundColor(.saveInk)
@@ -1866,6 +1866,15 @@ private struct SelectedPlaceCapsule: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(maxWidth: .infinity)
+
+                    if let contextLine = item.contextLine {
+                        Text(contextLine)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.saveCocoa.opacity(0.58))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .multilineTextAlignment(.center)
                 .contentShape(Rectangle())
@@ -1911,13 +1920,15 @@ private struct SelectedPlaceCapsule: View {
 
 private struct SelectedPlaceCapsuleIcon: View {
     let systemImage: String
+    var fill: Color = Color.saveNotebookPage.opacity(0.72)
+    var foreground: Color = .saveInk
 
     var body: some View {
         Image(systemName: systemImage)
             .font(.system(size: 15, weight: .bold))
-            .foregroundColor(.saveInk)
+            .foregroundColor(foreground)
             .frame(width: 38, height: 38)
-            .background(Color.saveNotebookPage.opacity(0.72))
+            .background(fill)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1)
@@ -1947,9 +1958,22 @@ private extension MapDetailDrawerItem {
         case .reviewCandidate(let candidate):
             return candidate.hasReliableCoordinates ? "Review Candidate" : "Source Clue"
         case .unsavedCandidate(let candidate):
-            return "\(candidate.category?.displayName ?? "Place") · Unsaved candidate"
+            var parts = [candidate.category?.displayName ?? "Place", "Not saved yet"]
+            if let distanceLabel = candidate.distanceLabel {
+                parts.append(distanceLabel)
+            }
+            return parts.joined(separator: " · ")
         case .socialPlace(let place):
             return "\(place.category.displayName) · \(place.socialSignal?.displayText ?? "Social signal")"
+        }
+    }
+
+    var contextLine: String? {
+        switch self {
+        case .unsavedCandidate:
+            return "Map search · review before saving"
+        default:
+            return nil
         }
     }
 
