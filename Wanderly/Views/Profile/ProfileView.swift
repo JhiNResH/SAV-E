@@ -782,12 +782,15 @@ struct SettingsRow: View {
     var body: some View {
         Button(action: { action?() }) {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.subheadline)
-                    .foregroundColor(color)
-                    .frame(width: 32, height: 32)
-                    .background(color.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                SaveIconTile(
+                    systemName: icon,
+                    size: 32,
+                    iconSize: 13,
+                    fill: color.opacity(0.16),
+                    foreground: .saveCocoa,
+                    strokeOpacity: 0.48,
+                    cornerRadius: 10
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)

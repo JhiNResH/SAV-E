@@ -233,7 +233,7 @@ struct AIDrawerView: View {
         .frame(height: 52)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.90) : Color.saveNotebookPage.opacity(0.86))
                 .overlay(commandBarFill)
         }
         .overlay(
@@ -632,16 +632,15 @@ struct AIDrawerView: View {
                 searchFocused = false
                 withAnimation { drawerDetent = .height(72) }
             }) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.saveCocoa.opacity(0.72))
-                    .frame(width: 30, height: 30)
-                    .background(Color.saveNotebookPage.opacity(0.62))
-                    .overlay(
-                        Circle()
-                            .stroke(Color.saveNotebookLine, lineWidth: 2)
-                    )
-                    .clipShape(Circle())
+                SaveIconTile(
+                    systemName: "xmark",
+                    size: 30,
+                    iconSize: 11,
+                    fill: Color.saveNotebookPage.opacity(0.72),
+                    foreground: Color.saveCocoa.opacity(0.78),
+                    strokeOpacity: 0.54,
+                    cornerRadius: 9
+                )
             }
             .accessibilityLabel(languageSettings.text(.closeDrawerContent))
         }
@@ -649,7 +648,7 @@ struct AIDrawerView: View {
         .padding(.vertical, 10)
         .background {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.92) : Color.saveNotebookPage.opacity(0.86))
                 .overlay(navigationHeaderTint)
         }
         .overlay(alignment: .bottom) {
@@ -972,15 +971,8 @@ struct AIDrawerView: View {
                     }
                 }
                 .padding(12)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(savedPanelTint)
-                }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
-                )
+                .saveNotebookSurface(cornerRadius: 16, fill: .saveNotebookPage, opacity: colorScheme == .dark ? 0.72 : 0.66, strokeOpacity: 0.36, lineWidth: 1)
+                .overlay(savedPanelTint)
 
                 HStack(spacing: 9) {
                     Button {
@@ -1702,13 +1694,15 @@ private struct MapDetailDrawerView: View {
             Spacer(minLength: 0)
 
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.saveCocoa.opacity(0.72))
-                    .frame(width: 30, height: 30)
-                    .background(Color.saveNotebookPage.opacity(0.62))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.5), lineWidth: 1))
+                SaveIconTile(
+                    systemName: "xmark",
+                    size: 30,
+                    iconSize: 11,
+                    fill: Color.saveNotebookPage.opacity(0.72),
+                    foreground: Color.saveCocoa.opacity(0.78),
+                    strokeOpacity: 0.54,
+                    cornerRadius: 9
+                )
             }
             .accessibilityLabel("Close place detail")
         }
@@ -1887,12 +1881,15 @@ private struct SelectedPlaceCapsuleIcon: View {
 
     var body: some View {
         Image(systemName: systemImage)
-            .font(.system(size: 15, weight: .black))
+            .font(.system(size: 15, weight: .bold))
             .foregroundColor(.saveInk)
             .frame(width: 38, height: 38)
-            .background(Color.saveNotebookPage.opacity(0.34))
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1))
+            .background(Color.saveNotebookPage.opacity(0.72))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -2004,16 +2001,7 @@ private struct SocialPlaceRow: View {
             .accessibilityLabel("Save \(place.name) to my SAV-E")
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(Color.white.opacity(0.12))
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
-        )
+        .saveNotebookSurface(cornerRadius: 14, fill: .saveNotebookPage, opacity: 0.62, strokeOpacity: 0.34, lineWidth: 1)
     }
 }
 
@@ -2022,7 +2010,7 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(.ultraThinMaterial)
+            .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.94) : Color.saveNotebookPage.opacity(0.90))
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2041,13 +2029,13 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.04),
-                Color.black.opacity(0.12)
+                Color.black.opacity(0.02),
+                Color.black.opacity(0.08)
             ]
         }
         return [
-            Color.white.opacity(0.04),
-            Color.saveCream.opacity(0.08)
+            Color.saveCream.opacity(0.18),
+            Color.saveNotebookPage.opacity(0.12)
         ]
     }
 }

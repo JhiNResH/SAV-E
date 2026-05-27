@@ -257,6 +257,18 @@ States:
 
 Do not introduce new badge states without updating this document first.
 
+### Shared Primitives
+
+Source: `Wanderly/Extensions/Color+Theme.swift`.
+
+- Use `saveNotebookSurface` for drawer/detail panels that belong to SAV-E's
+  memory layer.
+- Use `SaveIconTile` for small icon-only controls and row icons.
+- Avoid ad hoc circular icon buttons inside Passport, detail drawers, and
+  notebook cards unless the object is explicitly a map pin or avatar.
+- Avoid `.ultraThinMaterial` as the primary drawer/card surface for memory UI;
+  use notebook surfaces with visible ink strokes.
+
 ### Map Pins
 
 Source: `Wanderly/Views/Map/MapView.swift`.
