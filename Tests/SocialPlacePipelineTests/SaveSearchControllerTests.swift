@@ -2,6 +2,27 @@ import XCTest
 @testable import Wanderly
 
 final class SaveSearchControllerTests: XCTestCase {
+    func testMapCandidateKeepsMultipleBusinessPhotosForPreview() {
+        let candidate = SaveMapCandidate(
+            title: "Bright Coffee Bar",
+            subtitle: "Irvine, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            photoURL: "https://example.com/photo-1.jpg",
+            businessPhotoURLs: [
+                "https://example.com/photo-1.jpg",
+                "https://example.com/photo-2.jpg",
+                "https://example.com/photo-3.jpg"
+            ]
+        )
+
+        XCTAssertEqual(candidate.businessPhotoURLStrings, [
+            "https://example.com/photo-1.jpg",
+            "https://example.com/photo-2.jpg",
+            "https://example.com/photo-3.jpg"
+        ])
+    }
+
     func testCategoryInferenceUsesPOIAndAvoidsSubstringFalsePositives() {
         XCTAssertEqual(PlaceCategory.inferred(from: "Heritage Barbecue Chicken"), .food)
         XCTAssertEqual(PlaceCategory.inferred(from: "Bright Barber Shop"), .shopping)

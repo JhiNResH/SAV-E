@@ -124,19 +124,21 @@ struct MapCandidateSearchService: MapCandidateSearchServiceProtocol {
         var enrichedCandidate = candidate
         guard let match = await bestGoogleMatch(for: candidate) else { return enrichedCandidate }
 
-        let photoReference: String?
-        if let reference = match.photoReference {
-            photoReference = reference
-        } else {
-            photoReference = try? await googlePlacesService.getPlaceDetails(placeId: match.id).photoReferences?.first
-        }
+        let details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
+        let photoReferences = details?.photoReferences?.isEmpty == false
+            ? details?.photoReferences ?? []
+            : [match.photoReference].compactMap { $0 }
+        let photoURLs = photoReferences
+            .prefix(6)
+            .compactMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
 
-        if let photoReference,
-           let photoURL = googlePlacesService.photoURL(reference: photoReference, maxWidth: 800) {
-            enrichedCandidate.photoURL = photoURL.absoluteString
-            enrichedCandidate.evidence.append("Business photo: Google Places")
+        if !photoURLs.isEmpty {
+            let urls = photoURLs.map(\.absoluteString)
+            enrichedCandidate.photoURL = enrichedCandidate.photoURL ?? urls.first
+            enrichedCandidate.businessPhotoURLs = urls
+            enrichedCandidate.evidence.append(photoURLs.count > 1 ? "Business photos: Google Places" : "Business photo: Google Places")
         }
-        enrichedCandidate.rating = enrichedCandidate.rating ?? match.rating
+        enrichedCandidate.rating = enrichedCandidate.rating ?? details?.rating ?? match.rating
         enrichedCandidate.reviewCount = enrichedCandidate.reviewCount ?? match.reviewCount
         return enrichedCandidate
     }
@@ -535,6 +537,7 @@ final class MapViewModel: ObservableObject {
         )
         var place = try await saveSearchController.saveMapCandidate(draft)
         place.sourceImageUrl = candidate.photoURL
+        place.businessPhotoUrls = candidate.businessPhotoURLStrings
 
         if let userId = authService.currentUserId {
             do {
@@ -820,8 +823,10 @@ final class MapViewModel: ObservableObject {
         guard selectedMapCandidate?.id == candidate.id else { return }
 
         var updatedCandidate = candidate
-        if let photoURL = update.photoURL {
-            updatedCandidate.photoURL = photoURL.absoluteString
+        if !update.photoURLs.isEmpty {
+            let urls = update.photoURLs.map(\.absoluteString)
+            updatedCandidate.photoURL = updatedCandidate.photoURL ?? urls.first
+            updatedCandidate.businessPhotoURLs = urls
         }
         updatedCandidate.rating = updatedCandidate.rating ?? update.rating
         updatedCandidate.reviewCount = updatedCandidate.reviewCount ?? update.reviewCount
@@ -838,7 +843,7 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    private func businessDetails(for candidate: SaveMapCandidate) async -> (photoURL: URL?, rating: Double?, reviewCount: Int?, priceRange: String?, openingHours: String?)? {
+    private func businessDetails(for candidate: SaveMapCandidate) async -> (photoURLs: [URL], rating: Double?, reviewCount: Int?, priceRange: String?, openingHours: String?)? {
         do {
             let coordinate = CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
             let matches = try await googlePlacesService.searchPlace(query: "\(candidate.title) \(candidate.subtitle)", near: coordinate)
@@ -852,14 +857,18 @@ final class MapViewModel: ObservableObject {
             }) else { return nil }
 
             let details = try? await googlePlacesService.getPlaceDetails(placeId: match.id)
-            let photoReference = details?.photoReferences?.first ?? match.photoReference
-            let photoURL = photoReference.flatMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
+            let photoReferences = details?.photoReferences?.isEmpty == false
+                ? details?.photoReferences ?? []
+                : [match.photoReference].compactMap { $0 }
+            let photoURLs = photoReferences
+                .prefix(6)
+                .compactMap { googlePlacesService.photoURL(reference: $0, maxWidth: 900) }
             let priceLevel = details?.priceLevel ?? match.priceLevel
-            let hasDetails = photoURL != nil || details?.rating != nil || match.rating != nil || match.reviewCount != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
+            let hasDetails = !photoURLs.isEmpty || details?.rating != nil || match.rating != nil || match.reviewCount != nil || priceLevel != nil || details?.openingHours?.isEmpty == false
             guard hasDetails else { return nil }
 
             return (
-                photoURL,
+                photoURLs,
                 details?.rating ?? match.rating,
                 match.reviewCount,
                 priceLevel.map { String(repeating: "$", count: max(1, $0)) },

@@ -1925,63 +1925,7 @@ private struct UnsavedMapCandidateVisualPreview: View {
     var candidate: SaveMapCandidate
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let photoURL = candidate.photoURL.flatMap(URL.init(string:)) {
-                    AsyncImage(url: photoURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            fallbackVisual
-                        case .empty:
-                            ProgressView()
-                                .tint(.saveInk)
-                        @unknown default:
-                            fallbackVisual
-                        }
-                    }
-                } else {
-                    fallbackVisual
-                }
-            }
-            .frame(height: 138)
-            .frame(maxWidth: .infinity)
-            .clipped()
-
-            HStack(spacing: 6) {
-                Image(systemName: candidate.photoURL == nil ? "photo" : "camera.fill")
-                    .font(.caption2.weight(.black))
-                Text(candidate.photoURL == nil ? "No business photo available" : "Business photo")
-                    .font(.caption2.weight(.black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .foregroundColor(.saveInk)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(Color.saveNotebookPage.opacity(0.9))
-            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
-            .clipShape(Capsule())
-            .padding(8)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-        )
-    }
-
-    private var fallbackVisual: some View {
-        Rectangle()
-            .fill(Color.saveNotebookPage)
-            .overlay {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.title2.weight(.semibold))
-                    .foregroundColor(.saveCocoa.opacity(0.66))
-            }
+        PlaceBusinessPhotoCarousel(imageURLs: candidate.businessPhotoURLStrings)
     }
 }
 
