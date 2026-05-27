@@ -405,24 +405,70 @@ extension Place {
 }
 
 extension PlaceCategory {
-    static func inferred(from content: String) -> PlaceCategory {
-        let lowercased = content.lowercased()
-        if lowercased.range(of: #"cafe|coffee|bakery|tea|boba"#, options: .regularExpression) != nil {
-            return .cafe
-        }
-        if lowercased.range(of: #"bar|cocktail|wine|brew"#, options: .regularExpression) != nil {
-            return .bar
-        }
-        if lowercased.range(of: #"hotel|stay|resort|villa"#, options: .regularExpression) != nil {
+    static func inferred(from content: String, fallback: PlaceCategory = .food) -> PlaceCategory {
+        let lowercased = content
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+
+        if matches(lowercased, #"\b(airbnb|stay|hotel|resort|villa|motel|lodge|inn|glamping|retreat)\b|住宿|飯店|酒店|旅館|民宿"#) {
             return .stay
         }
-        if lowercased.range(of: #"shop|store|market"#, options: .regularExpression) != nil {
+        if matches(lowercased, #"\b(cafe|coffee|bakery|boba|milk tea|teahouse|tea house|dessert|patisserie|espresso)\b|咖啡|奶茶|珍珠|甜點|甜点|烘焙|麵包|面包"#) {
+            return .cafe
+        }
+        if matches(lowercased, #"\b(restaurant|food|eat|dining|dinner|lunch|breakfast|brunch|sushi|ramen|noodle|pizza|taco|burger|sandwich|bbq|barbecue|steak|hot pot|sukiyaki|yakiniku|izakaya)\b|餐廳|餐厅|美食|料理|燒肉|烧肉|火鍋|火锅|壽喜燒|寿喜烧|牛舌|拉麵|拉面|壽司|寿司"#) {
+            return .food
+        }
+        if matches(lowercased, #"\b(bar|pub|cocktail|wine|brewery|tavern|speakeasy|nightlife)\b|酒吧|調酒|调酒|啤酒|葡萄酒"#) {
+            return .bar
+        }
+        if matches(lowercased, #"\b(shop|store|market|mall|boutique|bookstore|pharmacy|spa|salon|massage|barber|beauty|fitness|gym|yoga|wellness|clinic|bank|atm|laundry)\b|商店|市場|市场|購物|购物|按摩|美容|健身|藥局|药房|銀行|银行"#) {
             return .shopping
         }
-        if lowercased.range(of: #"museum|park|event|gallery|festival|summit|conference|resort"#, options: .regularExpression) != nil {
+        if matches(lowercased, #"\b(museum|park|event|gallery|festival|summit|conference|theater|theatre|cinema|movie|stadium|zoo|aquarium|beach|landmark|monument|temple|shrine|church|library|school|university|airport|station|pier|garden)\b|博物館|博物馆|公園|公园|展覽|展览|景點|景点|寺|機場|机场|車站|车站"#) {
             return .attraction
         }
-        return .food
+
+        return fallback
+    }
+
+    static func inferredMapCategory(
+        title: String,
+        subtitle: String,
+        pointOfInterestCategory: String?,
+        fallback: PlaceCategory
+    ) -> PlaceCategory {
+        let poi = pointOfInterestCategory?
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased() ?? ""
+
+        if matches(poi, #"restaurant|foodtruck"#) {
+            return .food
+        }
+        if matches(poi, #"cafe|bakery"#) {
+            return .cafe
+        }
+        if matches(poi, #"brewery|winery|nightlife"#) {
+            return .bar
+        }
+        if matches(poi, #"hotel"#) {
+            return .stay
+        }
+        if matches(poi, #"store|market|pharmacy|spa|fitness|beauty|bank|atm|laundry"#) {
+            return .shopping
+        }
+        if matches(poi, #"museum|park|theater|movie|stadium|zoo|aquarium|beach|landmark|nationalpark|amusementpark|fairground|conventioncenter|musicvenue|airport|school|university|library|hospital|evcharger|parking|publictransport"#) {
+            return .attraction
+        }
+
+        return inferred(
+            from: "\(title) \(subtitle) \(pointOfInterestCategory ?? "")",
+            fallback: fallback
+        )
+    }
+
+    private static func matches(_ value: String, _ pattern: String) -> Bool {
+        value.range(of: pattern, options: .regularExpression) != nil
     }
 }
 
