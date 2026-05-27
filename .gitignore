@@ -22,11 +22,11 @@ xcuserdata/
 Packages/
 Package.resolved
 *.xcodeproj
-!Wanderly.xcodeproj/
-!Wanderly.xcodeproj/**
-Wanderly.xcodeproj/**/xcuserdata/
-Wanderly.xcodeproj/**/*.xcuserstate
-Wanderly.xcodeproj/**/xcdebugger/
+!SAV-E.xcodeproj/
+!SAV-E.xcodeproj/**
+SAV-E.xcodeproj/**/xcuserdata/
+SAV-E.xcodeproj/**/*.xcuserstate
+SAV-E.xcodeproj/**/xcdebugger/
 node_modules/
 backend/dist/
 
@@ -68,6 +68,6 @@ Thumbs.db
 .vercel
 
 # Local product drafts
-Wanderly_PRD_v1.0.docx
+SAV-E_PRD_v1.0.docx
 specs/app-store-screenshot-board.html
 specs/app-store-screenshots/

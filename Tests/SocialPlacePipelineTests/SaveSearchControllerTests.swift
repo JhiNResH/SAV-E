@@ -1,7 +1,7 @@
 import XCTest
 import MapKit
 import CoreLocation
-@testable import Wanderly
+@testable import SAVE
 
 final class SaveSearchControllerTests: XCTestCase {
     func testSavePlaceDrawerPresentationMapsCoreStates() {

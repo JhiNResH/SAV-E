@@ -15,24 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "70B8A21AF73E33F8B1BE0D31"
-               BuildableName = "Wanderly.app"
-               BlueprintName = "Wanderly"
-               ReferencedContainer = "container:Wanderly.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "1CA83326C3A3EB2A8CE18140"
-               BuildableName = "WanderlyTests.xctest"
-               BlueprintName = "WanderlyTests"
-               ReferencedContainer = "container:Wanderly.xcodeproj">
+               BlueprintIdentifier = "BCD0A8DE7E85AFADB1C8514C"
+               BuildableName = "SAVEClip.app"
+               BlueprintName = "SAVEClip"
+               ReferencedContainer = "container:SAV-E.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -46,27 +32,14 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "70B8A21AF73E33F8B1BE0D31"
-            BuildableName = "Wanderly.app"
-            BlueprintName = "Wanderly"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "BCD0A8DE7E85AFADB1C8514C"
+            BuildableName = "SAVEClip.app"
+            BlueprintName = "SAVEClip"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "1CA83326C3A3EB2A8CE18140"
-               BuildableName = "WanderlyTests.xctest"
-               BlueprintName = "WanderlyTests"
-               ReferencedContainer = "container:Wanderly.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -82,10 +55,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "70B8A21AF73E33F8B1BE0D31"
-            BuildableName = "Wanderly.app"
-            BlueprintName = "Wanderly"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "BCD0A8DE7E85AFADB1C8514C"
+            BuildableName = "SAVEClip.app"
+            BlueprintName = "SAVEClip"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -101,10 +74,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "70B8A21AF73E33F8B1BE0D31"
-            BuildableName = "Wanderly.app"
-            BlueprintName = "Wanderly"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "BCD0A8DE7E85AFADB1C8514C"
+            BuildableName = "SAVEClip.app"
+            BlueprintName = "SAVEClip"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

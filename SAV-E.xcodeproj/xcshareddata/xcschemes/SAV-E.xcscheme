@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "1600"
-   wasCreatedForAppExtension = "YES"
    version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -16,10 +15,24 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "5E6CCD0BB89E25C77DA2CF32"
-               BuildableName = "WanderlyShareExtension.appex"
-               BlueprintName = "WanderlyShareExtension"
-               ReferencedContainer = "container:Wanderly.xcodeproj">
+               BlueprintIdentifier = "9F18DE3C3B83AA483BDE2A71"
+               BuildableName = "SAVE.app"
+               BlueprintName = "SAVE"
+               ReferencedContainer = "container:SAV-E.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F150541C6B87E28EBACEF1CB"
+               BuildableName = "SAVETests.xctest"
+               BlueprintName = "SAVETests"
+               ReferencedContainer = "container:SAV-E.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,34 +46,46 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5E6CCD0BB89E25C77DA2CF32"
-            BuildableName = "WanderlyShareExtension.appex"
-            BlueprintName = "WanderlyShareExtension"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "9F18DE3C3B83AA483BDE2A71"
+            BuildableName = "SAVE.app"
+            BlueprintName = "SAVE"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F150541C6B87E28EBACEF1CB"
+               BuildableName = "SAVETests.xctest"
+               BlueprintName = "SAVETests"
+               ReferencedContainer = "container:SAV-E.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = ""
-      selectedLauncherIdentifier = "Xcode.IDEFoundation.Launcher.PosixSpawn"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       launchStyle = "0"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
-      allowLocationSimulation = "YES"
-      launchAutomaticallySubstyle = "2">
+      allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5E6CCD0BB89E25C77DA2CF32"
-            BuildableName = "WanderlyShareExtension.appex"
-            BlueprintName = "WanderlyShareExtension"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "9F18DE3C3B83AA483BDE2A71"
+            BuildableName = "SAVE.app"
+            BlueprintName = "SAVE"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -76,10 +101,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5E6CCD0BB89E25C77DA2CF32"
-            BuildableName = "WanderlyShareExtension.appex"
-            BlueprintName = "WanderlyShareExtension"
-            ReferencedContainer = "container:Wanderly.xcodeproj">
+            BlueprintIdentifier = "9F18DE3C3B83AA483BDE2A71"
+            BuildableName = "SAVE.app"
+            BlueprintName = "SAVE"
+            ReferencedContainer = "container:SAV-E.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -1,7 +1,7 @@
 import XCTest
 import CoreLocation
 import ZIPFoundation
-@testable import Wanderly
+@testable import SAVE
 
 private final class StubPublicSourceSearchService: PublicSourceSearchServiceProtocol {
     var queries: [String] = []

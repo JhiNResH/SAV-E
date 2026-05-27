@@ -21,7 +21,7 @@ Let native iOS users import their existing Google Maps saved places from Google 
 - Needs review entries are not saved as map pins.
 - Saving selected ready entries calls the existing backend persistence path.
 - Duplicate entries are skipped.
-- The app builds with `xcodebuild -project Wanderly.xcodeproj -scheme Wanderly -configuration Debug -destination 'generic/platform=iOS' build`.
+- The app builds with `xcodebuild -project SAV-E.xcodeproj -scheme SAV-E -configuration Debug -destination 'generic/platform=iOS' build`.
 
 ## Out of Scope
 

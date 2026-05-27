@@ -18,19 +18,19 @@ This makes SAV-E closer to an agent-readable place memory standard than a Yelp/M
 The repo already has most raw pieces:
 
 - Native local vault:
-  - `Wanderly/Models/SaveMemoryRecord.swift`
-  - `Wanderly/Services/SaveLocalVaultService.swift`
-  - `Wanderly/Intents/SavePlaceFromURLIntent.swift`
-  - `Wanderly/Intents/AskSaveMemoryIntent.swift`
-  - `Wanderly/Views/Profile/SaveMemoryDebugView.swift`
+  - `SAV-E/Models/SaveMemoryRecord.swift`
+  - `SAV-E/Services/SaveLocalVaultService.swift`
+  - `SAV-E/Intents/SavePlaceFromURLIntent.swift`
+  - `SAV-E/Intents/AskSaveMemoryIntent.swift`
+  - `SAV-E/Views/Profile/SaveMemoryDebugView.swift`
 - Social/link candidate parser:
-  - `Wanderly/Services/SocialLinkReviewCandidateService.swift`
-  - `Wanderly/Services/PendingPlaceImportService.swift`
+  - `SAV-E/Services/SocialLinkReviewCandidateService.swift`
+  - `SAV-E/Services/PendingPlaceImportService.swift`
 - Backend memory trail:
   - `backend/sql/schema.sql`: `captures`, `place_candidates`, `agent_decisions`, `recommendation_sets`, `recommendation_items`, `agent_tool_calls`
   - `backend/src/server.ts`: `/memory/*` and `/agents/*` routes
 - Share surfaces:
-  - `WanderlyClip/ClipContentView.swift` currently previews `wanderly.app/trip?d=<base64>`
+  - `SAV-EClip/ClipContentView.swift` currently previews `wanderly.app/trip?d=<base64>`
   - `save-rn/src/sharedTrip.ts` builds/decodes base64 trip links
   - `save-rn/App.tsx` already has import, trip selection, and share tab
 
@@ -148,7 +148,7 @@ Current App Clip only knows `wanderly.app/trip?d=<base64>`. V0 should not expand
 - Encryption migration.
 - Full backend migration.
 - New reservation/order flows.
-- Rebranding every UI string away from Wanderly/SAV-E.
+- Rebranding every UI string away from SAV-E/SAV-E.
 
 ## Implementation slices
 

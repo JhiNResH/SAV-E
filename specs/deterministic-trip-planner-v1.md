@@ -26,8 +26,8 @@ Acceptance criteria:
 Verification:
 
 - `git diff --check`
-- `xcodebuild -project Wanderly.xcodeproj -scheme Wanderly -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`
-- `xcodebuild -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -configuration Debug test`
+- `xcodebuild -project SAV-E.xcodeproj -scheme SAV-E -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -configuration Debug test`
 
 Out of scope:
 

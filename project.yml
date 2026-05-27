@@ -1,4 +1,4 @@
-name: Wanderly
+name: SAV-E
 options:
   bundleIdPrefix: com.wanderly
   deploymentTarget:
@@ -22,41 +22,41 @@ packages:
     from: 0.9.19
 
 targets:
-  Wanderly:
+  SAVE:
     type: application
     platform: iOS
     sources:
-      - path: Wanderly
+      - path: SAV-E
         excludes:
           - Resources/Secrets.plist
           - Resources/Secrets.plist.template
-      - path: WanderlyShared
-      - path: Wanderly/Resources/Secrets.plist
+      - path: SAV-EShared
+      - path: SAV-E/Resources/Secrets.plist
         optional: true
         buildPhase: resources
     preBuildScripts:
       - name: Create Local Secrets.plist
         script: |
           set -euo pipefail
-          secrets="${SRCROOT}/Wanderly/Resources/Secrets.plist"
-          template="${SRCROOT}/Wanderly/Resources/Secrets.plist.template"
+          secrets="${SRCROOT}/SAV-E/Resources/Secrets.plist"
+          template="${SRCROOT}/SAV-E/Resources/Secrets.plist.template"
           if [ ! -f "$secrets" ]; then
             cp "$template" "$secrets"
           fi
         inputFiles:
-          - $(SRCROOT)/Wanderly/Resources/Secrets.plist.template
+          - $(SRCROOT)/SAV-E/Resources/Secrets.plist.template
         outputFiles:
-          - $(SRCROOT)/Wanderly/Resources/Secrets.plist
+          - $(SRCROOT)/SAV-E/Resources/Secrets.plist
     dependencies:
       - package: Privy
         product: Privy
       - package: ZIPFoundation
         product: ZIPFoundation
-      - target: WanderlyShareExtension
-      - target: WanderlyClip
+      - target: SAVEShareExtension
+      - target: SAVEClip
         embed: true
     info:
-      path: Wanderly/Info.plist
+      path: SAV-E/Info.plist
       properties:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -90,14 +90,14 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "43"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Wanderly/Wanderly.entitlements
+        CODE_SIGN_ENTITLEMENTS: SAV-E/SAV-E.entitlements
 
-  WanderlyClip:
+  SAVEClip:
     type: application.on-demand-install-capable
     platform: iOS
     sources:
-      - path: WanderlyClip
-      - path: Wanderly/Resources/Assets.xcassets
+      - path: SAV-EClip
+      - path: SAV-E/Resources/Assets.xcassets
         buildPhase: resources
     settings:
       base:
@@ -109,7 +109,7 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "43"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: WanderlyClip/WanderlyClip.entitlements
+        CODE_SIGN_ENTITLEMENTS: SAV-EClip/SAV-EClip.entitlements
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_CFBundleIconName: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: SAV-E
@@ -128,31 +128,31 @@ targets:
         INFOPLIST_KEY_NSAppClip:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
-  WanderlyShareExtension:
+  SAVEShareExtension:
     type: app-extension
     platform: iOS
     sources:
-      - path: WanderlyShareExtension
+      - path: SAV-EShareExtension
         excludes:
           - Secrets.plist
           - Secrets.plist.template
-      - path: WanderlyShared
-      - path: WanderlyShareExtension/Secrets.plist
+      - path: SAV-EShared
+      - path: SAV-EShareExtension/Secrets.plist
         optional: true
         buildPhase: resources
     preBuildScripts:
       - name: Create Local Secrets.plist
         script: |
           set -euo pipefail
-          secrets="${SRCROOT}/WanderlyShareExtension/Secrets.plist"
-          template="${SRCROOT}/WanderlyShareExtension/Secrets.plist.template"
+          secrets="${SRCROOT}/SAV-EShareExtension/Secrets.plist"
+          template="${SRCROOT}/SAV-EShareExtension/Secrets.plist.template"
           if [ ! -f "$secrets" ]; then
             cp "$template" "$secrets"
           fi
         inputFiles:
-          - $(SRCROOT)/WanderlyShareExtension/Secrets.plist.template
+          - $(SRCROOT)/SAV-EShareExtension/Secrets.plist.template
         outputFiles:
-          - $(SRCROOT)/WanderlyShareExtension/Secrets.plist
+          - $(SRCROOT)/SAV-EShareExtension/Secrets.plist
     settings:
       base:
         DEVELOPMENT_TEAM: JC6858UYM9
@@ -162,16 +162,16 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "43"
         GENERATE_INFOPLIST_FILE: false
-        INFOPLIST_FILE: WanderlyShareExtension/Info.plist
-        CODE_SIGN_ENTITLEMENTS: WanderlyShareExtension/WanderlyShareExtension.entitlements
+        INFOPLIST_FILE: SAV-EShareExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SAV-EShareExtension/SAV-EShareExtension.entitlements
 
-  WanderlyTests:
+  SAVETests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: Tests/SocialPlacePipelineTests
     dependencies:
-      - target: Wanderly
+      - target: SAVE
       - package: ZIPFoundation
         product: ZIPFoundation
     settings:
@@ -180,36 +180,36 @@ targets:
         CODE_SIGN_STYLE: Automatic
         PRODUCT_BUNDLE_IDENTIFIER: com.wanderly.app.tests
         GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_KEY_CFBundleDisplayName: WanderlyTests
+        INFOPLIST_KEY_CFBundleDisplayName: SAVETests
         BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Wanderly.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Wanderly"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SAVE.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SAVE"
 schemes:
-  Wanderly:
+  SAV-E:
     build:
       targets:
-        Wanderly: all
-        WanderlyTests: [test]
+        SAVE: all
+        SAVETests: [test]
     run:
       config: Debug
     test:
       targets:
-        - WanderlyTests
+        - SAVETests
     archive:
       config: Release
 
-  WanderlyShareExtension:
+  SAVEShareExtension:
     build:
       targets:
-        WanderlyShareExtension: all
+        SAVEShareExtension: all
     run:
       config: Debug
     archive:
       config: Release
 
-  WanderlyClip:
+  SAVEClip:
     build:
       targets:
-        WanderlyClip: all
+        SAVEClip: all
     run:
       config: Debug
     archive:

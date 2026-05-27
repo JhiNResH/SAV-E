@@ -2,7 +2,7 @@ import Foundation
 import CoreLocation
 
 /// Lightweight place payload encoded in the App Clip URL.
-/// Duplicated across targets — keep in sync with WanderlyClip's copy.
+/// Duplicated across targets — keep in sync with SAVEClip's copy.
 struct SharedPlaceData: Codable {
     let id: String
     let name: String
@@ -123,7 +123,7 @@ struct SharedPlaceData: Codable {
 }
 
 /// Lightweight trip payload encoded in the App Clip URL.
-/// Duplicated across targets — keep in sync with WanderlyClip's copy.
+/// Duplicated across targets — keep in sync with SAVEClip's copy.
 struct SharedTripData: Codable {
     let name: String
     let city: String

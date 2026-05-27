@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "Wanderly",
+    name: "SAV-E",
     platforms: [
         .iOS(.v17)
     ],
     products: [
         .library(
-            name: "Wanderly",
-            targets: ["Wanderly"]
+            name: "SAV-E",
+            targets: ["SAVE"]
         ),
     ],
     dependencies: [
@@ -18,11 +18,11 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Wanderly",
+            name: "SAVE",
             dependencies: [
                 .product(name: "Privy", package: "privy-ios"),
             ],
-            path: "Wanderly"
+            path: "SAV-E"
         ),
     ]
 )

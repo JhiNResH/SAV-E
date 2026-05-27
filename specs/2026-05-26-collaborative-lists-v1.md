@@ -83,11 +83,11 @@ This is intentionally compatible with the current trip-share pattern. Backend-ba
 - Xcode targeted tests:
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -only-testing:WanderlyTests/SaveCollaborativeListTests CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -only-testing:SAVETests/SaveCollaborativeListTests CODE_SIGNING_ALLOWED=NO
 ```
 
 - Simulator build:
 
 ```bash
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ```
