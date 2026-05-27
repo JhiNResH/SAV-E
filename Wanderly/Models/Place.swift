@@ -25,6 +25,8 @@ struct Place: Identifiable, Codable, Hashable {
     var googlePriceLevel: Int?
     var openingHours: String?
     var createdAt: Date
+    var visibility: PlaceVisibility? = nil
+    var socialSignal: PlaceSocialSignal? = nil
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -279,7 +281,9 @@ extension Place {
         googleRating: 4.6,
         googlePriceLevel: 2,
         openingHours: "Mon-Sun 8:00 AM - 5:00 PM",
-        createdAt: Date()
+        createdAt: Date(),
+        visibility: .privateMemory,
+        socialSignal: nil
     )
 
     static let mockList: [Place] = [
@@ -298,7 +302,9 @@ extension Place {
             extractedDishes: ["Black King Ramen"],
             priceRange: "$$",
             googleRating: 4.5,
-            createdAt: Date().addingTimeInterval(-86400)
+            createdAt: Date().addingTimeInterval(-86400),
+            visibility: .privateMemory,
+            socialSignal: nil
         ),
         Place(
             id: UUID(),
@@ -311,7 +317,105 @@ extension Place {
             sourcePlatform: .other,
             priceRange: "$$$",
             googleRating: 4.3,
-            createdAt: Date().addingTimeInterval(-172800)
+            createdAt: Date().addingTimeInterval(-172800),
+            visibility: .privateMemory,
+            socialSignal: nil
         ),
     ]
+
+    static func socialSignalSeeds(near places: [Place]) -> [Place] {
+        let anchor = places.first ?? .mock
+        let baseLatitude = anchor.latitude == 0 ? 33.7455 : anchor.latitude
+        let baseLongitude = anchor.longitude == 0 ? -117.8677 : anchor.longitude
+
+        return [
+            Place(
+                id: UUID(),
+                name: "Hidden House Coffee",
+                address: "511 E Santa Ana Blvd, Santa Ana, CA",
+                latitude: baseLatitude + 0.006,
+                longitude: baseLongitude - 0.006,
+                category: .cafe,
+                status: .wantToGo,
+                rating: 4.6,
+                note: "Friend signal candidate",
+                sourcePlatform: .other,
+                priceRange: "$$",
+                recommender: "Maya",
+                googleRating: 4.6,
+                createdAt: Date(),
+                visibility: .friends,
+                socialSignal: PlaceSocialSignal(
+                    kind: .friendSaved,
+                    lens: .friends,
+                    friendNames: ["Maya", "Ezven"],
+                    friendCount: 4,
+                    saveCount: 18,
+                    trendingRank: nil,
+                    categoryRank: 2,
+                    sourceLabel: "Friends",
+                    referrerId: nil,
+                    referralCode: nil
+                )
+            ),
+            Place(
+                id: UUID(),
+                name: "Brodard Chateau",
+                address: "9100 Trask Ave, Garden Grove, CA",
+                latitude: baseLatitude - 0.005,
+                longitude: baseLongitude + 0.007,
+                category: .food,
+                status: .wantToGo,
+                rating: 4.5,
+                note: "Trending food candidate",
+                sourcePlatform: .other,
+                priceRange: "$$",
+                recommender: "SAV-E trending",
+                googleRating: 4.5,
+                createdAt: Date(),
+                visibility: .publicGuide,
+                socialSignal: PlaceSocialSignal(
+                    kind: .trending,
+                    lens: .trending,
+                    friendNames: [],
+                    friendCount: 0,
+                    saveCount: 67,
+                    trendingRank: 3,
+                    categoryRank: 1,
+                    sourceLabel: "Trending",
+                    referrerId: nil,
+                    referralCode: nil
+                )
+            ),
+            Place(
+                id: UUID(),
+                name: "The Blind Rabbit",
+                address: "440 S Anaheim Blvd, Anaheim, CA",
+                latitude: baseLatitude + 0.004,
+                longitude: baseLongitude + 0.005,
+                category: .bar,
+                status: .wantToGo,
+                rating: 4.4,
+                note: "For You candidate from friends and trending overlap",
+                sourcePlatform: .other,
+                priceRange: "$$$",
+                recommender: "Maya",
+                googleRating: 4.4,
+                createdAt: Date(),
+                visibility: .friends,
+                socialSignal: PlaceSocialSignal(
+                    kind: .friendSaved,
+                    lens: .forYou,
+                    friendNames: ["Maya"],
+                    friendCount: 2,
+                    saveCount: 24,
+                    trendingRank: 8,
+                    categoryRank: 3,
+                    sourceLabel: "For You",
+                    referrerId: nil,
+                    referralCode: nil
+                )
+            ),
+        ]
+    }
 }

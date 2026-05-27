@@ -65,7 +65,7 @@ const tripStopFields = [
   "note",
 ] as const;
 
-const profileFields = ["display_name", "avatar_url"] as const;
+const profileFields = ["display_name", "avatar_url", "handle", "referral_code"] as const;
 
 const captureFields = [
   "id",

@@ -7,6 +7,7 @@ struct SaveApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var openedTrip: SharedTripData?
     @State private var openedList: SaveCollaborativeList?
+    @State private var openedReferral: SaveReferralProfile?
 
     var body: some Scene {
         WindowGroup {
@@ -35,20 +36,24 @@ struct SaveApp: App {
                 handleIncomingURL(url)
             }
             .alert(linkAlertTitle, isPresented: Binding(
-                get: { openedTrip != nil || openedList != nil },
+                get: { openedTrip != nil || openedList != nil || openedReferral != nil },
                 set: {
                     if !$0 {
                         openedTrip = nil
                         openedList = nil
+                        openedReferral = nil
                     }
                 }
             )) {
                 Button(languageSettings.text(.ok)) {
                     openedTrip = nil
                     openedList = nil
+                    openedReferral = nil
                 }
             } message: {
-                if let openedList {
+                if let openedReferral {
+                    Text("\(openedReferral.displayName)'s starter map pack is ready. SAV-E will finish the follow after install/open and unlock your first AI itinerary from their places.")
+                } else if let openedList {
                     Text("\(openedList.title) joined as \(openedList.viewerRole.displayName.lowercased()). \(openedList.items.count) places are ready in Lists.")
                 } else if let openedTrip {
                     Text(String(
@@ -62,6 +67,12 @@ struct SaveApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        if let profile = SaveReferralLink.profile(from: url) {
+            SaveReferralHandoffStore.shared.save(profile)
+            openedReferral = profile
+            return
+        }
+
         if isTripLink(url), let trip = SharedTripData.from(url: url) {
             openedTrip = trip
             return
@@ -79,7 +90,8 @@ struct SaveApp: App {
     }
 
     private var linkAlertTitle: String {
-        openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
+        if openedReferral != nil { return "Referral ready" }
+        return openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
     }
 
     private func isTripLink(_ url: URL) -> Bool {
