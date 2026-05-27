@@ -1083,6 +1083,16 @@ struct ShareExtensionView: View {
                 isParsing = false
                 return
             }
+            let sourceOnly = googleMapsListSourceOnlyReviewCandidate(
+                from: metadata,
+                sourceURLString: parseContent,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText
+            )
+            reviewCandidates = [sourceOnly]
+            selectedCategory = sourceOnly.category
+            isParsing = false
+            return
         }
 
         if let mapPlace = deterministicMapPlace(from: parseContent, title: sharedTitle, text: sharedText) {
@@ -1422,6 +1432,55 @@ struct ShareExtensionView: View {
                 reviewState: hasCoordinates ? "map_match_ready" : "google_maps_list_candidate"
             )
         }
+    }
+
+    private func googleMapsListSourceOnlyReviewCandidate(
+        from metadata: ShareMetadata,
+        sourceURLString: String,
+        sharedTitle: String,
+        sharedText: String
+    ) -> PendingReviewCandidate {
+        let listTitle = googleMapsListTitle(sharedTitle: sharedTitle, metadataTitle: metadata.title)
+        let evidenceText = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+        let evidence = [
+            "Source URL: \(sourceURLString)",
+            "Google Maps saved list: \(listTitle)",
+            "No public place links were exposed in the shared list metadata/HTML"
+        ]
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: evidence,
+            attempts: [
+                "Scanned Google Maps saved-list metadata/HTML for /maps/place, /maps/search, and /maps?cid links",
+                "Kept this as a source clue instead of inventing places from a private or short-link shell"
+            ],
+            missingFields: ["Public list entries", "Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Make the Google Maps list public/shared-readable, share an individual place, or share a screenshot/copied list text."
+        )
+        return PendingReviewCandidate(
+            candidateName: listTitle,
+            address: "",
+            category: "attraction",
+            sourceURL: sourceURLString,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + ["Next best clue: \(diagnostic.nextBestClue)"],
+            confidence: 0,
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            isSourceOnly: true,
+            reviewState: "google_maps_list_source_only"
+        )
+    }
+
+    private func googleMapsListTitle(sharedTitle: String, metadataTitle: String?) -> String {
+        let rawTitle = [sharedTitle, metadataTitle]
+            .map { $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+            .first(where: { !$0.isEmpty }) ?? "Google Maps saved list"
+        let cleaned = rawTitle
+            .replacingOccurrences(of: " - Google Maps", with: "")
+            .replacingOccurrences(of: "| Google Maps", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "Google Maps saved list" : cleaned
     }
 
     private func socialReviewCandidate(

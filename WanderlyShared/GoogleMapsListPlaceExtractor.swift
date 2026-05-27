@@ -31,9 +31,12 @@ enum GoogleMapsListPlaceExtractor {
         let evidenceText = [text, metadataTitle, metadataDescription, htmlText]
             .compactMap { $0 }
             .joined(separator: "\n")
+        let normalizedText = normalizedEvidenceText(evidenceText)
+        let linkEvidenceText = normalizedText == evidenceText ? evidenceText : [evidenceText, normalizedText].joined(separator: "\n")
 
         var candidates: [GoogleMapsListPlaceCandidate] = []
-        candidates.append(contentsOf: candidatesFromGooglePlaceLinks(in: evidenceText))
+        candidates.append(contentsOf: candidatesFromGooglePlaceLinks(in: linkEvidenceText))
+        candidates.append(contentsOf: candidatesFromGoogleMapsQueryLinks(in: linkEvidenceText))
         candidates.append(contentsOf: candidatesFromPlainPlaceLines(in: [text, metadataDescription].compactMap { $0 }.joined(separator: "\n")))
 
         var seen = Set<String>()
@@ -51,6 +54,31 @@ enum GoogleMapsListPlaceExtractor {
                 evidence: candidate.evidence
             )
         }
+    }
+
+    private static func normalizedEvidenceText(_ value: String) -> String {
+        var decoded = value
+        let replacements = [
+            ("\\\\u003d", "="),
+            ("\\u003d", "="),
+            ("\\\\u0026", "&"),
+            ("\\u0026", "&"),
+            ("\\\\u002F", "/"),
+            ("\\u002F", "/"),
+            ("\\\\/", "/"),
+            ("\\/", "/"),
+            ("&amp;", "&"),
+            ("&quot;", "\""),
+            ("&#34;", "\""),
+            ("&#39;", "'"),
+            ("&apos;", "'"),
+            ("&lt;", "<"),
+            ("&gt;", ">")
+        ]
+        for (source, target) in replacements {
+            decoded = decoded.replacingOccurrences(of: source, with: target)
+        }
+        return decoded
     }
 
     private static func candidatesFromGooglePlaceLinks(in text: String) -> [GoogleMapsListPlaceCandidate] {
@@ -84,6 +112,30 @@ enum GoogleMapsListPlaceExtractor {
             }
         }
         return results
+    }
+
+    private static func candidatesFromGoogleMapsQueryLinks(in text: String) -> [GoogleMapsListPlaceCandidate] {
+        guard !text.isEmpty else { return [] }
+        let pattern = #"(?i)(?:https?:)?(?://)?(?:www\.)?google\.com/maps\?[^"'<>\s\\]*(?:cid|query_place_id|ftid)=[^"'<>\s\\]*|/maps\?[^"'<>\s\\]*(?:cid|query_place_id|ftid)=[^"'<>\s\\]*"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+
+        let nsText = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: nsText.length)).compactMap { match in
+            let snippet = htmlElementSnippet(in: nsText, around: match.range)
+            let nearby = nearbyText(in: nsText, around: match.range, radius: 280)
+            guard let name = placeNameNearGoogleQueryLink(in: snippet), !name.isEmpty else {
+                return nil
+            }
+            let coordinate = coordinateNearGoogleLink(in: nearby)
+            let address = firstAddressLine(in: nearby) ?? ""
+            return GoogleMapsListPlaceCandidate(
+                name: name,
+                address: address,
+                latitude: coordinate?.latitude,
+                longitude: coordinate?.longitude,
+                evidence: ["Found Google Maps place URL: \(name)"]
+            )
+        }
     }
 
     private static func candidatesFromPlainPlaceLines(in text: String) -> [GoogleMapsListPlaceCandidate] {
@@ -121,6 +173,11 @@ enum GoogleMapsListPlaceExtractor {
 
     private static func cleanPlaceName(_ value: String) -> String {
         SocialPlaceEvidenceScorer.cleanCandidateName(value)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#34;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
             .replacingOccurrences(of: " - Google Maps", with: "")
             .replacingOccurrences(of: "| Google Maps", with: "")
             .replacingOccurrences(of: "Google Maps", with: "")
@@ -141,10 +198,49 @@ enum GoogleMapsListPlaceExtractor {
               !lower.contains("reviews"),
               !lower.contains("photos"),
               !lower.contains("save to"),
+              !["open", "website", "route", "saved", "list", "view"].contains(lower),
               lower != listLower else {
             return false
         }
         return true
+    }
+
+    private static func placeNameNearGoogleQueryLink(in snippet: String) -> String? {
+        let patterns = [
+            #"(?is)aria-label\s*=\s*["']([^"']+)["']"#,
+            #"(?is)title\s*=\s*["']([^"']+)["']"#,
+            #"(?is)>\s*([^<>]{2,90})\s*</a>"#
+        ]
+        let nsSnippet = snippet as NSString
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            guard let match = regex.firstMatch(in: snippet, range: NSRange(location: 0, length: nsSnippet.length)),
+                  match.numberOfRanges > 1 else {
+                continue
+            }
+            let name = cleanPlaceName(nsSnippet.substring(with: match.range(at: 1)))
+            if isUsablePlaceName(name, listTitle: "") {
+                return name
+            }
+        }
+        return nil
+    }
+
+    private static func htmlElementSnippet(in text: NSString, around range: NSRange) -> String {
+        let beforeStart = max(0, range.location - 400)
+        let beforeLength = range.location - beforeStart
+        let before = text.substring(with: NSRange(location: beforeStart, length: beforeLength)) as NSString
+        let openRange = before.range(of: "<a", options: [.backwards, .caseInsensitive])
+        let snippetStart = openRange.location == NSNotFound ? max(0, range.location - 180) : beforeStart + openRange.location
+
+        let afterStart = range.location + range.length
+        let afterEnd = min(text.length, afterStart + 400)
+        let afterLength = max(0, afterEnd - afterStart)
+        let after = text.substring(with: NSRange(location: afterStart, length: afterLength)) as NSString
+        let closeRange = after.range(of: "</a>", options: .caseInsensitive)
+        let snippetEnd = closeRange.location == NSNotFound ? min(text.length, range.location + range.length + 180) : afterStart + closeRange.location + closeRange.length
+
+        return text.substring(with: NSRange(location: snippetStart, length: max(0, snippetEnd - snippetStart)))
     }
 
     private static func nearbyText(in text: NSString, around range: NSRange, radius: Int) -> String {
