@@ -8,6 +8,8 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:sav-e.app</string>
+		<string>appclips:sav-e.app</string>
 		<string>applinks:wanderly.app</string>
 		<string>appclips:wanderly.app</string>
 		<string>applinks:sav-e.app</string>

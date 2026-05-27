@@ -30,31 +30,6 @@ struct PlaceDetailView: View {
                 PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
                     .padding(.horizontal)
 
-                // Notes
-                if let note = cleanUserNote {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Why SAV-E saved this", systemImage: "sparkles")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.saveInk)
-                        Text(note)
-                            .font(.subheadline)
-                            .foregroundColor(.saveInk)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.saveNotebookPage)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1)
-                            )
-                    }
-                    .padding(.horizontal)
-                }
-
-                PlaceEvidenceReceiptPanel(place: detailPlace)
-                    .padding(.horizontal)
-
                 // Mini map
                 Map(position: .constant(.region(MKCoordinateRegion(
                     center: detailPlace.coordinate,
@@ -72,7 +47,7 @@ struct PlaceDetailView: View {
                         PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: .saveHoney)
                     }
 
-                    ShareLink(item: detailPlace.saveShareURL ?? detailPlace.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
+                    ShareLink(item: detailPlace.saveShareURL ?? URL(string: "https://sav-e.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
                         PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveMint.opacity(0.36))
                     }
 
@@ -100,7 +75,7 @@ struct PlaceDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: detailPlace.saveShareURL ?? detailPlace.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
+                ShareLink(item: detailPlace.saveShareURL ?? URL(string: "https://sav-e.app")!, subject: Text(detailPlace.shareSubject), message: Text(detailPlace.shareText)) {
                     Image(systemName: "square.and.arrow.up")
                 }
             }
@@ -209,10 +184,6 @@ struct PlaceDetailView: View {
             return "Map verified for \(detailPlace.name) in \(areaLabel). Address confirmed for this SAV-E memory."
         }
         return "Map verified and address confirmed for this SAV-E memory."
-    }
-
-    private var cleanUserNote: String? {
-        detailPlace.cleanMemoryNote
     }
 
     private func enrichBusinessDetails() async {

@@ -5,6 +5,7 @@ struct SaveApp: App {
     @StateObject private var authService = PrivyAuthService.shared
     @StateObject private var languageSettings = AppLanguageSettings()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var openedPlace: SharedPlaceData?
     @State private var openedTrip: SharedTripData?
     @State private var openedList: SaveCollaborativeList?
     @State private var openedReferral: SaveReferralProfile?
@@ -36,9 +37,10 @@ struct SaveApp: App {
                 handleIncomingURL(url)
             }
             .alert(linkAlertTitle, isPresented: Binding(
-                get: { openedTrip != nil || openedList != nil || openedReferral != nil },
+                get: { openedPlace != nil || openedTrip != nil || openedList != nil || openedReferral != nil },
                 set: {
                     if !$0 {
+                        openedPlace = nil
                         openedTrip = nil
                         openedList = nil
                         openedReferral = nil
@@ -46,6 +48,7 @@ struct SaveApp: App {
                 }
             )) {
                 Button(languageSettings.text(.ok)) {
+                    openedPlace = nil
                     openedTrip = nil
                     openedList = nil
                     openedReferral = nil
@@ -53,6 +56,8 @@ struct SaveApp: App {
             } message: {
                 if let openedReferral {
                     Text("\(openedReferral.displayName)'s starter map pack is ready. SAV-E will finish the follow after install/open and unlock your first AI itinerary from their places.")
+                } else if let openedPlace {
+                    Text("\(openedPlace.name) is ready. Save it to your SAV-E or open Maps from the place card.")
                 } else if let openedList {
                     Text("\(openedList.title) joined as \(openedList.viewerRole.displayName.lowercased()). \(openedList.items.count) places are ready in Lists.")
                 } else if let openedTrip {
@@ -70,6 +75,11 @@ struct SaveApp: App {
         if let profile = SaveReferralLink.profile(from: url) {
             SaveReferralHandoffStore.shared.save(profile)
             openedReferral = profile
+            return
+        }
+
+        if isPlaceLink(url), let place = SharedPlaceData.from(url: url) {
+            openedPlace = place
             return
         }
 
@@ -91,16 +101,27 @@ struct SaveApp: App {
 
     private var linkAlertTitle: String {
         if openedReferral != nil { return "Referral ready" }
+        if openedPlace != nil { return "SAV-E place ready" }
         return openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
+    }
+
+    private func isPlaceLink(_ url: URL) -> Bool {
+        if url.scheme == "wanderly", url.host == "p" {
+            return true
+        }
+        guard url.scheme == "https",
+              url.host == "sav-e.app" || url.host == "wanderly.app" else { return false }
+        return url.path.hasPrefix("/p/")
     }
 
     private func isTripLink(_ url: URL) -> Bool {
         if url.scheme == "wanderly", url.host == "trip" {
             return true
         }
-        return url.scheme == "https" &&
-            url.host == "wanderly.app" &&
-            url.path == "/trip"
+        guard url.scheme == "https",
+              url.host == "sav-e.app" || url.host == "wanderly.app" else { return false }
+        return url.path.hasPrefix("/trip/")
+            || (url.path == "/trip" && URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "d" } == true)
     }
 }
 

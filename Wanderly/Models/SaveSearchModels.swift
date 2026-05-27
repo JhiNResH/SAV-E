@@ -471,7 +471,7 @@ extension SaveMapCandidate {
     }
 
     var saveShareURL: URL? {
-        SharedTripData.from(candidate: self).toURL()
+        SharedPlaceData.from(candidate: self).toURL()
     }
 
     var shareText: String {
@@ -495,9 +495,6 @@ extension SaveMapCandidate {
         }
         if let saveShareURL {
             lines.append("Open in SAV-E: \(saveShareURL.absoluteString)")
-        }
-        if let mapsURL = appleMapsURL {
-            lines.append("Map fallback: \(mapsURL.absoluteString)")
         }
 
         return lines.joined(separator: "\n")
@@ -712,7 +709,7 @@ extension SaveSearchResult {
     }
 
     var saveShareURL: URL? {
-        SharedTripData.from(result: self)?.toURL()
+        SharedPlaceData.from(result: self)?.toURL()
     }
 
     var shareText: String {
