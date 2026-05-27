@@ -3,7 +3,7 @@ const path = require("node:path");
 
 const appBundleId = "com.wanderly.app";
 const appClipBundleId = "com.wanderly.app.Clip";
-const associatedDomain = "wanderly.app";
+const associatedDomain = "sav-e.app";
 const distRoot = path.join(__dirname, "..", "dist");
 const distDir = path.join(__dirname, "..", "dist", "_expo", "static", "js", "web");
 const publicDir = path.join(__dirname, "..", "public");
@@ -30,7 +30,7 @@ if (!fs.existsSync(distDir)) {
 }
 
 copyPublicAssets();
-writeTripRouteFallback();
+writeShareRouteFallbacks();
 writeAppleAppSiteAssociation();
 
 for (const fileName of fs.readdirSync(distDir)) {
@@ -68,13 +68,15 @@ function copyPublicAssets() {
   fs.cpSync(publicDir, distRoot, { recursive: true });
 }
 
-function writeTripRouteFallback() {
+function writeShareRouteFallbacks() {
   const indexPath = path.join(distRoot, "index.html");
   if (!fs.existsSync(indexPath)) return;
 
-  const tripDir = path.join(distRoot, "trip");
-  fs.mkdirSync(tripDir, { recursive: true });
-  fs.copyFileSync(indexPath, path.join(tripDir, "index.html"));
+  for (const route of ["p", "trip"]) {
+    const routeDir = path.join(distRoot, route);
+    fs.mkdirSync(routeDir, { recursive: true });
+    fs.copyFileSync(indexPath, path.join(routeDir, "index.html"));
+  }
 }
 
 function writeAppleAppSiteAssociation() {
@@ -125,8 +127,16 @@ function buildEnabledAssociation(teamId) {
           appIDs: [appId],
           components: [
             {
-              "/": "/trip",
+              "/": "/p/*",
+              comment: "SAV-E shared place preview links",
+            },
+            {
+              "/": "/trip/*",
               comment: "SAV-E shared trip preview links",
+            },
+            {
+              "/": "/trip",
+              comment: "Legacy SAV-E shared trip query links",
             },
           ],
         },

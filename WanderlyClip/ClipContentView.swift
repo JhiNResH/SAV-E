@@ -1,7 +1,9 @@
 import SwiftUI
 import MapKit
+import UIKit
 
 struct ClipContentView: View {
+    @State private var placeData: SharedPlaceData?
     @State private var tripData: SharedTripData?
     @State private var listData: SharedListData?
     @State private var isLoading = true
@@ -17,6 +19,8 @@ struct ClipContentView: View {
                     loadingView
                 } else if let list = listData {
                     listContentView(list)
+                } else if let place = placeData {
+                    placeContentView(place)
                 } else if let trip = tripData {
                     tripContentView(trip)
                 } else {
@@ -35,8 +39,96 @@ struct ClipContentView: View {
         }
         .task {
             try? await Task.sleep(for: .seconds(1))
-            if tripData == nil && listData == nil {
+            if placeData == nil && tripData == nil && listData == nil {
                 isLoading = false
+            }
+        }
+    }
+
+    // MARK: - Place Content
+
+    private func placeContentView(_ place: SharedPlaceData) -> some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                Map(position: $cameraPosition) {
+                    Marker(place.name, coordinate: place.coordinate)
+                        .tint(Color.saveCoral)
+                }
+                .frame(height: 190)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.horizontal)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    AsyncImage(url: place.photoURLs.first.flatMap(URL.init(string:))) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        ZStack {
+                            Color.savePaper
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundColor(Color.saveCoral)
+                        }
+                    }
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(place.name)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.saveInk)
+
+                        Text(place.category)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
+                    VStack(spacing: 10) {
+                        if let ratingText = ratingLine(for: place) {
+                            detailRow(icon: "star.fill", title: "Rating", value: ratingText)
+                        }
+                        if let hours = place.hours, !hours.isEmpty {
+                            detailRow(icon: "clock", title: "Hours", value: hours)
+                        }
+                        if !place.address.isEmpty {
+                            detailRow(icon: "mappin.and.ellipse", title: "Address", value: place.address)
+                        }
+                        detailRow(icon: "link", title: "Source", value: place.sourceLabel)
+                    }
+
+                    if let note = place.note, !note.isEmpty {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundColor(Color.saveCoral)
+                            .padding(.top, 2)
+                    }
+                }
+                .padding(16)
+                .background(Color.savePaper)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.saveNotebookLine, lineWidth: 2)
+                )
+                .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
+                .padding(.horizontal)
+
+                Button(action: openInFullApp) {
+                    Text("Save / Open in SAV-E")
+                        .font(.headline)
+                        .foregroundColor(Color.saveInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.saveHoney)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                        )
+                        .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 32)
             }
         }
     }
@@ -65,6 +157,10 @@ struct ClipContentView: View {
                     Text(summaryLine(for: trip))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+
+                    Text(routeSummary(for: trip))
+                        .font(.caption)
+                        .foregroundColor(Color.saveCoral)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -116,8 +212,24 @@ struct ClipContentView: View {
                 .padding(.horizontal)
 
                 VStack(spacing: 12) {
+                    Button {
+                        UIPasteboard.general.string = copySummary(for: trip)
+                    } label: {
+                        Text("Copy route summary")
+                            .font(.headline)
+                            .foregroundColor(Color.saveInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.savePaper)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.saveNotebookLine, lineWidth: 2)
+                            )
+                    }
+
                     Button(action: openInFullApp) {
-                        Text("Open in SAV-E")
+                        Text("Import / Open in SAV-E")
                             .font(.headline)
                             .foregroundColor(Color.saveInk)
                             .frame(maxWidth: .infinity)
@@ -290,13 +402,27 @@ struct ClipContentView: View {
         if SharedListPayload.isListLink(url) {
             if let payload = SharedListPayload.from(url: url) {
                 listData = payload.list
+                placeData = nil
+                tripData = nil
                 updateCamera(for: payload.list.items.map { SharedTripData.SharedStop(id: $0.id.uuidString, name: $0.title, address: $0.subtitle, lat: $0.latitude, lng: $0.longitude, time: nil, note: $0.note) })
             }
             isLoading = false
             return
         }
 
+        if isPlaceLink(url) {
+            if let data = SharedPlaceData.from(url: url) {
+                placeData = data
+                tripData = nil
+                listData = nil
+                updateCamera(for: [SharedTripData.SharedStop(id: data.id, name: data.name, address: data.address, lat: data.lat, lng: data.lng, time: nil, note: data.note)])
+            }
+            isLoading = false
+            return
+        }
+
         guard isTripLink(url) else {
+            placeData = nil
             tripData = nil
             listData = nil
             isLoading = false
@@ -305,6 +431,8 @@ struct ClipContentView: View {
 
         if let data = SharedTripData.from(url: url) {
             tripData = data
+            placeData = nil
+            listData = nil
             updateCamera(for: data.stops)
         }
         // Invalid URL data → tripData stays nil → errorView shown
@@ -313,17 +441,39 @@ struct ClipContentView: View {
 
     private var navigationTitle: String {
         if listData != nil { return "List Preview" }
-        return tripData?.stops.count == 1 ? "Place Preview" : "Trip Preview"
+        if placeData != nil { return "Place Preview" }
+        return "Trip Preview"
+    }
+
+    private func isPlaceLink(_ url: URL) -> Bool {
+        if url.scheme == "wanderly", url.host == "p" {
+            return true
+        }
+        guard url.scheme == "https",
+              ["sav-e.app", "wanderly.app"].contains(url.host ?? "") else {
+            return false
+        }
+        return url.path.split(separator: "/").first.map(String.init) == "p"
     }
 
     private func isTripLink(_ url: URL) -> Bool {
-        guard url.scheme == "https" &&
-            url.host == "wanderly.app" &&
-            url.path == "/trip",
-            let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+        if url.scheme == "wanderly", url.host == "trip" {
+            return true
+        }
+        guard url.scheme == "https",
+              ["sav-e.app", "wanderly.app"].contains(url.host ?? "") else {
             return false
         }
 
+        let pathParts = url.path.split(separator: "/")
+        if pathParts.first.map(String.init) == "trip", pathParts.count >= 2 {
+            return true
+        }
+
+        guard url.path == "/trip",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return false
+        }
         return components.queryItems?.contains { item in
             item.name == "d" && item.value?.isEmpty == false
         } == true
@@ -351,10 +501,50 @@ struct ClipContentView: View {
         return "\(countLabel) in \(trip.city)"
     }
 
+    private func routeSummary(for trip: SharedTripData) -> String {
+        trip.stops.map(\.name).joined(separator: " → ")
+    }
+
+    private func copySummary(for trip: SharedTripData) -> String {
+        let stops = trip.stops.enumerated().map { index, stop in
+            let address = stop.address.isEmpty ? "" : " — \(stop.address)"
+            return "\(index + 1). \(stop.name)\(address)"
+        }.joined(separator: "\n")
+        return "\(trip.name)\n\(trip.routeSummary)\n\(stops)"
+    }
+
+    private func ratingLine(for place: SharedPlaceData) -> String? {
+        guard let rating = place.rating else { return nil }
+        if let reviewCount = place.reviewCount {
+            return String(format: "%.1f · %d reviews", rating, reviewCount)
+        }
+        return String(format: "%.1f", rating)
+    }
+
+    private func detailRow(icon: String, title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .frame(width: 18)
+                .foregroundColor(Color.saveCoral)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(value)
+                    .font(.caption)
+                    .foregroundColor(Color.saveInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
     private func openInFullApp() {
         let url: URL?
         if listData != nil {
             url = currentListAppURL()
+        } else if let placeData {
+            url = placeData.toURL(baseURL: "wanderly://p") ?? URL(string: "wanderly://p")
         } else {
             url = tripData?.toURL(baseURL: "wanderly://trip") ?? URL(string: "wanderly://trip")
         }
