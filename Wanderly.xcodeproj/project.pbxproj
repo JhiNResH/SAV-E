@@ -91,6 +91,7 @@
 		E0A8D7C78588C7A73600E0BC /* SaveSearchControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F18BDD0A8864346CFD0FFDE /* SaveSearchControllerTests.swift */; };
 		E0EF8B3281AF0AE07B3CA461 /* PlaceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D14373C25E6C1A46308955A /* PlaceListView.swift */; };
 		E1E3F7D9319056F541095254 /* PlaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CFB6481B8E108DCAF01 /* PlaceCard.swift */; };
+		E4F69A127D631A93D27F4B3A /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 2DF7E4E9E139A09E051DB14C /* ZIPFoundation */; };
 		E7B4FE596AB72D438E1B8A83 /* GoogleTakeoutImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD6620A9DEB09C15873615BC /* GoogleTakeoutImportService.swift */; };
 		E8880348DF753D6DB2CA3B6C /* AIDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5210F08F016F1E68361D82DB /* AIDrawerView.swift */; };
 		EBD63B83A0C3291020E38823 /* MemoMascotMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E57195540863CB1F729752C /* MemoMascotMark.swift */; };
@@ -246,6 +247,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		1B5674069D26E567CFAF9196 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4F69A127D631A93D27F4B3A /* ZIPFoundation in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1B43C02DFFC85212E33C051 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -573,6 +582,7 @@
 			buildConfigurationList = 1C99FDE3BC8375F28EF07AAA /* Build configuration list for PBXNativeTarget "WanderlyTests" */;
 			buildPhases = (
 				06AE12DFE0FFE5EF5B7A5176 /* Sources */,
+				1B5674069D26E567CFAF9196 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -581,6 +591,7 @@
 			);
 			name = WanderlyTests;
 			packageProductDependencies = (
+				2DF7E4E9E139A09E051DB14C /* ZIPFoundation */,
 			);
 			productName = WanderlyTests;
 			productReference = 88C84F22D63C77B4CAE46817 /* WanderlyTests.xctest */;
@@ -1308,6 +1319,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2DF7E4E9E139A09E051DB14C /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6D23DAAE0E5F0AF7EBAEC513 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
 		9AEC21E0AA21AA2589449ABB /* Privy */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CB803A4D865B909CF73C50FE /* XCRemoteSwiftPackageReference "privy-ios" */;
