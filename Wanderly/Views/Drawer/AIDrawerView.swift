@@ -1801,7 +1801,6 @@ private struct SelectedPlaceCapsule: View {
     let item: MapDetailDrawerItem
     let onExpand: () -> Void
     let onClose: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1838,22 +1837,8 @@ private struct SelectedPlaceCapsule: View {
             .accessibilityLabel("Close selected place")
             .frame(width: 44, height: 44)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 78)
-        .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.42))
-                )
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.18) : Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.12), radius: 14, x: 0, y: 6)
+        .padding(.horizontal, 2)
+        .frame(height: 74)
         .gesture(
             DragGesture(minimumDistance: 8)
                 .onEnded { value in
