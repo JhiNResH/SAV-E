@@ -2,6 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg from "pg";
 import { runSourceSearchRecovery, type SourceSearchCandidate } from "./sourceSearchWorker.js";
+import {
+  normalizeFollowRequest,
+  normalizeVisibilityRequest,
+  parseLens,
+} from "./socialContracts.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -170,19 +175,29 @@ createServer(async (request, response) => {
       return sendJson(response, { ok: true, service: "save-backend" });
     }
 
+    const segments = url.pathname.split("/").filter(Boolean);
+    const [resource, id] = segments;
+
+    if (request.method === "GET" && resource === "referrals") {
+      return await handleReferrals(request, response, id, url);
+    }
+
     const userId = await resolveUserId(request);
     await ensureProfile(userId);
 
-    const [resource, id] = url.pathname.split("/").filter(Boolean);
-
+    if (resource === "places" && id && segments[2] === "visibility") {
+      return await handlePlaceVisibility(request, response, id, userId);
+    }
     if (resource === "places") return await handlePlaces(request, response, id, userId);
     if (resource === "trips") return await handleTrips(request, response, id, userId);
     if (resource === "profile") return await handleProfile(request, response, userId);
+    if (resource === "follows") return await handleFollows(request, response, userId);
+    if (resource === "social" && id === "signals") return await handleSocialSignals(request, response, url, userId);
     if (resource === "memory") {
-      return await handleMemory(request, response, url.pathname.split("/").filter(Boolean).slice(1), url, userId);
+      return await handleMemory(request, response, segments.slice(1), url, userId);
     }
     if (resource === "agents") {
-      return await handleAgents(request, response, url.pathname.split("/").filter(Boolean).slice(1), url, userId);
+      return await handleAgents(request, response, segments.slice(1), url, userId);
     }
 
     return sendJson(response, { error: "Not found" }, 404);
@@ -340,6 +355,127 @@ async function handleProfile(
   }
 
   return sendJson(response, { error: "Unsupported profile route" }, 405);
+}
+
+async function handleFollows(
+  request: IncomingMessage,
+  response: ServerResponse,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "POST") return sendJson(response, { error: "Unsupported follows route" }, 405);
+
+  const followRequest = normalizeFollowRequest(await readJson(request));
+  const target = await resolveFollowTarget(followRequest);
+  const targetId = stringValue(target.id);
+  if (!targetId) throw new ApiError(404, "Profile not found");
+  if (targetId === userId) return sendJson(response, { error: "Cannot follow yourself" }, 400);
+
+  const { rows } = await pool.query(
+    `insert into follows (follower_id, following_id, lens, source, referral_code)
+     values ($1, $2, $3, $4, $5)
+     on conflict (follower_id, following_id) do update set
+       lens = excluded.lens,
+       source = excluded.source,
+       referral_code = coalesce(excluded.referral_code, follows.referral_code)
+     returning *`,
+    [userId, targetId, followRequest.lens, followRequest.source, followRequest.referralCode ?? null],
+  );
+
+  return sendJson(response, {
+    follow: formatFollow(rows[0]),
+    profile: formatPublicProfile(target),
+  }, 201);
+}
+
+async function handlePlaceVisibility(
+  request: IncomingMessage,
+  response: ServerResponse,
+  placeId: string,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "PATCH") return sendJson(response, { error: "Unsupported place visibility route" }, 405);
+
+  await ensureOwnedPlaceReference(placeId, userId);
+  const visibility = normalizeVisibilityRequest(await readJson(request));
+  const { rows } = await pool.query(
+    `insert into place_visibility (
+       place_id,
+       user_id,
+       visibility,
+       allow_friend_signal,
+       allow_trending_signal,
+       published_at
+     )
+     values ($1, $2, $3, $4, $5, case when $3 = 'private' then null else now() end)
+     on conflict (place_id) do update set
+       visibility = excluded.visibility,
+       allow_friend_signal = excluded.allow_friend_signal,
+       allow_trending_signal = excluded.allow_trending_signal,
+       published_at = case
+         when excluded.visibility = 'private' then null
+         when place_visibility.published_at is null then now()
+         else place_visibility.published_at
+       end
+     returning *`,
+    [
+      placeId,
+      userId,
+      visibility.visibility,
+      visibility.allowFriendSignal,
+      visibility.allowTrendingSignal,
+    ],
+  );
+
+  return sendJson(response, formatDates(rows[0]));
+}
+
+async function handleSocialSignals(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "GET") return sendJson(response, { error: "Unsupported social signals route" }, 405);
+
+  const lens = parseLens(url.searchParams.get("lens"), "forYou");
+  const limit = clampLimit(url.searchParams.get("limit"));
+  const signals: JsonBody[] = [];
+
+  if (lens === "forYou" || lens === "friends") {
+    signals.push(...await friendSignalPlaces(userId, limit));
+  }
+  if (lens === "forYou" || lens === "trending") {
+    signals.push(...await trendingSignalPlaces(userId, limit));
+  }
+
+  return sendJson(response, signals.slice(0, limit));
+}
+
+async function handleReferrals(
+  request: IncomingMessage,
+  response: ServerResponse,
+  referralCode: string | undefined,
+  url: URL,
+): Promise<void> {
+  if (request.method !== "GET") return sendJson(response, { error: "Unsupported referrals route" }, 405);
+
+  const code = referralCode ?? url.searchParams.get("code") ?? undefined;
+  const handle = url.searchParams.get("handle") ?? undefined;
+  const profile = await referralProfile(code, handle);
+  const profileId = stringValue(profile.id);
+  if (!profileId) throw new ApiError(404, "Referral profile not found");
+  const featuredPlaces = await referralFeaturedPlaces(profileId, stringValue(profile.referral_code) ?? code ?? "");
+
+  return sendJson(response, {
+    referrerId: profileId,
+    handle: stringValue(profile.handle) ?? "",
+    displayName: displayName(profile),
+    referralCode: stringValue(profile.referral_code) ?? "",
+    lens: "friends",
+    avatarUrl: profile.avatar_url ?? null,
+    trustedGuideCount: profile.trusted_guide_count ?? 0,
+    featuredPlaces,
+  });
 }
 
 async function handleMemory(
@@ -700,6 +836,210 @@ async function handleAgentToolCalls(
   }
 
   return sendJson(response, { error: "Unsupported agent tool calls route" }, 405);
+}
+
+async function resolveFollowTarget(followRequest: ReturnType<typeof normalizeFollowRequest>): Promise<JsonBody> {
+  if (followRequest.followingId) {
+    const { rows } = await pool.query("select * from profiles where id = $1", [followRequest.followingId]);
+    if (!rows[0]) throw new ApiError(404, "Profile not found");
+    return asObject(rows[0]);
+  }
+
+  if (followRequest.handle) {
+    const { rows } = await pool.query("select * from profiles where lower(handle) = lower($1)", [followRequest.handle]);
+    if (!rows[0]) throw new ApiError(404, "Profile not found");
+    return asObject(rows[0]);
+  }
+
+  if (followRequest.referralCode) {
+    const { rows } = await pool.query("select * from profiles where referral_code = $1", [followRequest.referralCode]);
+    if (!rows[0]) throw new ApiError(404, "Profile not found");
+    return asObject(rows[0]);
+  }
+
+  throw new ApiError(400, "following_id, handle, or referral_code is required");
+}
+
+async function referralProfile(code: string | undefined, handle: string | undefined): Promise<JsonBody> {
+  if (!code && !handle) throw new ApiError(400, "code or handle is required");
+
+  const filters: string[] = [];
+  const values: QueryValue[] = [];
+  if (code) {
+    values.push(code);
+    filters.push(`referral_code = $${values.length}`);
+  }
+  if (handle) {
+    values.push(handle.replace(/^@+/, ""));
+    filters.push(`lower(handle) = lower($${values.length})`);
+  }
+
+  const { rows } = await pool.query(`select * from profiles where ${filters.join(" or ")} limit 1`, values);
+  if (!rows[0]) throw new ApiError(404, "Referral profile not found");
+  return asObject(rows[0]);
+}
+
+async function friendSignalPlaces(userId: string, limit: number): Promise<JsonBody[]> {
+  const { rows } = await pool.query(
+    `select
+       p.*,
+       pv.visibility as social_visibility,
+       f.lens as follow_lens,
+       actor.id as actor_id,
+       actor.display_name as actor_display_name,
+       actor.handle as actor_handle,
+       actor.referral_code as actor_referral_code
+     from follows f
+     join profiles actor on actor.id = f.following_id
+     join places p on p.user_id = f.following_id
+     join place_visibility pv on pv.place_id = p.id
+     where f.follower_id = $1
+       and p.user_id <> $1
+       and pv.allow_friend_signal = true
+       and pv.visibility in ('friends', 'public_link', 'public_guide')
+     order by p.created_at desc
+     limit $2`,
+    [userId, limit],
+  );
+
+  return rows.map((row) => {
+    const value = asObject(row);
+    const actorName = displayName({
+      display_name: value.actor_display_name,
+      handle: value.actor_handle,
+    });
+    return formatSocialPlace(value, {
+      kind: "friend_saved",
+      lens: parseLens(value.follow_lens, "friends"),
+      friendNames: actorName ? [actorName] : [],
+      friendCount: 1,
+      saveCount: 1,
+      trendingRank: null,
+      categoryRank: null,
+      sourceLabel: actorName,
+      referrerId: stringValue(value.actor_id) ?? null,
+      referralCode: stringValue(value.actor_referral_code) ?? null,
+    });
+  });
+}
+
+async function trendingSignalPlaces(userId: string, limit: number): Promise<JsonBody[]> {
+  const { rows } = await pool.query(
+    `select
+       p.*,
+       pv.visibility as social_visibility,
+       pss.lens as signal_lens,
+       pss.friend_count,
+       pss.save_count,
+       pss.category_rank,
+       pss.source_label,
+       pss.referrer_id,
+       pss.referral_code
+     from place_social_signals pss
+     join places p on p.id = pss.place_id
+     join place_visibility pv on pv.place_id = p.id
+     where (pss.viewer_user_id = $1 or pss.viewer_user_id is null)
+       and pss.signal_type = 'trending'
+       and p.user_id <> $1
+       and pv.allow_trending_signal = true
+       and pv.visibility in ('public_link', 'public_guide')
+     order by pss.trending_score desc, pss.created_at desc
+     limit $2`,
+    [userId, limit],
+  );
+
+  return rows.map((row, index) => {
+    const value = asObject(row);
+    const categoryRank = numberValue(value.category_rank) ?? index + 1;
+    return formatSocialPlace(value, {
+      kind: "trending",
+      lens: parseLens(value.signal_lens, "trending"),
+      friendNames: [],
+      friendCount: numberValue(value.friend_count) ?? 0,
+      saveCount: numberValue(value.save_count) ?? 0,
+      trendingRank: categoryRank,
+      categoryRank,
+      sourceLabel: stringValue(value.source_label) ?? "Trending in SAV-E",
+      referrerId: stringValue(value.referrer_id) ?? null,
+      referralCode: stringValue(value.referral_code) ?? null,
+    });
+  });
+}
+
+async function referralFeaturedPlaces(referrerId: string, referralCode: string): Promise<JsonBody[]> {
+  const { rows } = await pool.query(
+    `select
+       p.*,
+       pv.visibility as social_visibility,
+       owner.display_name as owner_display_name,
+       owner.handle as owner_handle
+     from places p
+     join place_visibility pv on pv.place_id = p.id
+     join profiles owner on owner.id = p.user_id
+     where p.user_id = $1
+       and pv.allow_friend_signal = true
+       and pv.visibility in ('public_link', 'public_guide')
+     order by p.created_at desc
+     limit 6`,
+    [referrerId],
+  );
+
+  return rows.map((row) => {
+    const value = asObject(row);
+    const ownerName = displayName({
+      display_name: value.owner_display_name,
+      handle: value.owner_handle,
+    });
+    return formatSocialPlace(value, {
+      kind: "referral_guide",
+      lens: "friends",
+      friendNames: [],
+      friendCount: 0,
+      saveCount: 0,
+      trendingRank: null,
+      categoryRank: null,
+      sourceLabel: ownerName,
+      referrerId,
+      referralCode,
+    });
+  });
+}
+
+function formatSocialPlace(row: JsonBody, socialSignal: JsonBody): JsonBody {
+  return {
+    ...formatDates(pickFields(row, [...placeFields, "user_id"])),
+    visibility: stringValue(row.social_visibility) ?? "private",
+    social_signal: socialSignal,
+  };
+}
+
+function formatFollow(row: JsonBody): JsonBody {
+  return formatDates(row);
+}
+
+function formatPublicProfile(row: JsonBody): JsonBody {
+  return {
+    id: row.id,
+    handle: row.handle ?? null,
+    display_name: displayName(row),
+    avatar_url: row.avatar_url ?? null,
+    referral_code: row.referral_code ?? null,
+  };
+}
+
+function displayName(row: JsonBody): string {
+  return stringValue(row.display_name) ?? stringValue(row.handle) ?? "SAV-E User";
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return undefined;
+}
+
+function clampLimit(value: string | null): number {
+  const parsed = value ? Number(value) : 40;
+  if (!Number.isFinite(parsed)) return 40;
+  return Math.max(1, Math.min(100, Math.trunc(parsed)));
 }
 
 async function existingCandidateKeys(captureId: string): Promise<Set<string>> {
