@@ -165,6 +165,19 @@ Before this works for friends without the full app installed:
 
 Without those Apple/domain steps, the same URL still opens the web app, but iOS will not invoke the App Clip. If `APPLE_TEAM_ID` is missing, the web build writes a disabled AASA placeholder with no app IDs so Vercel does not serve the SPA shell as Apple association data.
 
+## Referral Profile Links
+
+SAV-E referral links use these shapes:
+
+```text
+https://sav-e.app/r/<code>
+https://sav-e.app/u/<handle>?ref=<code>
+```
+
+The App Clip preview shows the referrer's profile, a starter map pack, and a follow CTA. The handoff opens the full app through `wanderly://referral?code=<code>&handle=<handle>&lens=friends`, where the full app stores the referrer and intended follow lens before completing follow after install/open.
+
+Before production referral App Clips work, `sav-e.app` needs the same Apple associated-domain and App Clip Experience setup as `wanderly.app`.
+
 ## Project Structure
 
 ```

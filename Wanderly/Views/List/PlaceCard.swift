@@ -26,6 +26,10 @@ struct PlaceCard: View {
                     .foregroundColor(.saveMutedText)
                     .lineLimit(1)
 
+                if let signal = place.socialSignal {
+                    friendSignalBadge(signal)
+                }
+
                 HStack(spacing: 8) {
                     if let rating = place.googleRating {
                         HStack(spacing: 2) {
@@ -116,6 +120,22 @@ struct PlaceCard: View {
         .background(Color.saveHoney.opacity(0.42))
         .foregroundColor(.saveCocoa)
         .cornerRadius(8)
+    }
+
+    private func friendSignalBadge(_ signal: PlaceSocialSignal) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: signal.kind.pinSystemImage)
+                .font(.system(size: 10, weight: .black))
+            Text(signal.displayText)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundColor(.saveCocoa)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.saveSky.opacity(signal.kind == .trending ? 0.18 : 0.28))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.25), lineWidth: 1))
     }
 
 }

@@ -45,6 +45,17 @@ struct MapView: View {
                         }
                     }
 
+                    ForEach(viewModel.visibleSocialPlaces) { place in
+                        Annotation("", coordinate: place.coordinate) {
+                            SocialPlaceMapPin(
+                                place: place,
+                                isSelected: viewModel.selectedSocialPlace?.id == place.id
+                            ) {
+                                viewModel.selectSocialPlace(place)
+                            }
+                        }
+                    }
+
                     if let polyline = viewModel.routePolyline {
                         MapPolyline(polyline)
                             .stroke(Color.saveCocoa, lineWidth: 3)
@@ -140,12 +151,33 @@ struct PlaceMapPin: View {
         Button(action: onTap) {
             DefaultMapPin(
                 systemImage: place.category.iconName,
-                fill: place.status == .visited ? .saveMint : .saveHoney,
+                fill: place.socialSignal?.pinFill ?? (place.status == .visited ? .saveMint : .saveHoney),
+                sourceImage: place.socialSignal?.kind.pinSystemImage,
                 isSelected: isSelected
             )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(place.name) Map Stamp")
+    }
+}
+
+private struct SocialPlaceMapPin: View {
+    let place: Place
+    var isSelected = false
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            DefaultMapPin(
+                systemImage: place.category.iconName,
+                fill: place.socialSignal?.pinFill ?? .saveSignal,
+                sourceImage: place.socialSignal?.kind.pinSystemImage,
+                isSelected: isSelected
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(place.name) social place")
+        .accessibilityHint(place.socialSignal?.displayText ?? "Opens a place from your social map")
     }
 }
 
@@ -186,6 +218,7 @@ private struct UnsavedMapCandidatePin: View {
 private struct DefaultMapPin: View {
     var systemImage: String
     var fill: Color
+    var sourceImage: String? = nil
     var isSelected: Bool
 
     var body: some View {
@@ -206,9 +239,34 @@ private struct DefaultMapPin: View {
             Image(systemName: systemImage)
                 .font(.system(size: isSelected ? 11 : 8, weight: .black))
                 .foregroundColor(.white)
+
+            if let sourceImage {
+                Image(systemName: sourceImage)
+                    .font(.system(size: 6, weight: .black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 12, height: 12)
+                    .background(Color.white.opacity(0.92))
+                    .clipShape(Circle())
+                    .offset(x: 11, y: -10)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black.opacity(0.12), lineWidth: 0.5)
+                            .offset(x: 11, y: -10)
+                    )
+            }
         }
         .frame(width: 32, height: 32)
         .contentShape(Rectangle())
+    }
+}
+
+private extension PlaceSocialSignal {
+    var pinFill: Color {
+        switch kind {
+        case .friendSaved: return .saveSky
+        case .trending: return .saveSignal
+        case .referralGuide: return .savePink
+        }
     }
 }
 

@@ -6,6 +6,7 @@ struct ClipContentView: View {
     @State private var placeData: SharedPlaceData?
     @State private var tripData: SharedTripData?
     @State private var listData: SharedListData?
+    @State private var referralData: SharedReferralProfile?
     @State private var isLoading = true
     @State private var cameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
@@ -17,6 +18,8 @@ struct ClipContentView: View {
             Group {
                 if isLoading {
                     loadingView
+                } else if let referral = referralData {
+                    referralContentView(referral)
                 } else if let list = listData {
                     listContentView(list)
                 } else if let place = placeData {
@@ -39,7 +42,7 @@ struct ClipContentView: View {
         }
         .task {
             try? await Task.sleep(for: .seconds(1))
-            if placeData == nil && tripData == nil && listData == nil {
+            if placeData == nil && tripData == nil && listData == nil && referralData == nil {
                 isLoading = false
             }
         }
@@ -361,6 +364,86 @@ struct ClipContentView: View {
         .shadow(color: Color.saveNotebookLine.opacity(0.18), radius: 0, x: 4, y: 4)
     }
 
+    private func referralContentView(_ profile: SharedReferralProfile) -> some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Map(position: $cameraPosition) {
+                    ForEach(profile.featuredPlaces) { place in
+                        Marker(place.name, coordinate: place.coordinate)
+                            .tint(Color.saveSky)
+                    }
+                }
+                .frame(height: 220)
+                .cornerRadius(18)
+                .padding(.horizontal)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(profile.displayName)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(Color.saveInk)
+                    Text("@\(profile.handle) invited you to SAV-E")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Open their starter map pack, follow their guide lens, and get your first AI itinerary from their places.")
+                        .font(.caption)
+                        .foregroundColor(Color.saveCoral)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+
+                VStack(spacing: 12) {
+                    ForEach(profile.featuredPlaces) { place in
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.fill")
+                                .font(.title3)
+                                .foregroundColor(Color.saveSky)
+                                .frame(width: 42, height: 42)
+                                .background(Color.savePaper)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(place.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(Color.saveInk)
+                                Text(place.address)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(place.signal)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(Color.saveCoral)
+                            }
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(Color.savePaper)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                Button(action: openInFullApp) {
+                    Text("Follow in SAV-E")
+                        .font(.headline)
+                        .foregroundColor(Color.saveInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.saveHoney)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                        )
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 32)
+            }
+        }
+    }
+
     // MARK: - Loading / Error
 
     private var loadingView: some View {
@@ -399,6 +482,15 @@ struct ClipContentView: View {
         guard let url else { return }
         print("App Clip opened with URL: \(url)")
 
+        if let referral = SharedReferralProfile.from(url: url) {
+            referralData = referral
+            updateCamera(for: referral.featuredPlaces.map {
+                SharedTripData.SharedStop(id: $0.id, name: $0.name, address: $0.address, lat: $0.lat, lng: $0.lng, time: nil, note: $0.signal)
+            })
+            isLoading = false
+            return
+        }
+
         if SharedListPayload.isListLink(url) {
             if let payload = SharedListPayload.from(url: url) {
                 listData = payload.list
@@ -425,6 +517,7 @@ struct ClipContentView: View {
             placeData = nil
             tripData = nil
             listData = nil
+            referralData = nil
             isLoading = false
             return
         }
@@ -440,6 +533,7 @@ struct ClipContentView: View {
     }
 
     private var navigationTitle: String {
+        if referralData != nil { return "Referral Preview" }
         if listData != nil { return "List Preview" }
         if placeData != nil { return "Place Preview" }
         return "Trip Preview"
@@ -543,6 +637,8 @@ struct ClipContentView: View {
         let url: URL?
         if listData != nil {
             url = currentListAppURL()
+        } else if let referralData {
+            url = referralData.fullAppURL()
         } else if let placeData {
             url = placeData.toURL(baseURL: "wanderly://p") ?? URL(string: "wanderly://p")
         } else {

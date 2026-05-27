@@ -192,3 +192,71 @@ struct SharedListItem: Codable, Identifiable {
         source == "savedPlace" ? "Map Stamp" : "Map result"
     }
 }
+
+struct SharedReferralProfile: Codable, Hashable {
+    var referrerId: String
+    var handle: String
+    var displayName: String
+    var referralCode: String
+    var lens: String
+    var featuredPlaces: [SharedReferralPlace]
+
+    static func from(url: URL) -> SharedReferralProfile? {
+        guard isReferralLink(url) else { return nil }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let pathParts = url.path.split(separator: "/").map(String.init)
+        let ref = components?.queryItems?.first(where: { $0.name == "ref" })?.value
+        let lens = components?.queryItems?.first(where: { $0.name == "lens" })?.value ?? "friends"
+
+        if pathParts.first == "r", let code = pathParts.dropFirst().first {
+            return preview(handle: "friend", code: code, lens: lens)
+        }
+        if pathParts.first == "u", let handle = pathParts.dropFirst().first {
+            return preview(handle: handle, code: ref ?? handle, lens: lens)
+        }
+        return nil
+    }
+
+    static func isReferralLink(_ url: URL) -> Bool {
+        url.scheme == "https" &&
+            url.host == "sav-e.app" &&
+            (url.path.hasPrefix("/r/") || url.path.hasPrefix("/u/"))
+    }
+
+    func fullAppURL() -> URL? {
+        URL(string: "wanderly://referral?code=\(referralCode)&handle=\(handle)&lens=\(lens)")
+    }
+
+    private static func preview(handle: String, code: String, lens: String) -> SharedReferralProfile {
+        let displayName = handle
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+        return SharedReferralProfile(
+            referrerId: "ref_\(code)",
+            handle: handle,
+            displayName: displayName,
+            referralCode: code,
+            lens: lens,
+            featuredPlaces: [
+                SharedReferralPlace(name: "Stereoscope Coffee", address: "4542 Beach Blvd, Buena Park, CA", category: "Cafe", lat: 33.8937, lng: -117.9992, signal: "Featured by \(displayName)"),
+                SharedReferralPlace(name: "Gem Dining", address: "10836 Warner Ave, Fountain Valley, CA", category: "Food", lat: 33.7157, lng: -117.9396, signal: "Starter map pack"),
+                SharedReferralPlace(name: "The Blind Rabbit", address: "440 S Anaheim Blvd, Anaheim, CA", category: "Bar", lat: 33.8312, lng: -117.9128, signal: "Good for first itinerary"),
+            ]
+        )
+    }
+}
+
+struct SharedReferralPlace: Codable, Identifiable, Hashable {
+    var id: String { "\(name)-\(address)" }
+    let name: String
+    let address: String
+    let category: String
+    let lat: Double
+    let lng: Double
+    let signal: String
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+}

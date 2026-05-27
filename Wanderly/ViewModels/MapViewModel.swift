@@ -249,6 +249,9 @@ final class MapViewModel: ObservableObject {
     @Published var selectedMapFeature: MapFeature?
     @Published var isLoadingMapCandidates = false
     @Published var collaborativeLists: [SaveCollaborativeList] = []
+    @Published var socialLens: SaveSocialLens = .forYou
+    @Published var socialPlaces: [Place] = []
+    @Published var selectedSocialPlace: Place?
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
@@ -323,6 +326,17 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    var visibleSocialPlaces: [Place] {
+        var result = socialPlaces.filter { place in
+            guard let signal = place.socialSignal else { return false }
+            return signal.lens == socialLens || (socialLens == .forYou && signal.lens != .trending)
+        }
+        if !selectedCategories.isEmpty {
+            result = result.filter { selectedCategories.contains($0.category) }
+        }
+        return result
+    }
+
     // MARK: - Actions
 
     func loadPlaces(force: Bool = false) async {
@@ -340,6 +354,7 @@ final class MapViewModel: ObservableObject {
         guard let userId = authService.currentUserId else {
             importPendingPlacesForLocalUse()
             reviewCandidates = []
+            refreshSocialSignals()
             return
         }
 
@@ -352,9 +367,11 @@ final class MapViewModel: ObservableObject {
                 print("MapViewModel: failed to fetch review candidates: \(error)")
             }
             try await importPendingPlaces(for: userId)
+            refreshSocialSignals()
         } catch {
             print("MapViewModel: failed to load places: \(error)")
             importPendingPlacesForLocalUse()
+            refreshSocialSignals()
         }
     }
 
@@ -367,6 +384,7 @@ final class MapViewModel: ObservableObject {
 
         guard let userId = authService.currentUserId else {
             importPendingPlacesForLocalUse()
+            refreshSocialSignals()
             return
         }
 
@@ -377,6 +395,7 @@ final class MapViewModel: ObservableObject {
             try await importPendingReviewCandidates(for: userId, runSourceRecovery: false)
             try await importPendingPlaces(for: userId)
             try await refreshReviewCandidates()
+            refreshSocialSignals()
         } catch {
             print("MapViewModel: failed to process scene activation imports: \(error)")
         }
@@ -565,6 +584,59 @@ final class MapViewModel: ObservableObject {
     }
 
     @discardableResult
+    func saveSocialPlaceToMySave(_ socialPlace: Place) async throws -> Place {
+        if let existing = places.first(where: { place in
+            place.matchesMapFeature(title: socialPlace.name, coordinate: socialPlace.coordinate) ||
+                place.name.localizedCaseInsensitiveCompare(socialPlace.name) == .orderedSame
+        }) {
+            selectedPlace = existing
+            selectedSocialPlace = nil
+            return existing
+        }
+
+        let place = Place(
+            id: UUID(),
+            name: socialPlace.name,
+            address: socialPlace.address,
+            latitude: socialPlace.latitude,
+            longitude: socialPlace.longitude,
+            googlePlaceId: socialPlace.googlePlaceId,
+            category: socialPlace.category,
+            status: .wantToGo,
+            rating: socialPlace.rating,
+            note: socialPlace.note,
+            sourceUrl: socialPlace.sourceUrl,
+            sourcePlatform: socialPlace.sourcePlatform,
+            sourceImageUrl: socialPlace.sourceImageUrl,
+            businessPhotoUrls: socialPlace.businessPhotoUrls,
+            extractedDishes: socialPlace.extractedDishes,
+            priceRange: socialPlace.priceRange,
+            recommender: socialPlace.socialSignal?.sourceLabel ?? socialPlace.recommender,
+            googleRating: socialPlace.googleRating,
+            googlePriceLevel: socialPlace.googlePriceLevel,
+            openingHours: socialPlace.openingHours,
+            createdAt: Date(),
+            visibility: .privateMemory,
+            socialSignal: nil
+        )
+
+        if let userId = authService.currentUserId {
+            do {
+                try await supabaseService.savePlace(place, userId: userId)
+            } catch {
+                print("MapViewModel: failed to sync social place \(place.name): \(error)")
+            }
+        }
+
+        mirrorToLocalVault(place)
+        places = [place] + places
+        socialPlaces.removeAll { $0.id == socialPlace.id }
+        selectedSocialPlace = nil
+        revealImportedPlaces([place])
+        return place
+    }
+
+    @discardableResult
     func createCollaborativeList(title: String, note: String?) -> SaveCollaborativeList {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let list = SaveCollaborativeList(
@@ -601,6 +673,13 @@ final class MapViewModel: ObservableObject {
 
     func reloadCollaborativeLists() {
         collaborativeLists = collaborativeListStore.load()
+    }
+
+    func selectSocialLens(_ lens: SaveSocialLens) {
+        socialLens = lens
+        if selectedSocialPlace?.socialSignal?.lens != lens {
+            selectedSocialPlace = nil
+        }
     }
 
     @discardableResult
@@ -719,12 +798,23 @@ final class MapViewModel: ObservableObject {
         activeFilter = nil
         selectedCategories.removeAll()
         selectedPlace = first
+        selectedSocialPlace = nil
         selectedMapCandidate = nil
         if first.latitude != 0 || first.longitude != 0 {
             cameraPosition = .region(MKCoordinateRegion(
                 center: first.coordinate,
                 span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
             ))
+        }
+    }
+
+    private func refreshSocialSignals() {
+        let seeds = Place.socialSignalSeeds(near: places)
+        socialPlaces = seeds.filter { seed in
+            !places.contains { saved in
+                saved.matchesMapFeature(title: seed.name, coordinate: seed.coordinate) ||
+                    saved.name.localizedCaseInsensitiveCompare(seed.name) == .orderedSame
+            }
         }
     }
 
@@ -766,6 +856,7 @@ final class MapViewModel: ObservableObject {
         selectedPlace = place
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
+        selectedSocialPlace = nil
         selectedMapFeature = nil
         guard place.businessPhotoURLStrings.count < 2 || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
         Task {
@@ -854,6 +945,7 @@ final class MapViewModel: ObservableObject {
         selectedReviewCandidate = candidate
         selectedPlace = nil
         selectedMapCandidate = nil
+        selectedSocialPlace = nil
         selectedMapFeature = nil
     }
 
@@ -861,9 +953,22 @@ final class MapViewModel: ObservableObject {
         selectedMapCandidate = candidate
         selectedPlace = nil
         selectedReviewCandidate = nil
+        selectedSocialPlace = nil
         selectedMapFeature = nil
         cameraPosition = .region(MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        ))
+    }
+
+    func selectSocialPlace(_ place: Place) {
+        selectedSocialPlace = place
+        selectedPlace = nil
+        selectedReviewCandidate = nil
+        selectedMapCandidate = nil
+        selectedMapFeature = nil
+        cameraPosition = .region(MKCoordinateRegion(
+            center: place.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
         ))
     }
@@ -872,6 +977,7 @@ final class MapViewModel: ObservableObject {
         selectedPlace = nil
         selectedReviewCandidate = nil
         selectedMapCandidate = nil
+        selectedSocialPlace = nil
         selectedMapFeature = nil
     }
 

@@ -8,6 +8,7 @@ struct SaveApp: App {
     @State private var openedPlace: SharedPlaceData?
     @State private var openedTrip: SharedTripData?
     @State private var openedList: SaveCollaborativeList?
+    @State private var openedReferral: SaveReferralProfile?
 
     var body: some Scene {
         WindowGroup {
@@ -36,12 +37,13 @@ struct SaveApp: App {
                 handleIncomingURL(url)
             }
             .alert(linkAlertTitle, isPresented: Binding(
-                get: { openedPlace != nil || openedTrip != nil || openedList != nil },
+                get: { openedPlace != nil || openedTrip != nil || openedList != nil || openedReferral != nil },
                 set: {
                     if !$0 {
                         openedPlace = nil
                         openedTrip = nil
                         openedList = nil
+                        openedReferral = nil
                     }
                 }
             )) {
@@ -49,9 +51,12 @@ struct SaveApp: App {
                     openedPlace = nil
                     openedTrip = nil
                     openedList = nil
+                    openedReferral = nil
                 }
             } message: {
-                if let openedPlace {
+                if let openedReferral {
+                    Text("\(openedReferral.displayName)'s starter map pack is ready. SAV-E will finish the follow after install/open and unlock your first AI itinerary from their places.")
+                } else if let openedPlace {
                     Text("\(openedPlace.name) is ready. Save it to your SAV-E or open Maps from the place card.")
                 } else if let openedList {
                     Text("\(openedList.title) joined as \(openedList.viewerRole.displayName.lowercased()). \(openedList.items.count) places are ready in Lists.")
@@ -67,6 +72,12 @@ struct SaveApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        if let profile = SaveReferralLink.profile(from: url) {
+            SaveReferralHandoffStore.shared.save(profile)
+            openedReferral = profile
+            return
+        }
+
         if isPlaceLink(url), let place = SharedPlaceData.from(url: url) {
             openedPlace = place
             return
@@ -89,6 +100,7 @@ struct SaveApp: App {
     }
 
     private var linkAlertTitle: String {
+        if openedReferral != nil { return "Referral ready" }
         if openedPlace != nil { return "SAV-E place ready" }
         return openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
     }

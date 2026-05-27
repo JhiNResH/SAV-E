@@ -59,6 +59,14 @@ struct ContentView: View {
                     onPlanList: { list in
                         await mapVM.planCollaborativeList(list)
                     },
+                    socialLens: mapVM.socialLens,
+                    socialPlaces: mapVM.visibleSocialPlaces,
+                    onSelectSocialLens: { lens in
+                        mapVM.selectSocialLens(lens)
+                    },
+                    onSaveSocialPlace: { place in
+                        _ = try await mapVM.saveSocialPlaceToMySave(place)
+                    },
                     selectedCategories: mapVM.selectedCategories,
                     onToggleCategory: { category in
                         mapVM.toggleCategory(category)
@@ -97,6 +105,14 @@ struct ContentView: View {
                 guard let candidate else { return }
                 drawerVM.returnToCommands()
                 mapDetailDrawerItem = .unsavedCandidate(candidate)
+                withAnimation(.spring(duration: 0.3)) {
+                    drawerDetent = .height(72)
+                }
+            }
+            .onChange(of: mapVM.selectedSocialPlace) { _, place in
+                guard let place else { return }
+                drawerVM.returnToCommands()
+                mapDetailDrawerItem = .socialPlace(place)
                 withAnimation(.spring(duration: 0.3)) {
                     drawerDetent = .height(72)
                 }

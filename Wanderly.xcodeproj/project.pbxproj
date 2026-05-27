@@ -67,6 +67,7 @@
 		94A09F6F9A7C50033699A242 /* ClipContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F4C10AEE6E547B29704866 /* ClipContentView.swift */; };
 		95CA35085C85CE5B72DD2279 /* SavePlaceFromURLIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D6416B0532D74DC9352BEBF /* SavePlaceFromURLIntent.swift */; };
 		990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C11340722858704F2CE328 /* SocialLinkReviewCandidateService.swift */; };
+		99DC40C0D34E5BB88F409F30 /* SocialMapSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C414D3F1FC6D7B05A6D9C2 /* SocialMapSignals.swift */; };
 		9EF348338705836E38E56F54 /* Privy in Frameworks */ = {isa = PBXBuildFile; productRef = 9AEC21E0AA21AA2589449ABB /* Privy */; };
 		A0E5547C98CF5125DCA587A2 /* MapViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 903A65214BCAA12AD2190D28 /* MapViewModel.swift */; };
 		A36DA56215269A9D45024E96 /* SocialPlaceParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1CD74A229155347FD4060F /* SocialPlaceParser.swift */; };
@@ -93,8 +94,8 @@
 		E0A8D7C78588C7A73600E0BC /* SaveSearchControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F18BDD0A8864346CFD0FFDE /* SaveSearchControllerTests.swift */; };
 		E0EF8B3281AF0AE07B3CA461 /* PlaceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D14373C25E6C1A46308955A /* PlaceListView.swift */; };
 		E1E3F7D9319056F541095254 /* PlaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F79CFB6481B8E108DCAF01 /* PlaceCard.swift */; };
-		E4F69A127D631A93D27F4B3A /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 2DF7E4E9E139A09E051DB14C /* ZIPFoundation */; };
 		E411DF8BC2148506E8B77499 /* SaveCollaborativeList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200567418360A1F751356BAB /* SaveCollaborativeList.swift */; };
+		E4F69A127D631A93D27F4B3A /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 2DF7E4E9E139A09E051DB14C /* ZIPFoundation */; };
 		E5E0874E59C798EA906F22F8 /* SaveCollaborativeListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1C9A28EAC731B9683EAF78 /* SaveCollaborativeListTests.swift */; };
 		E7B4FE596AB72D438E1B8A83 /* GoogleTakeoutImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD6620A9DEB09C15873615BC /* GoogleTakeoutImportService.swift */; };
 		E8880348DF753D6DB2CA3B6C /* AIDrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5210F08F016F1E68361D82DB /* AIDrawerView.swift */; };
@@ -196,6 +197,7 @@
 		52DB21AFBADBB002A3C38EC5 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		54E6F570FEC5900B20243363 /* CategoryPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPill.swift; sourceTree = "<group>"; };
 		560440B2921EE257D2BF57A1 /* SharedTripData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTripData.swift; sourceTree = "<group>"; };
+		57C414D3F1FC6D7B05A6D9C2 /* SocialMapSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialMapSignals.swift; sourceTree = "<group>"; };
 		5EFE7E456EC9AE78D349FF1F /* PlaceListComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceListComponent.swift; sourceTree = "<group>"; };
 		60C11340722858704F2CE328 /* SocialLinkReviewCandidateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialLinkReviewCandidateService.swift; sourceTree = "<group>"; };
 		62A066A6F8F79E541E817AED /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
@@ -486,6 +488,7 @@
 				3E4590D96689E07CCDFA4DAE /* SavePlanAroundModels.swift */,
 				1A55E0D03D610D9170CB7984 /* SaveSearchModels.swift */,
 				02E74EF49B8A57D105D2D652 /* SharedTripData.swift */,
+				57C414D3F1FC6D7B05A6D9C2 /* SocialMapSignals.swift */,
 				62A066A6F8F79E541E817AED /* Trip.swift */,
 				89976B73F7C977BD6F35B903 /* UserProfile.swift */,
 			);
@@ -899,6 +902,7 @@
 				4CA8A6A40C3DCA19526E9CDE /* SaveSearchResultsComponent.swift in Sources */,
 				0FEEB8D7A11D001D3AD43F40 /* SharedTripData.swift in Sources */,
 				990CC6A0705CC916C9092CF7 /* SocialLinkReviewCandidateService.swift in Sources */,
+				99DC40C0D34E5BB88F409F30 /* SocialMapSignals.swift in Sources */,
 				7C7136D0D553C7A82A8C4102 /* SocialOCRCandidateHeuristics.swift in Sources */,
 				230CFEDD9D415489D5AE1E71 /* SocialPlaceEvidence.swift in Sources */,
 				A36DA56215269A9D45024E96 /* SocialPlaceParser.swift in Sources */,
@@ -1157,7 +1161,7 @@
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = "SAV-E";
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
@@ -1172,7 +1176,7 @@
 					UIInterfaceOrientationLandscapeLeft,
 					UIInterfaceOrientationLandscapeRight,
 				);
-					LD_RUNPATH_SEARCH_PATHS = (
+				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
@@ -1237,7 +1241,7 @@
 				INFOPLIST_GENERATION_MODE = GeneratedFile;
 				INFOPLIST_KEY_CFBundleDisplayName = "SAV-E";
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
-				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestLocationConfirmation\": false, \"NSAppClipRequestEphemeralUserNotification\": false]";
+				INFOPLIST_KEY_NSAppClip = "[\"NSAppClipRequestEphemeralUserNotification\": false, \"NSAppClipRequestLocationConfirmation\": false]";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = (
@@ -1252,7 +1256,7 @@
 					UIInterfaceOrientationLandscapeLeft,
 					UIInterfaceOrientationLandscapeRight,
 				);
-					LD_RUNPATH_SEARCH_PATHS = (
+				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);

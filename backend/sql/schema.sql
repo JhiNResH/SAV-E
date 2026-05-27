@@ -11,6 +11,15 @@ create table if not exists profiles (
     updated_at timestamptz not null default now()
 );
 
+alter table profiles add column if not exists handle text;
+alter table profiles add column if not exists referral_code text;
+alter table profiles add column if not exists trusted_guide_count integer not null default 0;
+alter table profiles add column if not exists ai_planning_credits integer not null default 0;
+alter table profiles add column if not exists profile_stamp_unlocked_at timestamptz;
+
+create unique index if not exists idx_profiles_handle on profiles(lower(handle)) where handle is not null;
+create unique index if not exists idx_profiles_referral_code on profiles(referral_code) where referral_code is not null;
+
 create table if not exists places (
     id uuid primary key default gen_random_uuid(),
     user_id text references profiles(id) on delete cascade not null,
@@ -42,6 +51,62 @@ create index if not exists idx_places_lat_lng on places(latitude, longitude);
 create index if not exists idx_places_status on places(user_id, status);
 create index if not exists idx_places_fts on places
     using gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(address, '')));
+
+create table if not exists follows (
+    id uuid primary key default gen_random_uuid(),
+    follower_id text references profiles(id) on delete cascade not null,
+    following_id text references profiles(id) on delete cascade not null,
+    lens text not null default 'friends',
+    source text not null default 'manual',
+    referral_code text,
+    created_at timestamptz not null default now(),
+    constraint follows_unique_pair unique (follower_id, following_id),
+    constraint follows_not_self check (follower_id <> following_id),
+    constraint follows_lens_check check (lens in ('forYou', 'friends', 'trending')),
+    constraint follows_source_check check (source in ('manual', 'referral', 'app_clip_handoff'))
+);
+
+create index if not exists idx_follows_follower on follows(follower_id, created_at desc);
+create index if not exists idx_follows_following on follows(following_id, created_at desc);
+
+create table if not exists place_visibility (
+    place_id uuid primary key references places(id) on delete cascade,
+    user_id text references profiles(id) on delete cascade not null,
+    visibility text not null default 'private',
+    allow_friend_signal boolean not null default false,
+    allow_trending_signal boolean not null default false,
+    published_at timestamptz,
+    updated_at timestamptz not null default now(),
+    constraint place_visibility_value_check check (visibility in ('private', 'friends', 'public_link', 'public_guide'))
+);
+
+create index if not exists idx_place_visibility_user on place_visibility(user_id, visibility);
+create index if not exists idx_place_visibility_signal on place_visibility(visibility, allow_friend_signal, allow_trending_signal);
+
+create table if not exists place_social_signals (
+    id uuid primary key default gen_random_uuid(),
+    place_id uuid references places(id) on delete cascade not null,
+    viewer_user_id text references profiles(id) on delete cascade,
+    actor_user_id text references profiles(id) on delete cascade,
+    signal_type text not null,
+    lens text not null default 'forYou',
+    friend_count integer not null default 0,
+    save_count integer not null default 0,
+    trending_score double precision not null default 0,
+    category_rank integer,
+    source_label text not null default '',
+    referrer_id text references profiles(id) on delete set null,
+    referral_code text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint place_social_signals_type_check check (signal_type in ('friend_saved', 'trending', 'referral_guide')),
+    constraint place_social_signals_lens_check check (lens in ('forYou', 'friends', 'trending')),
+    constraint place_social_signals_score_check check (trending_score >= 0)
+);
+
+create index if not exists idx_place_social_signals_viewer on place_social_signals(viewer_user_id, lens, created_at desc);
+create index if not exists idx_place_social_signals_place on place_social_signals(place_id, signal_type);
+create index if not exists idx_place_social_signals_trending on place_social_signals(lens, trending_score desc);
 
 create table if not exists trips (
     id uuid primary key default gen_random_uuid(),
@@ -291,6 +356,14 @@ create trigger update_profiles_updated_at before update on profiles
 
 drop trigger if exists update_places_updated_at on places;
 create trigger update_places_updated_at before update on places
+    for each row execute procedure update_updated_at();
+
+drop trigger if exists update_place_visibility_updated_at on place_visibility;
+create trigger update_place_visibility_updated_at before update on place_visibility
+    for each row execute procedure update_updated_at();
+
+drop trigger if exists update_place_social_signals_updated_at on place_social_signals;
+create trigger update_place_social_signals_updated_at before update on place_social_signals
     for each row execute procedure update_updated_at();
 
 drop trigger if exists update_trips_updated_at on trips;

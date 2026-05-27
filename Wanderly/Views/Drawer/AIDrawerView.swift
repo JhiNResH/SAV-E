@@ -7,6 +7,7 @@ enum MapDetailDrawerItem: Identifiable {
     case savedPlace(Place)
     case reviewCandidate(PlaceReviewCandidate)
     case unsavedCandidate(SaveMapCandidate)
+    case socialPlace(Place)
 
     var id: String {
         switch self {
@@ -16,6 +17,8 @@ enum MapDetailDrawerItem: Identifiable {
             return "review-\(candidate.id.uuidString)"
         case .unsavedCandidate(let candidate):
             return "unsaved-\(candidate.id)"
+        case .socialPlace(let place):
+            return "social-\(place.id)"
         }
     }
 }
@@ -47,6 +50,10 @@ struct AIDrawerView: View {
     var onShareListURL: (SaveCollaborativeList, SaveListRole) -> URL? = { _, _ in nil }
     var onSaveListItem: (SaveListItem) async throws -> Void = { _ in }
     var onPlanList: (SaveCollaborativeList) async -> Void = { _ in }
+    var socialLens: SaveSocialLens = .forYou
+    var socialPlaces: [Place] = []
+    var onSelectSocialLens: (SaveSocialLens) -> Void = { _ in }
+    var onSaveSocialPlace: (Place) async throws -> Void = { _ in }
     var selectedCategories: Set<PlaceCategory> = []
     var onToggleCategory: (PlaceCategory) -> Void = { _ in }
     var onOpenPassport: () -> Void = {}
@@ -138,6 +145,9 @@ struct AIDrawerView: View {
                         try await onSaveMapCandidate(candidate)
                         mapDetailDrawerItem = nil
                     }
+                },
+                onSaveSocialPlace: { place in
+                    Task { await saveSocialPlace(place) }
                 },
                 onCreateList: createListForPicker,
                 onAddPlaceToList: onAddPlaceToList,
@@ -750,6 +760,7 @@ struct AIDrawerView: View {
             VStack(alignment: .leading, spacing: 12) {
                 quickActionStrip
                 categoryFilterStrip
+                socialSignalSection
 
                 if !viewModel.chatHistory.isEmpty {
                     NotebookBandLabel("Recent")
@@ -874,6 +885,51 @@ struct AIDrawerView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private var socialSignalSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NotebookBandLabel("Social map")
+                .padding(.horizontal, 16)
+
+            HStack(spacing: 7) {
+                ForEach(SaveSocialLens.allCases, id: \.self) { lens in
+                    Button {
+                        onSelectSocialLens(lens)
+                        withAnimation { drawerDetent = .medium }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: lens.systemImage)
+                                .font(.caption2.weight(.black))
+                            Text(lens.title)
+                                .font(.caption.weight(.black))
+                        }
+                        .foregroundColor(socialLens == lens ? .saveInk : .saveCocoa.opacity(0.78))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(socialLens == lens ? Color.saveHoney.opacity(0.50) : Color.white.opacity(colorScheme == .dark ? 0.08 : 0.18))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            if socialPlaces.isEmpty {
+                Text("Follow friends or open a referral link to seed this map.")
+                    .font(.caption)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
+                    .padding(.horizontal, 16)
+            } else {
+                ForEach(socialPlaces.prefix(3)) { place in
+                    SocialPlaceRow(place: place) {
+                        Task { await saveSocialPlace(place) }
+                    }
+                    .padding(.horizontal, 16)
+                }
             }
         }
     }
@@ -1315,6 +1371,16 @@ struct AIDrawerView: View {
         }
     }
 
+    private func saveSocialPlace(_ place: Place) async {
+        do {
+            try await onSaveSocialPlace(place)
+            addSpotStatus = "Saved \(place.name) to your SAV-E."
+            mapDetailDrawerItem = nil
+        } catch {
+            addSpotStatus = error.localizedDescription
+        }
+    }
+
     private func focusAgentPrompt(_ prompt: String) {
         showSavedCategories = false
         showReviewInbox = false
@@ -1562,6 +1628,7 @@ private struct MapDetailDrawerView: View {
     let onRejectCandidate: (PlaceReviewCandidate) -> Void
     let onSaveCandidate: (PlaceReviewCandidate) -> Void
     let onSaveMapCandidate: (SaveMapCandidate) -> Void
+    let onSaveSocialPlace: (Place) -> Void
     let onCreateList: () -> SaveCollaborativeList
     let onAddPlaceToList: (Place, UUID) throws -> Void
     let onAddMapCandidateToList: (SaveMapCandidate, UUID) throws -> Void
@@ -1678,6 +1745,11 @@ private struct MapDetailDrawerView: View {
                             }
                         }
                     )
+                case .socialPlace(let place):
+                    SocialPlaceDetailCard(
+                        place: place,
+                        onSave: { onSaveSocialPlace(place) }
+                    )
                 }
 
                 if let statusMessage {
@@ -1702,6 +1774,8 @@ private struct MapDetailDrawerView: View {
             return candidate.name
         case .unsavedCandidate(let candidate):
             return candidate.title
+        case .socialPlace(let place):
+            return place.name
         }
     }
 
@@ -1713,6 +1787,8 @@ private struct MapDetailDrawerView: View {
             return candidate.hasReliableCoordinates ? "Review Candidate" : "Source Clue"
         case .unsavedCandidate(let candidate):
             return "\(candidate.category?.displayName ?? "Place") · Unsaved candidate"
+        case .socialPlace(let place):
+            return "\(place.category.displayName) · \(place.socialSignal?.displayText ?? "Social signal")"
         }
     }
 
@@ -1724,7 +1800,69 @@ private struct MapDetailDrawerView: View {
             return candidate.hasReliableCoordinates ? .ready : .clue
         case .unsavedCandidate:
             return .ready
+        case .socialPlace:
+            return .ready
         }
+    }
+}
+
+private struct SocialPlaceRow: View {
+    let place: Place
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            SaveMemoryBadge(state: .ready, size: 38)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(place.name)
+                        .font(.subheadline.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(place.category.displayName)
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveCocoa.opacity(0.74))
+                }
+
+                Text(place.address)
+                    .font(.caption)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
+                    .lineLimit(1)
+
+                if let signal = place.socialSignal {
+                    Label(signal.displayText, systemImage: signal.kind.pinSystemImage)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.saveCocoa)
+                        .lineLimit(1)
+                }
+            }
+
+            Button(action: onSave) {
+                Text("Save")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.saveHoney.opacity(0.78))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Save \(place.name) to my SAV-E")
+        }
+        .padding(12)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(Color.white.opacity(0.12))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
+        )
     }
 }
 
@@ -1878,6 +2016,70 @@ private struct SavedMapDetailDrawerContent: View {
         } catch {
             deleteError = error.localizedDescription
         }
+    }
+}
+
+private struct SocialPlaceDetailCard: View {
+    let place: Place
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PlaceBusinessPhotoCarousel(imageURLs: place.businessPhotoURLStrings)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(place.name)
+                        .font(.title3.weight(.black))
+                        .foregroundColor(.saveInk)
+                    Spacer()
+                    CategoryPill(category: place.category, isSelected: true)
+                }
+
+                Text(place.address)
+                    .font(.caption)
+                    .foregroundColor(.saveCocoa.opacity(0.76))
+            }
+
+            if let signal = place.socialSignal {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(signal.displayText, systemImage: signal.kind.pinSystemImage)
+                        .font(.subheadline.weight(.black))
+                        .foregroundColor(.saveInk)
+                    Text(signal.detailText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.saveCocoa.opacity(0.78))
+                }
+                .padding(12)
+                .background(Color.saveSky.opacity(signal.kind == .trending ? 0.16 : 0.24))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+
+            PlaceBasicInfoPanel(place: place)
+            PlaceInsightSummaryPanel(place: place, fallbackSummary: "This is a social map result. Save it to make it part of your own SAV-E memory.")
+
+            Button(action: onSave) {
+                Label("Save to my SAV-E", systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.saveHoney)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .background(Color.saveNotebookPage.opacity(0.52))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1)
+        )
     }
 }
 
