@@ -29,7 +29,7 @@ Map Stamp, Review Clue, Passport, and Evidence Receipt.
 
 Files:
 
-- `Wanderly/App/SaveApp.swift`
+- `SAV-E/App/SaveApp.swift`
 
 Change:
 
@@ -49,7 +49,7 @@ States:
 
 Files:
 
-- `Wanderly/Views/Onboarding/OnboardingView.swift`
+- `SAV-E/Views/Onboarding/OnboardingView.swift`
 
 Change:
 
@@ -68,7 +68,7 @@ States:
 
 Files:
 
-- `Wanderly/Views/Map/MapView.swift`
+- `SAV-E/Views/Map/MapView.swift`
 
 Change:
 
@@ -90,11 +90,11 @@ States:
 
 Files:
 
-- `Wanderly/Views/Drawer/AIDrawerView.swift`
-- `Wanderly/Views/Drawer/Components/SaveSearchResultsComponent.swift`
-- `Wanderly/Views/Drawer/Components/PlaceListComponent.swift`
-- `Wanderly/Views/Drawer/Components/NavigationCardComponent.swift`
-- `Wanderly/Views/Drawer/Components/TripItineraryComponent.swift`
+- `SAV-E/Views/Drawer/AIDrawerView.swift`
+- `SAV-E/Views/Drawer/Components/SaveSearchResultsComponent.swift`
+- `SAV-E/Views/Drawer/Components/PlaceListComponent.swift`
+- `SAV-E/Views/Drawer/Components/NavigationCardComponent.swift`
+- `SAV-E/Views/Drawer/Components/TripItineraryComponent.swift`
 
 Change:
 
@@ -122,10 +122,10 @@ States:
 
 Files:
 
-- `Wanderly/Views/List/PlaceCard.swift`
-- `Wanderly/Views/Map/PlaceBottomSheet.swift`
-- `Wanderly/Views/Shared/EvidenceLinkList.swift`
-- `Wanderly/Views/Shared/SaveMemoryBadge.swift`
+- `SAV-E/Views/List/PlaceCard.swift`
+- `SAV-E/Views/Map/PlaceBottomSheet.swift`
+- `SAV-E/Views/Shared/EvidenceLinkList.swift`
+- `SAV-E/Views/Shared/SaveMemoryBadge.swift`
 
 Change:
 
@@ -148,9 +148,9 @@ States:
 
 Files:
 
-- `Wanderly/Views/Drawer/AIDrawerView.swift`
-- `Wanderly/ViewModels/AIDrawerViewModel.swift`
-- `Wanderly/ViewModels/MapViewModel.swift`
+- `SAV-E/Views/Drawer/AIDrawerView.swift`
+- `SAV-E/ViewModels/AIDrawerViewModel.swift`
+- `SAV-E/ViewModels/MapViewModel.swift`
 
 Change:
 
@@ -172,9 +172,9 @@ States:
 
 Files:
 
-- `Wanderly/Views/Profile/ProfileView.swift`
-- `Wanderly/Views/Profile/StatsView.swift`
-- `Wanderly/Views/Profile/SaveMemoryDebugView.swift`
+- `SAV-E/Views/Profile/ProfileView.swift`
+- `SAV-E/Views/Profile/StatsView.swift`
+- `SAV-E/Views/Profile/SaveMemoryDebugView.swift`
 
 Change:
 
@@ -343,7 +343,7 @@ Run after implementation:
 
 ```bash
 git diff --check
-xcodebuild -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO build
 ```
 
 Visual QA:

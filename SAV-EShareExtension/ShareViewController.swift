@@ -39,7 +39,7 @@ struct ParsedPlace {
     var priceRange: String?
 }
 
-private enum WanderlySharedStorage {
+private enum SAVESharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
     static let pendingPlacesFileName = "pending-places.json"
     static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
@@ -2986,7 +2986,7 @@ struct ShareExtensionView: View {
             savedAt: Date()
         )
 
-        guard let fileURL = appGroupFileURL(named: WanderlySharedStorage.pendingPlacesFileName) else {
+        guard let fileURL = appGroupFileURL(named: SAVESharedStorage.pendingPlacesFileName) else {
             parseError = "Shared app storage is unavailable"
             return
         }
@@ -3006,7 +3006,7 @@ struct ShareExtensionView: View {
 
     private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
         guard !candidates.isEmpty else { return }
-        guard let fileURL = appGroupFileURL(named: WanderlySharedStorage.pendingReviewCandidatesFileName) else {
+        guard let fileURL = appGroupFileURL(named: SAVESharedStorage.pendingReviewCandidatesFileName) else {
             parseError = "Shared app storage is unavailable"
             return
         }
@@ -3021,7 +3021,7 @@ struct ShareExtensionView: View {
     }
 
     private func saveSourceOnlyMemory(_ source: String, reason: String) {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) else {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName) else {
             return
         }
 
@@ -3060,7 +3060,7 @@ struct ShareExtensionView: View {
 
     private func appGroupFileURL(named fileName: String) -> URL? {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName)?
+            .containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName)?
             .appendingPathComponent(fileName)
     }
 

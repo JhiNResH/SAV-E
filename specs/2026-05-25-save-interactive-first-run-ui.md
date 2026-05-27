@@ -39,22 +39,22 @@ This spec is UI/product-only. It should reuse existing parser/review/drawer mech
 
 Current relevant surfaces:
 
-- `Wanderly/Views/Onboarding/OnboardingView.swift`
+- `SAV-E/Views/Onboarding/OnboardingView.swift`
   - currently a three-page static carousel:
     - “Save spots while you scroll”
     - “No more fake pins”
     - “Turn memories into trips”
   - good thesis, but it explains instead of demonstrating.
-- `Wanderly/App/ContentView.swift`
+- `SAV-E/App/ContentView.swift`
   - always presents `AIDrawerView` over `MapView`.
   - existing drawer can be the agent surface; do not add another permanent tab.
-- `Wanderly/Views/List/PlaceListView.swift`
+- `SAV-E/Views/List/PlaceListView.swift`
   - already has Agent Action Drawer preview from PR #147.
-- `Wanderly/Models/SaveSearchModels.swift`
+- `SAV-E/Models/SaveSearchModels.swift`
   - already has state-aware `agentDrawer` modeling.
-- `Wanderly/Views/Shared/MemoMascotMark.swift`
+- `SAV-E/Views/Shared/MemoMascotMark.swift`
   - mascot exists and can guide, but should clarify state/evidence rather than become decorative.
-- `Wanderly/Views/Shared/EmptyStateView.swift`
+- `SAV-E/Views/Shared/EmptyStateView.swift`
   - reusable but currently generic.
 
 ## Product Metaphor / State Machine
@@ -199,13 +199,13 @@ Create a small view-local model for the demo states.
 Suggested file:
 
 ```text
-Wanderly/Views/Onboarding/OnboardingView.swift
+SAV-E/Views/Onboarding/OnboardingView.swift
 ```
 
 or, if it grows:
 
 ```text
-Wanderly/Views/Onboarding/FirstRunPlaceDemoView.swift
+SAV-E/Views/Onboarding/FirstRunPlaceDemoView.swift
 ```
 
 Suggested Swift shape:
@@ -296,9 +296,9 @@ After onboarding completion, the first empty app surface should invite the user 
 
 Candidate surfaces:
 
-- `Wanderly/Views/Onboarding/OnboardingView.swift`
-- `Wanderly/Views/Drawer/AIDrawerView.swift`
-- `Wanderly/Views/Shared/EmptyStateView.swift`
+- `SAV-E/Views/Onboarding/OnboardingView.swift`
+- `SAV-E/Views/Drawer/AIDrawerView.swift`
+- `SAV-E/Views/Shared/EmptyStateView.swift`
 
 Desired empty-state copy:
 
@@ -342,8 +342,8 @@ Goal: replace static explanation with a one-screen micro demo while preserving o
 
 Files:
 
-- Modify: `Wanderly/Views/Onboarding/OnboardingView.swift`
-- Optional create: `Wanderly/Views/Onboarding/FirstRunPlaceDemoView.swift`
+- Modify: `SAV-E/Views/Onboarding/OnboardingView.swift`
+- Optional create: `SAV-E/Views/Onboarding/FirstRunPlaceDemoView.swift`
 - Test/snapshot if available: onboarding preview or existing UI tests
 
 Tasks:
@@ -368,10 +368,10 @@ Goal: align post-onboarding empty state with the same transformation loop.
 
 Files to inspect before editing:
 
-- `Wanderly/Views/Drawer/AIDrawerView.swift`
-- `Wanderly/Views/Shared/EmptyStateView.swift`
-- `Wanderly/ViewModels/AIDrawerViewModel.swift`
-- `Wanderly/ViewModels/MapViewModel.swift`
+- `SAV-E/Views/Drawer/AIDrawerView.swift`
+- `SAV-E/Views/Shared/EmptyStateView.swift`
+- `SAV-E/ViewModels/AIDrawerViewModel.swift`
+- `SAV-E/ViewModels/MapViewModel.swift`
 
 Tasks:
 
@@ -393,9 +393,9 @@ Goal: make the in-app drawer use the same state language as onboarding.
 
 Files:
 
-- `Wanderly/Models/SaveSearchModels.swift`
-- `Wanderly/Views/List/PlaceListView.swift`
-- `Wanderly/Views/Shared/SaveMemoryBadge.swift`
+- `SAV-E/Models/SaveSearchModels.swift`
+- `SAV-E/Views/List/PlaceListView.swift`
+- `SAV-E/Views/Shared/SaveMemoryBadge.swift`
 
 Tasks:
 
@@ -416,7 +416,7 @@ Acceptance criteria:
 Run the app on the existing simulator target and verify:
 
 ```bash
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ```
 
 Manual checks:
@@ -452,14 +452,14 @@ Attach screenshots or simulator captures for:
 Minimum:
 
 ```bash
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ~/brain/scripts/brain containment check --strict
 ```
 
 If tests touch `SaveSearchModels` or drawer actions:
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' -only-testing:WanderlyTests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' -only-testing:SAVETests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
 ```
 
 ## Product Risks

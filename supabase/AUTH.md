@@ -41,8 +41,8 @@ Do not disable RLS as the MVP shortcut unless the app is strictly local/demo onl
 
 The current checked-out tree contains placeholder values in:
 
-- `Wanderly/Resources/Secrets.plist`
-- `WanderlyShareExtension/Secrets.plist`
+- `SAV-E/Resources/Secrets.plist`
+- `SAV-EShareExtension/Secrets.plist`
 - `.env.example`
 
 Git history previously contained values that looked like real Privy and Supabase project credentials. If those values were real, rotate them from the provider dashboards before production use:

@@ -1,5 +1,5 @@
 import XCTest
-@testable import Wanderly
+@testable import SAVE
 
 final class SaveGuideCustomizationControllerTests: XCTestCase {
     func testGuideDraftKeepsStopsAndSuggestsSavedSwaps() {

@@ -26,7 +26,7 @@ Move the share extension pending handoff queue to App Group JSON files:
 ## Verification
 
 - `git diff --check`
-- `xcodebuild -project Wanderly.xcodeproj -scheme Wanderly -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project SAV-E.xcodeproj -scheme SAV-E -configuration Debug -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build`
 
 ## Out Of Scope
 

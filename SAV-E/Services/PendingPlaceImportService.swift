@@ -1,7 +1,7 @@
 import Foundation
 import MapKit
 
-enum WanderlySharedStorage {
+enum SAVESharedStorage {
     static let appGroupSuiteName = "group.com.wanderly.app"
     static let pendingPlacesFileName = "pending-places.json"
     static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
@@ -242,19 +242,19 @@ final class PendingPlaceImportService {
     }
 
     func consumePendingPlaces() -> [PendingSharedPlace] {
-        consumePendingArray(named: WanderlySharedStorage.pendingPlacesFileName, as: PendingSharedPlace.self)
+        consumePendingArray(named: SAVESharedStorage.pendingPlacesFileName, as: PendingSharedPlace.self)
     }
 
     func restorePendingPlaces(_ places: [PendingSharedPlace]) {
-        appendPendingArray(places, named: WanderlySharedStorage.pendingPlacesFileName)
+        appendPendingArray(places, named: SAVESharedStorage.pendingPlacesFileName)
     }
 
     func consumePendingReviewCandidates() -> [PendingReviewCandidate] {
-        consumePendingArray(named: WanderlySharedStorage.pendingReviewCandidatesFileName, as: PendingReviewCandidate.self)
+        consumePendingArray(named: SAVESharedStorage.pendingReviewCandidatesFileName, as: PendingReviewCandidate.self)
     }
 
     func restorePendingReviewCandidates(_ candidates: [PendingReviewCandidate]) {
-        appendPendingArray(candidates, named: WanderlySharedStorage.pendingReviewCandidatesFileName)
+        appendPendingArray(candidates, named: SAVESharedStorage.pendingReviewCandidatesFileName)
     }
 
     private func consumePendingArray<Element: Decodable>(named fileName: String, as elementType: Element.Type) -> [Element] {
@@ -305,7 +305,7 @@ final class PendingPlaceImportService {
     }
 
     private func pendingFileURL(named fileName: String) -> URL? {
-        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) else {
+        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName) else {
             return nil
         }
         return containerURL.appendingPathComponent(fileName)

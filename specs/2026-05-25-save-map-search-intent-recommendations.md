@@ -150,11 +150,11 @@ Build V0 as local-first and saved-memory-first.
 Relevant files inspected:
 
 ```text
-Wanderly/Views/Map/MapView.swift
-Wanderly/ViewModels/MapViewModel.swift
-Wanderly/Views/Drawer/AIDrawerView.swift
-Wanderly/ViewModels/AIDrawerViewModel.swift
-Wanderly/Services/SaveAIService.swift
+SAV-E/Views/Map/MapView.swift
+SAV-E/ViewModels/MapViewModel.swift
+SAV-E/Views/Drawer/AIDrawerView.swift
+SAV-E/ViewModels/AIDrawerViewModel.swift
+SAV-E/Services/SaveAIService.swift
 ```
 
 Current behavior:
@@ -314,11 +314,11 @@ parse query
 Files likely touched:
 
 ```text
-Wanderly/Services/SaveIntentRecommendationService.swift
-Wanderly/ViewModels/AIDrawerViewModel.swift
-Wanderly/Services/SaveAIService.swift
-Wanderly/Views/Drawer/AIDrawerView.swift
-WanderlyTests/SaveIntentRecommendationServiceTests.swift
+SAV-E/Services/SaveIntentRecommendationService.swift
+SAV-E/ViewModels/AIDrawerViewModel.swift
+SAV-E/Services/SaveAIService.swift
+SAV-E/Views/Drawer/AIDrawerView.swift
+SAVETests/SaveIntentRecommendationServiceTests.swift
 ```
 
 Acceptance:
@@ -334,9 +334,9 @@ Acceptance:
 Files likely touched:
 
 ```text
-Wanderly/Models/SaveAIResponse.swift
-Wanderly/Views/Drawer/AIDrawerView.swift
-Wanderly/Views/Map/MapView.swift
+SAV-E/Models/SaveAIResponse.swift
+SAV-E/Views/Drawer/AIDrawerView.swift
+SAV-E/Views/Map/MapView.swift
 ```
 
 Acceptance:
@@ -353,9 +353,9 @@ Only after A/B work.
 Files likely touched:
 
 ```text
-Wanderly/Services/MapPlaceSearchService.swift
-Wanderly/ViewModels/MapViewModel.swift
-Wanderly/Views/Map/MapView.swift
+SAV-E/Services/MapPlaceSearchService.swift
+SAV-E/ViewModels/MapViewModel.swift
+SAV-E/Views/Map/MapView.swift
 ```
 
 Acceptance:
@@ -381,8 +381,8 @@ Acceptance:
 Minimum local checks:
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' -only-testing:WanderlyTests/SaveIntentRecommendationServiceTests CODE_SIGNING_ALLOWED=NO
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' -only-testing:SAVETests/SaveIntentRecommendationServiceTests CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 /Users/jhinresh/brain/scripts/brain containment check --strict
 ```
 

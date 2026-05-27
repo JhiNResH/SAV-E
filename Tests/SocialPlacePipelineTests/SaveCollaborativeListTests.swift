@@ -1,6 +1,6 @@
 import CoreLocation
 import XCTest
-@testable import Wanderly
+@testable import SAVE
 
 final class SaveCollaborativeListTests: XCTestCase {
     func testSharedListLinkRoundTripsViewerRole() throws {

@@ -72,8 +72,8 @@ Next implementation should make the v0 shell real in this order:
 
 ## Verification
 
-- iOS simulator build for `Wanderly`.
-- iOS simulator build for `WanderlyClip`.
+- iOS simulator build for `SAV-E`.
+- iOS simulator build for `SAVEClip`.
 - Backend TypeScript build.
 - `git diff --check`.
 

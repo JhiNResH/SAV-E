@@ -9,14 +9,14 @@ Keep SAV-E's two Google import paths separate so saved-list link work does not b
 ### Google Maps Saved List Import
 
 - Trigger: iOS Share Sheet or clipboard URL import with a public Google Maps saved-list link.
-- Primary code: `WanderlyShareExtension/ShareViewController.swift` and `WanderlyShared/GoogleMapsListPlaceExtractor.swift`.
+- Primary code: `SAV-EShareExtension/ShareViewController.swift` and `SAV-EShared/GoogleMapsListPlaceExtractor.swift`.
 - Output: multiple review candidates.
 - Rule: never save places directly from a saved-list link without review.
 
 ### Google Takeout Bulk Import
 
 - Trigger: native file picker for `.zip`, `.json`, `.geojson`, or `.kml` Google Takeout exports.
-- Primary code: `Wanderly/Views/Import/GoogleTakeoutImportView.swift`, `Wanderly/Services/GoogleTakeoutImportService.swift`, and `Wanderly/Models/GoogleTakeoutImport.swift`.
+- Primary code: `SAV-E/Views/Import/GoogleTakeoutImportView.swift`, `SAV-E/Services/GoogleTakeoutImportService.swift`, and `SAV-E/Models/GoogleTakeoutImport.swift`.
 - Output: ready-to-save imported drafts plus review drafts.
 - Rule: only drafts with reliable coordinates become saved map places.
 

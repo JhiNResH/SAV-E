@@ -448,14 +448,14 @@ Default Apple/MapKit POIs are background context. SAV-E objects are the interact
 Likely relevant files:
 
 ```text
-Wanderly/Views/Map/MapView.swift
-Wanderly/Views/Drawer/AIDrawerView.swift
-Wanderly/ViewModels/AIDrawerViewModel.swift
-Wanderly/Services/SaveSearchController.swift
-Wanderly/Services/SaveAIService.swift
-Wanderly/Models/SaveSearchModels.swift
-Wanderly/Models/Place.swift
-Wanderly/Models/AIResponse.swift
+SAV-E/Views/Map/MapView.swift
+SAV-E/Views/Drawer/AIDrawerView.swift
+SAV-E/ViewModels/AIDrawerViewModel.swift
+SAV-E/Services/SaveSearchController.swift
+SAV-E/Services/SaveAIService.swift
+SAV-E/Models/SaveSearchModels.swift
+SAV-E/Models/Place.swift
+SAV-E/Models/AIResponse.swift
 Tests/SocialPlacePipelineTests/SaveSearchControllerTests.swift
 ```
 
@@ -525,9 +525,9 @@ struct SavePlaceDrawerPresentation: Equatable {
 Likely files:
 
 ```text
-Create or modify: Wanderly/Models/SavePlaceDrawerPresentation.swift
-Modify: Wanderly/Views/Drawer/AIDrawerView.swift
-Test: WanderlyTests/SavePlaceDrawerPresentationTests.swift
+Create or modify: SAV-E/Models/SavePlaceDrawerPresentation.swift
+Modify: SAV-E/Views/Drawer/AIDrawerView.swift
+Test: SAVETests/SavePlaceDrawerPresentationTests.swift
 ```
 
 #### Task 2 — Normalize drawer copy by state
@@ -667,12 +667,12 @@ Run at minimum:
 ```bash
 git status --short --branch
 git diff --check
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO -only-testing:SocialPlacePipelineTests/SaveSearchControllerTests
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO -only-testing:SocialPlacePipelineTests/SaveSearchControllerTests
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 /Users/jhinresh/brain/scripts/brain containment check --strict
 ```
 
-If `WanderlyConfirm` is unavailable, use an available iOS simulator from `xcodebuild -showdestinations -project Wanderly.xcodeproj -scheme Wanderly` and record the substitute destination in the PR body.
+If `SAVEConfirm` is unavailable, use an available iOS simulator from `xcodebuild -showdestinations -project SAV-E.xcodeproj -scheme SAV-E` and record the substitute destination in the PR body.
 
 ## PR breakdown
 

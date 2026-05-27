@@ -35,11 +35,11 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 
 2. Bootstrap local secrets:
    ```bash
-   cp -n Wanderly/Resources/Secrets.plist.template Wanderly/Resources/Secrets.plist
-   cp -n WanderlyShareExtension/Secrets.plist.template WanderlyShareExtension/Secrets.plist
+   cp -n SAV-E/Resources/Secrets.plist.template SAV-E/Resources/Secrets.plist
+   cp -n SAV-EShareExtension/Secrets.plist.template SAV-EShareExtension/Secrets.plist
    ```
 
-   Xcode also creates these local files from the templates during build if they are missing. It does not overwrite existing local `Secrets.plist` files; when templates change, compare them manually and add any new keys to your local files. Fill in your local API keys in `Wanderly/Resources/Secrets.plist` and `WanderlyShareExtension/Secrets.plist`:
+   Xcode also creates these local files from the templates during build if they are missing. It does not overwrite existing local `Secrets.plist` files; when templates change, compare them manually and add any new keys to your local files. Fill in your local API keys in `SAV-E/Resources/Secrets.plist` and `SAV-EShareExtension/Secrets.plist`:
    - `GEMINI_API_KEY` — from Google AI Studio
    - `GOOGLE_PLACES_API_KEY` — from [Google Cloud Console](https://console.cloud.google.com/)
    - `SAVE_API_URL` — Railway backend service URL
@@ -77,7 +77,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 
 5. Open the project in Xcode:
    ```bash
-   open Wanderly.xcodeproj
+   open SAV-E.xcodeproj
    ```
 
 6. Build and run on simulator or device. Simulator builds do not need signing; device builds and archives require either passing `APPLE_TEAM_ID` through the CLI or selecting your Apple Developer Team in Xcode locally.
@@ -90,11 +90,11 @@ Set `APPLE_TEAM_ID` to the 10-character Apple Developer Team ID for the account 
 export APPLE_TEAM_ID=ABCDE12345
 xcodegen generate
 xcodebuild \
-  -project Wanderly.xcodeproj \
-  -scheme Wanderly \
+  -project SAV-E.xcodeproj \
+  -scheme SAV-E \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath "$PWD/build/Wanderly.xcarchive" \
+  -archivePath "$PWD/build/SAV-E.xcarchive" \
   -allowProvisioningUpdates \
   APPLE_TEAM_ID="$APPLE_TEAM_ID" \
   archive
@@ -111,7 +111,7 @@ Upload the archive to App Store Connect for TestFlight processing:
 ```bash
 xcodebuild \
   -exportArchive \
-  -archivePath "$PWD/build/Wanderly.xcarchive" \
+  -archivePath "$PWD/build/SAV-E.xcarchive" \
   -exportPath "$PWD/build/TestFlightUpload" \
   -exportOptionsPlist "$PWD/build/ExportOptions.TestFlight.plist" \
   -allowProvisioningUpdates \
@@ -190,7 +190,7 @@ Before production referral App Clips work, `sav-e-app.vercel.app` needs the same
 ## Project Structure
 
 ```
-Wanderly/
+SAV-E/
 ├── App/                    Main app entry + tab-based root
 ├── Views/
 │   ├── Map/                Map view with annotations
@@ -205,8 +205,8 @@ Wanderly/
 ├── Services/               API service protocols + stubs
 ├── Extensions/             Color theme + utilities
 └── Resources/              Assets
-WanderlyShareExtension/     Share Extension target
-WanderlyClip/               App Clip target
+SAV-EShareExtension/     Share Extension target
+SAV-EClip/               App Clip target
 backend/                    Railway API + Postgres schema
 ```
 

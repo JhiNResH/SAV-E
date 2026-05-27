@@ -181,8 +181,8 @@ Secondary: Open source, Plan around this
 
 Existing implementation touches:
 
-- `Wanderly/Models/SaveSearchModels.swift`
-- `Wanderly/Views/List/PlaceListView.swift`
+- `SAV-E/Models/SaveSearchModels.swift`
+- `SAV-E/Views/List/PlaceListView.swift`
 - `Tests/SocialPlacePipelineTests/SaveSearchControllerTests.swift`
 
 ## Acceptance Criteria
@@ -197,8 +197,8 @@ Existing implementation touches:
 ## Verification
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' -only-testing:WanderlyTests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' -only-testing:SAVETests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ~/brain/scripts/brain containment check --strict
 ```
 
@@ -322,10 +322,10 @@ State
 
 ## Files Likely Touched
 
-- `Wanderly/Models/SaveSearchModels.swift`
-- `Wanderly/Services/SaveSearchController.swift`
-- `Wanderly/Views/List/PlaceListView.swift`
-- Possibly a new file: `Wanderly/Views/List/SaveEvidenceDrawerView.swift`
+- `SAV-E/Models/SaveSearchModels.swift`
+- `SAV-E/Services/SaveSearchController.swift`
+- `SAV-E/Views/List/PlaceListView.swift`
+- Possibly a new file: `SAV-E/Views/List/SaveEvidenceDrawerView.swift`
 - Tests: `Tests/SocialPlacePipelineTests/SaveSearchControllerTests.swift`
 
 ## Acceptance Criteria
@@ -355,8 +355,8 @@ saved place with source URL
 ## Verification
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' -only-testing:WanderlyTests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' -only-testing:SAVETests/SaveSearchControllerTests CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ~/brain/scripts/brain containment check --strict
 ```
 
@@ -440,10 +440,10 @@ If full backend persistence is too large, do this PR as local/store-compatible f
 
 ## Files Likely Touched
 
-- `Wanderly/Models/SaveSearchModels.swift`
-- `Wanderly/Services/SaveSearchController.swift`
-- `Wanderly/ViewModels/PlaceListViewModel.swift`
-- `Wanderly/Views/List/PlaceListView.swift`
+- `SAV-E/Models/SaveSearchModels.swift`
+- `SAV-E/Services/SaveSearchController.swift`
+- `SAV-E/ViewModels/PlaceListViewModel.swift`
+- `SAV-E/Views/List/PlaceListView.swift`
 - possibly app storage/local repository files after inspection
 - Tests under `Tests/SocialPlacePipelineTests/`
 
@@ -596,10 +596,10 @@ Use this priority order:
 
 ## Files Likely Touched
 
-- `Wanderly/Models/SaveSearchModels.swift`
-- New: `Wanderly/Models/SavePlanAroundModels.swift`
-- New: `Wanderly/Services/SavePlanAroundController.swift`
-- `Wanderly/Views/List/PlaceListView.swift` or drawer view
+- `SAV-E/Models/SaveSearchModels.swift`
+- New: `SAV-E/Models/SavePlanAroundModels.swift`
+- New: `SAV-E/Services/SavePlanAroundController.swift`
+- `SAV-E/Views/List/PlaceListView.swift` or drawer view
 - Tests: new `Tests/SocialPlacePipelineTests/SavePlanAroundControllerTests.swift`
 
 ## Acceptance Criteria
@@ -723,9 +723,9 @@ struct SaveGuideCustomizationDraft: Hashable {
 
 ## Files Likely Touched
 
-- New: `Wanderly/Models/SaveGuideModels.swift`
-- New: `Wanderly/Services/SaveGuideCustomizationController.swift`
-- Possible UI shell under `Wanderly/Views/Trips/` or drawer integration
+- New: `SAV-E/Models/SaveGuideModels.swift`
+- New: `SAV-E/Services/SaveGuideCustomizationController.swift`
+- Possible UI shell under `SAV-E/Views/Trips/` or drawer integration
 - Tests: new `Tests/SocialPlacePipelineTests/SaveGuideCustomizationControllerTests.swift`
 - Spec references: `specs/agent-map-trip-planner-v0.md`
 
@@ -791,8 +791,8 @@ Every PR must include:
 Required commands:
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' -only-testing:WanderlyTests CODE_SIGNING_ALLOWED=NO
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=WanderlyConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' -only-testing:SAVETests CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=SAVEConfirm,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ~/brain/scripts/brain containment check --strict
 ```
 

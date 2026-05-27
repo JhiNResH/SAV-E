@@ -107,7 +107,7 @@ final class SaveLocalVaultService {
 
     private func vaultURL() -> URL? {
         if let overrideVaultURL { return overrideVaultURL }
-        if let appGroupURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: WanderlySharedStorage.appGroupSuiteName) {
+        if let appGroupURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName) {
             return appGroupURL.appendingPathComponent(fileName)
         }
         return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(fileName)

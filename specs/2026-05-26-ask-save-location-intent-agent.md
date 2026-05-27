@@ -58,12 +58,12 @@ Do **not** build this as a generic travel chatbot or a new AI tab. It should liv
 Files already relevant:
 
 ```text
-Wanderly/Services/SaveAIService.swift
-Wanderly/Services/SaveSearchController.swift
-Wanderly/ViewModels/AIDrawerViewModel.swift
-Wanderly/Views/Drawer/AIDrawerView.swift
-Wanderly/Models/AIResponse.swift
-Wanderly/Models/Place.swift
+SAV-E/Services/SaveAIService.swift
+SAV-E/Services/SaveSearchController.swift
+SAV-E/ViewModels/AIDrawerViewModel.swift
+SAV-E/Views/Drawer/AIDrawerView.swift
+SAV-E/Models/AIResponse.swift
+SAV-E/Models/Place.swift
 ```
 
 Current implementation facts:
@@ -197,12 +197,12 @@ Add strict gates before any answer can recommend places for nearby/category quer
 Likely files:
 
 ```text
-Create: Wanderly/Services/SaveSearchIntentParser.swift
-Create: Wanderly/Services/SaveLocationIntentRecommendationService.swift
-Modify: Wanderly/Services/SaveSearchController.swift
-Modify: Wanderly/Services/SaveAIService.swift
-Modify: Wanderly/ViewModels/AIDrawerViewModel.swift
-Test: WanderlyTests/SaveLocationIntentRecommendationServiceTests.swift
+Create: SAV-E/Services/SaveSearchIntentParser.swift
+Create: SAV-E/Services/SaveLocationIntentRecommendationService.swift
+Modify: SAV-E/Services/SaveSearchController.swift
+Modify: SAV-E/Services/SaveAIService.swift
+Modify: SAV-E/ViewModels/AIDrawerViewModel.swift
+Test: SAVETests/SaveLocationIntentRecommendationServiceTests.swift
 ```
 
 Core logic:
@@ -256,8 +256,8 @@ Also required:
 Verification:
 
 ```bash
-xcodebuild test -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -only-testing:WanderlyTests/SaveLocationIntentRecommendationServiceTests CODE_SIGNING_ALLOWED=NO
-xcodebuild build -project Wanderly.xcodeproj -scheme Wanderly -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' -only-testing:SAVETests/SaveLocationIntentRecommendationServiceTests CODE_SIGNING_ALLOWED=NO
+xcodebuild build -project SAV-E.xcodeproj -scheme SAV-E -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' CODE_SIGNING_ALLOWED=NO
 /Users/jhinresh/brain/scripts/brain containment check --strict
 ```
 
@@ -339,11 +339,11 @@ Render structured recommendation sections and reasons in the drawer.
 Likely files:
 
 ```text
-Modify: Wanderly/Models/AIResponse.swift
-Modify: Wanderly/Views/Drawer/AIDrawerView.swift
-Modify: Wanderly/ViewModels/AIDrawerViewModel.swift
-Modify: Wanderly/Views/Map/MapView.swift
-Test: WanderlyTests/AIDrawerIntentRecommendationTests.swift
+Modify: SAV-E/Models/AIResponse.swift
+Modify: SAV-E/Views/Drawer/AIDrawerView.swift
+Modify: SAV-E/ViewModels/AIDrawerViewModel.swift
+Modify: SAV-E/Views/Map/MapView.swift
+Test: SAVETests/AIDrawerIntentRecommendationTests.swift
 ```
 
 Recommended response model extension:
@@ -433,11 +433,11 @@ For non-trigger examples, first answer from SAV-E memory and offer fallback.
 Likely files:
 
 ```text
-Modify/Create: Wanderly/Services/MapPlaceSearchService.swift
-Modify: Wanderly/Services/SaveSearchController.swift
-Modify: Wanderly/ViewModels/MapViewModel.swift
-Modify: Wanderly/Views/Map/MapView.swift
-Test: WanderlyTests/SaveNearbyUnsavedCandidateTests.swift
+Modify/Create: SAV-E/Services/MapPlaceSearchService.swift
+Modify: SAV-E/Services/SaveSearchController.swift
+Modify: SAV-E/ViewModels/MapViewModel.swift
+Modify: SAV-E/Views/Map/MapView.swift
+Test: SAVETests/SaveNearbyUnsavedCandidateTests.swift
 ```
 
 Acceptance criteria:
