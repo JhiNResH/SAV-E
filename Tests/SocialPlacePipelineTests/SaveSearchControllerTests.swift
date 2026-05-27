@@ -1,8 +1,73 @@
 import XCTest
 import MapKit
+import CoreLocation
 @testable import Wanderly
 
 final class SaveSearchControllerTests: XCTestCase {
+    func testSavedPlaceMatchesUnderlyingMapPOI() {
+        let savedPlace = place(
+            name: "Bright Coffee Bar",
+            address: "Irvine, CA",
+            category: .cafe,
+            latitude: 33.6849,
+            longitude: -117.8262
+        )
+
+        XCTAssertTrue(savedPlace.matchesMapFeature(
+            title: "Bright Coffee Bar",
+            coordinate: CLLocationCoordinate2D(latitude: 33.68491, longitude: -117.82619)
+        ))
+        XCTAssertFalse(savedPlace.matchesMapFeature(
+            title: "Different Coffee",
+            coordinate: CLLocationCoordinate2D(latitude: 33.6858, longitude: -117.8262)
+        ))
+    }
+
+    func testMapCandidateKeepsMultipleBusinessPhotosForPreview() {
+        let candidate = SaveMapCandidate(
+            title: "Bright Coffee Bar",
+            subtitle: "Irvine, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            photoURL: "https://example.com/photo-1.jpg",
+            businessPhotoURLs: [
+                "https://example.com/photo-1.jpg",
+                "https://example.com/photo-2.jpg",
+                "https://example.com/photo-3.jpg"
+            ]
+        )
+
+        XCTAssertEqual(candidate.businessPhotoURLStrings, [
+            "https://example.com/photo-1.jpg",
+            "https://example.com/photo-2.jpg",
+            "https://example.com/photo-3.jpg"
+        ])
+    }
+
+    func testCategoryInferenceUsesPOIAndAvoidsSubstringFalsePositives() {
+        XCTAssertEqual(PlaceCategory.inferred(from: "Heritage Barbecue Chicken"), .food)
+        XCTAssertEqual(PlaceCategory.inferred(from: "Bright Barber Shop"), .shopping)
+        XCTAssertEqual(PlaceCategory.inferred(from: "Disneyland Park"), .attraction)
+        XCTAssertEqual(
+            PlaceCategory.inferredMapCategory(
+                title: "Kung Fu Foot Massage",
+                subtitle: "Westminster, CA",
+                pointOfInterestCategory: "MKPOICategorySpa",
+                fallback: .food
+            ),
+            .shopping
+        )
+        XCTAssertEqual(
+            PlaceCategory.inferredMapCategory(
+                title: "Sushi Gen",
+                subtitle: "Little Tokyo",
+                pointOfInterestCategory: "MKPOICategoryRestaurant",
+                fallback: .attraction
+            ),
+            .food
+        )
+    }
+
     func testChineseMilkTeaQueryUnderstandsCafeDrinkIntent() throws {
         let controller = SaveSearchController()
         let response = controller.search(
@@ -689,14 +754,16 @@ final class SaveSearchControllerTests: XCTestCase {
         status: PlaceStatus = .wantToGo,
         sourceUrl: String? = nil,
         note: String? = nil,
-        extractedDishes: [String]? = nil
+        extractedDishes: [String]? = nil,
+        latitude: Double = 34.0522,
+        longitude: Double = -118.2437
     ) -> Place {
         Place(
             id: UUID(),
             name: name,
             address: address,
-            latitude: 34.0522,
-            longitude: -118.2437,
+            latitude: latitude,
+            longitude: longitude,
             googlePlaceId: nil,
             category: category,
             status: status,

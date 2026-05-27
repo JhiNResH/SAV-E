@@ -410,6 +410,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
     var sourceURL: String?
     var sourcePlatform: SourcePlatform?
     var photoURL: String?
+    var businessPhotoURLs: [String]?
     var evidence: [String]
     var createdAt: Date
 
@@ -425,6 +426,7 @@ struct SaveMapCandidate: Identifiable, Hashable {
         sourceURL: String? = nil,
         sourcePlatform: SourcePlatform? = nil,
         photoURL: String? = nil,
+        businessPhotoURLs: [String]? = nil,
         evidence: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -439,12 +441,24 @@ struct SaveMapCandidate: Identifiable, Hashable {
         self.sourceURL = sourceURL
         self.sourcePlatform = sourcePlatform
         self.photoURL = photoURL
+        self.businessPhotoURLs = businessPhotoURLs
         self.evidence = evidence
         self.createdAt = createdAt
     }
 }
 
 extension SaveMapCandidate {
+    var businessPhotoURLStrings: [String] {
+        var values = businessPhotoURLs ?? []
+        if let photoURL {
+            values.insert(photoURL, at: 0)
+        }
+        return values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .removingDuplicates()
+    }
+
     func matches(_ other: SaveMapCandidate) -> Bool {
         let nearby = abs(latitude - other.latitude) < 0.0008 &&
             abs(longitude - other.longitude) < 0.0008
@@ -530,6 +544,13 @@ extension SaveMapCandidate {
             URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")
         ]
         return components?.url
+    }
+}
+
+private extension Array where Element == String {
+    func removingDuplicates() -> [String] {
+        var seen: Set<String> = []
+        return filter { seen.insert($0).inserted }
     }
 }
 

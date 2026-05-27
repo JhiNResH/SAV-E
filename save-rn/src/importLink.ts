@@ -234,11 +234,12 @@ function cleanName(value: string): string {
 
 function inferCategory(content: string): PlaceCategory {
   const lower = content.toLowerCase();
-  if (/(cafe|coffee|bakery|tea|boba)/.test(lower)) return "cafe";
-  if (/(bar|cocktail|wine|brew)/.test(lower)) return "bar";
-  if (/(hotel|stay|resort)/.test(lower)) return "stay";
-  if (/(shop|store|market)/.test(lower)) return "shopping";
-  if (/(museum|park|event|gallery|festival|summit|conference)/.test(lower)) return "attraction";
+  if (/\b(airbnb|stay|hotel|resort|villa|motel|lodge|inn|glamping|retreat)\b/.test(lower)) return "stay";
+  if (/\b(cafe|coffee|bakery|boba|milk tea|teahouse|tea house|dessert|patisserie|espresso)\b/.test(lower)) return "cafe";
+  if (/\b(restaurant|food|eat|dining|dinner|lunch|breakfast|brunch|sushi|ramen|noodle|pizza|taco|burger|sandwich|bbq|barbecue|steak|hot pot|sukiyaki|yakiniku|izakaya)\b/.test(lower)) return "food";
+  if (/\b(bar|pub|cocktail|wine|brewery|tavern|speakeasy|nightlife)\b/.test(lower)) return "bar";
+  if (/\b(shop|store|market|mall|boutique|bookstore|pharmacy|spa|salon|massage|barber|beauty|fitness|gym|yoga|wellness|clinic|bank|atm|laundry)\b/.test(lower)) return "shopping";
+  if (/\b(museum|park|event|gallery|festival|summit|conference|theater|theatre|cinema|movie|stadium|zoo|aquarium|beach|landmark|monument|temple|shrine|church|library|school|university|airport|station|pier|garden)\b/.test(lower)) return "attraction";
   return "food";
 }
 

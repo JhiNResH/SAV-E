@@ -31,19 +31,41 @@ final class AIDrawerViewModel: ObservableObject {
 
     private let aiService: SaveAIService
     private let saveSearchController: SaveSearchController
+    private let locationIntentRecommendationService: SaveLocationIntentRecommendationService
+    private let locationService: LocationService
 
     /// Multi-turn conversation context for the current session.
     private var conversationTurns: [ConversationTurn] = []
     private var activeRequestID: UUID?
 
-    init(aiService: SaveAIService = .shared, saveSearchController: SaveSearchController = SaveSearchController()) {
+    init(
+        aiService: SaveAIService = .shared,
+        saveSearchController: SaveSearchController = SaveSearchController(),
+        locationIntentRecommendationService: SaveLocationIntentRecommendationService = SaveLocationIntentRecommendationService(),
+        locationService: LocationService? = nil
+    ) {
         self.aiService = aiService
         self.saveSearchController = saveSearchController
+        self.locationIntentRecommendationService = locationIntentRecommendationService
+        self.locationService = locationService ?? .shared
     }
 
     func submit() async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+
+        let currentLocation = locationIntentRecommendationService.requiresCurrentLocation(for: trimmed)
+            ? await locationService.requestCurrentLocation()
+            : locationService.currentLocation
+        if let gatedResponse = locationIntentRecommendationService.recommendationResponse(
+            for: trimmed,
+            places: places,
+            currentLocation: currentLocation
+        ) {
+            drawerState = .displaying(gatedResponse)
+            mapAction = gatedResponse.mapAction
+            return
+        }
 
         let saveSearchResponse = saveSearchController.search(
             query: trimmed,

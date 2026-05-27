@@ -409,11 +409,11 @@ extension Place {
 extension PlaceCategory {
     static func from(pointOfInterestCategory category: MKPointOfInterestCategory?) -> PlaceCategory? {
         guard let category else { return nil }
-        return fromPOITokens([category.rawValue])
+        return fromPOIText(category.rawValue)
     }
 
     static func from(googleTypes types: [String]) -> PlaceCategory? {
-        fromPOITokens(types)
+        fromPOIText(types.joined(separator: " "))
     }
 
     static func poiFirst(
@@ -430,106 +430,81 @@ extension PlaceCategory {
         return inferred(from: fallbackText)
     }
 
-    private static func fromPOITokens(_ tokens: [String]) -> PlaceCategory? {
-        let joined = tokens.joined(separator: " ").lowercased()
-        guard !joined.isEmpty else { return nil }
+    static func inferred(from content: String, fallback: PlaceCategory = .food) -> PlaceCategory {
+        let lowercased = content
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
 
-        if joined.contains("cafe") ||
-            joined.contains("coffee") ||
-            joined.contains("bakery") ||
-            joined.contains("tea") {
-            return .cafe
-        }
-        if joined.contains("restaurant") ||
-            joined.contains("meal") ||
-            joined.contains("food") {
-            return .food
-        }
-        if joined.contains("bar") ||
-            joined.contains("nightlife") ||
-            joined.contains("brewery") ||
-            joined.contains("winery") ||
-            joined.contains("liquor") {
-            return .bar
-        }
-        if joined.contains("lodging") ||
-            joined.contains("hotel") ||
-            joined.contains("motel") ||
-            joined.contains("resort") ||
-            joined.contains("campground") {
+        if matches(lowercased, #"\b(airbnb|stay|hotel|resort|villa|motel|lodge|inn|glamping|retreat)\b|住宿|飯店|酒店|旅館|民宿"#) {
             return .stay
         }
-        if joined.contains("store") ||
-            joined.contains("shop") ||
-            joined.contains("mall") ||
-            joined.contains("market") ||
-            joined.contains("pharmacy") ||
-            joined.contains("supermarket") {
+        if matches(lowercased, #"\b(cafe|coffee|bakery|boba|milk tea|teahouse|tea house|dessert|patisserie|espresso)\b|咖啡|奶茶|珍珠|甜點|甜点|烘焙|麵包|面包"#) {
+            return .cafe
+        }
+        if matches(lowercased, #"\b(restaurant|food|eat|dining|dinner|lunch|breakfast|brunch|sushi|ramen|noodle|pizza|taco|burger|sandwich|bbq|barbecue|steak|hot pot|sukiyaki|yakiniku|izakaya)\b|餐廳|餐厅|美食|料理|燒肉|烧肉|火鍋|火锅|壽喜燒|寿喜烧|牛舌|拉麵|拉面|壽司|寿司"#) {
+            return .food
+        }
+        if matches(lowercased, #"\b(bar|pub|cocktail|wine|brewery|tavern|speakeasy|nightlife)\b|酒吧|調酒|调酒|啤酒|葡萄酒"#) {
+            return .bar
+        }
+        if matches(lowercased, #"\b(shop|store|market|mall|boutique|bookstore|pharmacy|spa|salon|massage|barber|beauty|fitness|gym|yoga|wellness|clinic|bank|atm|laundry)\b|商店|市場|市场|購物|购物|按摩|美容|健身|藥局|药房|銀行|银行"#) {
             return .shopping
         }
-        if joined.contains("museum") ||
-            joined.contains("park") ||
-            joined.contains("tourist") ||
-            joined.contains("attraction") ||
-            joined.contains("gallery") ||
-            joined.contains("zoo") ||
-            joined.contains("aquarium") ||
-            joined.contains("theater") ||
-            joined.contains("cinema") ||
-            joined.contains("stadium") ||
-            joined.contains("airport") ||
-            joined.contains("spa") ||
-            joined.contains("beauty") ||
-            joined.contains("salon") ||
-            joined.contains("massage") ||
-            joined.contains("fitness") ||
-            joined.contains("gym") ||
-            joined.contains("school") ||
-            joined.contains("university") ||
-            joined.contains("library") ||
-            joined.contains("hospital") ||
-            joined.contains("doctor") ||
-            joined.contains("dentist") ||
-            joined.contains("parking") ||
-            joined.contains("station") ||
-            joined.contains("transit") ||
-            joined.contains("charger") ||
-            joined.contains("gas") ||
-            joined.contains("bank") ||
-            joined.contains("atm") ||
-            joined.contains("post") ||
-            joined.contains("courthouse") ||
-            joined.contains("government") ||
-            joined.contains("cityhall") ||
-            joined.contains("police") ||
-            joined.contains("fire") ||
-            joined.contains("religious") ||
-            joined.contains("church") ||
-            joined.contains("worship") {
+        if matches(lowercased, #"\b(museum|park|event|gallery|festival|summit|conference|theater|theatre|cinema|movie|stadium|zoo|aquarium|beach|landmark|monument|temple|shrine|church|library|school|university|airport|station|pier|garden)\b|博物館|博物馆|公園|公园|展覽|展览|景點|景点|寺|機場|机场|車站|车站"#) {
+            return .attraction
+        }
+
+        return fallback
+    }
+
+    static func inferredMapCategory(
+        title: String,
+        subtitle: String,
+        pointOfInterestCategory: String?,
+        fallback: PlaceCategory
+    ) -> PlaceCategory {
+        let poi = pointOfInterestCategory?
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased() ?? ""
+
+        if let category = fromPOIText(poi) { return category }
+
+        return inferred(
+            from: "\(title) \(subtitle) \(pointOfInterestCategory ?? "")",
+            fallback: fallback
+        )
+    }
+
+    private static func fromPOIText(_ value: String) -> PlaceCategory? {
+        let normalized = value
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+        guard !normalized.isEmpty else { return nil }
+
+        if matches(normalized, #"cafe|coffee|bakery|tea|dessert|patisserie"#) {
+            return .cafe
+        }
+        if matches(normalized, #"restaurant|meal|food|foodtruck"#) {
+            return .food
+        }
+        if matches(normalized, #"bar|nightlife|brewery|winery|liquor|pub"#) {
+            return .bar
+        }
+        if matches(normalized, #"lodging|hotel|motel|resort|campground"#) {
+            return .stay
+        }
+        if matches(normalized, #"store|shop|mall|market|pharmacy|supermarket|spa|fitness|beauty|salon|massage|gym|bank|atm|laundry"#) {
+            return .shopping
+        }
+        if matches(normalized, #"museum|park|tourist|attraction|gallery|zoo|aquarium|theater|theatre|cinema|movie|stadium|airport|school|university|library|hospital|doctor|dentist|parking|station|transit|charger|evcharger|gas|post|courthouse|government|cityhall|police|fire|religious|church|worship|nationalpark|amusementpark|fairground|conventioncenter|musicvenue|publictransport|landmark|beach"#) {
             return .attraction
         }
 
         return nil
     }
 
-    static func inferred(from content: String) -> PlaceCategory {
-        let lowercased = content.lowercased()
-        if lowercased.range(of: #"cafe|coffee|bakery|tea|boba"#, options: .regularExpression) != nil {
-            return .cafe
-        }
-        if lowercased.range(of: #"bar|cocktail|wine|brew"#, options: .regularExpression) != nil {
-            return .bar
-        }
-        if lowercased.range(of: #"hotel|stay|resort|villa"#, options: .regularExpression) != nil {
-            return .stay
-        }
-        if lowercased.range(of: #"shop|store|market"#, options: .regularExpression) != nil {
-            return .shopping
-        }
-        if lowercased.range(of: #"museum|park|event|gallery|festival|summit|conference|resort"#, options: .regularExpression) != nil {
-            return .attraction
-        }
-        return .food
+    private static func matches(_ value: String, _ pattern: String) -> Bool {
+        value.range(of: pattern, options: .regularExpression) != nil
     }
 }
 

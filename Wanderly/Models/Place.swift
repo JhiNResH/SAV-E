@@ -126,6 +126,21 @@ struct Place: Identifiable, Codable, Hashable {
         return components?.url
     }
 
+    func matchesMapFeature(title: String, coordinate: CLLocationCoordinate2D) -> Bool {
+        let distance = CLLocation(latitude: latitude, longitude: longitude)
+            .distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+        guard distance < 120 else { return false }
+
+        let featureName = title.normalizedMapMatchText
+        let placeName = name.normalizedMapMatchText
+        let sameName = !featureName.isEmpty &&
+            (featureName == placeName ||
+             featureName.contains(placeName) ||
+             placeName.contains(featureName))
+
+        return sameName || distance < 20
+    }
+
     var businessPhotoURLStrings: [String] {
         var values = businessPhotoUrls ?? []
         if let sourceImageUrl {
@@ -168,6 +183,16 @@ private extension Array where Element == String {
     func removingDuplicates() -> [String] {
         var seen: Set<String> = []
         return filter { seen.insert($0).inserted }
+    }
+}
+
+private extension String {
+    var normalizedMapMatchText: String {
+        folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }
 
