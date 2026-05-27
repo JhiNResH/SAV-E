@@ -1,11 +1,21 @@
 import { Buffer } from "buffer";
-import { Place, SharedTripData } from "./models";
+import { Place, PlaceCategory, SharedPlaceData, SharedTripData, SourcePlatform } from "./models";
 
 const legacyTripBaseUrl = "https://wanderly.app/trip";
+const placeBaseUrl =
+  normalizedEnvValue(process.env.EXPO_PUBLIC_SAVE_PLACE_SHARE_BASE_URL) ??
+  "https://sav-e-app.vercel.app/p";
 const tripBaseUrl =
+  normalizedEnvValue(process.env.EXPO_PUBLIC_SAVE_TRIP_SHARE_BASE_URL) ??
   normalizedEnvValue(process.env.EXPO_PUBLIC_SAVE_SHARE_BASE_URL) ??
   normalizedEnvValue(process.env.EXPO_PUBLIC_WANDERLY_SHARE_BASE_URL) ??
   "https://sav-e-app.vercel.app/trip";
+
+const acceptedShareHosts = new Set([
+  "sav-e-app.vercel.app",
+  "sav-e.app",
+  "wanderly.app",
+]);
 
 export function buildSharedTripData(
   name: string,
@@ -34,6 +44,21 @@ export function buildTripLink(
   return `${baseUrl}/${encodePayload(trip)}`;
 }
 
+export function isSavePlaceLink(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const placeBase = new URL(placeBaseUrl);
+    return (
+      url.protocol === "https:" &&
+      (acceptedShareHosts.has(url.hostname) || url.hostname === placeBase.hostname) &&
+      (url.pathname === placeBase.pathname ||
+        url.pathname.startsWith(`${placeBase.pathname}/`))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function isSaveTripLink(value: string): boolean {
   try {
     const url = new URL(value);
@@ -41,7 +66,7 @@ export function isSaveTripLink(value: string): boolean {
       const candidateUrl = new URL(candidate);
       return (
         url.protocol === candidateUrl.protocol &&
-        url.hostname === candidateUrl.hostname &&
+        (acceptedShareHosts.has(url.hostname) || url.hostname === candidateUrl.hostname) &&
         (url.pathname === candidateUrl.pathname ||
           url.pathname.startsWith(`${candidateUrl.pathname}/`))
       );
@@ -51,16 +76,47 @@ export function isSaveTripLink(value: string): boolean {
   }
 }
 
+export function decodePlaceLink(link: string): SharedPlaceData | null {
+  try {
+    const url = new URL(link);
+    if (!isSavePlaceLink(link)) return null;
+    const payload = routeToken(url, "p");
+    if (!payload) return null;
+    const json = Buffer.from(decodePayload(payload), "base64").toString("utf8");
+    return JSON.parse(json) as SharedPlaceData;
+  } catch {
+    return null;
+  }
+}
+
 export function decodeTripLink(link: string): SharedTripData | null {
   try {
     const url = new URL(link);
-    const payload = routeToken(url) ?? url.searchParams.get("d");
+    if (!isSaveTripLink(link)) return null;
+    const payload = routeToken(url, "trip") ?? url.searchParams.get("d");
     if (!payload) return null;
     const json = Buffer.from(decodePayload(payload), "base64").toString("utf8");
     return JSON.parse(json) as SharedTripData;
   } catch {
     return null;
   }
+}
+
+export function sharedPlaceToBookmark(shared: SharedPlaceData): Place {
+  return {
+    id: shared.id || `shared_${Date.now()}`,
+    name: shared.name || "Shared SAV-E place",
+    address: shared.address || "",
+    latitude: Number.isFinite(shared.lat) ? shared.lat : 0,
+    longitude: Number.isFinite(shared.lng) ? shared.lng : 0,
+    category: categoryFromLabel(shared.category),
+    status: "wantToGo",
+    sourcePlatform: sourcePlatformFromLabel(shared.sourceLabel),
+    priceRange: shared.priceRange ?? undefined,
+    note: shared.note ?? undefined,
+    sourceUrl: shared.sourceURL ?? undefined,
+    importKind: "place",
+  };
 }
 
 export function buildAppleMapsUrl(place: Place): string {
@@ -90,9 +146,29 @@ function decodePayload(value: string): string {
   return padding === 0 ? base64 : `${base64}${"=".repeat(4 - padding)}`;
 }
 
-function routeToken(url: URL): string | null {
+function routeToken(url: URL, route: string): string | null {
   const parts = url.pathname.split("/").filter(Boolean);
-  const tripIndex = parts.indexOf("trip");
-  if (tripIndex < 0 || tripIndex + 1 >= parts.length) return null;
-  return parts[tripIndex + 1];
+  const routeIndex = parts.indexOf(route);
+  if (routeIndex < 0 || routeIndex + 1 >= parts.length) return null;
+  return parts[routeIndex + 1];
+}
+
+function categoryFromLabel(value?: string | null): PlaceCategory {
+  const normalized = value?.toLowerCase() ?? "";
+  if (normalized.includes("cafe") || normalized.includes("coffee")) return "cafe";
+  if (normalized.includes("bar")) return "bar";
+  if (normalized.includes("attraction") || normalized.includes("museum") || normalized.includes("park")) return "attraction";
+  if (normalized.includes("stay") || normalized.includes("hotel")) return "stay";
+  if (normalized.includes("shopping") || normalized.includes("shop")) return "shopping";
+  return "food";
+}
+
+function sourcePlatformFromLabel(value?: string | null): SourcePlatform {
+  const normalized = value?.toLowerCase() ?? "";
+  if (normalized.includes("instagram")) return "instagram";
+  if (normalized.includes("threads")) return "threads";
+  if (normalized.includes("xiaohongshu")) return "xiaohongshu";
+  if (normalized.includes("google")) return "googleMaps";
+  if (normalized.includes("apple")) return "appleMaps";
+  return "other";
 }

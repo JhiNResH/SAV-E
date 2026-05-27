@@ -12,9 +12,9 @@
     "query": "我今天想喝奶茶",
     "expected": {
       "requiredCategories": ["cafe"],
-      "locationMode": "savedAnywhere",
+      "locationMode": "currentLocation",
       "mustMatchCategory": true,
-      "mustMatchLocation": false
+      "mustMatchLocation": true
     }
   },
   {

@@ -21,6 +21,7 @@ import {
   categoryLabel,
   Place,
   PlaceCategory,
+  SharedPlaceData,
   SharedTripData,
   TripRecord,
   statusLabel,
@@ -29,9 +30,12 @@ import { hasPrivyConfig, useOptionalPrivy, SavePrivyProvider } from "./src/privy
 import {
   buildAppleMapsUrl,
   buildSharedTripData,
+  decodePlaceLink,
   buildTripLink,
   decodeTripLink,
+  isSavePlaceLink,
   isSaveTripLink,
+  sharedPlaceToBookmark,
 } from "./src/sharedTrip";
 
 type TabKey = "places" | "trip" | "share";
@@ -77,6 +81,7 @@ function SaveApp() {
   const [importLink, setImportLink] = useState("");
   const [importMessage, setImportMessage] = useState("");
   const [pendingImport, setPendingImport] = useState<Place | null>(null);
+  const [incomingPlace, setIncomingPlace] = useState<SharedPlaceData | null>(null);
   const [incomingTrip, setIncomingTrip] = useState<SharedTripData | null>(null);
   const [guestId, setGuestId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -86,7 +91,7 @@ function SaveApp() {
     void hydrateInitialTripLink();
 
     const subscription = Linking.addEventListener("url", ({ url }) => {
-      applyIncomingTripLink(url);
+      applyIncomingShareLink(url);
     });
     return () => subscription.remove();
   }, []);
@@ -118,26 +123,44 @@ function SaveApp() {
   async function hydrateInitialTripLink() {
     const initialUrl = await Linking.getInitialURL();
     if (initialUrl) {
-      applyIncomingTripLink(initialUrl);
+      applyIncomingShareLink(initialUrl);
       return;
     }
 
     if (typeof window !== "undefined" && window.location?.href) {
-      applyIncomingTripLink(window.location.href);
+      applyIncomingShareLink(window.location.href);
     }
   }
 
-  function applyIncomingTripLink(url: string) {
-    if (!isSaveTripLink(url)) return;
+  function applyIncomingShareLink(url: string) {
+    if (isSavePlaceLink(url)) {
+      const place = decodePlaceLink(url);
+      if (!place) {
+        setActiveTab("share");
+        setImportMessage("This SAV-E place link is invalid or incomplete.");
+        return;
+      }
 
-    const trip = decodeTripLink(url);
-    if (!trip) return;
+      setIncomingPlace(place);
+      setActiveTab("share");
+      setImportMessage(`Opened shared place: ${place.name}`);
+      return;
+    }
 
-    setIncomingTrip(trip);
-    setTripName(trip.name);
-    setTripCity(trip.city);
-    setActiveTab("share");
-    setImportMessage(`Opened shared trip: ${trip.name}`);
+    if (isSaveTripLink(url)) {
+      const trip = decodeTripLink(url);
+      if (!trip) {
+        setActiveTab("share");
+        setImportMessage("This SAV-E trip link is invalid or incomplete.");
+        return;
+      }
+
+      setIncomingTrip(trip);
+      setTripName(trip.name);
+      setTripCity(trip.city);
+      setActiveTab("share");
+      setImportMessage(`Opened shared trip: ${trip.name}`);
+    }
   }
 
   async function bootstrap() {
@@ -250,6 +273,12 @@ function SaveApp() {
   }
 
   async function handleImportedLink(rawLink: string) {
+    const sharedPlace = decodePlaceLink(rawLink);
+    if (sharedPlace) {
+      await saveBookmark(sharedPlaceToBookmark(sharedPlace), `Saved shared place: ${sharedPlace.name}`);
+      return;
+    }
+
     const parsed = parseSharedLink(rawLink);
     if (!parsed) {
       Alert.alert(
@@ -378,6 +407,11 @@ function SaveApp() {
 
   async function openTripLink() {
     await Linking.openURL(tripLink);
+  }
+
+  async function saveIncomingPlace() {
+    if (!incomingPlace) return;
+    await saveBookmark(sharedPlaceToBookmark(incomingPlace), `Saved shared place: ${incomingPlace.name}`);
   }
 
   async function handleAuthAction() {
@@ -613,7 +647,15 @@ function SaveApp() {
 
           {activeTab === "share" ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Tesla handoff</Text>
+              <Text style={styles.sectionTitle}>{incomingPlace ? "Shared place" : "Tesla handoff"}</Text>
+
+              {incomingPlace ? (
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Opened place link</Text>
+                  <DecodedPlace place={incomingPlace} />
+                  <ActionButton label="Save Shared Place" onPress={saveIncomingPlace} />
+                </View>
+              ) : null}
 
               {incomingTrip ? (
                 <View style={styles.card}>
@@ -753,6 +795,29 @@ function PlaceCard({
       <Text style={styles.placeMeta}>
         {categoryLabel[place.category]} · {statusLabel[place.status]} · {place.sourcePlatform}
       </Text>
+      {place.note ? <Text style={styles.placeNote}>{place.note}</Text> : null}
+    </View>
+  );
+}
+
+function DecodedPlace({ place }: { place: SharedPlaceData }) {
+  const meta = [
+    place.category,
+    place.rating ? `${place.rating.toFixed(1)} stars` : null,
+    place.reviewCount ? `${place.reviewCount} reviews` : null,
+    place.priceRange,
+  ].filter(Boolean);
+
+  return (
+    <View style={styles.sharedPlaceCard}>
+      {place.photoURLs?.[0] ? (
+        <Text style={styles.helperText}>Photo available from shared payload</Text>
+      ) : null}
+      <Text style={styles.previewHeadline}>{place.name}</Text>
+      <Text style={styles.previewSubhead}>{place.address || "No address attached"}</Text>
+      {meta.length > 0 ? <Text style={styles.stopMeta}>{meta.join(" · ")}</Text> : null}
+      {place.hours ? <Text style={styles.stopMeta}>Hours: {place.hours}</Text> : null}
+      {place.sourceURL ? <Text style={styles.stopMeta}>Source: {place.sourceURL}</Text> : null}
       {place.note ? <Text style={styles.placeNote}>{place.note}</Text> : null}
     </View>
   );
@@ -1006,6 +1071,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 16, fontWeight: "900", color: palette.ink },
   nextStopCard: { gap: 8 },
+  sharedPlaceCard: { gap: 6 },
   previewHeadline: { fontSize: 18, fontWeight: "900", color: palette.ink, marginBottom: 4 },
   previewSubhead: { fontSize: 13, color: palette.muted, marginBottom: 12 },
   previewStop: { paddingVertical: 10, borderTopWidth: 2, borderTopColor: palette.border },
