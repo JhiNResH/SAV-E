@@ -1707,7 +1707,8 @@ private struct MapDetailDrawerView: View {
 
     private var compactHeader: some View {
         HStack(spacing: 12) {
-            SaveMemoryBadge(state: badgeState, size: 42)
+            shareAction
+                .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -1724,21 +1725,30 @@ private struct MapDetailDrawerView: View {
             Spacer(minLength: 0)
 
             Button(action: onClose) {
-                SaveIconTile(
-                    systemName: "xmark",
-                    size: 30,
-                    iconSize: 11,
-                    fill: Color.saveNotebookPage.opacity(0.72),
-                    foreground: Color.saveCocoa.opacity(0.78),
-                    strokeOpacity: 0.54,
-                    cornerRadius: 9
-                )
+                SelectedPlaceCapsuleIcon(systemImage: "xmark")
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Close place detail")
+            .frame(width: 44, height: 44)
         }
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var shareAction: some View {
+        if let url = item.shareURL {
+            ShareLink(item: url, subject: Text(item.shareSubject), message: Text(item.shareText)) {
+                SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share \(item.title)")
+        } else {
+            ShareLink(item: item.shareText, subject: Text(item.shareSubject)) {
+                SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share \(item.title)")
+        }
     }
 
     private func expandDetail() {
@@ -1827,18 +1837,6 @@ private struct MapDetailDrawerView: View {
         }
     }
 
-    private var badgeState: SaveMemoryBadge.State {
-        switch item {
-        case .savedPlace(let place):
-            return .saved(place.category)
-        case .reviewCandidate(let candidate):
-            return candidate.hasReliableCoordinates ? .ready : .clue
-        case .unsavedCandidate:
-            return .ready
-        case .socialPlace:
-            return .ready
-        }
-    }
 }
 
 private struct SelectedPlaceCapsule: View {
