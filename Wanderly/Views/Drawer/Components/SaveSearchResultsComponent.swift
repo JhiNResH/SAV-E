@@ -70,7 +70,7 @@ struct SaveSearchResultsComponent: View {
                     }
                 }
                 .padding(12)
-                .background(Color.saveNotebookPage.opacity(0.72))
+                .background(Color.saveNotebookPage.opacity(0.50))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(Color.saveNotebookLine, lineWidth: 1.2)
@@ -85,7 +85,7 @@ struct SaveSearchResultsComponent: View {
             }
         }
         .padding(14)
-        .background(Color.saveNotebookPage.opacity(0.96))
+        .background(Color.saveNotebookPage.opacity(0.72))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 2)

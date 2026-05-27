@@ -75,7 +75,7 @@ struct TripItineraryComponent: View {
             }
         }
         .padding(14)
-        .background(Color.saveNotebookPage.opacity(0.96))
+        .background(Color.saveNotebookPage.opacity(0.72))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
