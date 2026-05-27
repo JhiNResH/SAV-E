@@ -5,7 +5,7 @@ const legacyTripBaseUrl = "https://wanderly.app/trip";
 const tripBaseUrl =
   normalizedEnvValue(process.env.EXPO_PUBLIC_SAVE_SHARE_BASE_URL) ??
   normalizedEnvValue(process.env.EXPO_PUBLIC_WANDERLY_SHARE_BASE_URL) ??
-  legacyTripBaseUrl;
+  "https://sav-e.app/trip";
 
 export function buildSharedTripData(
   name: string,
@@ -31,10 +31,7 @@ export function buildTripLink(
   trip: SharedTripData,
   baseUrl = tripBaseUrl
 ): string {
-  const json = JSON.stringify(trip);
-  const base64 = Buffer.from(json, "utf8").toString("base64");
-  const encoded = encodeURIComponent(base64);
-  return `${baseUrl}?d=${encoded}`;
+  return `${baseUrl}/${encodePayload(trip)}`;
 }
 
 export function isSaveTripLink(value: string): boolean {
@@ -45,7 +42,8 @@ export function isSaveTripLink(value: string): boolean {
       return (
         url.protocol === candidateUrl.protocol &&
         url.hostname === candidateUrl.hostname &&
-        url.pathname === candidateUrl.pathname
+        (url.pathname === candidateUrl.pathname ||
+          url.pathname.startsWith(`${candidateUrl.pathname}/`))
       );
     });
   } catch {
@@ -56,9 +54,9 @@ export function isSaveTripLink(value: string): boolean {
 export function decodeTripLink(link: string): SharedTripData | null {
   try {
     const url = new URL(link);
-    const payload = url.searchParams.get("d");
+    const payload = routeToken(url) ?? url.searchParams.get("d");
     if (!payload) return null;
-    const json = Buffer.from(decodeURIComponent(payload), "base64").toString("utf8");
+    const json = Buffer.from(decodePayload(payload), "base64").toString("utf8");
     return JSON.parse(json) as SharedTripData;
   } catch {
     return null;
@@ -75,4 +73,26 @@ function normalizedEnvValue(value?: string): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed || trimmed.startsWith("__")) return undefined;
   return trimmed.replace(/\/+$/, "");
+}
+
+function encodePayload(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), "utf8")
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+function decodePayload(value: string): string {
+  const decoded = decodeURIComponent(value);
+  const base64 = decoded.replaceAll("-", "+").replaceAll("_", "/");
+  const padding = base64.length % 4;
+  return padding === 0 ? base64 : `${base64}${"=".repeat(4 - padding)}`;
+}
+
+function routeToken(url: URL): string | null {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const tripIndex = parts.indexOf("trip");
+  if (tripIndex < 0 || tripIndex + 1 >= parts.length) return null;
+  return parts[tripIndex + 1];
 }

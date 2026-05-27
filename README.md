@@ -13,7 +13,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 - **Profile** — Stats, world map visualization, collections, subscription management
 - **Onboarding** — 3-step carousel
 - **Place Detail** — Photo carousel, info grid, notes, navigate button, source link
-- **App Clip** — Lightweight shared trip preview for `https://wanderly.app/trip?d=...`
+- **App Clip** — Lightweight SAV-E previews for place links (`https://sav-e.app/p/:id`) and trip links (`https://sav-e.app/trip/:id`)
 
 ## Tech Stack
 
@@ -43,7 +43,9 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
    - `GEMINI_API_KEY` — from Google AI Studio
    - `GOOGLE_PLACES_API_KEY` — from [Google Cloud Console](https://console.cloud.google.com/)
    - `SAVE_API_URL` — Railway backend service URL
-   - `SAVE_SHARE_BASE_URL` — production share route, currently `https://wanderly.app/trip`
+   - `SAVE_PLACE_SHARE_BASE_URL` — production place share route, currently `https://sav-e.app/p`
+   - `SAVE_TRIP_SHARE_BASE_URL` — production trip share route, currently `https://sav-e.app/trip`
+   - `SAVE_SHARE_BASE_URL` — legacy trip share route fallback, currently `https://sav-e.app/trip`
    - `PRIVY_APP_ID` — from Privy Dashboard → App Settings → Basics
    - `PRIVY_APP_CLIENT_ID` — from Privy Dashboard → App Settings → Clients. The iOS app client must allow bundle id `com.wanderly.app` and URL scheme `wanderly`.
    - Keep real values out of commits.
@@ -128,26 +130,37 @@ Before uploading a build:
 - configure signing team/profiles in Xcode or release xcconfig
 - confirm the App Store icon and privacy manifest are included
 - keep real API keys out of commits and restrict bundled keys where provider dashboards allow it
-- create the App Clip Experience in App Store Connect for `https://wanderly.app/trip`
+- create App Clip Experiences in App Store Connect for `https://sav-e.app/p` and `https://sav-e.app/trip`
 
-## App Clip Trip Links
+## App Clip Share Routes
+
+SAV-E separates share actions from map actions:
+
+- Share = SAV-E link
+- Maps = Apple Maps link
+
+SAV-E place links use this shape:
+
+```text
+https://sav-e.app/p/<base64-url-encoded SharedPlaceData JSON>
+```
 
 SAV-E trip links use this shape:
 
 ```text
-https://wanderly.app/trip?d=<base64-url-encoded SharedTripData JSON>
+https://sav-e.app/trip/<base64-url-encoded SharedTripData JSON>
 ```
 
-The App Clip target can preview this payload and pass it to the full app through `wanderly://trip?d=...`. The full app also handles the same `https://wanderly.app/trip?...` universal link when installed.
+The App Clip target can preview place payloads with photo, rating, hours, address, source, and save/open actions. It can preview trip payloads with stops, route summary, copy summary, and import/open actions. The full app handles the same `https://sav-e.app/p/...` and `https://sav-e.app/trip/...` universal links when installed. Legacy `https://wanderly.app/trip?d=...` links remain readable during migration.
 
 Before this works for friends without the full app installed:
 
 - enable Associated Domains on `com.wanderly.app` and `com.wanderly.app.Clip` in Apple Developer
-- keep `applinks:wanderly.app` and `appclips:wanderly.app` in the app entitlement
-- keep `appclips:wanderly.app` in the App Clip entitlement
+- keep `applinks:sav-e.app` and `appclips:sav-e.app` in the app entitlement
+- keep `appclips:sav-e.app` in the App Clip entitlement
 - set `APPLE_TEAM_ID` in the Vercel build environment so `npm run export:web` writes the real `/.well-known/apple-app-site-association`
-- disable bot challenges/WAF rules for `https://wanderly.app/trip*` and `https://wanderly.app/.well-known/apple-app-site-association`; iOS cannot complete App Clip or Universal Link association through an HTML challenge page
-- create the App Clip Experience in App Store Connect for `https://wanderly.app/trip`
+- disable bot challenges/WAF rules for `https://sav-e.app/p*`, `https://sav-e.app/trip*`, and `https://sav-e.app/.well-known/apple-app-site-association`; iOS cannot complete App Clip or Universal Link association through an HTML challenge page
+- create App Clip Experiences in App Store Connect for `https://sav-e.app/p` and `https://sav-e.app/trip`
 - wait for Apple's associated-domain CDN to pick up the AASA file
 
 Without those Apple/domain steps, the same URL still opens the web app, but iOS will not invoke the App Clip. If `APPLE_TEAM_ID` is missing, the web build writes a disabled AASA placeholder with no app IDs so Vercel does not serve the SPA shell as Apple association data.

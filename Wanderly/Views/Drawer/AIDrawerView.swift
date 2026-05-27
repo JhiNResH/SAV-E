@@ -2652,7 +2652,7 @@ private struct UnsavedMapCandidateCard: View {
                         action: onSave
                     )
 
-                    ShareLink(item: candidate.saveShareURL ?? candidate.appleMapsURL ?? URL(string: "https://wanderly.app")!, subject: Text(candidate.shareSubject), message: Text(candidate.shareText)) {
+                    ShareLink(item: candidate.saveShareURL ?? URL(string: "https://sav-e.app")!, subject: Text(candidate.shareSubject), message: Text(candidate.shareText)) {
                         CandidateActionLabel(
                             title: "Share",
                             systemImage: "square.and.arrow.up",

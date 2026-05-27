@@ -63,7 +63,7 @@ struct Place: Identifiable, Codable, Hashable {
     }
 
     var saveShareURL: URL? {
-        SharedTripData.from(place: self).toURL()
+        SharedPlaceData.from(place: self).toURL()
     }
 
     var shareText: String {
@@ -93,10 +93,6 @@ struct Place: Identifiable, Codable, Hashable {
         if let saveShareURL {
             lines.append("Open in SAV-E: \(saveShareURL.absoluteString)")
         }
-        if let mapsURL = appleMapsURL {
-            lines.append("Map fallback: \(mapsURL.absoluteString)")
-        }
-
         return lines.joined(separator: "\n")
     }
 

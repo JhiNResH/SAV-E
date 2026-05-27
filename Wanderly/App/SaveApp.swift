@@ -5,6 +5,7 @@ struct SaveApp: App {
     @StateObject private var authService = PrivyAuthService.shared
     @StateObject private var languageSettings = AppLanguageSettings()
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var openedPlace: SharedPlaceData?
     @State private var openedTrip: SharedTripData?
     @State private var openedList: SaveCollaborativeList?
 
@@ -35,20 +36,24 @@ struct SaveApp: App {
                 handleIncomingURL(url)
             }
             .alert(linkAlertTitle, isPresented: Binding(
-                get: { openedTrip != nil || openedList != nil },
+                get: { openedPlace != nil || openedTrip != nil || openedList != nil },
                 set: {
                     if !$0 {
+                        openedPlace = nil
                         openedTrip = nil
                         openedList = nil
                     }
                 }
             )) {
                 Button(languageSettings.text(.ok)) {
+                    openedPlace = nil
                     openedTrip = nil
                     openedList = nil
                 }
             } message: {
-                if let openedList {
+                if let openedPlace {
+                    Text("\(openedPlace.name) is ready. Save it to your SAV-E or open Maps from the place card.")
+                } else if let openedList {
                     Text("\(openedList.title) joined as \(openedList.viewerRole.displayName.lowercased()). \(openedList.items.count) places are ready in Lists.")
                 } else if let openedTrip {
                     Text(String(
@@ -62,6 +67,11 @@ struct SaveApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+        if isPlaceLink(url), let place = SharedPlaceData.from(url: url) {
+            openedPlace = place
+            return
+        }
+
         if isTripLink(url), let trip = SharedTripData.from(url: url) {
             openedTrip = trip
             return
@@ -79,16 +89,27 @@ struct SaveApp: App {
     }
 
     private var linkAlertTitle: String {
-        openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
+        if openedPlace != nil { return "SAV-E place ready" }
+        return openedList == nil ? languageSettings.text(.tripLinkReady) : "SAV-E list ready"
+    }
+
+    private func isPlaceLink(_ url: URL) -> Bool {
+        if url.scheme == "wanderly", url.host == "p" {
+            return true
+        }
+        guard url.scheme == "https",
+              url.host == "sav-e.app" || url.host == "wanderly.app" else { return false }
+        return url.path.hasPrefix("/p/")
     }
 
     private func isTripLink(_ url: URL) -> Bool {
         if url.scheme == "wanderly", url.host == "trip" {
             return true
         }
-        return url.scheme == "https" &&
-            url.host == "wanderly.app" &&
-            url.path == "/trip"
+        guard url.scheme == "https",
+              url.host == "sav-e.app" || url.host == "wanderly.app" else { return false }
+        return url.path.hasPrefix("/trip/")
+            || (url.path == "/trip" && URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "d" } == true)
     }
 }
 
