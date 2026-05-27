@@ -1162,6 +1162,8 @@ struct AIDrawerView: View {
         searchFocused = false
         if let url = firstURL(in: viewModel.query) {
             importURLToReviewCandidates(url)
+        } else if viewModel.shouldSearchNearbyUnsavedCandidates(for: viewModel.query) {
+            searchNearbyUnsavedCandidates(for: viewModel.query)
         } else {
             Task { await viewModel.submit() }
         }
@@ -1170,13 +1172,17 @@ struct AIDrawerView: View {
     private func searchNearbyUnsavedCandidates(for query: String) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        viewModel.query = trimmed
+        let fallbackQuery = viewModel.shouldSearchNearbyUnsavedCandidates(for: trimmed)
+            ? trimmed
+            : "search nearby unsaved candidates for \(trimmed)"
+        viewModel.query = fallbackQuery
         addSpotStatus = "Looking for nearby unsaved candidates. Your SAV-E results stay separate."
         withAnimation { drawerDetent = .medium }
 
         Task {
-            let candidates = await onPrepareMapSearch(trimmed)
+            let candidates = await onPrepareMapSearch(fallbackQuery)
             if candidates.isEmpty {
+                viewModel.mapCandidates = []
                 addSpotStatus = "No nearby unsaved candidates found yet. Try a more specific place type or city."
             } else {
                 viewModel.mapCandidates = candidates

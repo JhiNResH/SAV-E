@@ -1,0 +1,36 @@
+[
+  {
+    "query": "附近咖啡廳",
+    "expected": {
+      "requiredCategories": ["cafe"],
+      "locationMode": "currentLocation",
+      "mustMatchCategory": true,
+      "mustMatchLocation": true
+    }
+  },
+  {
+    "query": "我今天想喝奶茶",
+    "expected": {
+      "requiredCategories": ["cafe"],
+      "locationMode": "savedAnywhere",
+      "mustMatchCategory": true,
+      "mustMatchLocation": false
+    }
+  },
+  {
+    "query": "coffee in LA",
+    "expected": {
+      "requiredCategories": ["cafe"],
+      "locationMode": "namedArea:Los Angeles",
+      "mustMatchCategory": true,
+      "mustMatchLocation": false
+    }
+  },
+  {
+    "query": "附近健身房",
+    "expected": {
+      "supportedCategory": false,
+      "shouldNotReturnCafeOrFood": true
+    }
+  }
+]

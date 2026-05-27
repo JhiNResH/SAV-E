@@ -125,7 +125,7 @@ final class SaveSearchControllerTests: XCTestCase {
     func testCoffeeCravingQueryReturnsNearbyUnsavedCafeCandidate() throws {
         let controller = SaveSearchController()
         let response = controller.search(
-            query: "我今天想喝咖啡推薦一家咖啡給我",
+            query: "找附近新的咖啡廳",
             places: [],
             localRecords: [],
             mapCandidates: [
@@ -162,6 +162,15 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.newRecommendations.results.first?.primaryAction, .savePlace)
         XCTAssertEqual(response.newRecommendations.results.first?.rating, 4.8)
         XCTAssertEqual(response.newRecommendations.results.first?.reviewCount, 1200)
+    }
+
+    func testPublicFallbackPreparationRequiresExplicitUnsavedIntent() {
+        let controller = SaveSearchController()
+
+        XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "附近咖啡廳"))
+        XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "New York"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "Search nearby unsaved cafes"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "找附近新的咖啡廳"))
     }
 
     func testReviewCandidateMilkTeaMatchStaysReviewScoped() throws {

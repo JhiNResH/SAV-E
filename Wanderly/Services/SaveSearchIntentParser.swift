@@ -142,3 +142,124 @@ struct SaveSearchIntentParser {
         keywords.contains { value.contains($0.lowercased()) }
     }
 }
+
+enum SaveSearchIntentValidationError: Error, Equatable {
+    case malformedJSON
+    case unknownCategory(String)
+    case invalidLocationMode
+    case invalidKind
+    case invalidSourceScope
+    case unsafeRadius
+    case unsafeCategoryGate
+    case unsafeLocationGate
+}
+
+struct SaveSearchIntentJSONValidator {
+    private struct IntentDTO: Decodable {
+        struct LocationModeDTO: Decodable {
+            let type: String
+            let radiusMeters: Double?
+            let area: String?
+        }
+
+        let kind: String
+        let requiredCategories: [String]?
+        let optionalCategories: [String]?
+        let locationMode: LocationModeDTO
+        let sourceScope: String
+        let mustMatchCategory: Bool
+        let mustMatchLocation: Bool
+        let confidence: Double
+    }
+
+    func parseIntentJSON(_ json: String, rawText: String) throws -> SaveSearchIntent {
+        guard let data = json.data(using: .utf8),
+              let dto = try? JSONDecoder().decode(IntentDTO.self, from: data) else {
+            throw SaveSearchIntentValidationError.malformedJSON
+        }
+
+        let normalized = SaveSearchIntentParser.normalize(rawText)
+        let deterministic = SaveSearchIntentParser().parse(rawText)
+        let requiredCategories = try categories(from: dto.requiredCategories ?? [])
+        let optionalCategories = try categories(from: dto.optionalCategories ?? [])
+        let locationMode = try locationMode(from: dto.locationMode)
+        let sourceScope = try sourceScope(from: dto.sourceScope)
+        let kind = try kind(from: dto.kind)
+
+        if deterministic?.mustMatchLocation == true, dto.mustMatchLocation == false {
+            throw SaveSearchIntentValidationError.unsafeLocationGate
+        }
+        if deterministic?.mustMatchCategory == true, dto.mustMatchCategory == false {
+            throw SaveSearchIntentValidationError.unsafeCategoryGate
+        }
+
+        return SaveSearchIntent(
+            rawText: rawText.trimmingCharacters(in: .whitespacesAndNewlines),
+            normalizedText: normalized,
+            kind: kind,
+            requiredCategories: Set(requiredCategories),
+            optionalCategories: Set(optionalCategories),
+            locationMode: locationMode,
+            sourceScope: sourceScope,
+            mustMatchCategory: dto.mustMatchCategory,
+            mustMatchLocation: dto.mustMatchLocation,
+            confidence: min(max(dto.confidence, 0), 1),
+            unsupportedCategoryLabel: deterministic?.unsupportedCategoryLabel,
+            categoryNeedles: deterministic?.categoryNeedles ?? []
+        )
+    }
+
+    private func categories(from values: [String]) throws -> [PlaceCategory] {
+        try values.map { value in
+            guard let category = PlaceCategory(rawValue: value) else {
+                throw SaveSearchIntentValidationError.unknownCategory(value)
+            }
+            return category
+        }
+    }
+
+    private func locationMode(from dto: IntentDTO.LocationModeDTO) throws -> SaveSearchIntent.LocationMode {
+        switch dto.type {
+        case "currentLocation":
+            let radius = dto.radiusMeters ?? 2_000
+            guard radius >= 500, radius <= 20_000 else {
+                throw SaveSearchIntentValidationError.unsafeRadius
+            }
+            return .currentLocation(radiusMeters: radius)
+        case "mapRegion":
+            return .mapRegion
+        case "namedArea":
+            guard let area = dto.area?.trimmingCharacters(in: .whitespacesAndNewlines), !area.isEmpty else {
+                throw SaveSearchIntentValidationError.invalidLocationMode
+            }
+            return .namedArea(area)
+        case "savedAnywhere":
+            return .savedAnywhere
+        case "unspecified":
+            return .unspecified
+        default:
+            throw SaveSearchIntentValidationError.invalidLocationMode
+        }
+    }
+
+    private func kind(from value: String) throws -> SaveSearchIntent.Kind {
+        switch value {
+        case "explicitPlaceSearch": return .explicitPlaceSearch
+        case "categoryRecommendation": return .categoryRecommendation
+        case "craving": return .craving
+        case "tripPlanning": return .tripPlanning
+        case "publicDiscovery": return .publicDiscovery
+        case "unknown": return .unknown
+        default: throw SaveSearchIntentValidationError.invalidKind
+        }
+    }
+
+    private func sourceScope(from value: String) throws -> SaveSearchIntent.SourceScope {
+        switch value {
+        case "savedOnly": return .savedOnly
+        case "savedFirstAllowPublicFallback": return .savedFirstAllowPublicFallback
+        case "publicOnly": return .publicOnly
+        default: throw SaveSearchIntentValidationError.invalidSourceScope
+        }
+    }
+}

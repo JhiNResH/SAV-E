@@ -7,13 +7,20 @@ struct SaveSearchResultsComponent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionView(response.fromYourSave, label: "FROM YOUR SAV-E")
-            sectionView(response.newRecommendations, label: "NEW / UNSAVED")
+            ForEach(renderedSections) { section in
+                sectionView(section)
+            }
         }
     }
 
+    private var renderedSections: [SaveSearchSection] {
+        ([response.fromYourSave] + response.additionalSections + [response.newRecommendations])
+            .filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
+    }
+
     @ViewBuilder
-    private func sectionView(_ section: SaveSearchSection, label: String) -> some View {
+    private func sectionView(_ section: SaveSearchSection) -> some View {
+        let label = section.label ?? (section.id == "from-your-save" ? "FROM YOUR SAV-E" : "NEW / UNSAVED")
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(label)
@@ -21,7 +28,7 @@ struct SaveSearchResultsComponent: View {
                     .foregroundColor(.saveInk)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(label == "FROM YOUR SAV-E" ? Color.saveMint.opacity(0.72) : Color.saveSky.opacity(0.72))
+                    .background(label.contains("UNSAVED") ? Color.saveSky.opacity(0.72) : Color.saveMint.opacity(0.72))
                     .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
                     .clipShape(Capsule())
 
@@ -54,7 +61,7 @@ struct SaveSearchResultsComponent: View {
                         .foregroundColor(.saveCocoa)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if label == "FROM YOUR SAV-E" {
+                    if section.showsNearbySearchAction {
                         Button(action: onSearchNearby) {
                             Label("Search nearby unsaved candidates", systemImage: "location.magnifyingglass")
                                 .saveSearchActionPill(isPrimary: true)
@@ -138,8 +145,8 @@ private struct SaveSearchResultNotebookRow: View {
 
             if !result.evidence.isEmpty || !result.missingInfo.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    if let firstEvidence = result.evidence.first {
-                        Label(firstEvidence, systemImage: "doc.text.magnifyingglass")
+                    ForEach(Array(result.evidence.prefix(3)), id: \.self) { evidence in
+                        Label(evidence, systemImage: "doc.text.magnifyingglass")
                             .lineLimit(2)
                     }
                     if !result.missingInfo.isEmpty {

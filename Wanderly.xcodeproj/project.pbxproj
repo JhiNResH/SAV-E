@@ -51,7 +51,9 @@
 		6C452B24209329AC54B287F1 /* GoogleTakeoutImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA0D1693E6B1F8D87EE88DA /* GoogleTakeoutImportView.swift */; };
 		74335232F64578F6C51A16C2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E0E478C4828BA2AD2022551 /* ContentView.swift */; };
 		76068D6F46F6328F2B1D2432 /* AIParsingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D8FDE6E93564AB450C09578 /* AIParsingService.swift */; };
+		765C4F19E85029F42E507364 /* SaveSearchIntentEvalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F55233EDE10484F9DF50EF85 /* SaveSearchIntentEvalTests.swift */; };
 		76D430AA3B1F4E1EB96B77CF /* TripViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10954376731AA5088DDEBEA /* TripViewModel.swift */; };
+		7C4A11610B669F4F5304ADB0 /* SaveLLMClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1EF4DC2E07D55BFDD06641 /* SaveLLMClient.swift */; };
 		7C7136D0D553C7A82A8C4102 /* SocialOCRCandidateHeuristics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A42C72F97728A06A761F9C4 /* SocialOCRCandidateHeuristics.swift */; };
 		7D12FEF322E5753B2E2B1C58 /* Color+Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC8F70BFBB3AC56AADC443E /* Color+Theme.swift */; };
 		7D8318FC0730E6A44483A3C9 /* SaveSearchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A55E0D03D610D9170CB7984 /* SaveSearchModels.swift */; };
@@ -233,6 +235,7 @@
 		C2F4C10AEE6E547B29704866 /* ClipContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipContentView.swift; sourceTree = "<group>"; };
 		C5ECE6C1F7F66FCFF9EF27DD /* EvidenceLinkList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceLinkList.swift; sourceTree = "<group>"; };
 		C6332D88A442A562A21E3D73 /* NavigationCardComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCardComponent.swift; sourceTree = "<group>"; };
+		CF1EF4DC2E07D55BFDD06641 /* SaveLLMClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLLMClient.swift; sourceTree = "<group>"; };
 		D361AE888D21B3766DD265FD /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		D3D9E06102742C508D6A1987 /* AppLanguageSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguageSettings.swift; sourceTree = "<group>"; };
 		D3F0D8561BF3280B1FC8411B /* ClipContentPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipContentPreview.swift; sourceTree = "<group>"; };
@@ -246,6 +249,7 @@
 		F09E8F1EE4BB5B8A6D02452A /* SaveLocationIntentRecommendationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLocationIntentRecommendationServiceTests.swift; sourceTree = "<group>"; };
 		F10954376731AA5088DDEBEA /* TripViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripViewModel.swift; sourceTree = "<group>"; };
 		F4061D8BC422CE2AA6DCEA08 /* PlatformIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformIcon.swift; sourceTree = "<group>"; };
+		F55233EDE10484F9DF50EF85 /* SaveSearchIntentEvalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveSearchIntentEvalTests.swift; sourceTree = "<group>"; };
 		FA66B7E10DCF1DE875D7E19A /* PlaceBottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceBottomSheet.swift; sourceTree = "<group>"; };
 		FF88BFEB0A8FF8426A8F6594 /* SaveAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveAIService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -394,6 +398,7 @@
 				F09E8F1EE4BB5B8A6D02452A /* SaveLocationIntentRecommendationServiceTests.swift */,
 				97D095BEE47C93C9CB1C90EF /* SavePlanAroundControllerTests.swift */,
 				2F18BDD0A8864346CFD0FFDE /* SaveSearchControllerTests.swift */,
+				F55233EDE10484F9DF50EF85 /* SaveSearchIntentEvalTests.swift */,
 				106F7D6E4F33469C21E9E520 /* SocialPlacePipelineTests.swift */,
 			);
 			name = SocialPlacePipelineTests;
@@ -500,6 +505,7 @@
 				2EA2DE34F0656884DCAB54CD /* PrivyAuthService.swift */,
 				FF88BFEB0A8FF8426A8F6594 /* SaveAIService.swift */,
 				2C84D6BD6DD536720150C020 /* SaveGuideCustomizationController.swift */,
+				CF1EF4DC2E07D55BFDD06641 /* SaveLLMClient.swift */,
 				C09120C4FFC2D6CA18D10FDF /* SaveLocalVaultService.swift */,
 				7A01813692671D7595E61DC5 /* SaveLocationIntentRecommendationService.swift */,
 				0DC77D2FDA5C5A3F29AF777C /* SavePlanAroundController.swift */,
@@ -802,6 +808,7 @@
 				7F11336837B0EC2EE5801AB8 /* SaveLocationIntentRecommendationServiceTests.swift in Sources */,
 				5311E10B19ABE278B394E7C1 /* SavePlanAroundControllerTests.swift in Sources */,
 				E0A8D7C78588C7A73600E0BC /* SaveSearchControllerTests.swift in Sources */,
+				765C4F19E85029F42E507364 /* SaveSearchIntentEvalTests.swift in Sources */,
 				1263A60FFAD7A5F3A889289A /* SocialPlacePipelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -877,6 +884,7 @@
 				26F656E5350968392F99B0BC /* SaveGuideCustomizationController.swift in Sources */,
 				8D206706A2CD2C076B2A1934 /* SaveGuideCustomizationView.swift in Sources */,
 				BA42999D1529BF71718E3B02 /* SaveGuideModels.swift in Sources */,
+				7C4A11610B669F4F5304ADB0 /* SaveLLMClient.swift in Sources */,
 				55744843693323A5DA49375E /* SaveLocalVaultService.swift in Sources */,
 				BC61DD110087FA8DE8BE8054 /* SaveLocationIntentRecommendationService.swift in Sources */,
 				601AC2D18A3144394339F436 /* SaveMemoryBadge.swift in Sources */,
