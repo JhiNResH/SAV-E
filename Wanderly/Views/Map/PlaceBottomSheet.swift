@@ -260,7 +260,7 @@ struct PlaceBasicInfoPanel: View {
             }
         }
         .padding(10)
-        .background(Color.saveSky.opacity(0.14))
+        .background(Color.saveSky.opacity(0.10))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
@@ -373,7 +373,7 @@ private struct PlaceMemoryChip: View {
         .foregroundColor(.saveCocoa)
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .background(Color.saveNotebookPage)
+        .background(Color.saveNotebookPage.opacity(0.50))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1))
     }
@@ -525,7 +525,7 @@ struct PlaceInsightSummaryPanel: View {
             }
         }
         .padding(12)
-        .background(Color.saveNotebookPage)
+        .background(Color.saveNotebookPage.opacity(0.50))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -667,7 +667,7 @@ struct PlaceBusinessPhotoCarousel: View {
             .foregroundColor(.saveInk)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(Color.saveNotebookPage.opacity(0.9))
+            .background(Color.saveNotebookPage.opacity(0.66))
             .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
             .clipShape(Capsule())
             .padding(8)
@@ -689,7 +689,7 @@ struct PlaceBusinessPhotoCarousel: View {
 
     private var fallbackVisual: some View {
         Rectangle()
-            .fill(Color.saveNotebookPage)
+            .fill(Color.saveNotebookPage.opacity(0.72))
             .overlay {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.title2.weight(.semibold))
