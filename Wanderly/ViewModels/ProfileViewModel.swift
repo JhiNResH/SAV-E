@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
@@ -38,6 +39,10 @@ final class ProfileViewModel: ObservableObject {
     }
 
     func updateDisplayName(_ displayName: String) async -> Bool {
+        await updateProfile(displayName: displayName, avatarData: nil)
+    }
+
+    func updateProfile(displayName: String, avatarData: Data?) async -> Bool {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             errorMessage = "Name cannot be empty."
@@ -46,6 +51,14 @@ final class ProfileViewModel: ObservableObject {
 
         let previousProfile = profile
         profile.displayName = trimmedName
+        if let avatarData {
+            do {
+                profile.avatarUrl = try saveAvatarImage(avatarData)
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
+        }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -64,5 +77,47 @@ final class ProfileViewModel: ObservableObject {
 
     func signOut() async {
         await authService.signOut()
+    }
+
+    private func saveAvatarImage(_ data: Data) throws -> String {
+        guard let image = UIImage(data: data) else {
+            throw ProfileImageError.invalidImage
+        }
+
+        let maxDimension: CGFloat = 512
+        let scale = min(maxDimension / max(image.size.width, image.size.height), 1)
+        let targetSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        guard let jpegData = resized.jpegData(compressionQuality: 0.84) else {
+            throw ProfileImageError.invalidImage
+        }
+
+        let directory = try avatarDirectory()
+        let fileURL = directory.appendingPathComponent("profile-avatar.jpg")
+        try jpegData.write(to: fileURL, options: .atomic)
+        return fileURL.absoluteString
+    }
+
+    private func avatarDirectory() throws -> URL {
+        let supportDirectory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let directory = supportDirectory.appendingPathComponent("Profile", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+}
+
+private enum ProfileImageError: LocalizedError {
+    case invalidImage
+
+    var errorDescription: String? {
+        "Couldn’t use that photo. Choose another image."
     }
 }
