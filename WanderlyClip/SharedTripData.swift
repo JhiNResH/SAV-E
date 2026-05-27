@@ -147,7 +147,7 @@ struct SharedListPayload: Codable {
             return true
         }
         return url.scheme == "https" &&
-            (url.host == "sav-e-app.vercel.app" || url.host == "wanderly.app") &&
+            ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app"].contains(url.host ?? "") &&
             url.path == "/list"
     }
 }
@@ -219,7 +219,7 @@ struct SharedReferralProfile: Codable, Hashable {
 
     static func isReferralLink(_ url: URL) -> Bool {
         url.scheme == "https" &&
-            url.host == "sav-e-app.vercel.app" &&
+            ["sav-e-app.vercel.app", "sav-e.app"].contains(url.host ?? "") &&
             (url.path.hasPrefix("/r/") || url.path.hasPrefix("/u/"))
     }
 

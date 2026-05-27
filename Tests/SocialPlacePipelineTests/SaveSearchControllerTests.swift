@@ -722,9 +722,9 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(shareText.contains("Kato"))
         XCTAssertTrue(shareText.contains("777 S Alameda St, Los Angeles, CA"))
         XCTAssertTrue(shareText.contains("Source: https://www.instagram.com/reel/kato/"))
-        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e.app/p/"))
+        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e-app.vercel.app/p/"))
         XCTAssertFalse(shareText.contains("Map fallback: https://maps.apple.com"))
-        XCTAssertEqual(savedPlace.saveShareURL?.host, "sav-e.app")
+        XCTAssertEqual(savedPlace.saveShareURL?.host, "sav-e-app.vercel.app")
         XCTAssertTrue(savedPlace.saveShareURL?.path.hasPrefix("/p/") == true)
     }
 
@@ -749,9 +749,9 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(shareText.contains("Rating: 4.8"))
         XCTAssertTrue(shareText.contains("Reviews: 1200"))
         XCTAssertTrue(shareText.contains("Source: https://maps.google.com/?q=Bright+Coffee+Bar"))
-        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e.app/p/"))
+        XCTAssertTrue(shareText.contains("Open in SAV-E: https://sav-e-app.vercel.app/p/"))
         XCTAssertFalse(shareText.contains("Map fallback: https://maps.apple.com"))
-        XCTAssertEqual(candidate.saveShareURL?.host, "sav-e.app")
+        XCTAssertEqual(candidate.saveShareURL?.host, "sav-e-app.vercel.app")
         XCTAssertTrue(candidate.saveShareURL?.path.hasPrefix("/p/") == true)
     }
 

@@ -262,7 +262,7 @@ struct SaveSharedListPayload: Codable, Hashable {
             return true
         }
         return url.scheme == "https" &&
-            (url.host == "sav-e-app.vercel.app" || url.host == "wanderly.app") &&
+            ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app"].contains(url.host ?? "") &&
             url.path == "/list"
     }
 }

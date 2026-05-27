@@ -110,7 +110,7 @@ struct SaveApp: App {
             return true
         }
         guard url.scheme == "https",
-              url.host == "sav-e-app.vercel.app" || url.host == "wanderly.app" else { return false }
+              ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app"].contains(url.host ?? "") else { return false }
         return url.path.hasPrefix("/p/")
     }
 
@@ -119,7 +119,7 @@ struct SaveApp: App {
             return true
         }
         guard url.scheme == "https",
-              url.host == "sav-e-app.vercel.app" || url.host == "wanderly.app" else { return false }
+              ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app"].contains(url.host ?? "") else { return false }
         return url.path.hasPrefix("/trip/")
             || (url.path == "/trip" && URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "d" } == true)
     }
