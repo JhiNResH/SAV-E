@@ -5,6 +5,7 @@ struct PlaceBottomSheet: View {
     var onDelete: (() async throws -> Void)?
     var onPlanAround: (() -> Void)?
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
@@ -61,7 +62,7 @@ struct PlaceBottomSheet: View {
                         .font(.headline.weight(.black))
                         .foregroundColor(.saveInk)
                         .frame(width: 36, height: 36)
-                        .background(Color.saveNotebookPage)
+                        .background(Color.saveNotebookPage.opacity(0.62))
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.4))
                 }
@@ -157,7 +158,7 @@ struct PlaceBottomSheet: View {
             }
         }
         .padding()
-        .background(SaveDottedBackground())
+        .background(PlaceDetailGlassBackground(colorScheme: colorScheme))
         .confirmationDialog(
             "Delete \(place.name)?",
             isPresented: $showDeleteConfirmation,
@@ -213,6 +214,19 @@ struct PlaceBottomSheet: View {
         place.cleanMemoryNote
     }
 
+}
+
+private struct PlaceDetailGlassBackground: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(colorScheme == .dark ? Color.black.opacity(0.16) : Color.saveNotebookPage.opacity(0.46))
+            )
+    }
 }
 
 struct PlaceBasicInfoPanel: View {

@@ -3,11 +3,29 @@ import UIKit
 import AVFoundation
 import Speech
 
+enum MapDetailDrawerItem: Identifiable {
+    case savedPlace(Place)
+    case reviewCandidate(PlaceReviewCandidate)
+    case unsavedCandidate(SaveMapCandidate)
+
+    var id: String {
+        switch self {
+        case .savedPlace(let place):
+            return "saved-\(place.id)"
+        case .reviewCandidate(let candidate):
+            return "review-\(candidate.id.uuidString)"
+        case .unsavedCandidate(let candidate):
+            return "unsaved-\(candidate.id)"
+        }
+    }
+}
+
 struct AIDrawerView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var viewModel: AIDrawerViewModel
     @Binding var drawerDetent: PresentationDetent
+    @Binding var mapDetailDrawerItem: MapDetailDrawerItem?
     var existingPlacesForImport: [Place] = []
     var reviewCandidates: [PlaceReviewCandidate] = []
     var onSaveGoogleTakeoutImport: ([ImportedPlaceDraft]) async throws -> GoogleTakeoutSaveSummary = { _ in
@@ -32,6 +50,7 @@ struct AIDrawerView: View {
     var selectedCategories: Set<PlaceCategory> = []
     var onToggleCategory: (PlaceCategory) -> Void = { _ in }
     var onOpenPassport: () -> Void = {}
+    var onDismissMapDetail: () -> Void = {}
     @FocusState private var searchFocused: Bool
     @StateObject private var voiceQuery = VoiceQueryController()
     @State private var showGoogleTakeoutImport = false
@@ -45,17 +64,21 @@ struct AIDrawerView: View {
     @State private var selectedListID: UUID?
     @State private var newListTitle = ""
     @State private var newListNote = ""
+    @State private var mapDetailDetent: PresentationDetent = .height(104)
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchBar
-            if showsContentArea {
-                Divider().opacity(colorScheme == .dark ? 0.18 : 0.28)
-                contentArea
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                searchBar
+                if showsContentArea(for: proxy.size.height) {
+                    Divider().opacity(colorScheme == .dark ? 0.18 : 0.28)
+                    contentArea
+                }
             }
-        }
-        .background {
-            DrawerGlassBackground(colorScheme: colorScheme)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background {
+                DrawerGlassBackground(colorScheme: colorScheme)
+            }
         }
         .sheet(isPresented: $viewModel.showPlaceList) {
             PlaceListView()
@@ -68,6 +91,62 @@ struct AIDrawerView: View {
         }
         .sheet(isPresented: $showProfile) {
             ProfileView(waitingClues: reviewCandidates.count)
+        }
+        .sheet(item: $mapDetailDrawerItem, onDismiss: {
+            mapDetailDetent = .height(104)
+            onDismissMapDetail()
+        }) { item in
+            MapDetailDrawerView(
+                item: item,
+                detent: $mapDetailDetent,
+                editableLists: collaborativeLists.filter(\.canEdit),
+                isWorkingReviewCandidateID: candidateActionInFlight,
+                isWorkingMapCandidateID: mapCandidateActionInFlight,
+                onClose: {
+                    mapDetailDrawerItem = nil
+                },
+                onDeletePlace: { place in
+                    try await onDeletePlace(place)
+                    viewModel.removePlace(place)
+                    mapDetailDrawerItem = nil
+                },
+                onPlanAroundPlace: { place in
+                    mapDetailDrawerItem = nil
+                    viewModel.query = "Plan around \(place.name)"
+                    Task { await viewModel.submit() }
+                },
+                onConfirmCandidate: { candidate in
+                    performCandidateAction(candidate, successMessage: "Marked as confirmed. Save it as a Map Stamp when ready.") {
+                        try await onConfirmCandidate(candidate)
+                    }
+                },
+                onRejectCandidate: { candidate in
+                    performCandidateAction(candidate, successMessage: "Removed from Review.") {
+                        try await onRejectCandidate(candidate)
+                        mapDetailDrawerItem = nil
+                    }
+                },
+                onSaveCandidate: { candidate in
+                    performCandidateAction(candidate, successMessage: saveFeedback(for: candidate)) {
+                        try await onSaveCandidate(candidate)
+                        mapDetailDrawerItem = nil
+                    }
+                },
+                onSaveMapCandidate: { candidate in
+                    performMapCandidateAction(candidate) {
+                        try await onSaveMapCandidate(candidate)
+                        mapDetailDrawerItem = nil
+                    }
+                },
+                onCreateList: createListForPicker,
+                onAddPlaceToList: onAddPlaceToList,
+                onAddMapCandidateToList: onAddMapCandidateToList
+            )
+            .presentationDetents([.height(104), .fraction(0.38), .large], selection: $mapDetailDetent)
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.38)))
+            .presentationBackground(.clear)
+            .presentationCornerRadius(28)
         }
         .onChange(of: viewModel.drawerState) { _, state in
             withAnimation(.spring(duration: 0.3)) {
@@ -165,11 +244,11 @@ struct AIDrawerView: View {
     }
 
     private var commandBarFill: Color {
-        colorScheme == .dark ? Color.black.opacity(0.34) : Color.white.opacity(0.44)
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.34)
     }
 
     private var commandIconFill: Color {
-        colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.48)
+        colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.38)
     }
 
     private var commandBarStroke: Color {
@@ -279,7 +358,7 @@ struct AIDrawerView: View {
                         .foregroundColor(.saveInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(Color.saveNotebookPage)
+                        .background(Color.saveNotebookPage.opacity(0.62))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .stroke(Color.saveNotebookLine, lineWidth: 1.4)
@@ -497,7 +576,7 @@ struct AIDrawerView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.saveInk)
                     .frame(width: 32, height: 32)
-                    .background(Color.saveNotebookPage)
+                    .background(Color.saveNotebookPage.opacity(0.62))
                     .overlay(
                         Circle()
                             .stroke(Color.saveNotebookLine, lineWidth: 2)
@@ -530,7 +609,7 @@ struct AIDrawerView: View {
                     .font(.caption.weight(.bold))
                     .foregroundColor(.saveCocoa.opacity(0.72))
                     .frame(width: 30, height: 30)
-                    .background(Color.saveNotebookPage)
+                    .background(Color.saveNotebookPage.opacity(0.62))
                     .overlay(
                         Circle()
                             .stroke(Color.saveNotebookLine, lineWidth: 2)
@@ -627,8 +706,9 @@ struct AIDrawerView: View {
         return false
     }
 
-    private var showsContentArea: Bool {
-        if case .idle = viewModel.drawerState, drawerDetent == .height(72), !showReviewInbox, !showLists { return false }
+    private func showsContentArea(for drawerHeight: CGFloat) -> Bool {
+        let isCollapsed = drawerHeight <= 96
+        if case .idle = viewModel.drawerState, isCollapsed, !showReviewInbox, !showLists { return false }
         return true
     }
 
@@ -1307,18 +1387,191 @@ private struct DrawerGlassBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.20),
-                Color.black.opacity(0.32)
+                Color.black.opacity(0.08),
+                Color.black.opacity(0.20)
             ]
         }
         return [
-            Color.white.opacity(0.16),
-            Color.saveCream.opacity(0.26)
+            Color.white.opacity(0.08),
+            Color.saveCream.opacity(0.14)
         ]
     }
 
     private var topStroke: Color {
         colorScheme == .dark ? Color.white.opacity(0.16) : Color.white.opacity(0.58)
+    }
+}
+
+private struct MapDetailDrawerView: View {
+    let item: MapDetailDrawerItem
+    @Binding var detent: PresentationDetent
+    let editableLists: [SaveCollaborativeList]
+    let isWorkingReviewCandidateID: UUID?
+    let isWorkingMapCandidateID: String?
+    let onClose: () -> Void
+    let onDeletePlace: (Place) async throws -> Void
+    let onPlanAroundPlace: (Place) -> Void
+    let onConfirmCandidate: (PlaceReviewCandidate) -> Void
+    let onRejectCandidate: (PlaceReviewCandidate) -> Void
+    let onSaveCandidate: (PlaceReviewCandidate) -> Void
+    let onSaveMapCandidate: (SaveMapCandidate) -> Void
+    let onCreateList: () -> SaveCollaborativeList
+    let onAddPlaceToList: (Place, UUID) throws -> Void
+    let onAddMapCandidateToList: (SaveMapCandidate, UUID) throws -> Void
+    @State private var statusMessage: String?
+
+    var body: some View {
+        GeometryReader { proxy in
+            Group {
+                if proxy.size.height <= 132 {
+                    compactHeader
+                } else {
+                    expandedContent
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background {
+                DrawerGlassBackground(colorScheme: colorScheme)
+            }
+        }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var compactHeader: some View {
+        HStack(spacing: 12) {
+            SaveMemoryBadge(state: badgeState, size: 42)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+
+                Text(categoryLabel)
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.76))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.saveCocoa.opacity(0.72))
+                    .frame(width: 30, height: 30)
+                    .background(Color.saveNotebookPage.opacity(0.62))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.5), lineWidth: 1))
+            }
+            .accessibilityLabel("Close place detail")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private var expandedContent: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                switch item {
+                case .savedPlace(let place):
+                    PlaceBottomSheet(place: place) {
+                        try await onDeletePlace(place)
+                    } onPlanAround: {
+                        onPlanAroundPlace(place)
+                    }
+
+                    AddToListPanel(
+                        title: "Add this Map Stamp to a list",
+                        lists: editableLists,
+                        onCreateList: onCreateList,
+                        onAddToList: { listID in
+                            do {
+                                try onAddPlaceToList(place, listID)
+                                statusMessage = "Added \(place.name) to list."
+                            } catch {
+                                statusMessage = error.localizedDescription
+                            }
+                        }
+                    )
+
+                case .reviewCandidate(let candidate):
+                    ReviewCandidateDetailCard(
+                        candidate: candidate,
+                        isWorking: isWorkingReviewCandidateID == candidate.id,
+                        onConfirm: { onConfirmCandidate(candidate) },
+                        onReject: { onRejectCandidate(candidate) },
+                        onSave: { onSaveCandidate(candidate) }
+                    )
+
+                case .unsavedCandidate(let candidate):
+                    UnsavedMapCandidateCard(
+                        candidate: candidate,
+                        isWorking: isWorkingMapCandidateID == candidate.id,
+                        onSave: { onSaveMapCandidate(candidate) }
+                    )
+
+                    AddToListPanel(
+                        title: "Add this map result to a list",
+                        lists: editableLists,
+                        onCreateList: onCreateList,
+                        onAddToList: { listID in
+                            do {
+                                try onAddMapCandidateToList(candidate, listID)
+                                statusMessage = "Added \(candidate.title) to list without saving it."
+                            } catch {
+                                statusMessage = error.localizedDescription
+                            }
+                        }
+                    )
+                }
+
+                if let statusMessage {
+                    Text(statusMessage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.saveCocoa.opacity(0.78))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 28)
+        }
+    }
+
+    private var title: String {
+        switch item {
+        case .savedPlace(let place):
+            return place.name
+        case .reviewCandidate(let candidate):
+            return candidate.name
+        case .unsavedCandidate(let candidate):
+            return candidate.title
+        }
+    }
+
+    private var categoryLabel: String {
+        switch item {
+        case .savedPlace(let place):
+            return "\(place.category.displayName) · Map Stamp"
+        case .reviewCandidate(let candidate):
+            return candidate.hasReliableCoordinates ? "Review Candidate" : "Source Clue"
+        case .unsavedCandidate(let candidate):
+            return "\(candidate.category?.displayName ?? "Place") · Unsaved candidate"
+        }
+    }
+
+    private var badgeState: SaveMemoryBadge.State {
+        switch item {
+        case .savedPlace(let place):
+            return .saved(place.category)
+        case .reviewCandidate(let candidate):
+            return candidate.hasReliableCoordinates ? .ready : .clue
+        case .unsavedCandidate:
+            return .ready
+        }
     }
 }
 
@@ -2205,6 +2458,7 @@ private struct UnsavedMapCandidateCard: View {
                 UnsavedMapCandidateVisualPreview(candidate: candidate)
 
                 UnsavedMapCandidateBasicInfo(candidate: candidate)
+                UnsavedMapCandidateSummaryPanel(candidate: candidate)
 
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 6) {
@@ -2318,6 +2572,90 @@ private struct UnsavedMapCandidateBasicInfo: View {
 
     private var reviewText: String? {
         candidate.reviewCount.map { "\($0) reviews" }
+    }
+}
+
+private struct UnsavedMapCandidateSummaryPanel: View {
+    var candidate: SaveMapCandidate
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.badge.magnifyingglass")
+                    .font(.caption.weight(.black))
+                Text("Place summary")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            VStack(alignment: .leading, spacing: 7) {
+                UnsavedMapCandidateSummaryLine(icon: "sparkles", text: candidateSummary)
+                UnsavedMapCandidateSummaryLine(icon: "mappin.and.ellipse", text: practicalInfo)
+                UnsavedMapCandidateSummaryLine(icon: "star.fill", text: reviewSummary)
+                UnsavedMapCandidateSummaryLine(icon: "hand.thumbsup.fill", text: recommendationSummary)
+            }
+        }
+        .padding(10)
+        .background(Color.saveNotebookPage.opacity(0.62))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var candidateSummary: String {
+        let category = candidate.category?.displayName.lowercased() ?? "place"
+        let area = candidate.shareAreaLabel.isEmpty ? candidate.subtitle : candidate.shareAreaLabel
+        return "\(candidate.title) is an unsaved \(category) map result near \(area)."
+    }
+
+    private var practicalInfo: String {
+        let address = candidate.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty
+            ? "Practical info: address is not available yet"
+            : "Practical info: \(address)"
+    }
+
+    private var reviewSummary: String {
+        var parts: [String] = []
+        if let rating = candidate.rating {
+            parts.append(String(format: "%.1f stars", rating))
+        }
+        if let reviewCount = candidate.reviewCount {
+            parts.append("\(reviewCount) reviews")
+        }
+        return parts.isEmpty ? "Reviews: no rating or review count yet" : "Reviews: \(parts.joined(separator: " · "))"
+    }
+
+    private var recommendationSummary: String {
+        if candidate.businessPhotoURLStrings.isEmpty {
+            return "Recommendation: check the map clue and address before saving."
+        }
+        return "Recommendation: compare the business photos, rating, and address before saving."
+    }
+}
+
+private struct UnsavedMapCandidateSummaryLine: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 16)
+                .padding(.top, 2)
+
+            Text(text)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
     }
 }
 

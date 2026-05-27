@@ -1,25 +1,26 @@
 import SwiftUI
+import UIKit
 
 extension Color {
     // MARK: - SAV-E Memo Scrapbook Theme
-    static let saveCream = Color(hex: "FFF5E7")
+    static let saveCream = Color(light: "FFF5E7", dark: "15191F")
     static let saveMint = Color(hex: "C8EBCF")
-    static let saveCocoa = Color(hex: "3A2415")
+    static let saveCocoa = Color(light: "3A2415", dark: "F7EFE5")
     static let saveHoney = Color(hex: "FFD66B")
     static let saveSky = Color(hex: "8FCAEA")
-    static let saveInk = Color(hex: "3A2415")
-    static let saveMutedText = Color(hex: "7A5D45")
+    static let saveInk = Color(light: "3A2415", dark: "FFF8ED")
+    static let saveMutedText = Color(light: "7A5D45", dark: "CFC4B8")
     static let saveDisabled = Color(hex: "D7C0A6")
-    static let savePaper = Color(hex: "FFF0DC")
-    static let saveLedger = Color(hex: "FFF5E7")
+    static let savePaper = Color(light: "FFF0DC", dark: "1B2027")
+    static let saveLedger = Color(light: "FFF5E7", dark: "15191F")
     static let saveSignal = Color(hex: "EE9C78")
     static let saveSuccess = Color(hex: "C8EBCF")
     static let saveCoral = Color(hex: "EE9C78")
     static let savePink = Color(hex: "F6C1CB")
-    static let saveNotebookBackground = Color(hex: "FFF5E7")
-    static let saveNotebookPage = Color(hex: "FFF0DC")
+    static let saveNotebookBackground = Color(light: "FFF5E7", dark: "101419")
+    static let saveNotebookPage = Color(light: "FFF0DC", dark: "1B2027")
     static let saveNotebookSpine = Color(hex: "F6C181")
-    static let saveNotebookLine = Color(hex: "3A2415")
+    static let saveNotebookLine = Color(light: "3A2415", dark: "6FFFFFFF")
 
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
@@ -36,6 +37,20 @@ extension Color {
 
     // MARK: - Hex Initializer
     init(hex: String) {
+        self.init(UIColor(hex: hex))
+    }
+
+    init(light lightHex: String, dark darkHex: String) {
+        self.init(UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(hex: darkHex)
+                : UIColor(hex: lightHex)
+        })
+    }
+}
+
+private extension UIColor {
+    convenience init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
@@ -49,11 +64,10 @@ extension Color {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
+            red: CGFloat(r) / 255,
+            green: CGFloat(g) / 255,
+            blue: CGFloat(b) / 255,
+            alpha: CGFloat(a) / 255
         )
     }
 }

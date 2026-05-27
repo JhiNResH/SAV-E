@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var drawerVM = AIDrawerViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var drawerDetent: PresentationDetent = .height(72)
+    @State private var mapDetailDrawerItem: MapDetailDrawerItem?
 
     var body: some View {
         MapView(viewModel: mapVM)
@@ -12,6 +13,7 @@ struct ContentView: View {
                 AIDrawerView(
                     viewModel: drawerVM,
                     drawerDetent: $drawerDetent,
+                    mapDetailDrawerItem: $mapDetailDrawerItem,
                     existingPlacesForImport: mapVM.places,
                     reviewCandidates: mapVM.reviewCandidates,
                     onSaveGoogleTakeoutImport: { drafts in
@@ -60,6 +62,9 @@ struct ContentView: View {
                     selectedCategories: mapVM.selectedCategories,
                     onToggleCategory: { category in
                         mapVM.toggleCategory(category)
+                    },
+                    onDismissMapDetail: {
+                        mapVM.clearSelectedMapObject()
                     }
                 )
                     .presentationDetents([.height(72), .fraction(0.34), .medium, .large], selection: $drawerDetent)
@@ -73,13 +78,28 @@ struct ContentView: View {
                 if let action { mapVM.apply(action) }
             }
             .onChange(of: mapVM.selectedPlace) { _, place in
-                if let place { drawerVM.showPlace(place) }
+                guard let place else { return }
+                drawerVM.returnToCommands()
+                mapDetailDrawerItem = .savedPlace(place)
+                withAnimation(.spring(duration: 0.3)) {
+                    drawerDetent = .height(72)
+                }
             }
             .onChange(of: mapVM.selectedReviewCandidate) { _, candidate in
-                if let candidate { drawerVM.showReviewCandidate(candidate) }
+                guard let candidate else { return }
+                drawerVM.returnToCommands()
+                mapDetailDrawerItem = .reviewCandidate(candidate)
+                withAnimation(.spring(duration: 0.3)) {
+                    drawerDetent = .height(72)
+                }
             }
             .onChange(of: mapVM.selectedMapCandidate) { _, candidate in
-                if let candidate { drawerVM.showMapCandidate(candidate) }
+                guard let candidate else { return }
+                drawerVM.returnToCommands()
+                mapDetailDrawerItem = .unsavedCandidate(candidate)
+                withAnimation(.spring(duration: 0.3)) {
+                    drawerDetent = .height(72)
+                }
             }
             .onChange(of: mapVM.places) { _, places in
                 drawerVM.places = places
