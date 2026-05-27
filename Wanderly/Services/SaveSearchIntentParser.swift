@@ -106,6 +106,9 @@ struct SaveSearchIntentParser {
         if let namedArea = namedArea(in: normalized) {
             return .namedArea(namedArea)
         }
+        if containsAny(normalized, keywords: ["today", "tonight", "now", "right now", "今天", "今晚", "現在", "现在"]) {
+            return .currentLocation(radiusMeters: 2_000)
+        }
         return .savedAnywhere
     }
 

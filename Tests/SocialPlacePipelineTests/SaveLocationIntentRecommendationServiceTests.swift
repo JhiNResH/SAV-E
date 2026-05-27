@@ -101,8 +101,9 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertEqual(response.placeIds, [])
     }
 
-    func testMilkTeaWithoutLocationRanksSpecificEvidenceBeforeGenericCafe() throws {
+    func testMilkTeaWithCurrentLocationRanksSpecificEvidenceBeforeGenericCafe() throws {
         let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 34.0522, longitude: -118.2437)
         let genericCafe = place(
             name: "Generic Coffee",
             category: .cafe,
@@ -119,7 +120,7 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         let response = try XCTUnwrap(service.recommendationResponse(
             for: "我今天想喝奶茶",
             places: [genericCafe, bobaCafe, dinner],
-            currentLocation: nil
+            currentLocation: currentLocation
         ))
 
         XCTAssertEqual(response.componentType, .placeList)
@@ -127,7 +128,7 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertFalse(response.placeIds.contains(dinner.id.uuidString))
     }
 
-    func testCoffeeCravingWithoutSavedCafeOffersExplicitUnsavedFallback() throws {
+    func testCoffeeCravingTodayRequiresCurrentLocation() throws {
         let service = SaveLocationIntentRecommendationService()
 
         let response = try XCTUnwrap(service.recommendationSearchResponse(
@@ -136,10 +137,47 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
             currentLocation: nil
         ))
 
-        XCTAssertEqual(response.fromYourSave.title, "No saved cafe")
+        XCTAssertEqual(response.fromYourSave.title, "Location needed")
         XCTAssertTrue(response.fromYourSave.results.isEmpty)
-        XCTAssertTrue(response.newRecommendations.showsNearbySearchAction)
+        XCTAssertFalse(response.newRecommendations.showsNearbySearchAction)
         XCTAssertTrue(response.newRecommendations.results.isEmpty)
+    }
+
+    func testCoffeeCravingTodayFallsBackToExplicitUnsavedSearchWhenNoNearbySavedCafe() throws {
+        let service = SaveLocationIntentRecommendationService()
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "我今天想喝咖啡推薦一家咖啡給我",
+            places: [],
+            currentLocation: CLLocation(latitude: 33.6846, longitude: -117.8265)
+        ))
+
+        XCTAssertEqual(response.fromYourSave.title, "From your SAV-E nearby")
+        XCTAssertTrue(response.fromYourSave.results.isEmpty)
+        XCTAssertTrue(response.fromYourSave.showsNearbySearchAction)
+        XCTAssertTrue(response.newRecommendations.showsNearbySearchAction)
+        XCTAssertTrue(response.shouldAutoSearchNearbyUnsavedCandidates)
+    }
+
+    func testCoffeeCravingTodayShowsSavedCafeFirstWhenNearby() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let nearbyCafe = place(
+            name: "Bright Coffee Bar",
+            category: .cafe,
+            latitude: 33.6849,
+            longitude: -117.8262
+        )
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "我今天想喝咖啡推薦一家咖啡給我",
+            places: [nearbyCafe],
+            currentLocation: currentLocation
+        ))
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Bright Coffee Bar"])
+        XCTAssertFalse(response.newRecommendations.showsNearbySearchAction)
+        XCTAssertFalse(response.shouldAutoSearchNearbyUnsavedCandidates)
     }
 
     func testUnsupportedGymQueryDoesNotMapToFoodOrCafe() throws {
@@ -174,8 +212,8 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         let parser = SaveSearchIntentParser()
         let milkTea = try XCTUnwrap(parser.parse("我今天想喝奶茶"))
         XCTAssertEqual(milkTea.requiredCategories, [.cafe])
-        XCTAssertEqual(milkTea.locationMode, .savedAnywhere)
-        XCTAssertFalse(milkTea.mustMatchLocation)
+        XCTAssertEqual(milkTea.locationMode, .currentLocation(radiusMeters: 2_000))
+        XCTAssertTrue(milkTea.mustMatchLocation)
 
         let laCoffee = try XCTUnwrap(parser.parse("coffee in LA"))
         XCTAssertEqual(laCoffee.requiredCategories, [.cafe])
