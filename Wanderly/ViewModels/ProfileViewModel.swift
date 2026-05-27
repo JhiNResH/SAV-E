@@ -3,7 +3,7 @@ import UIKit
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    @Published var profile: UserProfile = .mock
+    @Published var profile: UserProfile = .empty
     @Published var isLoading = false
     @Published var isSaving = false
     @Published var errorMessage: String?

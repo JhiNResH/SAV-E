@@ -878,6 +878,24 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(place.category, .cafe)
     }
 
+    func testPassportStatsDeriveFromSavedPlaces() {
+        let profile = UserProfile.empty
+        let places = [
+            place(name: "Irvine Coffee", address: "1 Main St, Irvine, CA", category: .cafe, status: .visited),
+            place(name: "Irvine Dinner", address: "2 Main St, Irvine, CA", category: .food),
+            place(name: "Tokyo Ramen", address: "Shibuya, Tokyo, Japan", category: .food, status: .visited)
+        ]
+
+        let stats = PassportStats(profile: profile, savedPlaces: places, waitingClues: 2)
+
+        XCTAssertEqual(stats.savedCount, 3)
+        XCTAssertEqual(stats.visitedCount, 2)
+        XCTAssertEqual(stats.citiesCount, 2)
+        XCTAssertEqual(stats.cityNames, ["Irvine", "Tokyo"])
+        XCTAssertEqual(stats.waitingClues, 2)
+        XCTAssertTrue(stats.usesSavedPlaces)
+    }
+
     private func place(
         name: String,
         address: String,

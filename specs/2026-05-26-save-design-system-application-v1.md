@@ -179,7 +179,9 @@ Files:
 Change:
 
 - Treat Passport as the user's memory ledger.
-- Keep settings secondary to Map Stamps, verified count, cities, and waiting clues.
+- Keep settings secondary to Map Stamps, visited count, cities, and waiting clues.
+- Do not use verified for self-marked visits; proof verification requires
+  receipt, photo, or location evidence.
 - Local Memory can remain available, but should read as a tool, not the main product.
 
 States:

@@ -10,7 +10,12 @@ struct ProfileView: View {
     @State private var showLanguageSettings = false
     @State private var draftDisplayName = ""
     @State private var draftAvatarData: Data?
+    var savedPlaces: [Place] = []
     var waitingClues: Int = 0
+
+    private var passportStats: PassportStats {
+        PassportStats(profile: viewModel.profile, savedPlaces: savedPlaces, waitingClues: waitingClues)
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,7 +43,7 @@ struct ProfileView: View {
                     )
                     .padding(.horizontal)
 
-                    StatsView(profile: viewModel.profile, waitingClues: waitingClues)
+                    StatsView(stats: passportStats)
 
                     if let errorMessage = viewModel.errorMessage {
                         HStack(spacing: 8) {
@@ -55,7 +60,8 @@ struct ProfileView: View {
                         .padding(.horizontal)
                     }
 
-                    PassportStampSection(profile: viewModel.profile, waitingClues: waitingClues)
+                    PassportStampSection(profile: viewModel.profile, stats: passportStats)
+                    PassportCountingRulesPanel(stats: passportStats)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(languageSettings.text(.passportControls))
@@ -63,21 +69,26 @@ struct ProfileView: View {
                             .foregroundColor(.saveCocoa)
                             .padding(.horizontal, 4)
 
-                        NavigationLink {
-                            SaveMemoryDebugView()
-                        } label: {
-                            SettingsRow(icon: "tray.full", title: languageSettings.text(.localMemory), color: .saveCocoa)
-                        }
-                        .buttonStyle(.plain)
-
                         SettingsRow(
-                            icon: "globe.asia.australia.fill",
+                            icon: "globe.asia.australia",
                             title: languageSettings.text(.language),
                             detail: languageSettings.language.displayName,
                             color: .saveSky
                         ) {
                             showLanguageSettings = true
                         }
+
+                        NavigationLink {
+                            SaveMemoryDebugView()
+                        } label: {
+                            SettingsRow(
+                                icon: "tray",
+                                title: localMemoryTitle,
+                                detail: localMemoryDetail,
+                                color: .saveCocoa
+                            )
+                        }
+                        .buttonStyle(.plain)
 
                         SettingsRow(icon: "arrow.right.square", title: languageSettings.text(.signOut), color: .red) {
                             Task { await viewModel.signOut() }
@@ -111,6 +122,20 @@ struct ProfileView: View {
         }
         .sheet(isPresented: $showLanguageSettings) {
             LanguageSettingsSheet()
+        }
+    }
+
+    private var localMemoryTitle: String {
+        switch languageSettings.language {
+        case .english: return "Raw local memory"
+        case .traditionalChinese: return "原始本機記憶"
+        }
+    }
+
+    private var localMemoryDetail: String {
+        switch languageSettings.language {
+        case .english: return "Captured clue inbox"
+        case .traditionalChinese: return "已捕捉線索的收件匣"
         }
     }
 }
@@ -357,11 +382,14 @@ private struct PassportHero: View {
                 HStack(alignment: .top, spacing: 14) {
                     ProfileAvatarView(avatarURLString: profile.avatarUrl, size: 78)
                         .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "checkmark.seal.fill")
+                            Image(systemName: "book.closed")
                                 .font(.system(size: 18, weight: .black))
-                                .foregroundColor(.saveSuccess)
+                                .foregroundColor(.saveInk)
+                                .frame(width: 28, height: 28)
                                 .background(Circle().fill(Color.saveNotebookPage))
-                                .offset(x: 5, y: 5)
+                                .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.2))
+                                .clipShape(Circle())
+                                .offset(x: 6, y: 6)
                         }
 
                     VStack(alignment: .leading, spacing: 5) {
@@ -383,7 +411,7 @@ private struct PassportHero: View {
 
                 HStack(spacing: 8) {
                     PassportBadge(text: languageSettings.text(.memoHelper), color: .saveHoney)
-                    PassportBadge(text: languageSettings.text(.reviewFirst), color: .saveSignal)
+                    PassportBadge(text: visitedBadgeText, color: .saveSignal)
                     Spacer()
                     Button(action: onEdit) {
                         Image(systemName: "pencil")
@@ -404,6 +432,13 @@ private struct PassportHero: View {
             .padding(16)
         }
         .saveNotebookPage(cornerRadius: 22)
+    }
+
+    private var visitedBadgeText: String {
+        switch languageSettings.language {
+        case .english: return "VISITED IS SELF-MARKED"
+        case .traditionalChinese: return "去過由你標記"
+        }
     }
 }
 
@@ -523,7 +558,7 @@ private struct PassportBadge: View {
 private struct PassportStampSection: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     let profile: UserProfile
-    let waitingClues: Int
+    let stats: PassportStats
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -541,15 +576,66 @@ private struct PassportStampSection: View {
                     .clipShape(Capsule())
             }
 
-            PassportStampRow(icon: "rectangle.stack.fill", title: languageSettings.text(.memoryCards), value: languageSettings.savedCountText(profile.savedCount))
-            PassportStampRow(icon: "checkmark.seal.fill", title: languageSettings.text(.verified), value: languageSettings.verifiedCountText(max(profile.savedCount - waitingClues, 0)))
-            PassportStampRow(icon: "building.2.fill", title: languageSettings.text(.cities), value: languageSettings.cityCountText(profile.citiesCount))
-            PassportStampRow(icon: "circle.hexagongrid.fill", title: languageSettings.text(.waitingClues), value: languageSettings.waitingPlaceText(waitingClues))
+            PassportStampRow(
+                icon: "rectangle.stack",
+                title: languageSettings.text(.memoryCards),
+                value: languageSettings.savedCountText(stats.savedCount),
+                detail: mapStampDetail
+            )
+            PassportStampRow(
+                icon: "figure.walk",
+                title: languageSettings.text(.verified),
+                value: languageSettings.verifiedCountText(stats.visitedCount),
+                detail: visitedDetail
+            )
+            PassportStampRow(
+                icon: "building.2",
+                title: languageSettings.text(.cities),
+                value: languageSettings.cityCountText(stats.citiesCount),
+                detail: citiesDetail
+            )
+            if !stats.cityNames.isEmpty {
+                PassportCityStrip(cityNames: stats.cityNames)
+            }
+            PassportStampRow(
+                icon: "circle.hexagongrid",
+                title: languageSettings.text(.waitingClues),
+                value: languageSettings.waitingPlaceText(stats.waitingClues),
+                detail: waitingClueDetail
+            )
             PassportStampRow(icon: "calendar", title: languageSettings.text(.memberSince), value: profile.createdAt.formatted(date: .abbreviated, time: .omitted))
         }
         .padding()
         .saveNotebookPage(cornerRadius: 18)
         .padding(.horizontal)
+    }
+
+    private var mapStampDetail: String {
+        switch languageSettings.language {
+        case .english: return "Saved places in your SAV-E map."
+        case .traditionalChinese: return "你存在 SAV-E 地圖裡的地點。"
+        }
+    }
+
+    private var visitedDetail: String {
+        switch languageSettings.language {
+        case .english: return "Places you marked visited; this is not proof-based yet."
+        case .traditionalChinese: return "你標記為去過的地點；目前還不是憑證驗證。"
+        }
+    }
+
+    private var citiesDetail: String {
+        switch languageSettings.language {
+        case .english: return stats.usesSavedPlaces ? "Unique areas parsed from saved place addresses." : "Appears after SAV-E has saved place addresses."
+        case .traditionalChinese: return stats.usesSavedPlaces ? "從已存地點地址推導出的不重複城市/區域。" : "儲存帶地址的地點後會出現。"
+        }
+    }
+
+    private var waitingClueDetail: String {
+        switch languageSettings.language {
+        case .english: return "Source clues that still need a confirmed place."
+        case .traditionalChinese: return "還需要確認成具體地點的來源線索。"
+        }
     }
 }
 
@@ -557,14 +643,19 @@ private struct PassportStampRow: View {
     let icon: String
     let title: String
     let value: String
+    var detail: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.subheadline)
+                .font(.subheadline.weight(.bold))
                 .foregroundColor(.saveCocoa)
                 .frame(width: 30, height: 30)
                 .background(Color.saveHoney.opacity(0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.62), lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
@@ -575,9 +666,126 @@ private struct PassportStampRow: View {
                     .font(.caption)
                     .foregroundColor(.saveMutedText)
                     .lineLimit(1)
+                if let detail {
+                    Text(detail)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.saveCocoa.opacity(0.74))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer()
+        }
+    }
+}
+
+private struct PassportCityStrip: View {
+    let cityNames: [String]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(cityNames.prefix(8), id: \.self) { city in
+                    Text(city)
+                        .font(.caption2.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.saveHoney.opacity(0.18))
+                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.62), lineWidth: 1))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+}
+
+private struct PassportCountingRulesPanel: View {
+    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    let stats: PassportStats
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "seal")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveCocoa)
+                Text(title)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveCocoa)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                PassportRuleLine(icon: "building.2", text: cityRule)
+                PassportRuleLine(icon: "figure.walk", text: visitedRule)
+                PassportRuleLine(icon: "checkmark.seal", text: proofRule)
+            }
+        }
+        .padding(12)
+        .background(Color.saveNotebookPage.opacity(0.78))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal)
+    }
+
+    private var title: String {
+        switch languageSettings.language {
+        case .english: return "How Passport counts stamps"
+        case .traditionalChinese: return "護照印章如何計算"
+        }
+    }
+
+    private var cityRule: String {
+        switch languageSettings.language {
+        case .english: return "Cities come from the city or area in saved place addresses."
+        case .traditionalChinese: return "城市來自已存地點地址中的城市或區域。"
+        }
+    }
+
+    private var visitedRule: String {
+        switch languageSettings.language {
+        case .english: return "Visited counts places you marked visited in SAV-E."
+        case .traditionalChinese: return "去過數量來自你在 SAV-E 標記為去過的地點。"
+        }
+    }
+
+    private var proofRule: String {
+        switch languageSettings.language {
+        case .english: return "Real-world proof will need receipt, photo, or location evidence; the current count stays self-marked."
+        case .traditionalChinese: return "真實到訪驗證需要收據、照片或定位證據；目前計數仍是你自己標記。"
+        }
+    }
+}
+
+private struct PassportRuleLine: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.bold))
+                .foregroundColor(.saveCocoa)
+                .frame(width: 22, height: 22)
+                .background(Color.saveCream.opacity(0.72))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            Text(text)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
     }
 }

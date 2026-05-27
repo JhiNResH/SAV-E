@@ -13,6 +13,48 @@ struct UserProfile: Identifiable, Codable {
     var createdAt: Date
 }
 
+struct PassportStats: Hashable {
+    var savedCount: Int
+    var visitedCount: Int
+    var citiesCount: Int
+    var waitingClues: Int
+    var cityNames: [String]
+    var usesSavedPlaces: Bool
+
+    init(profile: UserProfile, savedPlaces: [Place], waitingClues: Int) {
+        self.waitingClues = waitingClues
+
+        guard !savedPlaces.isEmpty else {
+            savedCount = profile.savedCount
+            visitedCount = profile.visitedCount
+            citiesCount = profile.citiesCount
+            cityNames = []
+            usesSavedPlaces = false
+            return
+        }
+
+        savedCount = savedPlaces.count
+        visitedCount = savedPlaces.filter { $0.status == .visited }.count
+        cityNames = Self.uniqueCityNames(from: savedPlaces)
+        citiesCount = cityNames.count
+        usesSavedPlaces = true
+    }
+
+    private static func uniqueCityNames(from places: [Place]) -> [String] {
+        var seen = Set<String>()
+        return places
+            .compactMap(cityName)
+            .filter { seen.insert($0.lowercased()).inserted }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    private static func cityName(for place: Place) -> String? {
+        let value = place.shareAreaLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        return value
+    }
+}
+
 struct PlaceCollection: Identifiable, Codable, Hashable {
     let id: UUID
     var name: String
@@ -23,6 +65,19 @@ struct PlaceCollection: Identifiable, Codable, Hashable {
 // MARK: - Mock Data
 
 extension UserProfile {
+    static let empty = UserProfile(
+        id: "local-user",
+        displayName: "SAV-E User",
+        email: nil,
+        avatarUrl: nil,
+        savedCount: 0,
+        visitedCount: 0,
+        citiesCount: 0,
+        isPremium: false,
+        collections: [],
+        createdAt: Date()
+    )
+
     static let mock = UserProfile(
         id: "mock-user",
         displayName: "SAV-E User",

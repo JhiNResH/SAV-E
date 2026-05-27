@@ -101,7 +101,7 @@ struct AIDrawerView: View {
             )
         }
         .sheet(isPresented: $showProfile) {
-            ProfileView(waitingClues: reviewCandidates.count)
+            ProfileView(savedPlaces: viewModel.places, waitingClues: reviewCandidates.count)
         }
         .onChange(of: viewModel.drawerState) { _, state in
             guard mapDetailDrawerItem == nil else { return }

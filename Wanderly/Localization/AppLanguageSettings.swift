@@ -58,9 +58,9 @@ final class AppLanguageSettings: ObservableObject {
     func verifiedCountText(_ count: Int) -> String {
         switch language {
         case .english:
-            return "\(count) ready to plan"
+            return count == 1 ? "1 visited place" : "\(count) visited places"
         case .traditionalChinese:
-            return "\(count) 個可規劃"
+            return "\(count) 個去過地點"
         }
     }
 
@@ -242,7 +242,7 @@ enum SaveText {
         case .memoryCards:
             return localized(english: "Memory cards", traditionalChinese: "記憶卡", language: language)
         case .verified:
-            return localized(english: "Verified", traditionalChinese: "已確認", language: language)
+            return localized(english: "Visited", traditionalChinese: "去過", language: language)
         case .cities:
             return localized(english: "Cities", traditionalChinese: "城市", language: language)
         case .waitingClues:
