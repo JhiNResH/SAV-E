@@ -1645,25 +1645,6 @@ private struct SavedMapDetailDrawerContent: View {
             PlaceBasicInfoPanel(place: place)
             PlaceInsightSummaryPanel(place: place, fallbackSummary: memorySummary)
 
-            if let note = place.cleanMemoryNote {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Why SAV-E saved this")
-                        .font(.caption.weight(.black))
-                        .foregroundColor(.saveCocoa)
-                    Text(note)
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.saveInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(12)
-                .background(Color.saveNotebookPage.opacity(0.34))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.35), lineWidth: 1)
-                )
-            }
-
             HStack(spacing: 8) {
                 Button {
                     NavigationService.navigate(to: place.coordinate, name: place.name)
@@ -2512,30 +2493,6 @@ private struct ReviewCandidateDetailCard: View {
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
-
-                if !candidate.evidence.isEmpty {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                                .font(.caption2.weight(.bold))
-                            Text("Evidence receipt")
-                                .font(.caption2.weight(.black))
-                            Spacer()
-                        }
-                        .foregroundColor(.saveCocoa)
-
-                        EvidenceLinkList(evidence: candidate.evidence, maxItems: 3)
-                    }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.saveHoney.opacity(0.16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                            )
-                    )
-                }
 
                 if !candidate.hasReliableCoordinates {
                     HStack(spacing: 6) {
