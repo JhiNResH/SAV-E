@@ -11,6 +11,8 @@ class ShareViewController: UIViewController {
         let hostingController = UIHostingController(rootView: ShareExtensionView(
             extensionContext: extensionContext
         ))
+        view.backgroundColor = .clear
+        hostingController.view.backgroundColor = .clear
         addChild(hostingController)
         view.addSubview(hostingController.view)
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -480,7 +482,8 @@ struct ShareExtensionView: View {
                     placePreview(place)
                 }
             }
-            .background(ShareScrapbookBackground())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(ShareScrapbookBackground().ignoresSafeArea())
             .navigationTitle("SAV-E ✨")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -491,6 +494,8 @@ struct ShareExtensionView: View {
                 }
             }
         }
+        .background(ShareScrapbookBackground().ignoresSafeArea())
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task {
             await extractAndParse()
         }

@@ -106,7 +106,7 @@ enum SocialPlaceEvidenceScorer {
 
     static func looksLikeOperatingHoursLine(_ value: String) -> Bool {
         value.range(
-            of: #"(?i)(營業|营业|hours?|open|closed|週[一二三四五六日天]|周[一二三四五六日天]|星期|\b\d{1,2}:\d{2}\s*[-–—~至]\s*\d{1,2}:\d{2})"#,
+            of: #"(?i)(營業|营业|hours?|open|closed|週[一二三四五六日天]|周[一二三四五六日天]|星期|[一二三四五六日天]\s*[～~\-–—至]\s*[一二三四五六日天]|\b\d{1,2}:\d{2}\s*[-–—~～至]\s*\d{1,2}:\d{2})"#,
             options: [.regularExpression]
         ) != nil
     }
