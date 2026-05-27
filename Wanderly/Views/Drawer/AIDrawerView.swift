@@ -1693,19 +1693,21 @@ private struct MapDetailDrawerView: View {
             shareAction
                 .frame(width: 44, height: 44)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 4) {
                 Text(item.presentation.title)
                     .font(.subheadline.weight(.black))
                     .foregroundColor(.saveInk)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity)
 
                 Text(item.presentation.eyebrow)
                     .font(.caption2.weight(.black))
                     .foregroundColor(.saveCocoa.opacity(0.76))
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity)
             }
-
-            Spacer(minLength: 0)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
 
             Button(action: onClose) {
                 SelectedPlaceCapsuleIcon(systemImage: "xmark")
@@ -2026,7 +2028,7 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.94) : Color.saveNotebookPage.opacity(0.90))
+            .fill(Color.clear)
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2045,13 +2047,13 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.02),
-                Color.black.opacity(0.08)
+                Color.black.opacity(0.10),
+                Color.black.opacity(0.18)
             ]
         }
         return [
-            Color.saveCream.opacity(0.18),
-            Color.saveNotebookPage.opacity(0.12)
+            Color.white.opacity(0.08),
+            Color.saveCream.opacity(0.14)
         ]
     }
 }
