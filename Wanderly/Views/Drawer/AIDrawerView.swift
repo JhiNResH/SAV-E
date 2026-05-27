@@ -1693,19 +1693,21 @@ private struct MapDetailDrawerView: View {
             shareAction
                 .frame(width: 44, height: 44)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
+            VStack(spacing: 4) {
+                Text(item.presentation.title)
                     .font(.subheadline.weight(.black))
                     .foregroundColor(.saveInk)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity)
 
-                Text(item.subtitle)
+                Text(item.presentation.eyebrow)
                     .font(.caption2.weight(.black))
                     .foregroundColor(.saveCocoa.opacity(0.76))
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity)
             }
-
-            Spacer(minLength: 0)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
 
             Button(action: onClose) {
                 SelectedPlaceCapsuleIcon(systemImage: "xmark")
@@ -1725,12 +1727,12 @@ private struct MapDetailDrawerView: View {
             ShareLink(item: url, subject: Text(item.shareSubject), message: Text(item.shareText)) {
                 SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share \(item.title)")
+            .accessibilityLabel("Share \(item.presentation.title)")
         } else {
             ShareLink(item: item.shareText, subject: Text(item.shareSubject)) {
                 SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share \(item.title)")
+            .accessibilityLabel("Share \(item.presentation.title)")
         }
     }
 
@@ -1820,34 +1822,32 @@ private struct SelectedPlaceCapsule: View {
 
             Button(action: onExpand) {
                 VStack(spacing: 2) {
-                    Text(item.title)
+                    Text(item.presentation.title)
                         .font(.subheadline.weight(.black))
                         .foregroundColor(.saveInk)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                         .frame(maxWidth: .infinity)
 
-                    Text(item.subtitle)
+                    Text(item.presentation.eyebrow)
                         .font(.caption2.weight(.bold))
                         .foregroundColor(.saveCocoa.opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(maxWidth: .infinity)
 
-                    if let contextLine = item.contextLine {
-                        Text(contextLine)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.saveCocoa.opacity(0.58))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                            .frame(maxWidth: .infinity)
-                    }
+                    Text(item.presentation.contextLine)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.saveCocoa.opacity(0.58))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .frame(maxWidth: .infinity)
                 }
                 .multilineTextAlignment(.center)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Open \(item.title) details")
+            .accessibilityLabel("Open \(item.presentation.title) details")
             .accessibilityHint("Expands the selected place drawer")
 
             Button(action: onClose) {
@@ -1875,12 +1875,12 @@ private struct SelectedPlaceCapsule: View {
             ShareLink(item: url, subject: Text(item.shareSubject), message: Text(item.shareText)) {
                 SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share \(item.title)")
+            .accessibilityLabel("Share \(item.presentation.title)")
         } else {
             ShareLink(item: item.shareText, subject: Text(item.shareSubject)) {
                 SelectedPlaceCapsuleIcon(systemImage: "square.and.arrow.up")
             }
-            .accessibilityLabel("Share \(item.title)")
+            .accessibilityLabel("Share \(item.presentation.title)")
         }
     }
 }
@@ -1905,43 +1905,37 @@ private struct SelectedPlaceCapsuleIcon: View {
 }
 
 private extension MapDetailDrawerItem {
-    var title: String {
+    var presentation: SavePlaceDrawerPresentation {
         switch self {
         case .savedPlace(let place):
-            return place.name
+            return SavePlaceDrawerPresentation(place: place)
         case .reviewCandidate(let candidate):
-            return candidate.name
+            return SavePlaceDrawerPresentation(reviewCandidate: candidate)
         case .unsavedCandidate(let candidate):
-            return candidate.title
+            return SavePlaceDrawerPresentation(mapCandidate: candidate)
         case .socialPlace(let place):
-            return place.name
+            return .unsavedMapCandidate(
+                title: place.name,
+                contextLine: "\(place.category.displayName) · \(place.socialSignal?.displayText ?? "Social signal")",
+                trustLine: "Social signal, not saved in your SAV-E yet."
+            )
         }
+    }
+
+    var title: String {
+        presentation.title
     }
 
     var subtitle: String {
-        switch self {
-        case .savedPlace(let place):
-            return "\(place.category.displayName) · Map Stamp"
-        case .reviewCandidate(let candidate):
-            return candidate.hasReliableCoordinates ? "Review Candidate" : "Source Clue"
-        case .unsavedCandidate(let candidate):
-            var parts = [candidate.category?.displayName ?? "Place", "Not saved yet"]
-            if let distanceLabel = candidate.distanceLabel {
-                parts.append(distanceLabel)
-            }
-            return parts.joined(separator: " · ")
-        case .socialPlace(let place):
-            return "\(place.category.displayName) · \(place.socialSignal?.displayText ?? "Social signal")"
-        }
+        presentation.eyebrow
     }
 
     var contextLine: String? {
-        switch self {
-        case .unsavedCandidate:
-            return "Map search · review before saving"
-        default:
-            return nil
-        }
+        presentation.contextLine
+    }
+
+    var trustLine: String {
+        presentation.trustLine
     }
 
     var shareSubject: String {
@@ -2034,7 +2028,7 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.94) : Color.saveNotebookPage.opacity(0.90))
+            .fill(Color.clear)
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2053,13 +2047,13 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.02),
-                Color.black.opacity(0.08)
+                Color.black.opacity(0.10),
+                Color.black.opacity(0.18)
             ]
         }
         return [
-            Color.saveCream.opacity(0.18),
-            Color.saveNotebookPage.opacity(0.12)
+            Color.white.opacity(0.08),
+            Color.saveCream.opacity(0.14)
         ]
     }
 }
@@ -2099,14 +2093,14 @@ private struct SavedMapDetailDrawerContent: View {
             )
 
             HStack(spacing: 8) {
+                Button(action: onPlanAroundPlace) {
+                    PlaceDetailActionLabel(title: "Plan", systemImage: "sparkles", fill: .saveHoney.opacity(0.78))
+                }
+
                 Button {
                     NavigationService.navigate(to: place.coordinate, name: place.name)
                 } label: {
-                    PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: .saveHoney.opacity(0.78))
-                }
-
-                ShareLink(item: place.saveShareURL ?? place.appleMapsURL ?? URL(string: "https://sav-e-app.vercel.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
-                    PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveMint.opacity(0.32))
+                    PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: Color.saveMint.opacity(0.32))
                 }
 
                 if let sourceURL = place.primarySourceURL {
@@ -2114,10 +2108,6 @@ private struct SavedMapDetailDrawerContent: View {
                         openURL(sourceURL)
                     } label: {
                         PlaceDetailActionLabel(title: "Source", systemImage: "link", fill: Color.saveSky.opacity(0.20))
-                    }
-                } else {
-                    Button(action: onPlanAroundPlace) {
-                        PlaceDetailActionLabel(title: "Plan", systemImage: "sparkles", fill: Color.saveNotebookPage.opacity(0.42))
                     }
                 }
             }
@@ -2970,18 +2960,18 @@ private struct ReviewCandidateDetailCard: View {
                     SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(candidate.hasReliableCoordinates ? "REVIEW CANDIDATE" : "SOURCE CLUE")
+                        Text(presentation.eyebrow)
                             .font(.caption2.weight(.black))
                             .foregroundColor(.saveCocoa)
                             .lineLimit(1)
 
-                        Text(candidate.name)
+                        Text(presentation.title)
                             .font(.headline)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
                             .lineLimit(2)
 
-                        Text(candidate.address.isEmpty ? "Needs address confirmation" : candidate.address)
+                        Text(presentation.contextLine)
                             .font(.caption)
                             .foregroundColor(.saveCocoa.opacity(0.74))
                             .lineLimit(2)
@@ -2997,9 +2987,7 @@ private struct ReviewCandidateDetailCard: View {
                     Spacer(minLength: 0)
                 }
 
-                Text(candidate.hasReliableCoordinates
-                     ? "I found enough map evidence. Save it as a Map Stamp when this looks right."
-                     : "I found the likely place, but I still need the exact address before saving it as a map pin.")
+                Text(presentation.trustLine)
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
@@ -3015,20 +3003,30 @@ private struct ReviewCandidateDetailCard: View {
                 }
 
                 HStack(spacing: 8) {
-                    CandidateActionButton(
-                        title: "Confirm",
-                        systemImage: "checkmark.seal",
-                        fill: Color.saveSky.opacity(0.54),
-                        disabled: isWorking,
-                        action: onConfirm
-                    )
-                    CandidateActionButton(
-                        title: candidate.hasReliableCoordinates ? "Save" : "Find + Save",
-                        systemImage: "seal",
-                        fill: .saveHoney,
-                        disabled: isWorking,
-                        action: onSave
-                    )
+                    if candidate.hasReliableCoordinates {
+                        CandidateActionButton(
+                            title: presentation.primaryActionTitle,
+                            systemImage: presentation.primaryActionSystemImage,
+                            fill: .saveHoney,
+                            disabled: isWorking,
+                            action: onConfirm
+                        )
+                        CandidateActionButton(
+                            title: "Save",
+                            systemImage: "seal",
+                            fill: .saveNotebookPage,
+                            disabled: isWorking,
+                            action: onSave
+                        )
+                    } else {
+                        CandidateActionButton(
+                            title: presentation.primaryActionTitle,
+                            systemImage: presentation.primaryActionSystemImage,
+                            fill: .saveHoney,
+                            disabled: isWorking,
+                            action: onSave
+                        )
+                    }
                     CandidateActionButton(
                         title: "Not this",
                         systemImage: "xmark",
@@ -3075,6 +3073,10 @@ private struct ReviewCandidateDetailCard: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
+
+    private var presentation: SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(reviewCandidate: candidate)
+    }
 }
 
 private struct UnsavedMapCandidateCard: View {
@@ -3086,8 +3088,8 @@ private struct UnsavedMapCandidateCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 CandidateActionButton(
-                    title: isWorking ? "Saving" : "Save",
-                    systemImage: "bookmark.badge.plus",
+                    title: isWorking ? "Saving" : presentation.primaryActionTitle,
+                    systemImage: presentation.primaryActionSystemImage,
                     fill: .saveHoney,
                     disabled: isWorking,
                     action: onSave
@@ -3127,6 +3129,7 @@ private struct UnsavedMapCandidateCard: View {
                     }
                     UnsavedCandidateInfoRow(title: "Category", value: candidate.category?.displayName ?? "Place")
                     UnsavedCandidateInfoRow(title: "Address", value: candidate.subtitle)
+                    UnsavedCandidateInfoRow(title: "State", value: presentation.eyebrow)
                     UnsavedCandidateInfoRow(title: "Source", value: sourceSummary)
                 }
             }
@@ -3137,7 +3140,7 @@ private struct UnsavedMapCandidateCard: View {
                     if let ratingSummary {
                         UnsavedCandidateQuickLine(text: ratingSummary)
                     }
-                    UnsavedCandidateQuickLine(text: "Not saved yet. Save only after the photo, address, and map pin match.")
+                    UnsavedCandidateQuickLine(text: presentation.trustLine)
                 }
             }
         }
@@ -3198,6 +3201,10 @@ private struct UnsavedMapCandidateCard: View {
             return "Map search · \(searchQuery)"
         }
         return "Map search"
+    }
+
+    private var presentation: SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(mapCandidate: candidate)
     }
 }
 

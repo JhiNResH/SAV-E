@@ -18,7 +18,7 @@ enum SaveSearchObjectType: String, Codable, CaseIterable, Hashable {
         case .triedMemory: return "Visited Map Stamp"
         case .review: return "Private review"
         case .tripStop: return "Trip stop"
-        case .mapVisibleUnsavedPlace: return "Unsaved Candidate"
+        case .mapVisibleUnsavedPlace: return "Not saved yet"
         case .newRecommendation: return "Recommendation"
         }
     }
@@ -102,7 +102,7 @@ struct SaveAgentActionDrawerModel: Hashable {
         switch result.objectType {
         case .sourceOnlyClue: return "Clue found"
         case .pendingCandidate: return "Review Candidate"
-        case .mapVisibleUnsavedPlace: return "Save unsaved candidate"
+        case .mapVisibleUnsavedPlace: return "Not saved yet"
         case .savedPlace: return "Plan around this Map Stamp"
         case .triedMemory: return "Update visited Map Stamp"
         case .review: return "Upgrade review proof"
@@ -204,6 +204,172 @@ struct SaveAgentActionDrawerModel: Hashable {
             return "Evidence: \(first)"
         }
         return "Evidence: no source attached yet"
+    }
+}
+
+enum SavePlaceMemoryState: Equatable {
+    case clue
+    case reviewCandidate
+    case unsavedMapCandidate
+    case mapStamp
+    case actionReceipt
+}
+
+struct SavePlaceDrawerPresentation: Equatable {
+    var state: SavePlaceMemoryState
+    var eyebrow: String
+    var title: String
+    var contextLine: String
+    var trustLine: String
+    var primaryActionTitle: String
+    var primaryActionSystemImage: String
+    var secondaryActionTitles: [String]
+
+    init(
+        state: SavePlaceMemoryState,
+        eyebrow: String,
+        title: String,
+        contextLine: String,
+        trustLine: String,
+        primaryActionTitle: String,
+        primaryActionSystemImage: String,
+        secondaryActionTitles: [String]
+    ) {
+        self.state = state
+        self.eyebrow = eyebrow
+        self.title = title
+        self.contextLine = contextLine
+        self.trustLine = trustLine
+        self.primaryActionTitle = primaryActionTitle
+        self.primaryActionSystemImage = primaryActionSystemImage
+        self.secondaryActionTitles = secondaryActionTitles
+    }
+
+    static func clue(
+        title: String,
+        contextLine: String,
+        trustLine: String = "Needs exact place before it can become a Map Stamp."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .clue,
+            eyebrow: "Clue · Needs exact place",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Find exact place",
+            primaryActionSystemImage: "sparkle.magnifyingglass",
+            secondaryActionTitles: ["View source", "Reject"]
+        )
+    }
+
+    static func reviewCandidate(
+        title: String,
+        contextLine: String,
+        trustLine: String = "Check before saving. This is not a Map Stamp yet."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .reviewCandidate,
+            eyebrow: "Review Candidate · Check before saving",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Confirm place",
+            primaryActionSystemImage: "checkmark.seal",
+            secondaryActionTitles: ["Save", "Reject", "View source"]
+        )
+    }
+
+    static func unsavedMapCandidate(
+        title: String,
+        contextLine: String,
+        trustLine: String = "Map-visible result, not one of your SAV-E memories yet."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .unsavedMapCandidate,
+            eyebrow: "Not saved yet",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Save this place",
+            primaryActionSystemImage: "bookmark.badge.plus",
+            secondaryActionTitles: ["Maps"]
+        )
+    }
+
+    static func mapStamp(
+        title: String,
+        contextLine: String,
+        trustLine: String = "Confirmed saved place from your SAV-E."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .mapStamp,
+            eyebrow: "Map Stamp · From your SAV-E",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Plan around this",
+            primaryActionSystemImage: "sparkles",
+            secondaryActionTitles: ["Directions", "Source", "Add to list", "More"]
+        )
+    }
+
+    static func actionReceipt(
+        title: String,
+        contextLine: String,
+        trustLine: String = "Tried memory or proof attached."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .actionReceipt,
+            eyebrow: "Action / Receipt · Proof attached",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Add private review",
+            primaryActionSystemImage: "text.bubble",
+            secondaryActionTitles: ["View receipt", "Use again", "More"]
+        )
+    }
+
+    init(place: Place) {
+        switch place.status {
+        case .visited:
+            self = .actionReceipt(
+                title: place.name,
+                contextLine: "\(place.category.displayName) · Tried memory",
+                trustLine: "Saved place you have marked as tried."
+            )
+        case .wantToGo:
+            self = .mapStamp(
+                title: place.name,
+                contextLine: "\(place.category.displayName) · Saved memory"
+            )
+        }
+    }
+
+    init(reviewCandidate candidate: PlaceReviewCandidate) {
+        if candidate.hasReliableCoordinates {
+            self = .reviewCandidate(
+                title: candidate.name,
+                contextLine: candidate.address.isEmpty ? "Likely match" : candidate.address
+            )
+        } else {
+            self = .clue(
+                title: candidate.name,
+                contextLine: candidate.city ?? "Source clue",
+                trustLine: "Needs address or coordinates before it can become a Map Stamp."
+            )
+        }
+    }
+
+    init(mapCandidate candidate: SaveMapCandidate) {
+        var parts = [candidate.category?.displayName ?? "Place", "Map search"]
+        if let distanceLabel = candidate.distanceLabel {
+            parts.append(distanceLabel)
+        }
+        self = .unsavedMapCandidate(
+            title: candidate.title,
+            contextLine: parts.joined(separator: " · ")
+        )
     }
 }
 
