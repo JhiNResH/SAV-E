@@ -845,8 +845,10 @@ final class MapViewModel: ObservableObject {
     func prepareMapCandidatesForDrawerQuery(_ query: String) async -> [SaveMapCandidate] {
         guard saveSearchController.shouldPrepareMapCandidates(for: query) else { return mapCandidates }
         let searchCenter: CLLocationCoordinate2D?
-        if saveSearchIntentParser.parse(query)?.mustMatchLocation == true {
-            guard let currentLocationCenter = await mapCandidateSearchCenter(for: query) else {
+        let shouldUseCurrentLocation = saveSearchIntentParser.parse(query)?.mustMatchLocation == true ||
+            !saveSearchController.mapCandidateCategories(for: query).isEmpty
+        if shouldUseCurrentLocation {
+            guard let currentLocationCenter = await currentLocationSearchCenter() else {
                 mapCandidates = []
                 return []
             }
@@ -865,8 +867,7 @@ final class MapViewModel: ObservableObject {
         return mapCandidates
     }
 
-    private func mapCandidateSearchCenter(for query: String) async -> CLLocationCoordinate2D? {
-        guard saveSearchIntentParser.parse(query)?.mustMatchLocation == true else { return nil }
+    private func currentLocationSearchCenter() async -> CLLocationCoordinate2D? {
         let currentLocation = await locationService.requestCurrentLocation()
         return currentLocation?.coordinate
     }

@@ -168,12 +168,49 @@ final class SaveSearchControllerTests: XCTestCase {
         let controller = SaveSearchController()
 
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "附近咖啡廳"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "咖啡廳"))
+        XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "餐廳"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "我想找餐廳"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "find restaurants"))
         XCTAssertFalse(controller.shouldPrepareMapCandidates(for: "New York"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "Search nearby unsaved cafes"))
         XCTAssertTrue(controller.shouldPrepareMapCandidates(for: "找附近新的咖啡廳"))
+        XCTAssertEqual(controller.mapCandidateCategories(for: "咖啡廳"), [.cafe])
         XCTAssertEqual(controller.mapCandidateCategories(for: "search nearby unsaved candidates for 我今天想喝咖啡推薦一家"), [.cafe])
+    }
+
+    func testPlainCafeSearchReturnsSavedAndUnsavedCandidatesWhenPrepared() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "咖啡廳",
+            places: [
+                place(
+                    name: "Saved Coffee",
+                    address: "Irvine, CA",
+                    category: .cafe
+                )
+            ],
+            localRecords: [],
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "Unsaved Coffee",
+                    subtitle: "Irvine, CA",
+                    latitude: 33.6846,
+                    longitude: -117.8265,
+                    category: .cafe,
+                    rating: 4.6,
+                    reviewCount: 420,
+                    sourceURL: "https://maps.apple.com/?q=Unsaved+Coffee",
+                    sourcePlatform: .other,
+                    evidence: ["Apple Maps result", "Search: coffee"]
+                )
+            ]
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Saved Coffee"])
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Coffee"])
+        XCTAssertEqual(response.newRecommendations.results.first?.objectType, .mapVisibleUnsavedPlace)
+        XCTAssertEqual(response.newRecommendations.results.first?.userState, .unsaved)
     }
 
     func testRestaurantSearchReturnsSavedAndUnsavedCandidatesWhenPrepared() throws {
