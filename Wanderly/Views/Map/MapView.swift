@@ -204,18 +204,24 @@ private struct UnsavedMapCandidatePin: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 4) {
-                if isSelected {
-                    UnsavedPOILabel(candidate: candidate)
-                }
+            Group {
+                if isSelected, candidate.usesNativePOISelectionStyle {
+                    NativePOISelectionMarker(fill: candidate.category?.poiFill ?? .saveSignal, isSelected: isSelected)
+                } else {
+                    VStack(spacing: 3) {
+                        if isSelected {
+                            UnsavedPOILabel(candidate: candidate)
+                        }
 
-                UnsavedPOIBadge(
-                    systemImage: candidate.category?.poiSymbolName ?? "mappin",
-                    fill: candidate.category?.poiFill ?? .saveSignal,
-                    isSelected: isSelected
-                )
+                        UnsavedPOIBadge(
+                            systemImage: candidate.category?.poiSymbolName ?? "mappin",
+                            fill: candidate.category?.poiFill ?? .saveSignal,
+                            isSelected: isSelected
+                        )
+                    }
+                }
             }
-            .offset(y: isSelected ? -5 : 0)
+            .offset(y: isSelected ? -3 : 0)
             .rotationEffect(.degrees(isWiggling ? -3 : 0))
             .animation(.easeInOut(duration: 0.08), value: isWiggling)
         }
@@ -245,6 +251,29 @@ private struct UnsavedMapCandidatePin: View {
     }
 }
 
+private struct NativePOISelectionMarker: View {
+    var fill: Color
+    var isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            if isSelected {
+                Circle()
+                    .stroke(fill.opacity(0.55), lineWidth: 2)
+                    .frame(width: 24, height: 24)
+
+                Circle()
+                    .fill(Color.white.opacity(0.88))
+                    .frame(width: 7, height: 7)
+                    .overlay(Circle().stroke(fill.opacity(0.72), lineWidth: 1.2))
+                    .shadow(color: Color.black.opacity(0.18), radius: 2, x: 0, y: 1)
+            }
+        }
+        .frame(width: isSelected ? 28 : 1, height: isSelected ? 28 : 1)
+        .contentShape(Rectangle())
+    }
+}
+
 private struct UnsavedPOILabel: View {
     let candidate: SaveMapCandidate
 
@@ -262,13 +291,13 @@ private struct UnsavedPOILabel: View {
             }
         }
         .foregroundColor(.saveInk)
-        .frame(maxWidth: 138)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.saveNotebookPage.opacity(0.96))
-        .overlay(Capsule().stroke(candidate.category?.poiFill ?? .saveSignal, lineWidth: 1.5))
+        .frame(maxWidth: 132)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color.saveNotebookPage.opacity(0.90))
+        .overlay(Capsule().stroke(candidate.category?.poiFill ?? .saveSignal, lineWidth: 1))
         .clipShape(Capsule())
-        .shadow(color: Color.black.opacity(0.20), radius: 5, x: 0, y: 3)
+        .shadow(color: Color.black.opacity(0.16), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -281,35 +310,29 @@ private struct UnsavedPOIBadge: View {
         ZStack {
             Circle()
                 .fill(fill.opacity(isSelected ? 1 : 0.94))
-                .frame(width: isSelected ? 34 : 28, height: isSelected ? 34 : 28)
+                .frame(width: isSelected ? 30 : 24, height: isSelected ? 30 : 24)
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(isSelected ? 0.90 : 0.74), lineWidth: isSelected ? 1.6 : 1.2)
+                        .stroke(Color.white.opacity(isSelected ? 0.84 : 0.68), lineWidth: isSelected ? 1.4 : 1)
                 )
                 .overlay(
                     Circle()
                         .stroke(Color.black.opacity(0.13), lineWidth: 0.6)
                 )
-                .shadow(color: Color.black.opacity(isSelected ? 0.22 : 0.16), radius: isSelected ? 5 : 3, x: 0, y: isSelected ? 3 : 2)
+                .shadow(color: Color.black.opacity(isSelected ? 0.18 : 0.12), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
 
             Image(systemName: systemImage)
-                .font(.system(size: isSelected ? 15 : 12, weight: .black))
+                .font(.system(size: isSelected ? 13 : 10, weight: .black))
                 .foregroundColor(.white)
-
-            Circle()
-                .fill(Color.saveNotebookPage)
-                .frame(width: isSelected ? 9 : 7, height: isSelected ? 9 : 7)
-                .overlay(Circle().stroke(Color.saveCocoa.opacity(0.24), lineWidth: 0.6))
-                .offset(x: isSelected ? 12 : 10, y: isSelected ? -12 : -9)
         }
         .overlay {
             if isSelected {
                 Circle()
-                    .stroke(fill.opacity(0.20), lineWidth: 3)
-                    .frame(width: 42, height: 42)
+                    .stroke(fill.opacity(0.18), lineWidth: 2)
+                    .frame(width: 36, height: 36)
             }
         }
-        .frame(width: isSelected ? 48 : 38, height: isSelected ? 48 : 38)
+        .frame(width: isSelected ? 40 : 32, height: isSelected ? 40 : 32)
         .contentShape(Rectangle())
     }
 }
@@ -410,5 +433,9 @@ private extension PlaceReviewCandidate {
 private extension SaveMapCandidate {
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    var usesNativePOISelectionStyle: Bool {
+        evidence.contains { $0.localizedCaseInsensitiveCompare("Apple Maps POI") == .orderedSame }
     }
 }
