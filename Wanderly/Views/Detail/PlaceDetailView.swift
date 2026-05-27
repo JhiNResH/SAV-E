@@ -170,20 +170,8 @@ struct PlaceDetailView: View {
         mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
     }
 
-    private var areaLabel: String? {
-        let parts = detailPlace.address
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 { return parts[parts.count - 2] }
-        return parts.first
-    }
-
     private var memorySummary: String {
-        if let areaLabel {
-            return "Map verified for \(detailPlace.name) in \(areaLabel). Address confirmed for this SAV-E memory."
-        }
-        return "Map verified and address confirmed for this SAV-E memory."
+        detailPlace.memorySummary
     }
 
     private func enrichBusinessDetails() async {

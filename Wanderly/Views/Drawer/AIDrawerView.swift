@@ -2146,14 +2146,7 @@ private struct SavedMapDetailDrawerContent: View {
     }
 
     private var memorySummary: String {
-        let parts = place.address
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 {
-            return "Map verified for \(place.name) in \(parts[parts.count - 2]). Address confirmed for this SAV-E memory."
-        }
-        return "Map verified and address confirmed for this SAV-E memory."
+        place.memorySummary
     }
 
     private func deletePlace() async {
@@ -3179,11 +3172,28 @@ private struct UnsavedMapCandidateCard: View {
 
     private var mapClueEvidence: [String] {
         let fallback = [
-            "Visible map result; not a SAV-E memory",
-            "State: unsaved candidate",
-            "Source: Maps result"
+            "Found in map search",
+            "Unsaved until you tap Save",
+            "Source: Apple Maps"
         ]
-        return candidate.evidence.isEmpty ? fallback : candidate.evidence
+        let cleaned = candidate.evidence.compactMap(cleanMapEvidenceLine)
+        return cleaned.isEmpty ? fallback : cleaned
+    }
+
+    private func cleanMapEvidenceLine(_ line: String) -> String? {
+        let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        if value.localizedCaseInsensitiveCompare("Apple Maps POI") == .orderedSame {
+            return "Selected from Apple Maps"
+        }
+        if value.localizedCaseInsensitiveCompare("Apple Maps result") == .orderedSame {
+            return "Found in Apple Maps nearby search"
+        }
+        if value.localizedCaseInsensitiveContains("POI:") ||
+            value.localizedCaseInsensitiveContains("MKPOICategory") {
+            return nil
+        }
+        return value
     }
 
 }
@@ -3250,7 +3260,7 @@ private struct UnsavedMapCandidateSummaryPanel: View {
             HStack(spacing: 6) {
                 Image(systemName: "text.badge.magnifyingglass")
                     .font(.caption.weight(.black))
-                Text("Place summary")
+                Text("Map result summary")
                     .font(.caption.weight(.black))
                 Spacer()
             }
@@ -3258,9 +3268,15 @@ private struct UnsavedMapCandidateSummaryPanel: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 UnsavedMapCandidateSummaryLine(icon: "sparkles", text: candidateSummary)
-                UnsavedMapCandidateSummaryLine(icon: "mappin.and.ellipse", text: practicalInfo)
-                UnsavedMapCandidateSummaryLine(icon: "star.fill", text: reviewSummary)
-                UnsavedMapCandidateSummaryLine(icon: "hand.thumbsup.fill", text: recommendationSummary)
+                if let practicalInfo {
+                    UnsavedMapCandidateSummaryLine(icon: "mappin.and.ellipse", text: practicalInfo)
+                }
+                if let reviewSummary {
+                    UnsavedMapCandidateSummaryLine(icon: "star.fill", text: reviewSummary)
+                }
+                if let sourceSummary {
+                    UnsavedMapCandidateSummaryLine(icon: "magnifyingglass", text: sourceSummary)
+                }
             }
         }
         .padding(10)
@@ -3274,18 +3290,24 @@ private struct UnsavedMapCandidateSummaryPanel: View {
 
     private var candidateSummary: String {
         let category = candidate.category?.displayName.lowercased() ?? "place"
-        let area = candidate.shareAreaLabel.isEmpty ? candidate.subtitle : candidate.shareAreaLabel
-        return "\(candidate.title) is an unsaved \(category) map result near \(area)."
+        if let searchQuery {
+            return "\(candidate.title) appeared in nearby \(searchQuery) results."
+        }
+        if !candidate.shareAreaLabel.isEmpty {
+            return "\(candidate.title) is an unsaved \(category) in \(candidate.shareAreaLabel)."
+        }
+        return "\(candidate.title) is an unsaved \(category) selected from the map."
     }
 
-    private var practicalInfo: String {
+    private var practicalInfo: String? {
         let address = candidate.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return address.isEmpty
-            ? "Practical info: address is not available yet"
-            : "Practical info: \(address)"
+        guard !address.isEmpty, address != "Nearby unsaved place", address != "Selected on map" else {
+            return nil
+        }
+        return "Address: \(address)"
     }
 
-    private var reviewSummary: String {
+    private var reviewSummary: String? {
         var parts: [String] = []
         if let rating = candidate.rating {
             parts.append(String(format: "%.1f stars", rating))
@@ -3293,14 +3315,28 @@ private struct UnsavedMapCandidateSummaryPanel: View {
         if let reviewCount = candidate.reviewCount {
             parts.append("\(reviewCount) reviews")
         }
-        return parts.isEmpty ? "Reviews: no rating or review count yet" : "Reviews: \(parts.joined(separator: " · "))"
+        return parts.isEmpty ? nil : "Reviews: \(parts.joined(separator: " · "))"
     }
 
-    private var recommendationSummary: String {
-        if candidate.businessPhotoURLStrings.isEmpty {
-            return "Recommendation: check the map clue and address before saving."
+    private var sourceSummary: String? {
+        var parts: [String] = []
+        if let searchQuery {
+            parts.append("Search: \(searchQuery)")
         }
-        return "Recommendation: compare the business photos, rating, and address before saving."
+        if !candidate.businessPhotoURLStrings.isEmpty {
+            parts.append("Business photos available")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private var searchQuery: String? {
+        candidate.evidence.compactMap { line -> String? in
+            guard let range = line.range(of: "Search:", options: [.caseInsensitive]) else {
+                return nil
+            }
+            let value = line[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }.first
     }
 }
 
