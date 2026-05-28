@@ -112,9 +112,12 @@ The Passport is the user's memory archive and control surface.
 Rules:
 
 - Use Passport for profile, language, local memory, saved count, visited count,
-  cities, waiting clues, and account controls.
+  proof-backed count, cities, waiting clues, and account controls.
 - Do not label a self-marked visited place as proof-verified. Real-world
   verification requires receipt, photo, or location evidence.
+- Proof-backed count stays `0` until SAV-E has user-attached proof evidence.
+  Public map metadata, friend-saved places, and self-marked Visited status do
+  not count as proof.
 - Do not call it a profile unless referring to the implementation file.
 - Passport should look like a notebook cover plus stamp ledger, not a settings table.
 
@@ -459,6 +462,8 @@ Rules:
 - Cities come from saved place addresses.
 - Visited comes from places the user marked as visited; do not imply SAV-E has
   verified real-world attendance without proof evidence.
+- Proof-backed is a separate slot from Visited. It remains `0` until receipt,
+  original photo, or location evidence can be attached by the user.
 
 ### Share Extension
 

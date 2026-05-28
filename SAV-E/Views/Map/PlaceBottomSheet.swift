@@ -78,6 +78,7 @@ struct PlaceBottomSheet: View {
                 visibility: place.effectiveVisibility,
                 onChange: onUpdateVisibility
             )
+            PlaceProofPlaceholderCard()
 
             FlowLayout(spacing: 8) {
                 CategoryPill(category: place.category, isSelected: true)
@@ -388,6 +389,45 @@ private struct PlaceInfoRow: View {
 
             Spacer(minLength: 0)
         }
+    }
+}
+
+private struct PlaceProofPlaceholderCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "checkmark.seal")
+                    .font(.caption.weight(.black))
+                Text("Real-world proof")
+                    .font(.caption.weight(.black))
+                Spacer()
+            }
+            .foregroundColor(.saveCocoa)
+
+            Text("Proof-backed visits will require a receipt, original photo, or location evidence attached by you. Public map details and self-marked Visited status do not count as proof.")
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.saveCocoa.opacity(0.74))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {} label: {
+                Label("Add proof", systemImage: "plus.circle")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.74))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(Color.saveNotebookPage.opacity(0.48))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.46), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(true)
+            .accessibilityHint("Proof attachments are not available yet.")
+        }
+        .padding(10)
+        .saveNotebookSurface(cornerRadius: 12, fill: .saveNotebookPage, opacity: 0.56)
     }
 }
 

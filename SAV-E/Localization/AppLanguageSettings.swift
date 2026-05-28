@@ -55,12 +55,21 @@ final class AppLanguageSettings: ObservableObject {
         }
     }
 
-    func verifiedCountText(_ count: Int) -> String {
+    func visitedCountText(_ count: Int) -> String {
         switch language {
         case .english:
             return count == 1 ? "1 visited place" : "\(count) visited places"
         case .traditionalChinese:
             return "\(count) 個去過地點"
+        }
+    }
+
+    func proofBackedCountText(_ count: Int) -> String {
+        switch language {
+        case .english:
+            return count == 1 ? "1 proof-backed place" : "\(count) proof-backed places"
+        case .traditionalChinese:
+            return "\(count) 個有憑證地點"
         }
     }
 
@@ -126,7 +135,8 @@ enum SaveTextKey {
     case passportStamps
     case memoBook
     case memoryCards
-    case verified
+    case visited
+    case proofBacked
     case cities
     case waitingClues
     case memberSince
@@ -241,8 +251,10 @@ enum SaveText {
             return localized(english: "MEMO BOOK", traditionalChinese: "MEMO 本", language: language)
         case .memoryCards:
             return localized(english: "Memory cards", traditionalChinese: "記憶卡", language: language)
-        case .verified:
+        case .visited:
             return localized(english: "Visited", traditionalChinese: "去過", language: language)
+        case .proofBacked:
+            return localized(english: "Proof-backed", traditionalChinese: "有憑證", language: language)
         case .cities:
             return localized(english: "Cities", traditionalChinese: "城市", language: language)
         case .waitingClues:

@@ -10,7 +10,7 @@ struct StatsView: View {
             GridItem(.flexible(), spacing: 8),
         ], spacing: 8) {
             StatItem(value: "\(stats.savedCount)", label: languageSettings.text(.memoryCards), color: .saveCocoa, icon: "rectangle.stack")
-            StatItem(value: "\(stats.visitedCount)", label: languageSettings.text(.verified), color: .saveSuccess, icon: "figure.walk")
+            StatItem(value: "\(stats.visitedCount)", label: languageSettings.text(.visited), color: .saveSuccess, icon: "figure.walk")
             StatItem(value: "\(stats.citiesCount)", label: languageSettings.text(.cities), color: .saveHoney, icon: "building.2")
             StatItem(value: "\(stats.waitingClues)", label: languageSettings.text(.waitingClues), color: .saveSignal, icon: "circle.hexagongrid")
         }
