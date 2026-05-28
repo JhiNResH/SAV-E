@@ -49,17 +49,8 @@ final class AIParsingService: AIParsingServiceProtocol {
     init(apiKey: String? = nil) {
         let resolved = apiKey
             ?? ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
-            ?? Self.keyFromPlist("GEMINI_API_KEY")
+            ?? SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
         self.apiKey = resolved
-    }
-
-    private static func keyFromPlist(_ key: String) -> String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let data = try? Data(contentsOf: url),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
-              let value = dict[key],
-              value != "YOUR_KEY_HERE" else { return nil }
-        return value
     }
 
     // MARK: - Parse URL

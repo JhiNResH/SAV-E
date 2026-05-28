@@ -42,13 +42,15 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
    Xcode also creates these local files from the templates during build if they are missing. It does not overwrite existing local `Secrets.plist` files; when templates change, compare them manually and add any new keys to your local files. Fill in your local API keys in `SAV-E/Resources/Secrets.plist` and `SAV-EShareExtension/Secrets.plist`:
    - `GEMINI_API_KEY` — from Google AI Studio
    - `GOOGLE_PLACES_API_KEY` — from [Google Cloud Console](https://console.cloud.google.com/)
-   - `SAVE_API_URL` — Railway backend service URL
+   - `SAVE_API_URL` — Railway backend service URL, currently `https://wanderly-api-production.up.railway.app`
    - `SAVE_PLACE_SHARE_BASE_URL` — production place share route, currently `https://sav-e-app.vercel.app/p`
    - `SAVE_TRIP_SHARE_BASE_URL` — production trip share route, currently `https://sav-e-app.vercel.app/trip`
    - `SAVE_SHARE_BASE_URL` — legacy trip share route fallback, currently `https://sav-e-app.vercel.app/trip`
    - `SAVE_LIST_SHARE_BASE_URL` — production collaborative list share route, currently `https://sav-e-app.vercel.app/list`
    - `PRIVY_APP_ID` — from Privy Dashboard → App Settings → Basics
    - `PRIVY_APP_CLIENT_ID` — from Privy Dashboard → App Settings → Clients. The iOS app client must allow bundle id `com.wanderly.app` and URL scheme `wanderly`.
+
+   New production config should use the `SAVE_*` keys above. The app still reads legacy `WANDERLY_*` keys as a migration fallback when present in an older local `Secrets.plist`, but the templates and release docs are SAV-E-first.
    - Keep real values out of commits.
 
 3. Configure the Railway backend:
@@ -100,10 +102,11 @@ xcodebuild \
   archive
 ```
 
-Prepare an App Store Connect upload options plist. The generated options mark the upload as internal TestFlight only, so use this for early internal review builds rather than external testers or App Store release candidates.
+Prepare an App Store Connect upload options plist. The generated options are external-TestFlight ready by default. Set `TESTFLIGHT_SCOPE=internal` only when producing an internal-only review build.
 
 ```bash
 APPLE_TEAM_ID="$APPLE_TEAM_ID" scripts/prepare-testflight-export-options.sh
+TESTFLIGHT_SCOPE=internal APPLE_TEAM_ID="$APPLE_TEAM_ID" scripts/prepare-testflight-export-options.sh build/ExportOptions.TestFlight.Internal.plist
 ```
 
 Upload the archive to App Store Connect for TestFlight processing:
@@ -128,6 +131,8 @@ Before uploading a build:
 - enable the App Group `group.com.wanderly.app` for the app and Share Extension
 - enable Associated Domains on `com.wanderly.app` and `com.wanderly.app.Clip`
 - enable the App Clip association capability on `com.wanderly.app`
+
+These Apple identifiers are the existing production compatibility layer. The user-facing product, Xcode targets, release config keys, and share URLs should use SAV-E / SAVE naming.
 - configure signing team/profiles in Xcode or release xcconfig
 - confirm the App Store icon and privacy manifest are included
 - keep real API keys out of commits and restrict bundled keys where provider dashboards allow it

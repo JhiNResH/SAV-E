@@ -1,12 +1,6 @@
 import Foundation
 import MapKit
 
-enum SAVESharedStorage {
-    static let appGroupSuiteName = "group.com.wanderly.app"
-    static let pendingPlacesFileName = "pending-places.json"
-    static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
-}
-
 struct PendingSharedPlace: Codable {
     var name: String
     var address: String
@@ -242,19 +236,19 @@ final class PendingPlaceImportService {
     }
 
     func consumePendingPlaces() -> [PendingSharedPlace] {
-        consumePendingArray(named: SAVESharedStorage.pendingPlacesFileName, as: PendingSharedPlace.self)
+        consumePendingArray(named: SAVEProductionConfig.pendingPlacesFileName, as: PendingSharedPlace.self)
     }
 
     func restorePendingPlaces(_ places: [PendingSharedPlace]) {
-        appendPendingArray(places, named: SAVESharedStorage.pendingPlacesFileName)
+        appendPendingArray(places, named: SAVEProductionConfig.pendingPlacesFileName)
     }
 
     func consumePendingReviewCandidates() -> [PendingReviewCandidate] {
-        consumePendingArray(named: SAVESharedStorage.pendingReviewCandidatesFileName, as: PendingReviewCandidate.self)
+        consumePendingArray(named: SAVEProductionConfig.pendingReviewCandidatesFileName, as: PendingReviewCandidate.self)
     }
 
     func restorePendingReviewCandidates(_ candidates: [PendingReviewCandidate]) {
-        appendPendingArray(candidates, named: SAVESharedStorage.pendingReviewCandidatesFileName)
+        appendPendingArray(candidates, named: SAVEProductionConfig.pendingReviewCandidatesFileName)
     }
 
     private func consumePendingArray<Element: Decodable>(named fileName: String, as elementType: Element.Type) -> [Element] {
@@ -305,7 +299,7 @@ final class PendingPlaceImportService {
     }
 
     private func pendingFileURL(named fileName: String) -> URL? {
-        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName) else {
+        guard let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: SAVEProductionConfig.appGroupSuiteName) else {
             return nil
         }
         return containerURL.appendingPathComponent(fileName)
