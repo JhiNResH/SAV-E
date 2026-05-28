@@ -759,9 +759,9 @@ struct SocialPlaceParser {
             isPlaceBearing: isPlaceBearing
         )
 
-        let analysisSourceType = (sourceType == .sourceOnly || sourceType == .ambiguous || sourceType == .unknown)
-            ? understanding.sourceType
-            : sourceType
+        let analysisSourceType = sourceType == .sourceOnly && merged.isEmpty
+            ? .sourceOnly
+            : (sourceType == .ambiguous || sourceType == .unknown ? understanding.sourceType : sourceType)
 
         return SocialPlaceAgentAnalysis(
             sourceType: analysisSourceType,
@@ -1379,6 +1379,12 @@ struct SocialPlaceParser {
     }
 
     private func firstLocationClue(in text: String) -> String? {
+        if let streetAddress = firstStreetAddress(in: text) {
+            return streetAddress
+                .replacingOccurrences(of: #"(?i)\s+(?:if\s+you|to\s+check|for\s+more).*$"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，"))
+        }
+
         let explicitLocationPatterns = [
             #"[📍👣]\s*([^\n\r\.]+)"#,
             #"\bLocation:\s*([^\n\r\.]+)"#,

@@ -13,6 +13,21 @@ fi
 output_path="${1:-build/ExportOptions.TestFlight.plist}"
 mkdir -p "$(dirname "$output_path")"
 
+testflight_scope="${TESTFLIGHT_SCOPE:-external}"
+testflight_scope="$(printf '%s' "$testflight_scope" | tr '[:upper:]' '[:lower:]')"
+case "$testflight_scope" in
+  external)
+    internal_only=false
+    ;;
+  internal)
+    internal_only=true
+    ;;
+  *)
+    echo "TESTFLIGHT_SCOPE must be external or internal." >&2
+    exit 2
+    ;;
+esac
+
 cat > "$output_path" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -31,7 +46,7 @@ cat > "$output_path" <<PLIST
   <key>manageAppVersionAndBuildNumber</key>
   <false/>
   <key>testFlightInternalTestingOnly</key>
-  <true/>
+  <${internal_only}/>
 </dict>
 </plist>
 PLIST

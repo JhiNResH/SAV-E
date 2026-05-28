@@ -100,10 +100,11 @@ xcodebuild \
   archive
 ```
 
-Prepare an App Store Connect upload options plist. The generated options mark the upload as internal TestFlight only, so use this for early internal review builds rather than external testers or App Store release candidates.
+Prepare an App Store Connect upload options plist. The generated options are external-TestFlight ready by default. Set `TESTFLIGHT_SCOPE=internal` only when producing an internal-only review build.
 
 ```bash
 APPLE_TEAM_ID="$APPLE_TEAM_ID" scripts/prepare-testflight-export-options.sh
+TESTFLIGHT_SCOPE=internal APPLE_TEAM_ID="$APPLE_TEAM_ID" scripts/prepare-testflight-export-options.sh build/ExportOptions.TestFlight.Internal.plist
 ```
 
 Upload the archive to App Store Connect for TestFlight processing:
