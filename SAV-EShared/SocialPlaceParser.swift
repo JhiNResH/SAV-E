@@ -1486,6 +1486,10 @@ struct SocialPlaceParser {
             }
         }
 
+        if let quotedHeadlineVenue = headlineQuotedVenueName(in: line) {
+            return quotedHeadlineVenue
+        }
+
         if let launchHeadlineName = launchHeadlineVenueName(in: line) {
             return launchHeadlineName
         }
@@ -1588,6 +1592,33 @@ struct SocialPlaceParser {
                 if SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned) {
                     return cleaned
                 }
+            }
+        }
+
+        for line in text.components(separatedBy: .newlines)
+            where !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line) {
+            if let headline = headlineQuotedVenueName(in: line) { return headline }
+        }
+        return nil
+    }
+
+    private func headlineQuotedVenueName(in line: String) -> String? {
+        guard line.range(of: #"必吃|必喝|必訪|必去|餐廳|餐厅|美食|韓其林|米其林|弘大|新村|明洞|西門|士林|東區|東区|台北|臺北"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        let patterns = [
+            "[「『]\\s*([^」』\\n\\r]{2,40})\\s*[」』]",
+            "[「『]\\s*([^」』\\n\\r]{2,40}(?:店|館|馆|餐廳|餐厅|咖啡|茶|酒吧|烘焙|燒肉|烧肉|火鍋|火锅|壽喜燒|寿喜烧|麵|面|飯|饭|屋|坊|室|湯|汤))",
+            "[\\\"]\\s*([^\\\"\\n\\r]{2,40})\\s*[\\\"]"
+        ]
+        for pattern in patterns {
+            guard let quoted = firstCapture(in: line, pattern: pattern) else { continue }
+            let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(quoted)
+            if SocialPlaceEvidenceScorer.isUsableCandidateName(cleaned),
+               !SocialPlaceEvidenceScorer.looksLikeCaptionHeadlineTitle(cleaned),
+               !SocialPlaceEvidenceScorer.looksLikeMarketingLine(cleaned),
+               !SocialPlaceEvidenceScorer.looksLikeGenericProductOrCityLine(cleaned) {
+                return cleaned
             }
         }
         return nil

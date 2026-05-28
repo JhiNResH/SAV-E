@@ -42,6 +42,19 @@ let cases: [ParserRegressionCase] = [
         expectedAddress: "台北信義新天地 A11 B2",
         rejectedNameFragments: ["5/29", "在韓國掀起", "法式吐司 Standard Bread 5"],
         rejectedAddressFragments: ["品牌必點招牌", "焦糖烤布蕾", "現烤出爐"]
+    ),
+    ParserRegressionCase(
+        name: "Instagram Taiwan headline uses quoted restaurant name instead of caption headline",
+        sourceURL: "https://www.instagram.com/p/DY4EPGgkckS/",
+        evidence: """
+        波波發胖 on Instagram: "#波波發胖 ➡西門也韓其林了！弘大必喝「百年土種參雞湯」
+        台北市萬華區萬壽里中華路一段88號3樓
+        #西門美食 #台北美食 #韓式料理"
+        """,
+        expectedName: "百年土種參雞湯",
+        expectedAddress: "台北市萬華區萬壽里中華路一段88號3樓",
+        rejectedNameFragments: ["#波波發胖", "西門也韓其林", "弘大必喝"],
+        rejectedAddressFragments: []
     )
 ]
 
