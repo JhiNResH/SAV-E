@@ -99,6 +99,7 @@ enum SocialPlaceEvidenceScorer {
             #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
             #"\d{1,6}\s*(?:号|號)"#
         ]
+
         return patterns.contains { pattern in
             line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
         }
@@ -131,6 +132,7 @@ enum SocialPlaceEvidenceScorer {
     static func looksLikeMarketingLine(_ value: String) -> Bool {
         let patterns = [
             #"最難訂|更難搶|不是米其林|不是餐廳|文化盛宴|文化大秀|門票|時段|位置交給|短短\d+分鐘|從.+到.+"#,
+            #"排隊熱潮|現烤出爐|撕開沾醬|迅速爆紅|曾到店朝聖|品牌必點招牌|排隊打卡美食|門市空間|麵包香氣|面包香气"#,
             #"台南爆漿巴斯克|巴斯克控不能錯過|不要說你吃過巴斯克蛋糕|一入口直接幸福感爆棚"#,
             #"^(?:💡\s*)?(補充|补充)\s*(?:💡)?|既視感|点就对了|點就對了"#,
             #"(?i)follow|save this|likes|comments|instagram|must try|don't miss|viral"#,

@@ -899,7 +899,9 @@ struct SocialPlaceParser {
     private func inferredAddressCandidates(from lines: [String], sourceURL: String, fullText: String) -> [SocialPlaceCandidateDraft] {
         guard lines.count >= 2 else { return [] }
         var result: [SocialPlaceCandidateDraft] = []
-        for (index, line) in lines.enumerated() where SocialPlaceEvidenceScorer.looksLikeAddressLine(line) {
+        for (index, line) in lines.enumerated() where SocialPlaceEvidenceScorer.looksLikeAddressLine(line) &&
+            !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line) &&
+            !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(line) {
             let priorLines = Array(lines.prefix(index))
             for priorLine in priorLines {
                 guard let name = candidateNameFromCaptionLine(priorLine) else { continue }
@@ -935,6 +937,11 @@ struct SocialPlaceParser {
         var names: [String] = []
         if let quoted = quotedVenueName(in: text) {
             names.append(quoted)
+        }
+        for line in text.components(separatedBy: .newlines) {
+            if let launchHeadline = launchHeadlineVenueName(in: line) {
+                names.append(launchHeadline)
+            }
         }
         if let composed = composedChineseVenueName(in: text) {
             names.append(composed)
@@ -1297,24 +1304,29 @@ struct SocialPlaceParser {
     }
 
     private func firstLocationClue(in text: String) -> String? {
-        let addressLine = text
-            .components(separatedBy: .newlines)
-            .map(SocialPlaceEvidenceScorer.cleanText)
-            .first(where: SocialPlaceEvidenceScorer.looksLikeAddressLine)
-        if let addressLine { return cleanLocationMarker(from: addressLine) }
-
-        let patterns = [
+        let explicitLocationPatterns = [
             #"[📍👣]\s*([^\n\r\.]+)"#,
             #"\bLocation:\s*([^\n\r\.]+)"#,
             #"(?i)\b(?:located|based)\s+in\s+([A-Z][A-Za-z .'-]{2,40})(?:[.!?,\n\r]|$)"#,
             #"\b([A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China|California))\b"#
         ]
-        for pattern in patterns {
+        for pattern in explicitLocationPatterns {
             guard let value = firstCapture(in: text, pattern: pattern) else { continue }
             let cleaned = SocialPlaceEvidenceScorer.cleanText(value)
                 .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，"))
             if !cleaned.isEmpty { return cleaned }
         }
+
+        let addressLine = text
+            .components(separatedBy: .newlines)
+            .map(SocialPlaceEvidenceScorer.cleanText)
+            .first { line in
+                SocialPlaceEvidenceScorer.looksLikeAddressLine(line) &&
+                    !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line) &&
+                    !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(line)
+            }
+        if let addressLine { return cleanLocationMarker(from: addressLine) }
+
         return nil
     }
 
@@ -1399,6 +1411,10 @@ struct SocialPlaceParser {
             }
         }
 
+        if let launchHeadlineName = launchHeadlineVenueName(in: line) {
+            return launchHeadlineName
+        }
+
         if let leadingName = firstCapture(in: line, pattern: #"^([^/\n]{2,60})\s*/"#) {
             let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(leadingName)
             if SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned) {
@@ -1449,6 +1465,27 @@ struct SocialPlaceParser {
         }
         if let quoted = quotedVenueName(in: line) {
             return quoted
+        }
+        return nil
+    }
+
+    private func launchHeadlineVenueName(in line: String) -> String? {
+        guard line.range(of: #"開幕|插旗|登台|正式|即將|即将|新店"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        let patterns = [
+            #"([A-Z][A-Za-z0-9 &'._-]{2,60})\s+\d{1,2}/\d{1,2}"#,
+            #"(?:法式吐司|咖啡|餐廳|餐厅|麵包|面包|甜點|甜点|品牌)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})(?:\s|$)"#,
+            #"([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:即將|即将|正式|開幕|插旗|登台)"#
+        ]
+        for pattern in patterns {
+            guard let raw = firstCapture(in: line, pattern: pattern) else { continue }
+            let cleaned = SocialPlaceEvidenceScorer.cleanCandidateName(raw)
+                .replacingOccurrences(of: #"\s+\d{1,2}$"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r.。!！?？,，"))
+            guard SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned),
+                  !SocialPlaceEvidenceScorer.looksLikeMarketingLine(cleaned) else { continue }
+            return cleaned
         }
         return nil
     }
