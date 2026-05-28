@@ -356,6 +356,7 @@ private struct PlaceRow: Codable {
     let source_url: String?
     let source_platform: String
     let source_image_url: String?
+    let business_photo_urls: [String]?
     let extracted_dishes: [String]?
     let price_range: String?
     let recommender: String?
@@ -381,6 +382,7 @@ private struct PlaceRow: Codable {
             sourceUrl: source_url,
             sourcePlatform: SourcePlatform(rawValue: source_platform) ?? .other,
             sourceImageUrl: source_image_url,
+            businessPhotoUrls: business_photo_urls,
             extractedDishes: extracted_dishes,
             priceRange: price_range,
             recommender: recommender,
@@ -409,6 +411,7 @@ private struct PlaceRow: Codable {
             source_url: place.sourceUrl,
             source_platform: place.sourcePlatform.rawValue,
             source_image_url: place.sourceImageUrl,
+            business_photo_urls: place.businessPhotoUrls,
             extracted_dishes: place.extractedDishes,
             price_range: place.priceRange,
             recommender: place.recommender,

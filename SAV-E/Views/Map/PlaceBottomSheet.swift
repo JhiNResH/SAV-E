@@ -457,7 +457,9 @@ extension Place {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { line in
-                !line.localizedCaseInsensitiveContains("Source URL:") &&
+                let normalizedLine = line.normalizedSummaryText
+                let metadataPrefixes = ["source:", "category:", "rating:", "reviews:", "hours:", "address:"]
+                return !line.localizedCaseInsensitiveContains("Source URL:") &&
                 !line.localizedCaseInsensitiveContains("Analysis pipeline:") &&
                 !line.localizedCaseInsensitiveContains("Evidence tier:") &&
                 !line.localizedCaseInsensitiveContains("Apple Maps POI") &&
@@ -465,7 +467,15 @@ extension Place {
                 !line.localizedCaseInsensitiveContains("POI:") &&
                 !line.localizedCaseInsensitiveContains("MKPOICategory") &&
                 !line.localizedCaseInsensitiveContains("Business photo: Google Places") &&
-                !line.localizedCaseInsensitiveContains("External reviews:")
+                !line.localizedCaseInsensitiveContains("External reviews:") &&
+                !line.localizedCaseInsensitiveContains("Venue name:") &&
+                !line.localizedCaseInsensitiveContains("Address clue:") &&
+                !line.localizedCaseInsensitiveContains("Source saved") &&
+                !line.localizedCaseInsensitiveContains("citiesmemory") &&
+                !line.localizedCaseInsensitiveContains("Public rating") &&
+                !metadataPrefixes.contains { normalizedLine.hasPrefix($0) } &&
+                normalizedLine != name.normalizedSummaryText &&
+                normalizedLine != address.normalizedSummaryText
             }
         guard !cleanedLines.isEmpty else { return nil }
         return cleanedLines.joined(separator: "\n")
@@ -488,17 +498,27 @@ extension Place {
             return note
         }
         if let dishes = extractedDishes, !dishes.isEmpty {
-            return "\(name) is saved for \(dishes.prefix(3).joined(separator: ", "))."
+            return "Saved for \(dishes.prefix(3).joined(separator: ", "))."
         }
-        let category = category.displayName.lowercased()
-        if !shareAreaLabel.isEmpty {
-            return "\(name) is a saved \(category) in \(shareAreaLabel)."
+        if let recommender = recommender?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !recommender.isEmpty {
+            return "Recommended by \(recommender)."
         }
-        let addressText = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !addressText.isEmpty {
-            return "\(name) is a saved \(category) at \(addressText)."
+        switch status {
+        case .visited:
+            return "Marked visited in SAV-E."
+        case .wantToGo:
+            return "Saved as a place to try."
         }
-        return "\(name) is saved in SAV-E as \(status.memoryCardLabel.lowercased())."
+    }
+}
+
+private extension String {
+    var normalizedSummaryText: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
     }
 }
 
@@ -581,15 +601,6 @@ struct PlaceInsightSummaryPanel: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 PlaceSummaryLine(icon: "sparkles", text: fallbackSummary)
-                if let practicalInfo {
-                    PlaceSummaryLine(icon: "clock.fill", text: practicalInfo)
-                }
-                if let reviewSummary {
-                    PlaceSummaryLine(icon: "star.fill", text: reviewSummary)
-                }
-                if let recommendationSummary {
-                    PlaceSummaryLine(icon: "fork.knife", text: recommendationSummary)
-                }
             }
         }
         .padding(12)
