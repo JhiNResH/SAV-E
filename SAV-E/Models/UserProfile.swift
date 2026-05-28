@@ -16,6 +16,7 @@ struct UserProfile: Identifiable, Codable {
 struct PassportStats: Hashable {
     var savedCount: Int
     var visitedCount: Int
+    var proofBackedCount: Int
     var citiesCount: Int
     var waitingClues: Int
     var cityNames: [String]
@@ -23,6 +24,7 @@ struct PassportStats: Hashable {
 
     init(profile: UserProfile, savedPlaces: [Place], waitingClues: Int) {
         self.waitingClues = waitingClues
+        proofBackedCount = 0
 
         guard !savedPlaces.isEmpty else {
             savedCount = profile.savedCount

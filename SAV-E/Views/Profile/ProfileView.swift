@@ -585,9 +585,15 @@ private struct PassportStampSection: View {
             )
             PassportStampRow(
                 icon: "figure.walk",
-                title: languageSettings.text(.verified),
-                value: languageSettings.verifiedCountText(stats.visitedCount),
+                title: languageSettings.text(.visited),
+                value: languageSettings.visitedCountText(stats.visitedCount),
                 detail: visitedDetail
+            )
+            PassportStampRow(
+                icon: "checkmark.seal",
+                title: languageSettings.text(.proofBacked),
+                value: languageSettings.proofBackedCountText(stats.proofBackedCount),
+                detail: proofBackedDetail
             )
             PassportStampRow(
                 icon: "building.2",
@@ -620,8 +626,15 @@ private struct PassportStampSection: View {
 
     private var visitedDetail: String {
         switch languageSettings.language {
-        case .english: return "Places you marked visited; this is not proof-based yet."
-        case .traditionalChinese: return "你標記為去過的地點；目前還不是憑證驗證。"
+        case .english: return "Places you marked visited in SAV-E."
+        case .traditionalChinese: return "你在 SAV-E 標記為去過的地點。"
+        }
+    }
+
+    private var proofBackedDetail: String {
+        switch languageSettings.language {
+        case .english: return "Receipt, original photo, or location proof attached by you. Coming soon."
+        case .traditionalChinese: return "由你附上的收據、原始照片或定位證據。即將推出。"
         }
     }
 
@@ -758,8 +771,8 @@ private struct PassportCountingRulesPanel: View {
 
     private var proofRule: String {
         switch languageSettings.language {
-        case .english: return "Real-world proof will need receipt, photo, or location evidence; the current count stays self-marked."
-        case .traditionalChinese: return "真實到訪驗證需要收據、照片或定位證據；目前計數仍是你自己標記。"
+        case .english: return "Proof-backed stays 0 until SAV-E supports user-attached receipt, original photo, or location evidence. Public map metadata and friend-saved places do not count."
+        case .traditionalChinese: return "有憑證數量會維持 0，直到 SAV-E 支援由你附上的收據、原始照片或定位證據。公開地圖資料與朋友儲存地點不算。"
         }
     }
 }
