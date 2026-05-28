@@ -10,6 +10,18 @@ struct ParserRegressionCase {
     let rejectedAddressFragments: [String]
 }
 
+struct SourceIntentRegressionCase {
+    let name: String
+    let sourceURL: String
+    let evidence: String
+    let ocrLines: [String]
+    let expectedIntent: SocialPlaceSourceIntent
+    let expectedUnderstandingType: SocialPlaceSourceType
+    let expectedTopic: String?
+    let expectedRegion: String?
+    let expectedCandidateCount: Int
+}
+
 let cases: [ParserRegressionCase] = [
     ParserRegressionCase(
         name: "Instagram launch headline extracts Standard Bread and pin location",
@@ -30,6 +42,29 @@ let cases: [ParserRegressionCase] = [
         expectedAddress: "台北信義新天地 A11 B2",
         rejectedNameFragments: ["5/29", "在韓國掀起", "法式吐司 Standard Bread 5"],
         rejectedAddressFragments: ["品牌必點招牌", "焦糖烤布蕾", "現烤出爐"]
+    )
+]
+
+let sourceIntentCases: [SourceIntentRegressionCase] = [
+    SourceIntentRegressionCase(
+        name: "Instagram Reel cover OCR classifies hidden in-video Tainan ice-shop list as place-bearing list",
+        sourceURL: "https://www.instagram.com/reel/DYYmBrXzw2S/",
+        evidence: """
+        小妡（ㄒㄧㄣ）台南美食/台北美食 Tai Hsin Yu on Instagram: "台南的夏天有多熱？
+        熱到每天都想衝去吃刨冰
+        吃下去整個人瞬間被救回來
+
+        不管是芒果冰、粉粿冰、八寶冰還是布丁冰
+        只要端上桌，心情直接好一半
+
+        #台南 #台南小吃#台南冰品"
+        """,
+        ocrLines: ["台南夏天吃什麼", "推薦４間冰店"],
+        expectedIntent: .multiPlaceList,
+        expectedUnderstandingType: .multiPlaceList,
+        expectedTopic: "推薦４間冰店",
+        expectedRegion: "台南",
+        expectedCandidateCount: 0
     )
 ]
 
@@ -74,8 +109,46 @@ struct SocialPlaceParserRegressionRunner {
             }
         }
 
+        for testCase in sourceIntentCases {
+            let analysis = parser.analyze(
+                evidence: SocialPlaceSourceEvidence(
+                    sourceURL: testCase.sourceURL,
+                    resolvedURL: nil,
+                    sharedTitle: nil,
+                    sharedText: testCase.evidence,
+                    metadataTitle: nil,
+                    metadataDescription: nil,
+                    ocrLines: testCase.ocrLines
+                )
+            )
+
+            if analysis.sourceIntent != testCase.expectedIntent {
+                failures.append("\(testCase.name): expected intent \(testCase.expectedIntent.rawValue), got \(analysis.sourceIntent.rawValue)")
+            }
+            if analysis.sourceType != testCase.expectedUnderstandingType {
+                failures.append("\(testCase.name): expected type \(testCase.expectedUnderstandingType.rawValue), got \(analysis.sourceType.rawValue)")
+            }
+            if analysis.placesFound.count != testCase.expectedCandidateCount {
+                failures.append("\(testCase.name): expected \(testCase.expectedCandidateCount) candidates, got \(analysis.placesFound.count)")
+            }
+            if !analysis.isPlaceBearing {
+                failures.append("\(testCase.name): expected place-bearing source")
+            }
+            if let expectedTopic = testCase.expectedTopic, analysis.topic != expectedTopic {
+                failures.append("\(testCase.name): expected topic \(expectedTopic), got \(analysis.topic ?? "nil")")
+            }
+            if let expectedRegion = testCase.expectedRegion, analysis.regionClues.first != expectedRegion {
+                failures.append("\(testCase.name): expected first region \(expectedRegion), got \(analysis.regionClues.first ?? "nil")")
+            }
+            if let expectedTopic = testCase.expectedTopic,
+               !analysis.recoveryHints.contains(where: { $0.queryFragment == expectedTopic }) {
+                failures.append("\(testCase.name): expected recovery hint for topic \(expectedTopic)")
+            }
+        }
+
+        let caseCount = cases.count + sourceIntentCases.count
         if failures.isEmpty {
-            print("social place parser regression: PASS (\(cases.count) cases)")
+            print("social place parser regression: PASS (\(caseCount) cases)")
         } else {
             print("social place parser regression: FAIL")
             failures.forEach { print("- \($0)") }

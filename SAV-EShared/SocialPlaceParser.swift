@@ -371,7 +371,7 @@ struct SocialSourceClassifier {
             type = .mapShare
         } else if hasBookingClues {
             type = .bookingOrReservation
-        } else if legacySourceType == .multiPlaceList || !groups.isEmpty {
+        } else if legacySourceType == .multiPlaceList || !groups.isEmpty || sourceIntent == .multiPlaceList {
             type = .multiPlaceList
         } else if looksLikeActivityOrExperience(text: text, placesFound: placesFound) {
             type = .activityOrExperienceVenue
@@ -688,9 +688,13 @@ struct SocialPlaceParser {
             isPlaceBearing: isPlaceBearing
         )
 
+        let analysisSourceType = (sourceType == .sourceOnly || sourceType == .ambiguous || sourceType == .unknown)
+            ? understanding.sourceType
+            : sourceType
+
         return SocialPlaceAgentAnalysis(
-            sourceType: sourceType,
-            sourceSummary: sourceSummary(for: text, ocrLineCount: evidence.ocrLines.count, sourceType: sourceType, topic: topic),
+            sourceType: analysisSourceType,
+            sourceSummary: sourceSummary(for: text, ocrLineCount: evidence.ocrLines.count, sourceType: analysisSourceType, topic: topic),
             topic: topic,
             regionClues: regionClues,
             groups: sourceGroups,
@@ -703,12 +707,12 @@ struct SocialPlaceParser {
             recoveryHints: recoveryHints(intent: intent, topic: topic, regionClues: regionClues, text: text),
             understanding: understanding,
             resolverDecision: resolverDecision,
-            confidence: sourceConfidence(sourceType: sourceType, groups: sourceGroups, candidates: merged),
+            confidence: sourceConfidence(sourceType: analysisSourceType, groups: sourceGroups, candidates: merged),
             nextBestAction: merged.isEmpty
                 ? isPlaceBearing
                     ? "Run source recovery search or add the exact place name/map link before saving as a Map Stamp."
                     : "Add one more clue: place name, screenshot, caption, or map link."
-                : sourceType == .multiPlaceList
+                : analysisSourceType == .multiPlaceList
                     ? "Review or enrich selected venue clues before saving Map Stamps."
                 : "Open Review to confirm exact address and coordinates."
         )
@@ -1705,6 +1709,9 @@ struct SocialPlaceParser {
 
         let searchable = normalizedSearchText(trimmed)
         let topicText = normalizedSearchText(topic ?? "")
+        if isPlaceListRecommendation(searchable) || isPlaceListRecommendation(topicText) {
+            return .multiPlaceList
+        }
         if isRestaurantRecommendation(searchable) || isRestaurantRecommendation(topicText) {
             return .restaurantRecommendation
         }
@@ -1797,12 +1804,25 @@ struct SocialPlaceParser {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func isPlaceListRecommendation(_ text: String) -> Bool {
+        guard !text.isEmpty else { return false }
+        let countPattern = #"(?:\d{1,2}|[０-９]{1,2}|[一二三四五六七八九十]{1,3})"#
+        let patterns = [
+            #"\b(?:best|top|favorite|favourite|must[- ]?try|recommended?)\s+\d{1,2}\s+(?:restaurants?|cafes?|coffee shops?|dessert shops?|ice shops?|places to eat|food spots?)\b"#,
+            #"(?:推薦|精選|必吃|必去|收藏)\s*"# + countPattern + #"\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店)"#,
+            countPattern + #"\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店)"#
+        ]
+        return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
+    }
+
     private func isRestaurantRecommendation(_ text: String) -> Bool {
         guard !text.isEmpty else { return false }
         let patterns = [
             #"\b(?:favorite|favourite|best|top|must try|must-try|iconic|hidden gem|hidden gems)[^.\n]{0,80}\b(?:restaurants?|food spots?|dinner spots?|brunch spots?|places to eat)\b"#,
             #"\b(?:where to eat|wheretoeat|places to eat|food spots?|dinner spots?|brunch spots?)\b"#,
-            #"\b(?:restaurants?|food spots?|places to eat)\s+in\s+(?:la|los angeles|oc|orange county|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#
+            #"\b(?:restaurants?|food spots?|places to eat)\s+in\s+(?:la|los angeles|oc|orange county|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#,
+            #"(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)?[^\n\r]{0,20}(?:推薦|必吃|想衝去吃|吃什麼)[^\n\r]{0,40}(?:刨冰|剉冰|冰品|冰店|芒果冰|粉粿冰|八寶冰|布丁冰|小吃|美食|餐廳|餐厅)"#,
+            #"(?:刨冰|剉冰|冰品|冰店|芒果冰|粉粿冰|八寶冰|布丁冰|小吃|美食)[^\n\r]{0,30}(?:推薦|必吃|店)"#
         ]
         return patterns.contains { text.range(of: $0, options: .regularExpression) != nil }
     }
@@ -1836,7 +1856,7 @@ struct SocialPlaceParser {
 
     private func hasPlaceCategorySignal(_ text: String) -> Bool {
         text.range(
-            of: #"\b(?:restaurants?|cafes?|coffee shops?|bars?|bakeries|dessert shops?|hotels?|resorts?|places to eat|things to do|hidden gems?)\b"#,
+            of: #"\b(?:restaurants?|cafes?|coffee shops?|bars?|bakeries|dessert shops?|hotels?|resorts?|places to eat|things to do|hidden gems?)\b|(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡廳|餐廳|餐厅|小吃|美食|店)"#,
             options: .regularExpression
         ) != nil
     }
@@ -1864,13 +1884,18 @@ struct SocialPlaceParser {
         if lowered == "losangeles" || lowered == "la" || lowered == "lacoffee" { return "LA" }
         if lowered == "orangecounty" || lowered == "oc" || lowered == "ocfood" { return "Orange County" }
         if lowered == "newyork" { return "New York" }
+        if clue == "臺南" { return "台南" }
+        if clue == "臺北" { return "台北" }
+        if clue == "臺中" { return "台中" }
         return clue
     }
 
     private func meaningfulPlaceBearingPhrase(from text: String) -> String? {
         let patterns = [
             #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
-            #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#
+            #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#,
+            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)[^\n\r]{0,30}(?:推薦|必吃|吃什麼|冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅))"#,
+            #"((?:推薦|精選|必吃|必去|收藏)\s*(?:\d{1,2}|[０-９]{1,2}|[一二三四五六七八九十]{1,3})\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店))"#
         ]
         for pattern in patterns {
             guard let phrase = firstCapture(in: text, pattern: pattern) else { continue }
@@ -1889,6 +1914,8 @@ struct SocialPlaceParser {
             #"(?:🇺🇸)?\s*(LA必吃美食)"#,
             #"(洛杉[矶磯]美食)"#,
             #"(?i)\b(?:the\s+)?(coffee shops?\s+in\s+Los Angeles County)\b"#,
+            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)[^\n\r]{0,20}(?:冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅|甜點|甜品|咖啡廳))"#,
+            #"((?:推薦|精選|必吃|必去|收藏)\s*(?:\d{1,2}|[０-９]{1,2}|[一二三四五六七八九十]{1,3})\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店))"#,
             #"(?i)\b(?:favorite|favourite|best|top|must-try|must try|hidden gems?)?[^\n\r]{0,30}\b((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+(?:LA|OC|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"(?i)\b((?:LA|Los Angeles|Orange County|OC|Tokyo|Taipei|Seoul|Paris|London|New York)\s+(?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?))\b"#
         ]
@@ -1896,6 +1923,7 @@ struct SocialPlaceParser {
             guard let topic = firstCapture(in: text, pattern: pattern) else { continue }
             let cleaned = SocialPlaceEvidenceScorer.cleanText(topic)
                 .replacingOccurrences(of: #"(?i)^the\s+"#, with: "", options: .regularExpression)
+            if cleaned.contains("/") { continue }
             if !cleaned.isEmpty { return cleaned }
         }
         return nil
@@ -1911,7 +1939,9 @@ struct SocialPlaceParser {
             #"洛杉[矶磯]"#,
             #"(?i)\bOrange County\b"#,
             #"(?i)\bOC\b"#,
-            #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#
+            #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#,
+            #"(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)(?=[^\n\r]{0,12}(?:冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅|甜點|甜品|咖啡廳|推薦|必吃|吃什麼))"#,
+            #"#(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)(?:小吃|美食|冰品|冰店|甜點|甜品)?"#
         ]
         for pattern in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { continue }
