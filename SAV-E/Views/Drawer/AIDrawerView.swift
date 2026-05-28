@@ -24,6 +24,31 @@ enum MapDetailDrawerItem: Identifiable {
     }
 }
 
+private enum CommandDrawerTab: String, CaseIterable, Hashable {
+    case saved
+    case review
+    case lists
+    case friends
+
+    var title: String {
+        switch self {
+        case .saved: return "Saved"
+        case .review: return "Review"
+        case .lists: return "Lists"
+        case .friends: return "Friends"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .saved: return "list.bullet.rectangle"
+        case .review: return "checklist.unchecked"
+        case .lists: return "person.2.wave.2.fill"
+        case .friends: return "person.2.fill"
+        }
+    }
+}
+
 struct AIDrawerView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     @Environment(\.colorScheme) private var colorScheme
@@ -71,6 +96,7 @@ struct AIDrawerView: View {
     @State private var isImportingURL = false
     @State private var showProfile = false
     @State private var showLists = false
+    @State private var activeCommandTab: CommandDrawerTab = .saved
     @State private var selectedListID: UUID?
     @State private var newListTitle = ""
     @State private var newListNote = ""
@@ -356,15 +382,7 @@ struct AIDrawerView: View {
     private var contentBody: some View {
         switch viewModel.drawerState {
         case .idle:
-            if showLists {
-                collaborativeListsView
-            } else if showSavedCategories {
-                savedPlacesView
-            } else if showReviewInbox {
-                reviewInboxView
-            } else {
-                suggestionsView
-            }
+            commandHomeView
 
         case .loading:
             VStack(spacing: 12) {
@@ -517,9 +535,7 @@ struct AIDrawerView: View {
                         performCandidateAction(candidate, successMessage: "Removed from Review.") {
                             try await onRejectCandidate(candidate)
                             viewModel.returnToCommands()
-                            showSavedCategories = false
-                            showReviewInbox = true
-                            showLists = false
+                            activeCommandTab = .review
                         }
                     },
                     onSave: {
@@ -732,20 +748,92 @@ struct AIDrawerView: View {
 
     private func showsContentArea(for drawerHeight: CGFloat) -> Bool {
         let isCollapsed = drawerHeight <= 96
-        if case .idle = viewModel.drawerState, isCollapsed, !showReviewInbox, !showSavedCategories, !showLists { return false }
+        if case .idle = viewModel.drawerState, isCollapsed { return false }
         return true
     }
 
     private var hasActiveDrawerContent: Bool {
         switch viewModel.drawerState {
         case .idle:
-            return showReviewInbox || showSavedCategories || showLists
+            return false
         case .loading, .displaying, .saveSearchResults, .placeDetail, .reviewCandidateDetail, .mapCandidateDetail, .error:
             return true
         }
     }
 
     // MARK: - Idle suggestions
+
+    private var commandHomeView: some View {
+        VStack(spacing: 0) {
+            commandTabBar
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+
+            switch activeCommandTab {
+            case .saved:
+                savedPlacesView
+            case .review:
+                reviewInboxView
+            case .lists:
+                collaborativeListsView
+            case .friends:
+                socialMapTabView
+            }
+        }
+    }
+
+    private var commandTabBar: some View {
+        HStack(spacing: 7) {
+            ForEach(CommandDrawerTab.allCases, id: \.self) { tab in
+                Button {
+                    activeCommandTab = tab
+                    showSavedCategories = false
+                    showReviewInbox = false
+                    showLists = false
+                    searchFocused = false
+                    withAnimation { drawerDetent = .medium }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.systemImage)
+                            .font(.caption2.weight(.black))
+                        Text(tab.title)
+                            .font(.caption.weight(.black))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.76)
+                    }
+                    .foregroundColor(activeCommandTab == tab ? .saveInk : .saveCocoa.opacity(0.76))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 34)
+                    .background(activeCommandTab == tab ? Color.saveHoney.opacity(0.62) : Color.white.opacity(colorScheme == .dark ? 0.08 : 0.18))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(activeCommandTab == tab ? 0.56 : 0.22), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var socialMapTabView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
+                socialSignalSection
+                if let addSpotStatus {
+                    Text(addSpotStatus)
+                        .font(.caption)
+                        .foregroundColor(.saveCocoa.opacity(0.74))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 24)
+        }
+    }
 
     private var suggestionsView: some View {
         ScrollView {
@@ -1028,7 +1116,7 @@ struct AIDrawerView: View {
                             .font(.caption)
                             .foregroundColor(.saveCocoa.opacity(0.72))
 
-                        if !savedCategoryCounts.isEmpty {
+                        if !selectedCategories.isEmpty, !savedCategoryCounts.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(savedCategoryCounts, id: \.category) { bucket in
@@ -1106,7 +1194,7 @@ struct AIDrawerView: View {
 
     private var savedPlacesSubtitle: String {
         if selectedCategories.isEmpty {
-            return "\(viewModel.places.count) saved Map Stamps. Categories filter this list and the map together."
+            return "\(viewModel.places.count) saved Map Stamps."
         }
         let names = selectedCategories.map(\.displayName).sorted().joined(separator: ", ")
         return "\(savedPlacesForDrawer.count) saved in \(names)."
@@ -1238,29 +1326,7 @@ struct AIDrawerView: View {
     private var reviewInboxView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
-                    Button(action: {
-                        showSavedCategories = false
-                        showReviewInbox = false
-                        showLists = false
-                        withAnimation { drawerDetent = .medium }
-                    }) {
-                        Label("Commands", systemImage: "terminal")
-                            .font(.caption)
-                            .fontWeight(.black)
-                            .foregroundColor(.saveInk)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.saveSky.opacity(0.54))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
+                FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
 
                 ReviewCandidatesSection(
                     candidates: reviewCandidates,
@@ -1490,27 +1556,21 @@ struct AIDrawerView: View {
 
     private func openReviewInbox() {
         viewModel.returnToCommands()
-        showSavedCategories = false
-        showReviewInbox = true
-        showLists = false
+        activeCommandTab = .review
         searchFocused = false
         withAnimation { drawerDetent = .large }
     }
 
     private func openSavedPlaces() {
         viewModel.returnToCommands()
-        showSavedCategories = true
-        showReviewInbox = false
-        showLists = false
+        activeCommandTab = .saved
         searchFocused = false
         withAnimation { drawerDetent = .medium }
     }
 
     private func openCollaborativeLists() {
         viewModel.returnToCommands()
-        showSavedCategories = false
-        showReviewInbox = false
-        showLists = true
+        activeCommandTab = .lists
         searchFocused = false
         withAnimation { drawerDetent = .large }
     }
@@ -1674,8 +1734,7 @@ struct AIDrawerView: View {
         Task {
             await onPlanList(list)
             viewModel.showCollaborativeListPlan(list)
-            showSavedCategories = false
-            showLists = false
+            activeCommandTab = .lists
             withAnimation { drawerDetent = .large }
         }
     }
