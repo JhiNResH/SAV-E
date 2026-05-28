@@ -2957,7 +2957,7 @@ private struct ReviewCandidateDetailCard: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 11) {
-                    SaveMemoryBadge(state: candidate.hasReliableCoordinates ? .ready : .clue, size: 40)
+                    ReviewCandidateDetailIcon(candidate: candidate)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(presentation.eyebrow)
@@ -3001,6 +3001,8 @@ private struct ReviewCandidateDetailCard: View {
                     }
                     .foregroundColor(.saveCocoa)
                 }
+
+                ReviewCandidateSourcePanel(candidate: candidate)
 
                 HStack(spacing: 8) {
                     if candidate.hasReliableCoordinates {
@@ -3076,6 +3078,127 @@ private struct ReviewCandidateDetailCard: View {
 
     private var presentation: SavePlaceDrawerPresentation {
         SavePlaceDrawerPresentation(reviewCandidate: candidate)
+    }
+}
+
+private struct ReviewCandidateDetailIcon: View {
+    var candidate: PlaceReviewCandidate
+
+    private var category: PlaceCategory {
+        PlaceCategory.inferred(from: "\(candidate.name) \(candidate.address)")
+    }
+
+    var body: some View {
+        Image(systemName: candidate.hasReliableCoordinates ? category.iconName : "link")
+            .font(.headline.weight(.semibold))
+            .foregroundColor(.white)
+            .frame(width: 40, height: 40)
+            .background(iconFill)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.white.opacity(0.54), lineWidth: 1)
+            )
+            .accessibilityHidden(true)
+    }
+
+    private var iconFill: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.saveStampColor(for: category),
+                Color.saveSignal.opacity(candidate.hasReliableCoordinates ? 0.90 : 0.58)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
+private struct ReviewCandidateSourcePanel: View {
+    var candidate: PlaceReviewCandidate
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: "link")
+                    .font(.caption.weight(.black))
+                Text("Source")
+                    .font(.caption.weight(.black))
+                Spacer()
+                if let sourceURL {
+                    Button {
+                        openURL(sourceURL)
+                    } label: {
+                        Text("Open")
+                            .font(.caption2.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.saveHoney.opacity(0.74))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open review candidate source")
+                }
+            }
+            .foregroundColor(.saveInk)
+
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(sourceLines, id: \.self) { line in
+                    Text(line)
+                        .font(.caption)
+                        .foregroundColor(.saveCocoa.opacity(0.78))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.saveNotebookPage.opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private var sourceLines: [String] {
+        let sourceLike = candidate.evidence
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .filter { line in
+                let lowered = line.lowercased()
+                return lowered.contains("source") ||
+                    lowered.contains("http") ||
+                    lowered.contains("instagram") ||
+                    lowered.contains("google") ||
+                    lowered.contains("maps")
+            }
+
+        let lines = sourceLike.isEmpty
+            ? candidate.evidence
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            : sourceLike
+
+        let visibleLines = Array(lines.prefix(3))
+        return visibleLines.isEmpty ? ["Review evidence saved"] : visibleLines
+    }
+
+    private var sourceURL: URL? {
+        candidate.evidence.compactMap(Self.firstURL(in:)).first
+    }
+
+    private static func firstURL(in line: String) -> URL? {
+        line
+            .split(whereSeparator: \.isWhitespace)
+            .compactMap { rawToken -> URL? in
+                let token = rawToken.trimmingCharacters(in: CharacterSet(charactersIn: "<>()[]{}.,;\"'"))
+                guard token.hasPrefix("http://") || token.hasPrefix("https://") else { return nil }
+                return URL(string: token)
+            }
+            .first
     }
 }
 
