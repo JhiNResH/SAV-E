@@ -40,6 +40,7 @@ create table public.places (
     source_url text,
     source_platform text not null default 'other',
     source_image_url text,
+    business_photo_urls text[] default '{}',
     extracted_dishes text[] default '{}',
     price_range text,
     recommender text,
@@ -51,6 +52,8 @@ create table public.places (
 );
 
 alter table public.places enable row level security;
+
+alter table public.places add column if not exists business_photo_urls text[] default '{}';
 
 create index idx_places_user_id on public.places(user_id);
 create index idx_places_category on public.places(category);

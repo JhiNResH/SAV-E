@@ -40,6 +40,7 @@ const placeFields = [
   "source_url",
   "source_platform",
   "source_image_url",
+  "business_photo_urls",
   "extracted_dishes",
   "price_range",
   "recommender",

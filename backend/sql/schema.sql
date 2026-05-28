@@ -35,6 +35,7 @@ create table if not exists places (
     source_url text,
     source_platform text not null default 'other',
     source_image_url text,
+    business_photo_urls text[] default '{}',
     extracted_dishes text[] default '{}',
     price_range text,
     recommender text,
@@ -51,6 +52,8 @@ create index if not exists idx_places_lat_lng on places(latitude, longitude);
 create index if not exists idx_places_status on places(user_id, status);
 create index if not exists idx_places_fts on places
     using gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(address, '')));
+
+alter table places add column if not exists business_photo_urls text[] default '{}';
 
 create table if not exists follows (
     id uuid primary key default gen_random_uuid(),
