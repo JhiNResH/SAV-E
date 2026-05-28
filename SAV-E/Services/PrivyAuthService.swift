@@ -50,8 +50,8 @@ final class PrivyAuthService: ObservableObject {
     }
 
     private init() {
-        let appId = Self.keyFromPlist("PRIVY_APP_ID") ?? ""
-        let clientId = Self.keyFromPlist("PRIVY_APP_CLIENT_ID") ?? ""
+        let appId = SAVEProductionConfig.configValue(for: ["PRIVY_APP_ID"]) ?? ""
+        let clientId = SAVEProductionConfig.configValue(for: ["PRIVY_APP_CLIENT_ID"]) ?? ""
         self.appId = appId
         self.clientId = clientId
         let config   = PrivyConfig(appId: appId, appClientId: clientId)
@@ -143,16 +143,6 @@ final class PrivyAuthService: ObservableObject {
     private func validateConfig() throws {
         if appId.isEmpty { throw AuthError.missingPrivyConfig("PRIVY_APP_ID") }
         if clientId.isEmpty { throw AuthError.missingPrivyConfig("PRIVY_APP_CLIENT_ID") }
-    }
-
-    private static func keyFromPlist(_ key: String) -> String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let data = try? Data(contentsOf: url),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
-              let value = dict[key],
-              value != "YOUR_KEY_HERE",
-              !value.isEmpty else { return nil }
-        return value
     }
 }
 

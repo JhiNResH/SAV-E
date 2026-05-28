@@ -331,43 +331,7 @@ enum SaveCollaborativeListError: LocalizedError {
 
 private enum SaveCollaborativeListLinkConfig {
     static let listBaseURL: String = {
-        configValue(for: ["SAVE_LIST_SHARE_BASE_URL", "SAVE_SHARE_LIST_BASE_URL"])
-            ?? "https://sav-e-app.vercel.app/list"
+        SAVEProductionConfig.URLConfigValue(for: ["SAVE_LIST_SHARE_BASE_URL", "SAVE_SHARE_LIST_BASE_URL"])
+            ?? SAVEProductionConfig.defaultListShareBaseURL
     }()
-
-    private static func configValue(for keys: [String]) -> String? {
-        for key in keys {
-            if let value = normalizedConfigValue(ProcessInfo.processInfo.environment[key]) {
-                return removingTrailingSlashes(from: value)
-            }
-            if let value = normalizedConfigValue(keyFromPlist(key)) {
-                return removingTrailingSlashes(from: value)
-            }
-        }
-        return nil
-    }
-
-    private static func normalizedConfigValue(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty,
-              value != "YOUR_KEY_HERE"
-        else { return nil }
-        return value
-    }
-
-    private static func keyFromPlist(_ key: String) -> String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let data = try? Data(contentsOf: url),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
-        else { return nil }
-        return dict[key]
-    }
-
-    private static func removingTrailingSlashes(from value: String) -> String {
-        var result = value
-        while result.hasSuffix("/") {
-            result.removeLast()
-        }
-        return result
-    }
 }

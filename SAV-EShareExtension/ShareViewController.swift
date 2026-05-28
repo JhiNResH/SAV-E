@@ -39,12 +39,6 @@ struct ParsedPlace {
     var priceRange: String?
 }
 
-private enum SAVESharedStorage {
-    static let appGroupSuiteName = "group.com.wanderly.app"
-    static let pendingPlacesFileName = "pending-places.json"
-    static let pendingReviewCandidatesFileName = "pending-review-candidates.json"
-}
-
 private enum SaveTheme {
     static let cream = Color(hex: "FFF5E7")
     static let yellow = Color(hex: "FFD66B")
@@ -2939,18 +2933,7 @@ struct ShareExtensionView: View {
     }
 
     private func geminiAPIKey() -> String? {
-        // Try environment variable first, then Secrets.plist in shared App Group
-        if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
-            return key
-        }
-        // Try reading from main app bundle's Secrets.plist via App Group
-        // For now, try the extension's own bundle
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let data = try? Data(contentsOf: url),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
-              let value = dict["GEMINI_API_KEY"],
-              value != "YOUR_KEY_HERE" else { return nil }
-        return value
+        SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
     }
 
     // MARK: - Save
@@ -2986,7 +2969,7 @@ struct ShareExtensionView: View {
             savedAt: Date()
         )
 
-        guard let fileURL = appGroupFileURL(named: SAVESharedStorage.pendingPlacesFileName) else {
+        guard let fileURL = appGroupFileURL(named: SAVEProductionConfig.pendingPlacesFileName) else {
             parseError = "Shared app storage is unavailable"
             return
         }
@@ -3006,7 +2989,7 @@ struct ShareExtensionView: View {
 
     private func saveReviewCandidates(_ candidates: [PendingReviewCandidate]) {
         guard !candidates.isEmpty else { return }
-        guard let fileURL = appGroupFileURL(named: SAVESharedStorage.pendingReviewCandidatesFileName) else {
+        guard let fileURL = appGroupFileURL(named: SAVEProductionConfig.pendingReviewCandidatesFileName) else {
             parseError = "Shared app storage is unavailable"
             return
         }
@@ -3021,7 +3004,7 @@ struct ShareExtensionView: View {
     }
 
     private func saveSourceOnlyMemory(_ source: String, reason: String) {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName) else {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SAVEProductionConfig.appGroupSuiteName) else {
             return
         }
 
@@ -3060,7 +3043,7 @@ struct ShareExtensionView: View {
 
     private func appGroupFileURL(named fileName: String) -> URL? {
         FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: SAVESharedStorage.appGroupSuiteName)?
+            .containerURL(forSecurityApplicationGroupIdentifier: SAVEProductionConfig.appGroupSuiteName)?
             .appendingPathComponent(fileName)
     }
 

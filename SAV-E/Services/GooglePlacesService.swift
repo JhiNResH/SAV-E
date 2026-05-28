@@ -69,16 +69,8 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
         self.apiKey = Self.normalizedAPIKey(
             apiKey
                 ?? ProcessInfo.processInfo.environment["GOOGLE_PLACES_API_KEY"]
-                ?? Self.keyFromPlist("GOOGLE_PLACES_API_KEY")
+                ?? SAVEProductionConfig.keyFromPlist("GOOGLE_PLACES_API_KEY")
         )
-    }
-
-    private static func keyFromPlist(_ key: String) -> String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
-              let data = try? Data(contentsOf: url),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String],
-              let value = dict[key] else { return nil }
-        return value
     }
 
     private static func normalizedAPIKey(_ value: String?) -> String? {
