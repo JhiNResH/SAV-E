@@ -64,6 +64,7 @@ enum SocialPlaceEvidenceScorer {
               !looksLikeMarketingLine(value),
               !looksLikeHashtagsOnlyLine(value),
               !looksLikeGenericProductOrCityLine(value),
+              !looksLikeCaptionHeadlineTitle(value),
               !lowered.contains(" on instagram"),
               !lowered.contains("casual"),
               !lowered.contains("dream"),
@@ -88,7 +89,20 @@ enum SocialPlaceEvidenceScorer {
             looksLikeMenuOrPriceLine(value) ||
             looksLikeMarketingLine(value) ||
             looksLikeHashtagsOnlyLine(value) ||
-            looksLikeGenericProductOrCityLine(value)
+            looksLikeGenericProductOrCityLine(value) ||
+            looksLikeCaptionHeadlineTitle(value)
+    }
+
+    static func looksLikeCaptionHeadlineTitle(_ value: String) -> Bool {
+        if value.contains("#") || value.contains("「") || value.contains("『") {
+            return true
+        }
+        if value.range(of: #"➡|➜|→"#, options: .regularExpression) != nil {
+            return true
+        }
+        guard value.count > 18 else { return false }
+        return value.range(of: #"必吃|必喝|必訪|必去|韓其林|米其林|弘大|新村|明洞"#, options: .regularExpression) != nil ||
+            value.range(of: #"(?:西門|士林|東區|東区|台北|臺北).*(?:美食|餐廳|餐厅|必吃|必喝)"#, options: .regularExpression) != nil
     }
 
     static func looksLikeAddressLine(_ line: String) -> Bool {
