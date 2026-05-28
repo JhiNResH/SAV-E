@@ -34,6 +34,29 @@ struct SocialLinkParserCheck {
         expect(chinese.candidateName != "不是餐廳，是一場沉浸式文化盛宴。", "Marketing line must not become venue name")
         expect(chinese.address != "從沙漠絲路到盛世敦煌，", "Marketing line must not become address")
 
+        let standardBreadCaption = """
+        GIRLSTALK on Instagram: "#GIRLSTALK美食
+        在韓國掀起排隊熱潮的法式吐司 Standard Bread 5/29即將在台北信義新天地A11正式開幕！
+
+        主打「每30分鐘現烤出爐」的吐司，加上獨特的撕開沾醬吐司吃法，在韓國迅速爆紅。就連 BLACKPINK Jisoo、Super Junior 銀赫都曾到店朝聖！
+
+        品牌必點招牌 「焦糖烤布蕾法式吐司」 外層炙燒成金黃焦糖脆殼，內層則柔軟濕潤，一口能同時吃到焦糖香與蛋奶香，另外更推薦「杜拜巧克力法式吐司」，吃得到開心果酥脆口感✨搭配歐洲鄉村風格的門市空間與剛出爐的奶油麵包香氣，讓信義區多一間新的排隊打卡美食！
+
+        📍台北信義新天地 A11 B2
+        📅 開幕日期：5/29正式開幕
+        #StandardBread #韓國咖啡 #聖水洞美食 #Na編"
+        """
+
+        let standardBreadCandidates = SocialLinkReviewCandidateService.shared.reviewCandidates(
+            fromEvidenceText: standardBreadCaption,
+            sourceURL: "https://www.instagram.com/p/DY1nVh0n8mu/"
+        )
+        expect(standardBreadCandidates.count == 1, "Standard Bread IG post should produce one review candidate")
+        expect(standardBreadCandidates[0].candidateName == "Standard Bread", "Launch headline should extract the brand, not the full marketing sentence/date")
+        expect(standardBreadCandidates[0].address == "台北信義新天地 A11 B2", "Explicit pin line should win over marketing paragraphs as the location clue")
+        expect(!standardBreadCandidates[0].candidateName.contains("5/29"), "Opening date must not leak into the venue name")
+        expect(!standardBreadCandidates[0].address.contains("品牌必點招牌"), "Marketing paragraph must not become address")
+
         let numberedCaption = """
         1. Ulaman Eco Luxury Resort
         staying at @ulamanbali
