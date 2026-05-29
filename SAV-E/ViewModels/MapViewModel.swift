@@ -1154,8 +1154,75 @@ final class MapViewModel: ObservableObject {
     }
 
     func selectMapFeature(_ feature: MapFeature?) {
-        // Background map features stay passive; SAV-E only opens its own annotations.
+        guard let feature else { return }
+        guard feature.kind == .pointOfInterest else {
+            selectedMapFeature = nil
+            return
+        }
+        selectMapPOI(
+            title: feature.title,
+            coordinate: feature.coordinate,
+            pointOfInterestCategory: feature.pointOfInterestCategory?.rawValue
+        )
+    }
+
+    func selectMapPOI(
+        title rawTitle: String?,
+        coordinate: CLLocationCoordinate2D,
+        pointOfInterestCategory: String?
+    ) {
+        let title = (rawTitle ?? "Map place").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            selectedMapFeature = nil
+            return
+        }
+
+        if let savedPlace = places.first(where: { $0.matchesMapFeature(title: title, coordinate: coordinate) }) {
+            selectPlace(savedPlace)
+            selectedMapFeature = nil
+            return
+        }
+
+        var evidence = ["Apple Maps POI"]
+        if let pointOfInterestCategory {
+            evidence.append("POI: \(pointOfInterestCategory)")
+        }
+
+        let candidate = SaveMapCandidate(
+            title: title,
+            subtitle: "Selected on map",
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            category: PlaceCategory.inferredMapCategory(
+                title: title,
+                subtitle: "Selected on map",
+                pointOfInterestCategory: pointOfInterestCategory,
+                fallback: .attraction
+            ),
+            sourceURL: appleMapsURL(title: title, coordinate: coordinate),
+            sourcePlatform: .other,
+            evidence: evidence
+        )
+
+        let selectedCandidate: SaveMapCandidate
+        if let existingCandidate = mapCandidates.first(where: { $0.id == candidate.id || $0.matches(candidate) }) {
+            var nativeSelectedCandidate = existingCandidate
+            if !nativeSelectedCandidate.evidence.contains(where: { $0.localizedCaseInsensitiveCompare("Apple Maps POI") == .orderedSame }) {
+                nativeSelectedCandidate.evidence.insert("Apple Maps POI", at: 0)
+            }
+            mapCandidates = mapCandidates.map { $0.id == nativeSelectedCandidate.id ? nativeSelectedCandidate : $0 }
+            selectedCandidate = nativeSelectedCandidate
+        } else {
+            mapCandidates = [candidate] + mapCandidates
+            selectedCandidate = candidate
+        }
+
+        selectedMapCandidate = selectedCandidate
+        selectedPlace = nil
+        selectedReviewCandidate = nil
+        selectedSocialPlace = nil
         selectedMapFeature = nil
+        enrichSelectedMapCandidateAfterSelection(selectedCandidate)
     }
 
     func deletePlace(_ place: Place) async throws {

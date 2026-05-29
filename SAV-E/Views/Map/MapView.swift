@@ -62,8 +62,8 @@ struct MapView: View {
                     }
                 }
                 .mapStyle(.standard)
-                .mapFeatureSelectionDisabled { _ in
-                    true
+                .mapFeatureSelectionDisabled { feature in
+                    feature.kind != .pointOfInterest
                 }
                 .mapControls {
                     MapCompass()
