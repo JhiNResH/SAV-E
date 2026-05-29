@@ -58,6 +58,7 @@ enum SocialPlaceEvidenceScorer {
         guard isUsableCandidateName(value) else { return false }
         let lowered = value.lowercased()
         guard !looksLikeAddressLine(value),
+              !looksLikeTransitAccessLine(value),
               !looksLikeOperatingHoursLine(value),
               !looksLikeReviewMetricLine(value),
               !looksLikeMenuOrPriceLine(value),
@@ -84,6 +85,7 @@ enum SocialPlaceEvidenceScorer {
 
     static func isRejectedTitle(_ value: String) -> Bool {
         looksLikeAddressLine(value) ||
+            looksLikeTransitAccessLine(value) ||
             looksLikeOperatingHoursLine(value) ||
             looksLikeReviewMetricLine(value) ||
             looksLikeMenuOrPriceLine(value) ||
@@ -106,6 +108,7 @@ enum SocialPlaceEvidenceScorer {
     }
 
     static func looksLikeAddressLine(_ line: String) -> Bool {
+        guard !looksLikeTransitAccessLine(line) else { return false }
         let patterns = [
             #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
             #"\b\d{1,6}\s+Via\s+[A-Za-z0-9 .'-]{2,80}(?:,\s*[A-Za-z .'-]{2,40})?(?:,\s*[A-Z]{2})?(?:\s+\d{5})?\b"#,
@@ -117,6 +120,18 @@ enum SocialPlaceEvidenceScorer {
 
         return patterns.contains { pattern in
             line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    static func looksLikeTransitAccessLine(_ value: String) -> Bool {
+        let cleaned = cleanText(value)
+        let patterns = [
+            #"(?i)(?:捷運|地鐵|地铁|地下鉄|mrt|metro|subway)[^\n\r]{0,32}(?:站|station|出口|exit|\d+\s*(?:號|号))"#,
+            #"(?i)(?:站|station)[\s\(（]*\d+\s*(?:號|号)?\s*(?:出口|exit)"#,
+            #"(?i)(?:出口|exit)\s*\d+"#
+        ]
+        return patterns.contains { pattern in
+            cleaned.range(of: pattern, options: [.regularExpression]) != nil
         }
     }
 
