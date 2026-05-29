@@ -540,6 +540,35 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidence.contains("Google Places refined match: Wild Wonders"))
     }
 
+    func testTransitExitClueDoesNotBecomeAddressOnlyPlaceCandidate() {
+        let evidence = """
+        蘆洲美食 on Instagram: "下班後想吃點甜的
+        🚇捷運蘆洲站(2號出口)
+        #蘆洲美食 #台北甜點 #reels"
+        """
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/DY6Kbg6PS3N/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: evidence,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: []
+            )
+        )
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: evidence,
+            sourceURL: "https://www.instagram.com/reel/DY6Kbg6PS3N/"
+        )
+
+        XCTAssertFalse(SocialPlaceEvidenceScorer.looksLikeAddressLine("🚇捷運蘆洲站(2號出口)"))
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "Address-only place clue" })
+        XCTAssertFalse(candidates.contains { $0.candidateName == "Address-only place clue" })
+        XCTAssertFalse(candidates.contains { $0.address.contains("捷運蘆洲站") })
+    }
+
     func testAgentParserMergesNumberedPlaceEvidence() {
         let analysis = SocialPlaceParser().analyze(
             evidence: SocialPlaceSourceEvidence(
