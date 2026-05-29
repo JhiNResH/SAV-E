@@ -431,7 +431,8 @@ struct AIDrawerView: View {
                         PlaceListComponent(
                             title: response.title ?? "Places",
                             places: viewModel.resolvePlaces(from: response.placeIds),
-                            aiMessage: response.aiMessage
+                            aiMessage: response.aiMessage,
+                            onSelect: openSavedPlace
                         )
 
                     case .navigationCard:
@@ -476,11 +477,7 @@ struct AIDrawerView: View {
                     SaveSearchResultsComponent(
                         response: response,
                         onSelectResult: { result in
-                            if let candidate = reviewCandidate(for: result) {
-                                openReviewCandidateDetail(candidate)
-                            } else {
-                                viewModel.showSearchResult(result)
-                            }
+                            openSearchResult(result)
                         },
                         onSearchNearby: {
                             searchNearbyUnsavedCandidates(for: response.query)
@@ -1562,21 +1559,40 @@ struct AIDrawerView: View {
     }
 
     private func openSavedPlace(_ place: Place) {
-        showSavedCategories = false
-        showReviewInbox = false
-        showLists = false
-        searchFocused = false
+        prepareMapDetailOpening()
         viewModel.showPlace(place)
-        withAnimation { drawerDetent = .medium }
+        viewModel.returnToCommands()
+        mapDetailDrawerItem = .savedPlace(place)
+        withAnimation(.spring(duration: 0.28)) {
+            drawerDetent = .height(88)
+        }
     }
 
     private func openReviewCandidateDetail(_ candidate: PlaceReviewCandidate) {
+        prepareMapDetailOpening()
+        viewModel.showReviewCandidate(candidate)
+        viewModel.returnToCommands()
+        mapDetailDrawerItem = .reviewCandidate(candidate)
+        withAnimation(.spring(duration: 0.28)) {
+            drawerDetent = .height(88)
+        }
+    }
+
+    private func openMapCandidateDetail(_ candidate: SaveMapCandidate) {
+        prepareMapDetailOpening()
+        viewModel.showMapCandidate(candidate)
+        viewModel.returnToCommands()
+        mapDetailDrawerItem = .unsavedCandidate(candidate)
+        withAnimation(.spring(duration: 0.28)) {
+            drawerDetent = .height(88)
+        }
+    }
+
+    private func prepareMapDetailOpening() {
         showSavedCategories = false
         showReviewInbox = false
         showLists = false
         searchFocused = false
-        viewModel.showReviewCandidate(candidate)
-        withAnimation { drawerDetent = .medium }
     }
 
     private func reviewCandidate(for result: SaveSearchResult) -> PlaceReviewCandidate? {
@@ -1584,6 +1600,37 @@ struct AIDrawerView: View {
         let rawID = String(result.id.dropFirst("review-candidate-".count))
         guard let id = UUID(uuidString: rawID) else { return nil }
         return reviewCandidates.first { $0.id == id }
+    }
+
+    private func openSearchResult(_ result: SaveSearchResult) {
+        if let candidate = reviewCandidate(for: result) {
+            openReviewCandidateDetail(candidate)
+            return
+        }
+
+        switch result.objectType {
+        case .savedPlace, .triedMemory:
+            guard let place = savedPlace(for: result) else { return }
+            openSavedPlace(place)
+        case .mapVisibleUnsavedPlace:
+            guard let candidate = mapCandidate(for: result) else { return }
+            openMapCandidateDetail(candidate)
+        default:
+            viewModel.showSearchResult(result)
+        }
+    }
+
+    private func savedPlace(for result: SaveSearchResult) -> Place? {
+        guard result.id.hasPrefix("place-") else { return nil }
+        let rawID = String(result.id.dropFirst("place-".count))
+        guard let id = UUID(uuidString: rawID) else { return nil }
+        return viewModel.places.first { $0.id == id }
+    }
+
+    private func mapCandidate(for result: SaveSearchResult) -> SaveMapCandidate? {
+        guard result.id.hasPrefix("map-candidate-") else { return nil }
+        let rawID = String(result.id.dropFirst("map-candidate-".count))
+        return viewModel.mapCandidates.first { $0.id == rawID }
     }
 
     private func submitSearchField() {
