@@ -108,7 +108,8 @@ enum SocialPlaceEvidenceScorer {
     static func looksLikeAddressLine(_ line: String) -> Bool {
         let patterns = [
             #"\b(?:No\.?|#)\s*\d+[A-Za-z]?\b"#,
-            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy|Old Street|District|County|City)\b"#,
+            #"\b\d{1,6}\s+Via\s+[A-Za-z0-9 .'-]{2,80}(?:,\s*[A-Za-z .'-]{2,40})?(?:,\s*[A-Z]{2})?(?:\s+\d{5})?\b"#,
+            #"\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy|Via|Place|Pl\.?|Court|Ct\.?|Old Street|District|County|City)\b(?:,\s*[A-Za-z .'-]{2,40})?(?:,\s*[A-Z]{2})?(?:\s+\d{5})?"#,
             #"\b[A-Z][A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO|Bali|Indonesia|Chongqing|China)\b"#,
             #"[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?"#,
             #"\d{1,6}\s*(?:号|號)"#
@@ -150,7 +151,8 @@ enum SocialPlaceEvidenceScorer {
             #"排隊熱潮|現烤出爐|撕開沾醬|迅速爆紅|曾到店朝聖|品牌必點招牌|排隊打卡美食|門市空間|麵包香氣|面包香气"#,
             #"台南爆漿巴斯克|巴斯克控不能錯過|不要說你吃過巴斯克蛋糕|一入口直接幸福感爆棚"#,
             #"^(?:💡\s*)?(補充|补充)\s*(?:💡)?|既視感|点就对了|點就對了"#,
-            #"(?i)follow|save this|likes|comments|instagram|must try|don't miss|viral"#,
+            #"(?i)follow|save this|likes|comments|instagram|must try|don't miss|viral|things to know|weekend idea"#,
+            #"(?i)\b(?:wildlife|animal\s+encounter|sanctuary|tour|experience)\b[^\n\r]{0,80}\b(?:near|in)\s+(?:San Diego|Bonsall|LA|Los Angeles|OC|Orange County)\b"#,
             #"(?i)\b(?:most\s+iconic|iconic\s+(?:restaurant|dinner|spot)|dinner\s+spot\s+by\s+the\s+beach)\b"#,
             #"(?i)\b(?:unique\s+coffee\s+experiences|best\s+for\s+coffee\s+quality|atmosphere\s*&\s*aesthetic|desserts?\s+worth\s+it)\b"#,
             #"(?i)^(?:my\s+favorite|my\s+favourite|favorite|favourite|which\s+one\s+would\s+you\s+go\s+to\s+first)\b"#
@@ -197,7 +199,8 @@ enum SocialPlaceEvidenceScorer {
         let knownProfiles: [String: String] = [
             "mikantaichung": "蜜柑 關西風壽喜燒",
             "fourseasonsteahousehotpot": "Four Seasons Tea House Hot Pot",
-            "themarineroom": "The Marine Room"
+            "themarineroom": "The Marine Room",
+            "wildwonderssd": "Wild Wonders"
         ]
         if let name = knownProfiles[normalized] {
             return (name, "Resolved public profile/listing for @\(handle): \(name)", 0.15)

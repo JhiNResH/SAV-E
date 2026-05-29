@@ -74,6 +74,19 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
                 )
             ]
         }
+        if query.localizedCaseInsensitiveContains("5712 Via Montellano") || query.localizedCaseInsensitiveContains("Wild Wonders") {
+            return [
+                GooglePlaceMatch(
+                    id: "wild-wonders",
+                    name: "Wild Wonders",
+                    address: "5712 Via Montellano, Bonsall, CA 92003",
+                    latitude: 33.2927,
+                    longitude: -117.2089,
+                    rating: 4.9,
+                    priceLevel: nil
+                )
+            ]
+        }
         return []
     }
 
@@ -479,6 +492,52 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(analysis.placesFound.first?.venueHandles.contains("themarineroom") == true)
         XCTAssertFalse(analysis.placesFound.contains { $0.displayName == "LA JOLLA'S MOST ICONIC RESTAURANT" })
         XCTAssertFalse(analysis.placesFound.first?.evidenceChips.contains { $0.contains("@https://") } == true)
+    }
+
+    func testInstagramWildWondersVenueHandleBeatsGenericOCRHeading() {
+        let analysis = SocialPlaceParser().analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "https://www.instagram.com/reel/wildwonders/",
+                resolvedURL: nil,
+                sharedTitle: nil,
+                sharedText: """
+                San Diego weekend idea: @wildwonderssd in Bonsall offers wildlife animal encounters and sanctuary tours.
+                📍5712 Via Montellano, Bonsall, CA 92003
+                """,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: ["Things to know", "animal encounter experience"]
+            )
+        )
+
+        XCTAssertEqual(analysis.placesFound.first?.displayName, "Wild Wonders")
+        XCTAssertEqual(analysis.placesFound.first?.category, "attraction")
+        XCTAssertEqual(analysis.placesFound.first?.locationClues.first, "5712 Via Montellano, Bonsall, CA 92003")
+        XCTAssertTrue(analysis.placesFound.first?.venueHandles.contains("wildwonderssd") == true)
+        XCTAssertTrue(analysis.regionClues.contains("San Diego"))
+        XCTAssertTrue(analysis.regionClues.contains("Bonsall"))
+        XCTAssertFalse(analysis.placesFound.contains { $0.displayName.localizedCaseInsensitiveContains("Things to know") })
+    }
+
+    func testAddressOnlyHighConfidencePlacesMatchOverridesGenericOCRHeading() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: """
+            Things to know
+            Wildlife animal encounter experience near San Diego.
+            📍5712 Via Montellano, Bonsall, CA 92003
+            """,
+            sourceURL: "https://www.instagram.com/reel/wildwonders-address/"
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertEqual(candidate.candidateName, "Wild Wonders")
+        XCTAssertEqual(candidate.address, "5712 Via Montellano, Bonsall, CA 92003")
+        XCTAssertEqual(candidate.category, "attraction")
+        XCTAssertEqual(candidate.reviewState, "map_match_ready")
+        XCTAssertEqual(candidate.hasReliableCoordinates, true)
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("Things to know") })
+        XCTAssertTrue(candidate.evidence.contains("Google Places refined match: Wild Wonders"))
     }
 
     func testAgentParserMergesNumberedPlaceEvidence() {
