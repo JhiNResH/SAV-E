@@ -359,7 +359,7 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
-    func testSelectedApplePOIBecomesUnsavedMapCandidateDetail() {
+    func testSelectedApplePOIBecomesEphemeralUnsavedMapCandidateDetail() {
         let map = MapViewModel()
         let coordinate = CLLocationCoordinate2D(latitude: 33.6846, longitude: -117.8265)
 
@@ -373,9 +373,8 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(candidate?.title, "Utopia Euro Caffe")
         XCTAssertEqual(candidate?.subtitle, "Selected on map")
         XCTAssertEqual(candidate?.category, .cafe)
-        XCTAssertEqual(map.mapCandidates.first?.id, candidate?.id)
+        XCTAssertTrue(map.mapCandidates.isEmpty)
         XCTAssertTrue(candidate?.evidence.contains("Apple Maps POI") == true)
-        XCTAssertNil(map.selectedMapFeature)
         XCTAssertNil(map.selectedPlace)
     }
 
@@ -400,7 +399,6 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(map.selectedPlace?.id, savedPlace.id)
         XCTAssertNil(map.selectedMapCandidate)
         XCTAssertTrue(map.mapCandidates.isEmpty)
-        XCTAssertNil(map.selectedMapFeature)
     }
 
     func testUnsavedMapCandidatesSortByDistanceWhenScoresTie() throws {

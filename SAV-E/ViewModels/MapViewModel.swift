@@ -1178,8 +1178,7 @@ final class MapViewModel: ObservableObject {
         }
 
         if let savedPlace = places.first(where: { $0.matchesMapFeature(title: title, coordinate: coordinate) }) {
-            selectPlace(savedPlace)
-            selectedMapFeature = nil
+            selectSavedPlaceFromMapFeature(savedPlace)
             return
         }
 
@@ -1204,25 +1203,22 @@ final class MapViewModel: ObservableObject {
             evidence: evidence
         )
 
-        let selectedCandidate: SaveMapCandidate
-        if let existingCandidate = mapCandidates.first(where: { $0.id == candidate.id || $0.matches(candidate) }) {
-            var nativeSelectedCandidate = existingCandidate
-            if !nativeSelectedCandidate.evidence.contains(where: { $0.localizedCaseInsensitiveCompare("Apple Maps POI") == .orderedSame }) {
-                nativeSelectedCandidate.evidence.insert("Apple Maps POI", at: 0)
-            }
-            mapCandidates = mapCandidates.map { $0.id == nativeSelectedCandidate.id ? nativeSelectedCandidate : $0 }
-            selectedCandidate = nativeSelectedCandidate
-        } else {
-            mapCandidates = [candidate] + mapCandidates
-            selectedCandidate = candidate
-        }
-
-        selectedMapCandidate = selectedCandidate
+        selectedMapCandidate = candidate
         selectedPlace = nil
         selectedReviewCandidate = nil
         selectedSocialPlace = nil
-        selectedMapFeature = nil
-        enrichSelectedMapCandidateAfterSelection(selectedCandidate)
+        enrichSelectedMapCandidateAfterSelection(candidate)
+    }
+
+    private func selectSavedPlaceFromMapFeature(_ place: Place) {
+        selectedPlace = place
+        selectedReviewCandidate = nil
+        selectedMapCandidate = nil
+        selectedSocialPlace = nil
+        guard place.businessPhotoURLStrings.count < 2 || place.googleRating == nil || place.priceRange == nil || place.openingHours == nil else { return }
+        Task {
+            await enrichSelectedPlacePhoto(place)
+        }
     }
 
     func deletePlace(_ place: Place) async throws {
