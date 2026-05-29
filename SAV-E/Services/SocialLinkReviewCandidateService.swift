@@ -336,6 +336,7 @@ final class SocialLinkReviewCandidateService {
     func reviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
         let candidates = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
             .placesFound
+            .filter { $0.displayName != "Address-only place clue" }
             .map { pendingReviewCandidate(from: $0, sourceURL: sourceURL, sourceText: evidenceText) }
         return rankedCandidates(candidates)
     }
@@ -701,6 +702,9 @@ final class SocialLinkReviewCandidateService {
               !SocialPlaceEvidenceScorer.isRejectedTitle(candidate.candidateName) else {
             return []
         }
+        if isAddressOnlyPlaceClue(candidate), !candidate.address.isEmpty {
+            return [candidate.address]
+        }
         let cityText = cityClues
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -758,12 +762,16 @@ final class SocialLinkReviewCandidateService {
             else { score += tokenOverlap(candidateName, matchName) * 0.62 }
         }
         if !candidateAddress.isEmpty, !matchAddress.isEmpty {
-            if matchAddress == candidateAddress { score += 0.45 }
-            else if matchAddress.contains(candidateAddress) || candidateAddress.contains(matchAddress) { score += 0.38 }
-            else { score += tokenOverlap(candidateAddress, matchAddress) * 0.38 }
+            if matchAddress == candidateAddress { score += isAddressOnlyPlaceClue(candidate) ? 0.78 : 0.45 }
+            else if matchAddress.contains(candidateAddress) || candidateAddress.contains(matchAddress) { score += isAddressOnlyPlaceClue(candidate) ? 0.72 : 0.38 }
+            else { score += tokenOverlap(candidateAddress, matchAddress) * (isAddressOnlyPlaceClue(candidate) ? 0.72 : 0.38) }
         }
         if match.rating != nil { score += 0.02 }
         return min(score, 1.0)
+    }
+
+    private func isAddressOnlyPlaceClue(_ candidate: PendingReviewCandidate) -> Bool {
+        candidate.candidateName == "Address-only place clue"
     }
 
     private func tokenOverlap(_ left: String, _ right: String) -> Double {

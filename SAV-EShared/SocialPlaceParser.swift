@@ -714,6 +714,7 @@ struct SocialPlaceParser {
         candidates.append(contentsOf: bracketedCandidates(from: text, sourceURL: evidence.sourceURL))
         candidates.append(contentsOf: englishStayCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: inferredAddressCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
+        candidates.append(contentsOf: addressOnlyCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: chineseVenueCandidates(from: text, sourceURL: evidence.sourceURL))
         candidates.append(contentsOf: instagramMetadataTitleCandidates(from: lines, sourceURL: evidence.sourceURL, fullText: text))
         candidates.append(contentsOf: handleOnlyCandidates(from: handleContexts, sourceURL: evidence.sourceURL, fullText: text, creatorHandles: creatorHandles))
@@ -731,13 +732,14 @@ struct SocialPlaceParser {
             to: mergeCandidates(candidates)
         )
             .filter { !SocialPlaceEvidenceScorer.isRejectedTitle($0.displayName) }
+        let rankedMerged = prioritizeParsedCandidates(merged)
         let intent = sourceIntent(
             text: text,
             sourceType: sourceType,
             topic: topic,
             regionClues: regionClues,
             groups: sourceGroups,
-            placesFound: merged,
+            placesFound: rankedMerged,
             creatorHandles: creatorHandles
         )
         let isPlaceBearing = isPlaceBearingIntent(intent)
@@ -745,7 +747,7 @@ struct SocialPlaceParser {
             evidence: evidence,
             legacySourceType: sourceType,
             sourceIntent: intent,
-            placesFound: merged,
+            placesFound: rankedMerged,
             groups: sourceGroups,
             creatorHandles: creatorHandles,
             regionClues: regionClues
@@ -753,7 +755,7 @@ struct SocialPlaceParser {
         let resolverDecision = SocialPlaceResolverDecision.resolve(
             sourceType: understanding.sourceType,
             sourceIntent: intent,
-            placesFound: merged,
+            placesFound: rankedMerged,
             groups: sourceGroups,
             understanding: understanding,
             isPlaceBearing: isPlaceBearing
@@ -769,7 +771,7 @@ struct SocialPlaceParser {
             topic: topic,
             regionClues: regionClues,
             groups: sourceGroups,
-            placesFound: merged,
+            placesFound: rankedMerged,
             sourceActors: uniqueActors(sourceActors),
             discardedCandidates: uniqueDiscarded(discarded),
             sourceIntent: intent,
@@ -778,8 +780,8 @@ struct SocialPlaceParser {
             recoveryHints: recoveryHints(intent: intent, topic: topic, regionClues: regionClues, text: text),
             understanding: understanding,
             resolverDecision: resolverDecision,
-            confidence: sourceConfidence(sourceType: analysisSourceType, groups: sourceGroups, candidates: merged),
-            nextBestAction: merged.isEmpty
+            confidence: sourceConfidence(sourceType: analysisSourceType, groups: sourceGroups, candidates: rankedMerged),
+            nextBestAction: rankedMerged.isEmpty
                 ? isPlaceBearing
                     ? "Run source recovery search or add the exact place name/map link before saving as a Map Stamp."
                     : "Add one more clue: place name, screenshot, caption, or map link."
@@ -1021,6 +1023,29 @@ struct SocialPlaceParser {
         return cleaned
     }
 
+    private func addressOnlyCandidates(from lines: [String], sourceURL: String, fullText: String) -> [SocialPlaceCandidateDraft] {
+        lines.compactMap { line in
+            guard SocialPlaceEvidenceScorer.looksLikeAddressLine(line),
+                  !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line),
+                  !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(line) else { return nil }
+            let address = firstLocationClue(in: line) ?? cleanLocationMarker(from: line)
+            guard !address.isEmpty else { return nil }
+            return draft(
+                name: "Address-only place clue",
+                category: category(from: "\(address)\n\(fullText)"),
+                sourceURL: sourceURL,
+                fullText: fullText,
+                locationClues: [address],
+                atoms: [
+                    SocialEvidenceAtom(source: .captionSentence, role: .address, value: address, line: line, confidence: 0.7)
+                ],
+                confidence: 0.5,
+                tier: .weakCandidate,
+                extraMissingInfo: ["Address-only clue; enrich with Google Places before saving"]
+            )
+        }
+    }
+
     private func chineseVenueCandidates(from text: String, sourceURL: String) -> [SocialPlaceCandidateDraft] {
         var names: [String] = []
         if let quoted = quotedVenueName(in: text) {
@@ -1236,6 +1261,12 @@ struct SocialPlaceParser {
         return orderedKeys.compactMap { merged[$0] }
     }
 
+    private func prioritizeParsedCandidates(_ candidates: [SocialPlaceCandidateDraft]) -> [SocialPlaceCandidateDraft] {
+        let namedCandidates = candidates.filter { $0.displayName != "Address-only place clue" }
+        let addressOnlyCandidates = candidates.filter { $0.displayName == "Address-only place clue" }
+        return namedCandidates + addressOnlyCandidates
+    }
+
     // MARK: - Handles
 
     private struct HandleContext {
@@ -1266,7 +1297,7 @@ struct SocialPlaceParser {
             return (.creatorHandle, "Appears near creator/follow language; not near a venue line.")
         }
         if numberedName(from: line) != nil ||
-            line.range(of: #"(?i)\b(?:staying at|located at|located in|known for|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse)\b"#, options: .regularExpression) != nil {
+            line.range(of: #"(?i)\b(?:staying at|located at|located in|known for|offers?|experience|encounters?|sanctuary|tours?|wildlife|animal|book|reserve|hotel|resort|restaurant|cafe|airbnb|villa|treehouse)\b"#, options: .regularExpression) != nil {
             return (.venueHandle, "Appears inside a venue/stay/place line.")
         }
         if looksLikeSocialPlaceList(fullText), handles(in: line).count > 0 {
@@ -1491,7 +1522,7 @@ struct SocialPlaceParser {
     private func firstStreetAddress(in text: String) -> String? {
         firstCapture(
             in: text,
-            pattern: #"\b(\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy|Old Street)(?:\s*\([^\n\r)]{2,40}\))?(?:,?\s*[A-Za-z0-9 .'-]{2,60}){0,2}(?:,?\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO))?(?:\s+\d{5}(?:-\d{4})?)?)\b"#
+            pattern: #"\b(\d{1,6}\s+Via\s+[A-Za-z0-9 .'-]{2,80}(?:,\s*[A-Za-z .'-]{2,40})?(?:,\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO))?(?:\s+\d{5}(?:-\d{4})?)?|\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy|Place|Pl\.?|Court|Ct\.?|Old Street)(?:\s*\([^\n\r)]{2,40}\))?(?:,?\s*[A-Za-z0-9 .'-]{2,60}){0,2}(?:,?\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO))?(?:\s+\d{5}(?:-\d{4})?)?)\b"#
         )
     }
 
@@ -1672,7 +1703,7 @@ struct SocialPlaceParser {
         if lowered.range(of: #"airbnb|stay|hotel|resort|villa|home|cabin|treehouse|marriott|hyatt|hilton|lodge|inn|glamping|retreat"#, options: .regularExpression) != nil {
             return "stay"
         }
-        if lowered.range(of: #"\b(pottery|ceramics?|studio|workshops?|classes?|lessons?|experience|atelier)\b"#, options: .regularExpression) != nil {
+        if lowered.range(of: #"\b(pottery|ceramics?|studio|workshops?|classes?|lessons?|experiences?|atelier|wildlife|animal\s+encounters?|sanctuary|tours?|zoo|aquarium|safari)\b"#, options: .regularExpression) != nil {
             return "attraction"
         }
         if lowered.range(of: #"\b(restaurant|food|eat|cafe|coffee|tea|bar|hot pot|sukiyaki|yakiniku)\b"#, options: .regularExpression) != nil {
@@ -1977,7 +2008,7 @@ struct SocialPlaceParser {
 
     private func hasPlaceCategorySignal(_ text: String) -> Bool {
         text.range(
-            of: #"\b(?:restaurants?|cafes?|coffee shops?|bars?|bakeries|dessert shops?|hotels?|resorts?|places to eat|things to do|hidden gems?)\b|(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡廳|餐廳|餐厅|小吃|美食|店)"#,
+            of: #"\b(?:restaurants?|cafes?|coffee shops?|bars?|bakeries|dessert shops?|hotels?|resorts?|places to eat|things to do|hidden gems?|wildlife|animal\s+encounters?|sanctuar(?:y|ies)|tours?|experiences?)\b|(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡廳|餐廳|餐厅|小吃|美食|店)"#,
             options: .regularExpression
         ) != nil
     }
@@ -2004,6 +2035,7 @@ struct SocialPlaceParser {
         let lowered = clue.lowercased()
         if lowered == "losangeles" || lowered == "la" || lowered == "lacoffee" { return "LA" }
         if lowered == "orangecounty" || lowered == "oc" || lowered == "ocfood" { return "Orange County" }
+        if lowered == "sandiego" { return "San Diego" }
         if lowered == "newyork" { return "New York" }
         if clue == "臺南" { return "台南" }
         if clue == "臺北" { return "台北" }
@@ -2056,6 +2088,8 @@ struct SocialPlaceParser {
             #"(?i)(?:^|[^A-Za-z])(LA)(?:[^A-Za-z]|$)"#,
             #"(?i)\bLos Angeles County\b"#,
             #"(?i)\bLos Angeles\b"#,
+            #"(?i)\bSan Diego\b"#,
+            #"(?i)\bBonsall\b"#,
             #"(?i)\bThai\s+Town\b"#,
             #"洛杉[矶磯]"#,
             #"(?i)\bOrange County\b"#,
