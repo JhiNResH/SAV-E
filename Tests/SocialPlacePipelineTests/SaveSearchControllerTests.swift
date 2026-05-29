@@ -358,6 +358,51 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertNil(map.calculatedRoute)
     }
 
+    @MainActor
+    func testSelectedApplePOIBecomesUnsavedMapCandidateDetail() {
+        let map = MapViewModel()
+        let coordinate = CLLocationCoordinate2D(latitude: 33.6846, longitude: -117.8265)
+
+        map.selectMapPOI(
+            title: "Utopia Euro Caffe",
+            coordinate: coordinate,
+            pointOfInterestCategory: "MKPOICategoryCafe"
+        )
+
+        let candidate = map.selectedMapCandidate
+        XCTAssertEqual(candidate?.title, "Utopia Euro Caffe")
+        XCTAssertEqual(candidate?.subtitle, "Selected on map")
+        XCTAssertEqual(candidate?.category, .cafe)
+        XCTAssertEqual(map.mapCandidates.first?.id, candidate?.id)
+        XCTAssertTrue(candidate?.evidence.contains("Apple Maps POI") == true)
+        XCTAssertNil(map.selectedMapFeature)
+        XCTAssertNil(map.selectedPlace)
+    }
+
+    @MainActor
+    func testSelectedApplePOIMatchesSavedPlaceInsteadOfCreatingUnsavedCandidate() {
+        let savedPlace = place(
+            name: "Utopia Euro Caffe",
+            address: "Irvine, CA",
+            category: .cafe,
+            latitude: 33.6846,
+            longitude: -117.8265
+        )
+        let map = MapViewModel()
+        map.places = [savedPlace]
+
+        map.selectMapPOI(
+            title: "Utopia Euro Caffe",
+            coordinate: CLLocationCoordinate2D(latitude: 33.68461, longitude: -117.82651),
+            pointOfInterestCategory: "MKPOICategoryCafe"
+        )
+
+        XCTAssertEqual(map.selectedPlace?.id, savedPlace.id)
+        XCTAssertNil(map.selectedMapCandidate)
+        XCTAssertTrue(map.mapCandidates.isEmpty)
+        XCTAssertNil(map.selectedMapFeature)
+    }
+
     func testUnsavedMapCandidatesSortByDistanceWhenScoresTie() throws {
         let controller = SaveSearchController()
         let response = controller.search(
