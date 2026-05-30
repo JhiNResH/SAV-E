@@ -32,7 +32,7 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .saved: return "Saved"
+        case .saved: return "Stamps"
         case .review: return "Review"
         case .lists: return "Lists"
         case .friends: return "Friends"
@@ -732,7 +732,7 @@ struct AIDrawerView: View {
         case .displaying:
             return languageSettings.text(.answerSubtitle)
         case .saveSearchResults:
-            return "Map Stamps first, unsaved recommendations separate"
+            return "Memory first, public discovery separate"
         case .placeDetail:
             return languageSettings.text(.placeDetailSubtitle)
         case .reviewCandidateDetail(let candidate):
@@ -907,11 +907,11 @@ struct AIDrawerView: View {
     }
 
     private let suggestions = [
-        "I want boba today",
-        "Coffee from my Map Stamps",
-        "Plan a day from my Map Stamps",
-        "Navigate to the nearest cafe",
-        "Show waiting clues",
+        "Date night from my Map Stamps",
+        "Coffee from my saved places first",
+        "Plan Tokyo from my Map Stamps",
+        "What is nearby from my memory?",
+        "Show Review clues",
     ]
 
     private var quickActionStrip: some View {
@@ -921,7 +921,7 @@ struct AIDrawerView: View {
 
             HStack(spacing: 9) {
                 DrawerActionChip(
-                    title: "Saved",
+                    title: "Map Stamps",
                     systemImage: "list.bullet.rectangle",
                     count: viewModel.places.isEmpty ? nil : viewModel.places.count,
                     fill: Color.saveMint.opacity(0.36),
@@ -929,7 +929,7 @@ struct AIDrawerView: View {
                 )
 
                 DrawerActionChip(
-                    title: "Review",
+                    title: "Review Nest",
                     systemImage: "checklist.unchecked",
                     count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
                     fill: Color.saveHoney.opacity(0.42),
@@ -948,7 +948,7 @@ struct AIDrawerView: View {
 
             HStack(spacing: 9) {
                 DrawerActionChip(
-                    title: "Takeout",
+                    title: "Sources",
                     systemImage: "tray.and.arrow.down",
                     count: nil,
                     fill: Color.saveSky.opacity(0.34),
@@ -956,12 +956,12 @@ struct AIDrawerView: View {
                 )
 
                 DrawerActionChip(
-                    title: "Plan",
+                    title: "Ask",
                     systemImage: "map.fill",
                     count: nil,
                     fill: Color.saveSignal.opacity(0.30),
                     action: {
-                        focusAgentPrompt("Plan a day from my Map Stamps")
+                        focusAgentPrompt("Plan from my Map Stamps first")
                     }
                 )
             }
@@ -992,7 +992,7 @@ struct AIDrawerView: View {
 
     private var socialSignalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            NotebookBandLabel("Social map")
+            NotebookBandLabel("Friend signal")
                 .padding(.horizontal, 16)
 
             HStack(spacing: 7) {
@@ -1111,11 +1111,11 @@ struct AIDrawerView: View {
     private var socialSignalEmptyMessage: String {
         switch socialLens {
         case .forYou:
-            return "Friends' saved places will appear here after you follow someone."
+            return "Friend-shared places will appear here when someone shares real saved spots with you."
         case .friends:
             return "No shared friend places yet. SAV-E only shows places friends chose to share."
         case .trending:
-            return "Trending stays empty until enough public Map Stamps exist for this area and category."
+            return "Trending stays empty until there is enough real shared place signal for this area and category."
         }
     }
 
@@ -1202,9 +1202,9 @@ struct AIDrawerView: View {
 
                 AgentCommandRow(
                     icon: "sparkle.magnifyingglass",
-                    title: "Add a place clue",
-                    subtitle: "Links, posts, maps, screenshots, lists, or notes",
-                    commandLabel: "review first",
+                    title: "Capture a place intent",
+                    subtitle: "Save what caught your eye now; decide from it later.",
+                    commandLabel: "decision later",
                     tone: .cocoa,
                     isPrimary: true
                 ) {
@@ -1214,7 +1214,7 @@ struct AIDrawerView: View {
                 HStack(spacing: 9) {
                     AgentCommandCard(
                         icon: "circle.hexagongrid.fill",
-                        title: "Review",
+                        title: "Review Nest",
                         subtitle: "Confirm candidates before Map Stamps",
                         commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
                         tone: .honey
@@ -1224,7 +1224,7 @@ struct AIDrawerView: View {
 
                     AgentCommandCard(
                         icon: "link",
-                        title: "Clipboard",
+                        title: "Recent Source",
                         subtitle: "Recover one copied place link",
                         commandLabel: "source clue",
                         tone: .signal
@@ -1236,7 +1236,7 @@ struct AIDrawerView: View {
                 HStack(spacing: 9) {
                     AgentCommandCard(
                         icon: "note.text",
-                        title: "Notes",
+                        title: "Lists / Notes",
                         subtitle: "Turn a rough list into clues",
                         commandLabel: "review first",
                         tone: .honey
@@ -1279,15 +1279,15 @@ struct AIDrawerView: View {
 
                 AgentCommandRow(
                     icon: "map.fill",
-                    title: "Plan around Map Stamps",
-                    subtitle: "Ask SAV-E from confirmed private places first.",
-                    commandLabel: "uses Map Stamps",
+                    title: "Ask your saved places",
+                    subtitle: "Decision answers start from your memory, then public discovery if needed.",
+                    commandLabel: "memory first",
                     tone: .sky
                 ) {
                     focusAgentPrompt("""
                     Help me organize my Map Stamps into a practical plan.
 
-                    Use only Map Stamps unless I explicitly ask you to investigate new candidates. Start with:
+                    Use my saved Map Stamps first. If you need public discovery, label it separately. Start with:
                     """)
                 }
             }

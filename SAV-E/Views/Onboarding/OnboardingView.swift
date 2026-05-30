@@ -16,13 +16,13 @@ struct OnboardingView: View {
                     MemoMascotMark(size: 92, framed: false)
 
                     VStack(spacing: 8) {
-                        Text("Stop losing places you already wanted to try")
+                        Text("Capture intent now. Use it when deciding.")
                             .font(.title2)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
                             .multilineTextAlignment(.center)
 
-                        Text("Add links, lists, maps, screenshots, or notes. SAV-E turns them into private Map Stamps after Review.")
+                        Text("Save the place today, let SAV-E wake it up for date night, nearby coffee, or Tokyo next month.")
                             .font(.subheadline)
                             .lineSpacing(3)
                             .foregroundColor(.saveMutedText)
@@ -73,10 +73,10 @@ private enum FirstRunDemoState: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .clue: return "Source clue saved"
+        case .clue: return "Import a place you saved"
         case .candidate: return "Review before saving"
-        case .mapStamp: return "Private Map Stamp"
-        case .tripPlan: return "Ask from your places"
+        case .mapStamp: return "Confirm into Map Stamp"
+        case .tripPlan: return "Ask when deciding"
         }
     }
 
@@ -91,19 +91,19 @@ private enum FirstRunDemoState: String, CaseIterable {
 
     var input: String {
         switch self {
-        case .clue: return "instagram.com/reel/..."
-        case .candidate: return "Speranza dinner clip"
+        case .clue: return "friend's Reel, map list, or link"
+        case .candidate: return "one Review Candidate"
         case .mapStamp: return "Speranza · Silver Lake"
-        case .tripPlan: return "Coffee near my saved spots"
+        case .tripPlan: return "date night near my saved spots"
         }
     }
 
     var known: String {
         switch self {
-        case .clue: return "source link + place hint"
+        case .clue: return "source + why it caught your eye"
         case .candidate: return "source text + map name + neighborhood"
         case .mapStamp: return "confirmed place identity"
-        case .tripPlan: return "saved-first options nearby"
+        case .tripPlan: return "memory first, public second"
         }
     }
 
@@ -112,7 +112,7 @@ private enum FirstRunDemoState: String, CaseIterable {
         case .clue: return "exact map place"
         case .candidate: return "your confirmation"
         case .mapStamp: return "nothing before saving"
-        case .tripPlan: return "new places only if needed"
+        case .tripPlan: return "public discovery if needed"
         }
     }
 

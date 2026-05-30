@@ -172,7 +172,7 @@ enum SaveText {
         case .opening:
             return localized(english: "Opening SAV-E", traditionalChinese: "正在開啟 SAV-E", language: language)
         case .openingHint:
-            return localized(english: "Saving your place memory", traditionalChinese: "整理你的地點記憶", language: language)
+            return localized(english: "Waking up your place memory", traditionalChinese: "喚醒你的地點記憶", language: language)
         case .tripLinkReady:
             return localized(english: "Trip Link Ready", traditionalChinese: "行程連結已準備好", language: language)
         case .tripLinkMessage:
@@ -208,7 +208,7 @@ enum SaveText {
         case .signInTagline:
             return localized(english: "Your private place memory.", traditionalChinese: "你的私人地點記憶。", language: language)
         case .signInDescription:
-            return localized(english: "Add links, posts, screenshots, notes, or maps. SAV-E keeps uncertain places in Review before they become Map Stamps.", traditionalChinese: "加入連結、貼文、截圖、筆記或地圖。SAV-E 會先把不確定的地點放進 Review，再變成地圖章。", language: language)
+            return localized(english: "Add links, posts, screenshots, notes, or maps. SAV-E captures why you saved them, keeps uncertain places in Review, and wakes them up when you need a decision.", traditionalChinese: "加入連結、貼文、截圖、筆記或地圖。SAV-E 會保留你為什麼存、不確定的先放進 Review，等你要決定時再喚醒。", language: language)
         case .capture:
             return localized(english: "Capture", traditionalChinese: "捕捉", language: language)
         case .captureSubtitle:
@@ -274,7 +274,7 @@ enum SaveText {
         case .signOut:
             return localized(english: "Sign Out", traditionalChinese: "登出", language: language)
         case .askPlaceholder:
-            return localized(english: "Ask SAV-E or paste a place...", traditionalChinese: "問 SAV-E 或貼上地點...", language: language)
+            return localized(english: "Ask saved places or paste a spot...", traditionalChinese: "問已存地點或貼上新地點...", language: language)
         case .openReviewCandidates:
             return localized(english: "Open review candidates", traditionalChinese: "開啟待確認地點", language: language)
         case .memoSorting:

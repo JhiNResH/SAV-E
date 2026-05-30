@@ -15,6 +15,18 @@ Working line:
 SAV-E turns the restaurants, cafes, attractions, and travel spots you saved everywhere into your private map memory.
 ```
 
+Core thesis:
+
+```text
+SAV-E captures intent at discovery time and activates it at decision time.
+```
+
+Examples:
+
+- Today: a friend sends a restaurant, or the user sees it on IG/TikTok/Xiaohongshu -> SAV-E saves the source as a clue/candidate.
+- Two weeks later: date night nearby -> SAV-E wakes up trusted saved places first.
+- Next month: Tokyo trip -> SAV-E turns confirmed place memory into a plan.
+
 Short App Store hook:
 
 ```text
@@ -42,6 +54,62 @@ The opening is trust and control:
 - source evidence stays visible;
 - uncertain places stay in Review;
 - public recommendations are clearly separated from `From your SAV-E`.
+
+## Product Rules
+
+### Memory First, Discovery Second
+
+Default answer from my memory first; public discovery second and clearly labeled.
+
+SAV-E should not begin by asking:
+
+```text
+What kind of traveler are you?
+```
+
+It should begin from the user's real data:
+
+- saved places;
+- friend-shared places;
+- Google Maps saved lists;
+- IG/TikTok/Xiaohongshu links;
+- tried places and private review history.
+
+### Every Saved Place Carries Context
+
+Every saved place should carry source, state, tags/reasons, and next-best action.
+
+Each Map Stamp should eventually know:
+
+- why it was saved;
+- who shared it;
+- original source;
+- confirmation state;
+- suitable context;
+- tried/untried state;
+- private review;
+- whether it is relevant nearby right now.
+
+### Map Is A Work View
+
+Map is not the entire app identity. The main product identity is private place memory.
+
+Map states must remain distinct:
+
+- confirmed Map Stamp;
+- Review Candidate;
+- Source-only clue;
+- unsaved public map result.
+
+### Drawer Gives Next Action
+
+The drawer is the agent/action surface, not a generic chat tab.
+
+- Source-only clue -> Find exact place.
+- Review Candidate -> Confirm / edit / reject.
+- Unsaved map result -> Save as Map Stamp.
+- Saved place -> Plan around this / add note / mark tried.
+- Decision query -> answer from saved places first.
 
 ## Product Boundary
 
@@ -111,9 +179,10 @@ Do not lead with:
 ### P0 - First-Run Positioning
 
 - Replace generic vault or itinerary wording with private place memory wording.
-- First screen should answer: "I saved this somewhere. Can SAV-E help me use it now?"
+- First screen should answer: "I saved this somewhere. Can SAV-E help me use it when I need a decision?"
 - Show one real capture path: Share Sheet / paste link / Google Maps list.
 - CTA should be `Add Spots` / `Save a Place`, not a vague AI prompt.
+- Show the sequence in 20 seconds: import a place already saved elsewhere -> Review Candidate -> confirmed Map Stamp -> ask SAV-E to plan around saved places.
 
 Acceptance:
 
@@ -136,13 +205,13 @@ Acceptance:
 ### P0 - Ask Saved Places First
 
 - Nearby/date/trip queries should retrieve saved/review candidates deterministically before LLM narration.
-- Split results into `From your SAV-E`, `Review candidates`, and `New recommendations`.
+- Split results into `From your SAV-E`, `Review candidates`, and `Public discovery`.
 - LLM may explain or summarize, but cannot create place identity, category, coordinates, or confirmation state.
 
 Acceptance:
 
 - "nearby coffee" and "nearby restaurant" return saved-first sections when available.
-- Public fallback is labeled and never mixed into `From your SAV-E`.
+- Public fallback is labeled as public discovery and never mixed into `From your SAV-E`.
 - Wrong category and wrong location cannot satisfy a category/location ask.
 
 ### P1 - Roamy-Parity Capture
