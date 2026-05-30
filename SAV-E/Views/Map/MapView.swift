@@ -149,7 +149,12 @@ struct PlaceMapPin: View {
 
     var body: some View {
         Button(action: onTap) {
-            DefaultPOIMarker(isSelected: isSelected)
+            DefaultPOIMarker(
+                systemName: place.category.iconName,
+                tint: place.category.mapTint,
+                isSelected: isSelected,
+                showsSavedBadge: true
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(place.name) Map Stamp")
@@ -163,7 +168,12 @@ private struct SocialPlaceMapPin: View {
 
     var body: some View {
         Button(action: onTap) {
-            DefaultPOIMarker(isSelected: isSelected)
+            DefaultPOIMarker(
+                systemName: place.category.iconName,
+                tint: place.category.mapTint,
+                isSelected: isSelected,
+                showsSavedBadge: true
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(place.name) social place")
@@ -178,7 +188,12 @@ private struct ReviewCandidateMapPin: View {
 
     var body: some View {
         Button(action: onTap) {
-            DefaultPOIMarker(isSelected: isSelected)
+            DefaultPOIMarker(
+                systemName: "doc.text.magnifyingglass",
+                tint: .saveHoney,
+                isSelected: isSelected,
+                showsSavedBadge: false
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(candidate.name) Review Candidate")
@@ -193,7 +208,12 @@ private struct UnsavedMapCandidatePin: View {
 
     var body: some View {
         Button(action: onTap) {
-            DefaultPOIMarker(isSelected: isSelected)
+            DefaultPOIMarker(
+                systemName: candidate.category?.iconName ?? "mappin.circle.fill",
+                tint: candidate.category?.mapTint ?? .saveSky,
+                isSelected: isSelected,
+                showsSavedBadge: false
+            )
         }
         .buttonStyle(.plain)
         .zIndex(isSelected ? 10 : 0)
@@ -203,16 +223,52 @@ private struct UnsavedMapCandidatePin: View {
 }
 
 private struct DefaultPOIMarker: View {
+    var systemName: String
+    var tint: Color
     var isSelected: Bool
+    var showsSavedBadge: Bool
 
     var body: some View {
-        Image(systemName: "mappin.circle.fill")
-            .font(.system(size: isSelected ? 26 : 22, weight: .semibold))
-            .foregroundStyle(.red)
-            .shadow(color: Color.black.opacity(0.16), radius: isSelected ? 3 : 1, x: 0, y: 1)
-            .scaleEffect(isSelected ? 1.04 : 1)
-            .animation(.easeInOut(duration: 0.12), value: isSelected)
-            .contentShape(Rectangle())
+        ZStack {
+            Circle()
+                .fill(.regularMaterial)
+                .overlay(Circle().fill(tint.opacity(isSelected ? 0.24 : 0.16)))
+                .overlay(
+                    Circle()
+                        .stroke(showsSavedBadge ? Color.saveSignal.opacity(0.72) : Color.white.opacity(0.86), lineWidth: isSelected ? 2.4 : 1.8)
+                )
+                .frame(width: isSelected ? 34 : 30, height: isSelected ? 34 : 30)
+
+            Image(systemName: systemName)
+                .font(.system(size: isSelected ? 17 : 15, weight: .bold))
+                .foregroundStyle(tint)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if showsSavedBadge {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: isSelected ? 11 : 10, weight: .black))
+                    .foregroundStyle(Color.saveSignal)
+                    .background(Circle().fill(Color.white.opacity(0.92)))
+                    .offset(x: 2, y: 2)
+            }
+        }
+        .shadow(color: Color.black.opacity(0.16), radius: isSelected ? 4 : 2, x: 0, y: 1)
+        .scaleEffect(isSelected ? 1.06 : 1)
+        .animation(.easeInOut(duration: 0.12), value: isSelected)
+        .contentShape(Rectangle())
+    }
+}
+
+private extension PlaceCategory {
+    var mapTint: Color {
+        switch self {
+        case .food: return .orange
+        case .cafe: return .brown
+        case .bar: return .purple
+        case .attraction: return .pink
+        case .stay: return .blue
+        case .shopping: return .saveHoney
+        }
     }
 }
 

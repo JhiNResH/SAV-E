@@ -3243,28 +3243,34 @@ private struct SavedPlacesSection: View {
             if places.isEmpty {
                 SavedPlacesEmptyState(isFiltered: isFiltered)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                        SavedPlaceRow(place: place) {
-                            onSelect(place)
-                        }
+                VStack(spacing: 12) {
+                    ForEach(categorySections, id: \.category) { section in
+                        VStack(spacing: 0) {
+                            SavedCategoryHeader(category: section.category, count: section.places.count)
 
-                        if index < places.count - 1 {
-                            Divider()
-                                .padding(.leading, 64)
+                            ForEach(Array(section.places.enumerated()), id: \.element.id) { index, place in
+                                SavedPlaceRow(place: place) {
+                                    onSelect(place)
+                                }
+
+                                if index < section.places.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 64)
+                                }
+                            }
                         }
+                        .background {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(.regularMaterial)
+                                .overlay(groupTint)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Color.saveNotebookLine.opacity(0.12), lineWidth: 1)
+                        )
                     }
                 }
-                .background {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay(groupTint)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.12), lineWidth: 1)
-                )
             }
         }
     }
@@ -3290,6 +3296,49 @@ private struct SavedPlacesSection: View {
     private var groupTint: Color {
         colorScheme == .dark ? Color.saveNotebookPage.opacity(0.58) : Color.white.opacity(0.30)
     }
+
+    private var categorySections: [(category: PlaceCategory, places: [Place])] {
+        PlaceCategory.allCases.compactMap { category in
+            let sectionPlaces = places.filter { $0.category == category }
+            return sectionPlaces.isEmpty ? nil : (category, sectionPlaces)
+        }
+    }
+}
+
+private struct SavedCategoryHeader: View {
+    var category: PlaceCategory
+    var count: Int
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: category.outlineIconName)
+                .font(.caption.weight(.black))
+                .foregroundColor(category.drawerTint)
+                .frame(width: 28, height: 28)
+                .background(category.drawerTint.opacity(0.16))
+                .clipShape(Circle())
+
+            Text(category.displayName)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+
+            Spacer()
+
+            Text("\(count)")
+                .font(.caption.monospacedDigit().weight(.black))
+                .foregroundColor(.saveCocoa.opacity(0.72))
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color.white.opacity(0.08))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.saveNotebookLine.opacity(0.12))
+                .frame(height: 1)
+                .padding(.leading, 64)
+        }
+    }
 }
 
 private struct SavedPlaceRow: View {
@@ -3308,10 +3357,13 @@ private struct SavedPlaceRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.red)
+                Image(systemName: place.category.iconName)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(place.category.drawerTint)
                     .frame(width: 42, height: 42)
+                    .background(place.category.drawerTint.opacity(0.18))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.saveSignal.opacity(0.28), lineWidth: 1.2))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(place.name)
@@ -4012,6 +4064,17 @@ private extension PlaceCategory {
         case .attraction: return "star"
         case .stay: return "bed.double"
         case .shopping: return "bag"
+        }
+    }
+
+    var drawerTint: Color {
+        switch self {
+        case .food: return .orange
+        case .cafe: return .brown
+        case .bar: return .purple
+        case .attraction: return .pink
+        case .stay: return .blue
+        case .shopping: return .saveHoney
         }
     }
 }
