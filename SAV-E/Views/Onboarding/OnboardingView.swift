@@ -16,13 +16,13 @@ struct OnboardingView: View {
                     MemoMascotMark(size: 92, framed: false)
 
                     VStack(spacing: 8) {
-                        Text("Drop a messy place link")
+                        Text("Stop losing places you already wanted to try")
                             .font(.title2)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
                             .multilineTextAlignment(.center)
 
-                        Text("SAV-E reads the source, shows what it knows, and keeps uncertain places in Review.")
+                        Text("Add links, lists, maps, screenshots, or notes. SAV-E turns them into private Map Stamps after Review.")
                             .font(.subheadline)
                             .lineSpacing(3)
                             .foregroundColor(.saveMutedText)
@@ -35,7 +35,7 @@ struct OnboardingView: View {
                     FirstRunPlaceDemoCard(state: selectedState)
 
                     Button(action: onComplete) {
-                        Text("Paste your first place")
+                        Text("Add Spots")
                             .font(.headline)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
@@ -66,17 +66,17 @@ struct OnboardingView: View {
 // MARK: - First Run Demo
 
 private enum FirstRunDemoState: String, CaseIterable {
-    case clue = "Clue"
+    case clue = "Source Clue"
     case candidate = "Review Candidate"
     case mapStamp = "Map Stamp"
-    case tripPlan = "Trip Plan"
+    case tripPlan = "Ask / Plan"
 
     var title: String {
         switch self {
-        case .clue: return "Found a place clue"
-        case .candidate: return "Possible match"
-        case .mapStamp: return "Saved as Map Stamp"
-        case .tripPlan: return "Trip shell ready"
+        case .clue: return "Source clue saved"
+        case .candidate: return "Review before saving"
+        case .mapStamp: return "Private Map Stamp"
+        case .tripPlan: return "Ask from your places"
         }
     }
 
@@ -94,16 +94,16 @@ private enum FirstRunDemoState: String, CaseIterable {
         case .clue: return "instagram.com/reel/..."
         case .candidate: return "Speranza dinner clip"
         case .mapStamp: return "Speranza · Silver Lake"
-        case .tripPlan: return "Weekend around Silver Lake"
+        case .tripPlan: return "Coffee near my saved spots"
         }
     }
 
     var known: String {
         switch self {
-        case .clue: return "food + neighborhood hint"
+        case .clue: return "source link + place hint"
         case .candidate: return "source text + map name + neighborhood"
         case .mapStamp: return "confirmed place identity"
-        case .tripPlan: return "1 anchor + 2 nearby Map Stamps"
+        case .tripPlan: return "saved-first options nearby"
         }
     }
 
@@ -112,7 +112,7 @@ private enum FirstRunDemoState: String, CaseIterable {
         case .clue: return "exact map place"
         case .candidate: return "your confirmation"
         case .mapStamp: return "nothing before saving"
-        case .tripPlan: return "final route review"
+        case .tripPlan: return "new places only if needed"
         }
     }
 
@@ -120,8 +120,8 @@ private enum FirstRunDemoState: String, CaseIterable {
         switch self {
         case .clue: return "Find exact place"
         case .candidate: return "Confirm candidate"
-        case .mapStamp: return "Plan around this"
-        case .tripPlan: return "Review plan"
+        case .mapStamp: return "Ask around this"
+        case .tripPlan: return "Open suggestions"
         }
     }
 
@@ -191,7 +191,7 @@ private struct FirstRunPlaceDemoCard: View {
                         .fontWeight(.black)
                         .foregroundColor(.saveInk)
 
-                    Text("Clue -> Candidate -> Map Stamp -> Trip Plan")
+                    Text("Source Clue -> Review Candidate -> Map Stamp -> Ask / Plan")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.saveMutedText)

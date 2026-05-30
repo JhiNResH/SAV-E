@@ -40,9 +40,9 @@ final class AppLanguageSettings: ObservableObject {
     func memoWaitingText(_ count: Int) -> String {
         switch language {
         case .english:
-            return count == 1 ? "Memo has 1 clue waiting" : "Memo has \(count) clues waiting"
+            return count == 1 ? "SAV-E has 1 clue waiting" : "SAV-E has \(count) clues waiting"
         case .traditionalChinese:
-            return count == 1 ? "Memo 有 1 個線索待確認" : "Memo 有 \(count) 個線索待確認"
+            return count == 1 ? "SAV-E 有 1 個線索待確認" : "SAV-E 有 \(count) 個線索待確認"
         }
     }
 
@@ -206,9 +206,9 @@ enum SaveText {
         case .verify:
             return localized(english: "Verify", traditionalChinese: "驗證", language: language)
         case .signInTagline:
-            return localized(english: "Your personal place memory.", traditionalChinese: "你的個人地點記憶庫。", language: language)
+            return localized(english: "Your private place memory.", traditionalChinese: "你的私人地點記憶。", language: language)
         case .signInDescription:
-            return localized(english: "Drop in links, posts, screenshots, notes, or maps. Memo helps SAV-E turn them into Review Candidates or Map Stamps.", traditionalChinese: "丟進連結、貼文、截圖、筆記或地圖，Memo 會幫 SAV-E 轉成待確認地點或地圖章。", language: language)
+            return localized(english: "Add links, posts, screenshots, notes, or maps. SAV-E keeps uncertain places in Review before they become Map Stamps.", traditionalChinese: "加入連結、貼文、截圖、筆記或地圖。SAV-E 會先把不確定的地點放進 Review，再變成地圖章。", language: language)
         case .capture:
             return localized(english: "Capture", traditionalChinese: "捕捉", language: language)
         case .captureSubtitle:
@@ -274,11 +274,11 @@ enum SaveText {
         case .signOut:
             return localized(english: "Sign Out", traditionalChinese: "登出", language: language)
         case .askPlaceholder:
-            return localized(english: "Ask or search your SAV-E...", traditionalChinese: "搜尋或詢問你的 SAV-E...", language: language)
+            return localized(english: "Ask SAV-E or paste a place...", traditionalChinese: "問 SAV-E 或貼上地點...", language: language)
         case .openReviewCandidates:
             return localized(english: "Open review candidates", traditionalChinese: "開啟待確認地點", language: language)
         case .memoSorting:
-            return localized(english: "Memo is sorting the clues...", traditionalChinese: "Memo 正在整理線索...", language: language)
+            return localized(english: "SAV-E is sorting the clues...", traditionalChinese: "SAV-E 正在整理線索...", language: language)
         case .cancel:
             return localized(english: "Cancel", traditionalChinese: "取消", language: language)
         case .back:

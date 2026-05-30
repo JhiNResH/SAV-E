@@ -1198,13 +1198,13 @@ struct AIDrawerView: View {
             FieldNotebookHeader(memoryCount: viewModel.places.count, clueCount: reviewCandidates.count)
 
             VStack(alignment: .leading, spacing: 9) {
-                NotebookBandLabel("Command Console")
+                NotebookBandLabel("Add Spots")
 
                 AgentCommandRow(
                     icon: "sparkle.magnifyingglass",
-                    title: "Paste your first place",
-                    subtitle: "IG, TikTok, Google Maps, Apple Maps, blog, or note",
-                    commandLabel: "evidence first",
+                    title: "Add a place clue",
+                    subtitle: "Links, posts, maps, screenshots, lists, or notes",
+                    commandLabel: "review first",
                     tone: .cocoa,
                     isPrimary: true
                 ) {
@@ -1215,7 +1215,7 @@ struct AIDrawerView: View {
                     AgentCommandCard(
                         icon: "circle.hexagongrid.fill",
                         title: "Review",
-                        subtitle: "Turn Review Candidates into Map Stamps",
+                        subtitle: "Confirm candidates before Map Stamps",
                         commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
                         tone: .honey
                     ) {
@@ -1225,8 +1225,8 @@ struct AIDrawerView: View {
                     AgentCommandCard(
                         icon: "link",
                         title: "Clipboard",
-                        subtitle: "Read one copied URL",
-                        commandLabel: "metadata",
+                        subtitle: "Recover one copied place link",
+                        commandLabel: "source clue",
                         tone: .signal
                     ) {
                         importClipboardURL()
@@ -1237,8 +1237,8 @@ struct AIDrawerView: View {
                     AgentCommandCard(
                         icon: "note.text",
                         title: "Notes",
-                        subtitle: "Paste a rough list",
-                        commandLabel: "review only",
+                        subtitle: "Turn a rough list into clues",
+                        commandLabel: "review first",
                         tone: .honey
                     ) {
                         focusAgentPrompt("""
@@ -1253,8 +1253,8 @@ struct AIDrawerView: View {
                     AgentCommandCard(
                         icon: "doc.viewfinder",
                         title: "Media",
-                        subtitle: "Screenshot or file evidence",
-                        commandLabel: "investigate",
+                        subtitle: "Read screenshot or file evidence",
+                        commandLabel: "source clue",
                         tone: .sky
                     ) {
                         focusMediaEvidencePrompt()
@@ -1264,7 +1264,7 @@ struct AIDrawerView: View {
                 AgentCommandRow(
                     icon: "location.magnifyingglass",
                     title: "Resolve a fuzzy venue",
-                    subtitle: "Find address, city, source links, and whether it is safe to save.",
+                    subtitle: "Find the real name, address, source links, and save confidence.",
                     commandLabel: "verifies address",
                     tone: .cocoa
                 ) {
@@ -1280,7 +1280,7 @@ struct AIDrawerView: View {
                 AgentCommandRow(
                     icon: "map.fill",
                     title: "Plan around Map Stamps",
-                    subtitle: "Build a route from the spatial memory canvas.",
+                    subtitle: "Ask SAV-E from confirmed private places first.",
                     commandLabel: "uses Map Stamps",
                     tone: .sky
                 ) {
@@ -3045,12 +3045,12 @@ private struct FieldNotebookHeader: View {
 
     private var statusText: String {
         if clueCount > 0 {
-            return "\(clueCount) clues waiting to save"
+            return "\(clueCount) review clues waiting"
         }
         if memoryCount > 0 {
-            return "Ready to investigate the next save"
+            return "\(memoryCount) Map Stamps ready to ask"
         }
-        return "Waiting for the first place clue"
+        return "Add spots from links, maps, screenshots, or notes"
     }
 
     var body: some View {
@@ -3062,7 +3062,7 @@ private struct FieldNotebookHeader: View {
                     MemoMascotMark(size: 52)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("SAV-E Memo Book")
+                        Text("Private Place Memory")
                             .font(.title3)
                             .fontWeight(.black)
                             .foregroundColor(.saveInk)
@@ -3078,7 +3078,7 @@ private struct FieldNotebookHeader: View {
 
                     Spacer(minLength: 0)
 
-                    Text("MEMO")
+                    Text("SAV-E")
                         .font(.caption2.weight(.black))
                         .foregroundColor(.saveInk)
                         .padding(.horizontal, 8)
@@ -3089,9 +3089,9 @@ private struct FieldNotebookHeader: View {
                 }
 
                 HStack(spacing: 8) {
-                    FieldNotebookStat(title: "MEMORIES", value: "\(memoryCount)", color: .saveCocoa)
-                    FieldNotebookStat(title: "CLUES", value: "\(clueCount)", color: .saveHoney)
-                    FieldNotebookStat(title: "HELPER", value: "MEMO", color: .saveSky)
+                    FieldNotebookStat(title: "MAP STAMPS", value: "\(memoryCount)", color: .saveCocoa)
+                    FieldNotebookStat(title: "REVIEW", value: "\(clueCount)", color: .saveHoney)
+                    FieldNotebookStat(title: "ASK", value: "READY", color: .saveSky)
                 }
             }
             .padding(14)
