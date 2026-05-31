@@ -187,7 +187,7 @@ struct AIDrawerView: View {
             },
             onPlanAroundPlace: { place in
                 closeMapDetail()
-                viewModel.query = "Plan around \(place.name)"
+                viewModel.query = "What should I order at \(place.name)?"
                 Task { await viewModel.submit() }
             },
             onConfirmCandidate: { candidate in
@@ -514,7 +514,7 @@ struct AIDrawerView: View {
                             drawerDetent = .height(72)
                         }
                     } onPlanAround: {
-                        viewModel.query = "Plan around \(place.name)"
+                        viewModel.query = "What should I order at \(place.name)?"
                         Task { await viewModel.submit() }
                     } onUpdateVisibility: { visibility in
                         try await onUpdatePlaceVisibility(place, visibility)
@@ -2082,7 +2082,7 @@ private struct SavedMapDetailDrawerContent: View {
 
             HStack(spacing: 8) {
                 Button(action: onPlanAroundPlace) {
-                    PlaceDetailActionLabel(title: "Plan", systemImage: "sparkles", fill: .saveHoney.opacity(0.78))
+                    PlaceDetailActionLabel(title: "Order?", systemImage: "fork.knife", fill: .saveHoney.opacity(0.78))
                 }
 
                 Button {

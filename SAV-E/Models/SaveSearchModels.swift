@@ -28,12 +28,16 @@ enum SaveSearchPrimaryAction: String, Codable, Hashable {
     case openSource = "open_source"
     case runRecovery = "run_recovery"
     case savePlace = "save_place"
+    case confirmMapStamp = "confirm_map_stamp"
     case planAround = "plan_around"
     case addToTrip = "add_to_trip"
     case markTried = "mark_tried"
     case addReview = "add_review"
     case addProof = "add_proof"
     case showNearby = "show_nearby"
+    case recommendOrder = "recommend_order"
+    case addNote = "add_note"
+    case saveClue = "save_clue"
     case none = "none"
 
     var displayName: String {
@@ -41,12 +45,16 @@ enum SaveSearchPrimaryAction: String, Codable, Hashable {
         case .openSource: return "Open source"
         case .runRecovery: return "Find exact place"
         case .savePlace: return "Save this place"
+        case .confirmMapStamp: return "Confirm Map Stamp"
         case .planAround: return "Plan around this"
         case .addToTrip: return "Add to trip"
         case .markTried: return "Mark as tried"
         case .addReview: return "Add private review"
         case .addProof: return "Add proof"
         case .showNearby: return "Show nearby"
+        case .recommendOrder: return "What should I order?"
+        case .addNote: return "Add note"
+        case .saveClue: return "Save as clue"
         case .none: return "No action"
         }
     }
@@ -56,12 +64,16 @@ enum SaveSearchPrimaryAction: String, Codable, Hashable {
         case .openSource: return "link"
         case .runRecovery: return "sparkle.magnifyingglass"
         case .savePlace: return "bookmark.badge.plus"
+        case .confirmMapStamp: return "checkmark.seal"
         case .planAround: return "wand.and.stars"
         case .addToTrip: return "plus.square.on.square"
         case .markTried: return "checkmark.seal"
         case .addReview: return "text.bubble"
         case .addProof: return "receipt"
         case .showNearby: return "location.magnifyingglass"
+        case .recommendOrder: return "fork.knife"
+        case .addNote: return "note.text"
+        case .saveClue: return "tray.and.arrow.down"
         case .none: return "circle"
         }
     }
@@ -100,10 +112,10 @@ struct SaveAgentActionDrawerModel: Hashable {
 
     private static func heading(for result: SaveSearchResult) -> String {
         switch result.objectType {
-        case .sourceOnlyClue: return "Clue found"
-        case .pendingCandidate: return "Review Candidate"
+        case .sourceOnlyClue: return "Source clue"
+        case .pendingCandidate: return "Review before stamping"
         case .mapVisibleUnsavedPlace: return "Not saved yet"
-        case .savedPlace: return "Plan around this Map Stamp"
+        case .savedPlace: return "Saved to your place memory"
         case .triedMemory: return "Update visited Map Stamp"
         case .review: return "Upgrade review proof"
         case .tripStop: return "Use trip stop"
@@ -114,13 +126,13 @@ struct SaveAgentActionDrawerModel: Hashable {
     private static func contextLine(for result: SaveSearchResult) -> String {
         switch result.objectType {
         case .sourceOnlyClue:
-            return "SAV-E has a source clue but still needs a confirmed map match."
+            return "SAV-E found a source, but not enough proof for a place yet."
         case .pendingCandidate:
-            return "SAV-E found a likely place; confirm it before it becomes a Map Stamp."
+            return "SAV-E found a likely place. Review the evidence before stamping it to your map."
         case .mapVisibleUnsavedPlace:
             return "This is a map-visible suggestion, not a saved memory yet."
         case .savedPlace:
-            return "Use this confirmed Map Stamp as an anchor for nearby plans and trips."
+            return "Ask what to order, plan around it, or add private notes later."
         case .triedMemory:
             return "Add private notes or proof to this visited Map Stamp."
         case .review:
@@ -135,8 +147,10 @@ struct SaveAgentActionDrawerModel: Hashable {
     private static func primaryAction(for result: SaveSearchResult) -> SaveSearchPrimaryAction {
         switch result.objectType {
         case .sourceOnlyClue: return .runRecovery
-        case .pendingCandidate, .mapVisibleUnsavedPlace: return .savePlace
-        case .savedPlace, .tripStop: return .planAround
+        case .pendingCandidate: return .confirmMapStamp
+        case .mapVisibleUnsavedPlace: return .savePlace
+        case .savedPlace: return .recommendOrder
+        case .tripStop: return .planAround
         case .triedMemory: return .addReview
         case .review: return .addProof
         case .newRecommendation: return result.primaryAction
@@ -148,13 +162,13 @@ struct SaveAgentActionDrawerModel: Hashable {
 
         switch result.objectType {
         case .sourceOnlyClue:
-            actions = [.openSource]
+            actions = [.openSource, .addNote, .saveClue]
         case .pendingCandidate:
             actions = [.openSource, .runRecovery]
         case .mapVisibleUnsavedPlace:
             actions = [.planAround, .openSource, .showNearby]
         case .savedPlace:
-            actions = [.openSource, .addToTrip, .showNearby, .markTried]
+            actions = [.planAround, .addNote, .openSource, .addToTrip, .markTried]
         case .triedMemory:
             actions = [.addProof, .planAround, .addToTrip]
         case .review:
@@ -212,6 +226,7 @@ enum SavePlaceMemoryState: Equatable {
     case reviewCandidate
     case unsavedMapCandidate
     case mapStamp
+    case menuOrderDraft
     case actionReceipt
 }
 
@@ -248,7 +263,7 @@ struct SavePlaceDrawerPresentation: Equatable {
     static func clue(
         title: String,
         contextLine: String,
-        trustLine: String = "Needs exact place before it can become a Map Stamp."
+        trustLine: String = "SAV-E found a source, but not enough proof for a place yet."
     ) -> SavePlaceDrawerPresentation {
         SavePlaceDrawerPresentation(
             state: .clue,
@@ -258,14 +273,14 @@ struct SavePlaceDrawerPresentation: Equatable {
             trustLine: trustLine,
             primaryActionTitle: "Find exact place",
             primaryActionSystemImage: "sparkle.magnifyingglass",
-            secondaryActionTitles: ["View source", "Reject"]
+            secondaryActionTitles: ["View source", "Add note", "Save as clue"]
         )
     }
 
     static func reviewCandidate(
         title: String,
         contextLine: String,
-        trustLine: String = "Check before saving. This is not a Map Stamp yet."
+        trustLine: String = "SAV-E found a likely place. Review the evidence before stamping it to your map."
     ) -> SavePlaceDrawerPresentation {
         SavePlaceDrawerPresentation(
             state: .reviewCandidate,
@@ -273,7 +288,7 @@ struct SavePlaceDrawerPresentation: Equatable {
             title: title,
             contextLine: contextLine,
             trustLine: trustLine,
-            primaryActionTitle: "Confirm place",
+            primaryActionTitle: "Confirm Map Stamp",
             primaryActionSystemImage: "checkmark.seal",
             secondaryActionTitles: ["Save", "Reject", "View source"]
         )
@@ -299,7 +314,7 @@ struct SavePlaceDrawerPresentation: Equatable {
     static func mapStamp(
         title: String,
         contextLine: String,
-        trustLine: String = "Confirmed saved place from your SAV-E. Memory first."
+        trustLine: String = "Saved to your place memory."
     ) -> SavePlaceDrawerPresentation {
         SavePlaceDrawerPresentation(
             state: .mapStamp,
@@ -307,9 +322,26 @@ struct SavePlaceDrawerPresentation: Equatable {
             title: title,
             contextLine: contextLine,
             trustLine: trustLine,
-            primaryActionTitle: "Plan around this",
-            primaryActionSystemImage: "sparkles",
-            secondaryActionTitles: ["Directions", "Source", "Add to list", "More"]
+            primaryActionTitle: "What should I order?",
+            primaryActionSystemImage: "fork.knife",
+            secondaryActionTitles: ["Plan around this", "Add private note", "Share SAV-E Card", "Edit memory"]
+        )
+    }
+
+    static func menuOrderDraft(
+        title: String,
+        contextLine: String,
+        trustLine: String = "SAV-E can turn this place memory into an order idea before you go."
+    ) -> SavePlaceDrawerPresentation {
+        SavePlaceDrawerPresentation(
+            state: .menuOrderDraft,
+            eyebrow: "Order draft · From your SAV-E",
+            title: title,
+            contextLine: contextLine,
+            trustLine: trustLine,
+            primaryActionTitle: "Draft order idea",
+            primaryActionSystemImage: "fork.knife.circle",
+            secondaryActionTitles: ["View place memory", "Add private note", "Share SAV-E Card"]
         )
     }
 
@@ -355,8 +387,7 @@ struct SavePlaceDrawerPresentation: Equatable {
         } else {
             self = .clue(
                 title: candidate.name,
-                contextLine: candidate.city ?? "Source clue",
-                trustLine: "Needs address or coordinates before it can become a Map Stamp."
+                contextLine: candidate.city ?? "Source clue"
             )
         }
     }
