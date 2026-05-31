@@ -42,8 +42,8 @@ final class SaveSearchIntentEvalTests: XCTestCase {
         }
     }
 
-    func testGeminiModelOrderPrefersFlashBeforeFlashLite() {
-        XCTAssertEqual(SaveAIService.defaultModelFallbacks.prefix(2), ["gemini-2.5-flash", "gemini-2.5-flash-lite"])
+    func testGeminiModelOrderUsesGemini3Pro() {
+        XCTAssertEqual(SaveAIService.defaultModelFallbacks, ["gemini-3-pro"])
     }
 
     private func loadFixtures() throws -> [Fixture] {
