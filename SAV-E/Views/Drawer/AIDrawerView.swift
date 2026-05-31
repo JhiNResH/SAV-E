@@ -274,9 +274,10 @@ struct AIDrawerView: View {
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.thinMaterial)
+                .opacity(colorScheme == .dark ? 0.50 : 0.32)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.black.opacity(0.20) : Color.white.opacity(0.36))
+                        .fill(colorScheme == .dark ? Color.black.opacity(0.08) : Color.white.opacity(0.06))
                 )
                 .overlay(commandBarFill)
         }
@@ -679,7 +680,8 @@ struct AIDrawerView: View {
         .background {
             Rectangle()
                 .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
-                .background(colorScheme == .dark ? Color.black.opacity(0.20) : Color.white.opacity(0.18))
+                .opacity(colorScheme == .dark ? 0.46 : 0.26)
+                .background(colorScheme == .dark ? Color.black.opacity(0.08) : Color.white.opacity(0.04))
                 .overlay(navigationHeaderTint)
         }
         .overlay(alignment: .bottom) {
@@ -690,7 +692,7 @@ struct AIDrawerView: View {
     }
 
     private var navigationHeaderTint: Color {
-        colorScheme == .dark ? Color.black.opacity(0.10) : Color.white.opacity(0.12)
+        colorScheme == .dark ? Color.black.opacity(0.04) : Color.white.opacity(0.03)
     }
 
     private var showsNavigationHeader: Bool {
@@ -1564,6 +1566,7 @@ private struct DrawerGlassBackground: View {
     var body: some View {
         Rectangle()
             .fill(.ultraThinMaterial)
+            .opacity(materialOpacity)
             .background(baseTint)
             .overlay {
                 LinearGradient(
@@ -1583,22 +1586,26 @@ private struct DrawerGlassBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.12),
-                Color.black.opacity(0.26)
+                Color.black.opacity(0.03),
+                Color.black.opacity(0.08)
             ]
         }
         return [
-            Color.white.opacity(0.06),
-            Color.saveCream.opacity(0.08)
+            Color.white.opacity(0.01),
+            Color.saveCream.opacity(0.02)
         ]
     }
 
     private var baseTint: Color {
-        colorScheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.06)
+        colorScheme == .dark ? Color.black.opacity(0.10) : Color.white.opacity(0.03)
+    }
+
+    private var materialOpacity: Double {
+        colorScheme == .dark ? 0.46 : 0.24
     }
 
     private var topStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.52)
+        colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.24)
     }
 }
 
@@ -1995,6 +2002,7 @@ private struct MapDetailDrawerBackground: View {
     var body: some View {
         Rectangle()
             .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+            .opacity(materialOpacity)
             .background(baseTint)
             .overlay {
                 LinearGradient(
@@ -2005,7 +2013,7 @@ private struct MapDetailDrawerBackground: View {
             }
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.68))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.42))
                     .frame(height: 1)
             }
             .ignoresSafeArea()
@@ -2014,18 +2022,22 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.16),
-                Color.black.opacity(0.30)
+                Color.black.opacity(0.04),
+                Color.black.opacity(0.10)
             ]
         }
         return [
-            Color.white.opacity(0.06),
-            Color.saveCream.opacity(0.08)
+            Color.white.opacity(0.01),
+            Color.saveCream.opacity(0.02)
         ]
     }
 
     private var baseTint: Color {
-        colorScheme == .dark ? Color.black.opacity(0.28) : Color.white.opacity(0.08)
+        colorScheme == .dark ? Color.black.opacity(0.10) : Color.white.opacity(0.03)
+    }
+
+    private var materialOpacity: Double {
+        colorScheme == .dark ? 0.46 : 0.24
     }
 }
 
