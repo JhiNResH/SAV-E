@@ -857,7 +857,14 @@ struct AIDrawerView: View {
     private var suggestionsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                quickActionStrip
+                MemoryFlowCTA(
+                    reviewCount: reviewCandidates.count,
+                    stampCount: viewModel.places.count,
+                    onReview: openReviewInbox,
+                    onAsk: askFromSavedMemory
+                )
+                .padding(.horizontal, 16)
+
                 categoryFilterStrip
                 socialSignalSection
 
@@ -911,61 +918,6 @@ struct AIDrawerView: View {
         "What is nearby from my memory?",
         "Show Review clues",
     ]
-
-    private var quickActionStrip: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            NotebookBandLabel("Quick actions")
-                .padding(.horizontal, 16)
-
-            HStack(spacing: 9) {
-                DrawerActionChip(
-                    title: "Map Stamps",
-                    systemImage: "list.bullet.rectangle",
-                    count: viewModel.places.isEmpty ? nil : viewModel.places.count,
-                    fill: Color.saveMint.opacity(0.36),
-                    action: openSavedPlaces
-                )
-
-                DrawerActionChip(
-                    title: "Review Nest",
-                    systemImage: "checklist.unchecked",
-                    count: reviewCandidates.isEmpty ? nil : reviewCandidates.count,
-                    fill: Color.saveHoney.opacity(0.42),
-                    action: openReviewInbox
-                )
-
-                DrawerActionChip(
-                    title: "Lists",
-                    systemImage: "person.2.wave.2.fill",
-                    count: collaborativeLists.isEmpty ? nil : collaborativeLists.count,
-                    fill: Color.savePink.opacity(0.36),
-                    action: openCollaborativeLists
-                )
-            }
-            .padding(.horizontal, 16)
-
-            HStack(spacing: 9) {
-                DrawerActionChip(
-                    title: "Sources",
-                    systemImage: "tray.and.arrow.down",
-                    count: nil,
-                    fill: Color.saveSky.opacity(0.34),
-                    action: { showGoogleTakeoutImport = true }
-                )
-
-                DrawerActionChip(
-                    title: "Ask",
-                    systemImage: "map.fill",
-                    count: nil,
-                    fill: Color.saveSignal.opacity(0.30),
-                    action: {
-                        focusAgentPrompt("Plan from my Map Stamps first")
-                    }
-                )
-            }
-            .padding(.horizontal, 16)
-        }
-    }
 
     private var categoryFilterStrip: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1120,6 +1072,13 @@ struct AIDrawerView: View {
     private var savedPlacesView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                MemoryFlowCTA(
+                    reviewCount: reviewCandidates.count,
+                    stampCount: viewModel.places.count,
+                    onReview: openReviewInbox,
+                    onAsk: askFromSavedMemory
+                )
+
                 if !savedCategoryCounts.isEmpty {
                     SavedCategoryGrid(
                         categories: savedCategoryCounts,
@@ -1356,18 +1315,8 @@ struct AIDrawerView: View {
         withAnimation { drawerDetent = .large }
     }
 
-    private func openSavedPlaces() {
-        viewModel.returnToCommands()
-        activeCommandTab = .saved
-        searchFocused = false
-        withAnimation { drawerDetent = .medium }
-    }
-
-    private func openCollaborativeLists() {
-        viewModel.returnToCommands()
-        activeCommandTab = .lists
-        searchFocused = false
-        withAnimation { drawerDetent = .large }
+    private func askFromSavedMemory() {
+        focusAgentPrompt("What should I pick from my saved places first?")
     }
 
     private func openSavedPlace(_ place: Place) {
@@ -3885,54 +3834,122 @@ private struct PassportDrawerButton: View {
     }
 }
 
-private struct DrawerActionChip: View {
+private struct MemoryFlowCTA: View {
     @Environment(\.colorScheme) private var colorScheme
-    var title: String
-    var systemImage: String
-    var count: Int?
-    var fill: Color = Color.saveHoney.opacity(0.84)
-    var action: () -> Void
+    var reviewCount: Int
+    var stampCount: Int
+    var onReview: () -> Void
+    var onAsk: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(.caption.weight(.semibold))
-                    .frame(width: 16)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("PLACE MEMORY")
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.saveHoney.opacity(colorScheme == .dark ? 0.34 : 0.50))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1))
 
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                Text("Save what friends send. Ask when it matters.")
+                    .font(.headline.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                if let count {
-                    Text("\(count)")
-                        .font(.caption2.monospacedDigit().weight(.bold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.saveMint)
-                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
-                        .clipShape(Capsule())
+                Text("New places wait in Review first. Confirm them into Map Stamps, then SAV-E answers from what you saved.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.74))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 8) {
+                flowStep(number: "1", title: "Review", count: reviewCount, tint: .saveHoney)
+                flowStep(number: "2", title: "Stamp", count: stampCount, tint: .saveMint)
+                flowStep(number: "3", title: "Ask", count: nil, tint: .saveSky)
+            }
+
+            HStack(spacing: 10) {
+                Button(action: onReview) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "checklist.unchecked")
+                            .font(.caption.weight(.black))
+                        Text(reviewCount > 0 ? "Review \(reviewCount)" : "Open Review")
+                            .font(.caption.weight(.black))
+                    }
+                    .foregroundColor(.saveInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(Color.saveHoney.opacity(colorScheme == .dark ? 0.42 : 0.58))
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+                    )
                 }
+                .buttonStyle(.plain)
+
+                Button(action: onAsk) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "sparkles")
+                            .font(.caption.weight(.black))
+                        Text("Ask saved")
+                            .font(.caption.weight(.black))
+                    }
+                    .foregroundColor(.saveInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.24))
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .foregroundColor(colorScheme == .dark ? .white : .saveInk)
-            .frame(height: 38)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 12)
-            .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(fill)
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1.1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
+                .overlay(Color.saveNotebookPage.opacity(colorScheme == .dark ? 0.30 : 0.18))
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.30 : 0.20), lineWidth: 1.1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Review clues, save Map Stamps, ask your saved memory")
+    }
+
+    private func flowStep(number: String, title: String, count: Int?, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(number)
+                .font(.caption2.monospacedDigit().weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 18, height: 18)
+                .background(tint.opacity(colorScheme == .dark ? 0.34 : 0.52))
+                .clipShape(Circle())
+
+            Text(title)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveCocoa.opacity(0.78))
+                .lineLimit(1)
+
+            if let count, count > 0 {
+                Text("\(count)")
+                    .font(.caption2.monospacedDigit().weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
+        .background(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.20))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
