@@ -142,7 +142,7 @@ struct AIDrawerView: View {
             guard mapDetailDrawerItem == nil else { return }
             withAnimation(.spring(duration: 0.3)) {
                 switch state {
-                case .idle:             drawerDetent = .height(72)
+                case .idle:             drawerDetent = .fraction(0.34)
                 case .loading:          drawerDetent = .medium
                 case .error:            drawerDetent = .medium
                 case .placeDetail:      drawerDetent = .medium

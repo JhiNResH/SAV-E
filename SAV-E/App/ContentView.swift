@@ -4,7 +4,7 @@ struct ContentView: View {
     @StateObject private var mapVM = MapViewModel()
     @StateObject private var drawerVM = AIDrawerViewModel()
     @Environment(\.scenePhase) private var scenePhase
-    @State private var drawerDetent: PresentationDetent = .height(72)
+    @State private var drawerDetent: PresentationDetent = .fraction(0.34)
     @State private var mapDetailDrawerItem: MapDetailDrawerItem?
 
     var body: some View {
