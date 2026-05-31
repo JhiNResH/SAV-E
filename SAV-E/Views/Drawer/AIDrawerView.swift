@@ -25,6 +25,7 @@ enum MapDetailDrawerItem: Identifiable {
 }
 
 private enum CommandDrawerTab: String, CaseIterable, Hashable {
+    case add
     case saved
     case review
     case lists
@@ -32,6 +33,7 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
+        case .add: return "Add"
         case .saved: return "Stamps"
         case .review: return "Review"
         case .lists: return "Lists"
@@ -41,6 +43,7 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 
     var systemImage: String {
         switch self {
+        case .add: return "plus.circle.fill"
         case .saved: return "list.bullet.rectangle"
         case .review: return "checklist.unchecked"
         case .lists: return "person.2.wave.2.fill"
@@ -796,6 +799,8 @@ struct AIDrawerView: View {
                     .padding(.bottom, 8)
 
                 switch activeCommandTab {
+                case .add:
+                    addSpotsHub
                 case .saved:
                     savedPlacesView
                 case .review:
@@ -1185,6 +1190,9 @@ struct AIDrawerView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Button {
+                        if activeCommandTab == .add {
+                            activeCommandTab = .saved
+                        }
                         showAddSpotsHub = false
                         withAnimation { drawerDetent = .medium }
                     } label: {
@@ -3054,7 +3062,7 @@ private struct SpotDrawerCTA: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            NotebookSpine(color: .saveNotebookSpine)
+            NotebookSpine(color: .saveNotebookSpine, opacity: 0.26)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
@@ -3064,8 +3072,12 @@ private struct SpotDrawerCTA: View {
                             .foregroundColor(.saveInk)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 5)
-                            .background(Color.saveHoney.opacity(0.64))
-                            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1))
+                            .background {
+                                Capsule()
+                                    .fill(.thinMaterial)
+                                    .overlay(Color.saveHoney.opacity(colorScheme == .dark ? 0.30 : 0.42))
+                            }
+                            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.26), lineWidth: 1))
                             .clipShape(Capsule())
 
                         Text("All your spots in one place")
@@ -3096,7 +3108,7 @@ private struct SpotDrawerCTA: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                             .font(.subheadline.weight(.black))
-                            .foregroundStyle(Color.saveSky)
+                            .foregroundStyle(Color.saveInk)
 
                         Text("Add Spots")
                             .font(.subheadline.weight(.black))
@@ -3109,11 +3121,15 @@ private struct SpotDrawerCTA: View {
                             .foregroundColor(.saveCocoa.opacity(0.74))
                     }
                     .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .background(Color.saveHoney.opacity(colorScheme == .dark ? 0.42 : 0.52))
+                    .frame(minHeight: 44)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(Color.saveHoney.opacity(colorScheme == .dark ? 0.26 : 0.34))
+                    }
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.50), lineWidth: 1.1)
+                            .stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
@@ -3124,29 +3140,43 @@ private struct SpotDrawerCTA: View {
         }
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
                 .overlay(
                     colorScheme == .dark
-                        ? Color.saveNotebookPage.opacity(0.50)
-                        : Color.saveCream.opacity(0.34)
+                        ? Color.saveNotebookPage.opacity(0.34)
+                        : Color.white.opacity(0.20)
                 )
+                .overlay(alignment: .topLeading) {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(colorScheme == .dark ? 0.10 : 0.44),
+                            Color.white.opacity(0)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .allowsHitTesting(false)
+                }
         }
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.68), lineWidth: 1.6)
+                .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.32 : 0.24), lineWidth: 1.1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
 private struct SpotDrawerScene: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.saveNotebookPage.opacity(0.72))
+                .fill(.ultraThinMaterial)
+                .overlay(Color.saveNotebookPage.opacity(colorScheme == .dark ? 0.28 : 0.20))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+                        .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
                 )
 
             VStack(spacing: 5) {
@@ -3168,16 +3198,21 @@ private struct SpotDrawerScene: View {
             .font(.system(size: 12, weight: .black))
             .foregroundColor(tint)
             .frame(width: 30, height: 30)
-            .background(Color.saveCream.opacity(0.56))
+            .background {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(.thinMaterial)
+                    .overlay(tint.opacity(0.12))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
+                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
 
 private struct SpotSourceChip: View {
+    @Environment(\.colorScheme) private var colorScheme
     var systemName: String
     var title: String
     var color: Color
@@ -3192,17 +3227,23 @@ private struct SpotSourceChip: View {
         }
         .foregroundColor(.saveInk)
         .frame(maxWidth: .infinity)
+        .frame(minHeight: 32)
         .padding(.vertical, 6)
-        .background(color.opacity(0.24))
+        .background {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(color.opacity(colorScheme == .dark ? 0.16 : 0.18))
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1)
+                .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
 private struct AddSpotChoiceCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     var icon: String
     var title: String
     var subtitle: String
@@ -3216,10 +3257,14 @@ private struct AddSpotChoiceCard: View {
                     .font(.system(size: 22, weight: .black))
                     .foregroundColor(.saveInk)
                     .frame(width: 54, height: 54)
-                    .background(color.opacity(0.30))
+                    .background {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(.thinMaterial)
+                            .overlay(color.opacity(colorScheme == .dark ? 0.18 : 0.22))
+                    }
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
@@ -3241,10 +3286,14 @@ private struct AddSpotChoiceCard: View {
             }
             .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
             .padding(14)
-            .background(Color.saveNotebookPage.opacity(0.86))
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.28) : Color.white.opacity(0.16))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
+                    .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
@@ -3276,6 +3325,7 @@ private struct AddSpotDivider: View {
 }
 
 private struct ManualAddSpotRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     var icon: String
     var title: String
     var subtitle: String
@@ -3289,10 +3339,14 @@ private struct ManualAddSpotRow: View {
                     .font(.system(size: 26, weight: .black))
                     .foregroundColor(.saveInk)
                     .frame(width: 58, height: 58)
-                    .background(color.opacity(0.30))
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.thinMaterial)
+                            .overlay(color.opacity(colorScheme == .dark ? 0.18 : 0.22))
+                    }
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+                            .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
@@ -3312,10 +3366,14 @@ private struct ManualAddSpotRow: View {
                     .foregroundColor(.saveCocoa.opacity(0.64))
             }
             .padding(14)
-            .background(Color.saveNotebookPage.opacity(0.90))
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.30) : Color.white.opacity(0.16))
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
+                    .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
@@ -3327,6 +3385,7 @@ private struct ManualAddSpotRow: View {
 
 private struct NotebookSpine: View {
     var color: Color
+    var opacity: Double = 0.58
 
     var body: some View {
         VStack(spacing: 11) {
@@ -3340,7 +3399,7 @@ private struct NotebookSpine: View {
         }
         .frame(width: 24)
         .padding(.top, 18)
-        .background(color.opacity(0.58))
+        .background(color.opacity(opacity))
     }
 }
 
@@ -4632,6 +4691,7 @@ private enum AgentCommandTone {
 }
 
 private struct AgentCommandRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let icon: String
     let title: String
     let subtitle: String
@@ -4647,10 +4707,14 @@ private struct AgentCommandRow: View {
                     .font(.system(size: isPrimary ? 19 : 16, weight: .black))
                     .foregroundColor(.saveInk)
                     .frame(width: 40, height: 40)
-                    .background(isPrimary ? Color.saveHoney : tone.color.opacity(0.42))
+                    .background {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(.thinMaterial)
+                            .overlay(tone.color.opacity(isPrimary ? 0.34 : 0.20))
+                    }
                     .overlay(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                            .stroke(Color.saveNotebookLine.opacity(isPrimary ? 0.40 : 0.26), lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
@@ -4696,11 +4760,12 @@ private struct AgentCommandRow: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isPrimary ? Color.saveHoney.opacity(0.72) : Color.saveNotebookPage.opacity(0.96))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine, lineWidth: 2)
-                    )
+                    .fill(isPrimary ? .regularMaterial : .ultraThinMaterial)
+                    .overlay(commandSurfaceTint)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(isPrimary ? 0.38 : 0.22), lineWidth: 1.1)
             )
             .overlay(alignment: .leading) {
                 VStack(spacing: 6) {
@@ -4717,9 +4782,17 @@ private struct AgentCommandRow: View {
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
     }
+
+    private var commandSurfaceTint: Color {
+        if isPrimary {
+            return tone.color.opacity(colorScheme == .dark ? 0.30 : 0.36)
+        }
+        return colorScheme == .dark ? Color.saveNotebookPage.opacity(0.32) : Color.white.opacity(0.16)
+    }
 }
 
 private struct AgentCommandCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     typealias Tone = AgentCommandTone
 
     let icon: String
@@ -4737,10 +4810,14 @@ private struct AgentCommandCard: View {
                         .font(.system(size: 16, weight: .black))
                         .foregroundColor(.saveInk)
                         .frame(width: 34, height: 34)
-                        .background(tone.color.opacity(0.42))
+                        .background {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(.thinMaterial)
+                                .overlay(tone.color.opacity(0.20))
+                        }
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                                .stroke(Color.saveNotebookLine.opacity(0.26), lineWidth: 1)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
@@ -4789,16 +4866,21 @@ private struct AgentCommandCard: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.saveNotebookPage.opacity(0.96))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine, lineWidth: 2)
-                    )
+                    .fill(.ultraThinMaterial)
+                    .overlay(commandSurfaceTint)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
+    }
+
+    private var commandSurfaceTint: Color {
+        colorScheme == .dark ? Color.saveNotebookPage.opacity(0.30) : Color.white.opacity(0.16)
     }
 }
