@@ -14,7 +14,8 @@ final class SaveSearchControllerTests: XCTestCase {
 
         XCTAssertEqual(savedPresentation.state, .mapStamp)
         XCTAssertEqual(savedPresentation.eyebrow, "Map Stamp · From your SAV-E")
-        XCTAssertEqual(savedPresentation.primaryActionTitle, "Plan around this")
+        XCTAssertEqual(savedPresentation.trustLine, "Saved to your place memory.")
+        XCTAssertEqual(savedPresentation.primaryActionTitle, "What should I order?")
 
         let reviewCandidate = PlaceReviewCandidate(
             id: UUID(),
@@ -34,7 +35,8 @@ final class SaveSearchControllerTests: XCTestCase {
 
         XCTAssertEqual(reviewPresentation.state, .reviewCandidate)
         XCTAssertEqual(reviewPresentation.eyebrow, "Review Candidate · Check before saving")
-        XCTAssertEqual(reviewPresentation.primaryActionTitle, "Confirm place")
+        XCTAssertEqual(reviewPresentation.trustLine, "SAV-E found a likely place. Review the evidence before stamping it to your map.")
+        XCTAssertEqual(reviewPresentation.primaryActionTitle, "Confirm Map Stamp")
 
         let sourceClue = PlaceReviewCandidate(
             id: UUID(),
@@ -54,7 +56,17 @@ final class SaveSearchControllerTests: XCTestCase {
 
         XCTAssertEqual(cluePresentation.state, .clue)
         XCTAssertEqual(cluePresentation.eyebrow, "Clue · Needs exact place")
+        XCTAssertEqual(cluePresentation.trustLine, "SAV-E found a source, but not enough proof for a place yet.")
         XCTAssertEqual(cluePresentation.primaryActionTitle, "Find exact place")
+
+        let orderDraftPresentation = SavePlaceDrawerPresentation.menuOrderDraft(
+            title: "Bright Coffee Bar",
+            contextLine: "Saved coffee place from your map memory."
+        )
+
+        XCTAssertEqual(orderDraftPresentation.state, .menuOrderDraft)
+        XCTAssertEqual(orderDraftPresentation.eyebrow, "Order draft · From your SAV-E")
+        XCTAssertEqual(orderDraftPresentation.primaryActionTitle, "Draft order idea")
     }
 
     func testSavePlaceDrawerPresentationLabelsUnsavedMapCandidatesSeparately() {
@@ -71,7 +83,7 @@ final class SaveSearchControllerTests: XCTestCase {
         let presentation = SavePlaceDrawerPresentation(mapCandidate: candidate)
 
         XCTAssertEqual(presentation.state, .unsavedMapCandidate)
-        XCTAssertEqual(presentation.eyebrow, "Not saved yet")
+        XCTAssertEqual(presentation.eyebrow, "Public discovery · Not saved yet")
         XCTAssertEqual(presentation.primaryActionTitle, "Save this place")
         XCTAssertTrue(presentation.contextLine.contains("Shopping"))
         XCTAssertTrue(presentation.contextLine.contains("1.7 km away"))
@@ -833,6 +845,14 @@ final class SaveSearchControllerTests: XCTestCase {
                         missingFields: ["valid source URL"],
                         nextBestClue: "Share the original link"
                     )
+                ),
+                SaveMemoryRecord(
+                    state: .reviewCandidate,
+                    sourceURL: "https://www.instagram.com/reel/review-place/",
+                    title: "Possible cafe found",
+                    placeName: "Dayglow Coffee",
+                    address: "Los Angeles, CA",
+                    evidence: ["Place name detected from caption"]
                 )
             ],
             mapCandidates: [
@@ -854,19 +874,30 @@ final class SaveSearchControllerTests: XCTestCase {
         let sourceOnly = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "Pasta reel clue" })
         XCTAssertEqual(sourceOnly.objectType.displayName, "Clue")
         XCTAssertEqual(sourceOnly.agentDrawer.primaryAction.kind, .runRecovery)
-        XCTAssertEqual(sourceOnly.agentDrawer.heading, "Clue found")
+        XCTAssertEqual(sourceOnly.agentDrawer.heading, "Source clue")
+        XCTAssertEqual(sourceOnly.agentDrawer.contextLine, "SAV-E found a source, but not enough proof for a place yet.")
         XCTAssertTrue(sourceOnly.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
+        XCTAssertTrue(sourceOnly.agentDrawer.secondaryActions.map(\.kind).contains(.addNote))
+        XCTAssertTrue(sourceOnly.agentDrawer.secondaryActions.map(\.kind).contains(.saveClue))
         XCTAssertTrue(sourceOnly.agentDrawer.evidenceSummary.contains("Missing: exact place, coordinates"))
 
         let malformedSource = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "Malformed source clue" })
         XCTAssertFalse(malformedSource.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
 
+        let reviewCandidate = try XCTUnwrap(response.fromYourSave.results.first { $0.objectType == .pendingCandidate })
+        XCTAssertEqual(reviewCandidate.agentDrawer.heading, "Review before stamping")
+        XCTAssertEqual(reviewCandidate.agentDrawer.primaryAction.kind, .confirmMapStamp)
+        XCTAssertEqual(reviewCandidate.agentDrawer.primaryAction.label, "Confirm Map Stamp")
+
         let savedPlace = try XCTUnwrap(response.fromYourSave.results.first { $0.objectType == .savedPlace })
         XCTAssertEqual(savedPlace.objectType.displayName, "Map Stamp")
-        XCTAssertEqual(savedPlace.agentDrawer.heading, "Plan around this Map Stamp")
-        XCTAssertEqual(savedPlace.agentDrawer.primaryAction.kind, .planAround)
+        XCTAssertEqual(savedPlace.agentDrawer.heading, "Saved to your place memory")
+        XCTAssertEqual(savedPlace.agentDrawer.contextLine, "Ask what to order, plan around it, or add private notes later.")
+        XCTAssertEqual(savedPlace.agentDrawer.primaryAction.kind, .recommendOrder)
         XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.openSource))
         XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.addToTrip))
+        XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.planAround))
+        XCTAssertTrue(savedPlace.agentDrawer.secondaryActions.map(\.kind).contains(.addNote))
 
         let unsavedMapPlace = try XCTUnwrap(response.newRecommendations.results.first { $0.objectType == .mapVisibleUnsavedPlace })
         XCTAssertEqual(unsavedMapPlace.objectType.displayName, "Not saved yet")

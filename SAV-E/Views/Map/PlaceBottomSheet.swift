@@ -117,13 +117,21 @@ struct PlaceBottomSheet: View {
 
             HStack(spacing: 8) {
                 Button {
+                    onPlanAround?()
+                } label: {
+                    PlaceDetailActionLabel(title: "Order?", systemImage: "fork.knife", fill: .saveHoney)
+                }
+                .disabled(onPlanAround == nil)
+                .opacity(onPlanAround == nil ? 0.55 : 1)
+
+                Button {
                     NavigationService.navigate(to: place.coordinate, name: place.name)
                 } label: {
-                    PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: .saveHoney)
+                    PlaceDetailActionLabel(title: "Maps", systemImage: "map.fill", fill: Color.saveMint.opacity(0.36))
                 }
 
                 ShareLink(item: place.saveShareURL ?? URL(string: "https://sav-e-app.vercel.app")!, subject: Text(place.shareSubject), message: Text(place.shareText)) {
-                    PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveMint.opacity(0.36))
+                    PlaceDetailActionLabel(title: "Share", systemImage: "square.and.arrow.up", fill: Color.saveNotebookPage)
                 }
 
                 if let sourceURL = place.primarySourceURL {
@@ -132,14 +140,6 @@ struct PlaceBottomSheet: View {
                     } label: {
                         PlaceDetailActionLabel(title: "Source", systemImage: "link", fill: Color.saveSky.opacity(0.22))
                     }
-                } else {
-                    Button {
-                        onPlanAround?()
-                    } label: {
-                        PlaceDetailActionLabel(title: "Plan", systemImage: "sparkles", fill: Color.saveNotebookPage)
-                    }
-                    .disabled(onPlanAround == nil)
-                    .opacity(onPlanAround == nil ? 0.55 : 1)
                 }
             }
 

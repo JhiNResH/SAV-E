@@ -426,7 +426,7 @@ private struct SaveAgentActionDrawerPreview: View {
             }
             .buttonStyle(.plain)
             .disabled(isSaving)
-        } else if action.kind == .planAround {
+        } else if action.kind == .planAround || action.kind == .recommendOrder {
             Button {
                 onPlanAround(result)
             } label: {
