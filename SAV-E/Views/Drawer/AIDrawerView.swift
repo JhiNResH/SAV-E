@@ -95,6 +95,7 @@ struct AIDrawerView: View {
     @State private var mapCandidateActionInFlight: String?
     @State private var showReviewInbox = false
     @State private var showSavedCategories = false
+    @State private var showAddSpotsHub = false
     @State private var isImportingURL = false
     @State private var showProfile = false
     @State private var showLists = false
@@ -786,20 +787,24 @@ struct AIDrawerView: View {
 
     private var commandHomeView: some View {
         VStack(spacing: 0) {
-            commandTabBar
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+            if showAddSpotsHub {
+                addSpotsHub
+            } else {
+                commandTabBar
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
 
-            switch activeCommandTab {
-            case .saved:
-                savedPlacesView
-            case .review:
-                reviewInboxView
-            case .lists:
-                collaborativeListsView
-            case .friends:
-                socialMapTabView
+                switch activeCommandTab {
+                case .saved:
+                    savedPlacesView
+                case .review:
+                    reviewInboxView
+                case .lists:
+                    collaborativeListsView
+                case .friends:
+                    socialMapTabView
+                }
             }
         }
     }
@@ -811,6 +816,7 @@ struct AIDrawerView: View {
                     activeCommandTab = tab
                     showSavedCategories = false
                     showReviewInbox = false
+                    showAddSpotsHub = false
                     showLists = false
                     searchFocused = false
                     withAnimation { drawerDetent = .medium }
@@ -841,7 +847,7 @@ struct AIDrawerView: View {
     private var socialMapTabView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: focusSocialInvestigationPrompt)
+                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
                 socialSignalSection
                 if let addSpotStatus {
                     Text(addSpotStatus)
@@ -1122,23 +1128,15 @@ struct AIDrawerView: View {
     private var savedPlacesView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: focusSocialInvestigationPrompt)
+                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
 
-                if !selectedCategories.isEmpty, !savedCategoryCounts.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(savedCategoryCounts, id: \.category) { bucket in
-                                SavedCategoryLensRow(
-                                    category: bucket.category,
-                                    count: bucket.count,
-                                    isSelected: selectedCategories.contains(bucket.category)
-                                ) {
-                                    onToggleCategory(bucket.category)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
+                if !savedCategoryCounts.isEmpty {
+                    SavedCategoryGrid(
+                        categories: savedCategoryCounts,
+                        selectedCategories: selectedCategories,
+                        onToggle: onToggleCategory,
+                        onClear: clearSelectedCategories
+                    )
                 }
 
                 SavedPlacesSection(
@@ -1147,21 +1145,6 @@ struct AIDrawerView: View {
                     isFiltered: !selectedCategories.isEmpty,
                     onSelect: openSavedPlace
                 )
-
-                if !selectedCategories.isEmpty {
-                    Button {
-                        Array(selectedCategories).forEach { onToggleCategory($0) }
-                    } label: {
-                        Label("Clear filters", systemImage: "line.3.horizontal.decrease.circle")
-                            .font(.caption.weight(.black))
-                            .foregroundColor(commandBarTextColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.24))
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
 
                 if let addSpotStatus {
                     Text(addSpotStatus)
@@ -1174,6 +1157,10 @@ struct AIDrawerView: View {
             .padding(.top, 14)
             .padding(.bottom, 24)
         }
+    }
+
+    private func clearSelectedCategories() {
+        Array(selectedCategories).forEach { onToggleCategory($0) }
     }
 
     private var savedCategoryCounts: [(category: PlaceCategory, count: Int)] {
@@ -1194,126 +1181,104 @@ struct AIDrawerView: View {
     // MARK: - Add Spots
 
     private var addSpotsHub: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SpotDrawerCTA(onAddSpots: focusSocialInvestigationPrompt)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Button {
+                        showAddSpotsHub = false
+                        withAnimation { drawerDetent = .medium }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.subheadline.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .frame(width: 36, height: 36)
+                            .background(Color.saveNotebookPage.opacity(0.72))
+                            .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.54), lineWidth: 1.2))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 9) {
-                NotebookBandLabel("Add Spots")
+                    Spacer()
 
-                AgentCommandRow(
-                    icon: "sparkle.magnifyingglass",
-                    title: "Capture a place intent",
-                    subtitle: "Save what caught your eye now; decide from it later.",
-                    commandLabel: "decision later",
-                    tone: .cocoa,
-                    isPrimary: true
-                ) {
-                    focusSocialInvestigationPrompt()
+                    Text("Add Spots")
+                        .font(.title2.weight(.black))
+                        .foregroundColor(.saveInk)
+
+                    Spacer()
+
+                    Color.clear.frame(width: 36, height: 36)
                 }
 
-                HStack(spacing: 9) {
-                    AgentCommandCard(
-                        icon: "circle.hexagongrid.fill",
-                        title: "Review Nest",
-                        subtitle: "Confirm candidates before Map Stamps",
-                        commandLabel: reviewCandidates.isEmpty ? "all clear" : "\(reviewCandidates.count) waiting",
-                        tone: .honey
-                    ) {
-                        openReviewInbox()
-                    }
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    AddSpotChoiceCard(
+                        icon: "sparkle.magnifyingglass",
+                        title: "Social Search",
+                        subtitle: "TikTok or Instagram clues",
+                        color: .savePink,
+                        action: focusSocialInvestigationPrompt
+                    )
 
-                    AgentCommandCard(
+                    AddSpotChoiceCard(
                         icon: "link",
-                        title: "Recent Source",
-                        subtitle: "Recover one copied place link",
-                        commandLabel: "source clue",
-                        tone: .signal
-                    ) {
-                        importClipboardURL()
-                    }
-                }
+                        title: "Paste any URL",
+                        subtitle: "Articles, blogs, videos",
+                        color: .saveSignal,
+                        action: importClipboardURL
+                    )
 
-                HStack(spacing: 9) {
-                    AgentCommandCard(
+                    AddSpotChoiceCard(
                         icon: "note.text",
-                        title: "Lists / Notes",
-                        subtitle: "Turn a rough list into clues",
-                        commandLabel: "review first",
-                        tone: .honey
-                    ) {
-                        focusAgentPrompt("""
-                        Turn these notes into reviewable place clues.
+                        title: "Notes",
+                        subtitle: "Paste a rough list",
+                        color: .saveHoney,
+                        action: focusNotesPrompt
+                    )
 
-                        Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
-
-                        Notes:
-                        """)
-                    }
-
-                    AgentCommandCard(
+                    AddSpotChoiceCard(
                         icon: "doc.viewfinder",
-                        title: "Media",
-                        subtitle: "Read screenshot or file evidence",
-                        commandLabel: "source clue",
-                        tone: .sky
-                    ) {
-                        focusMediaEvidencePrompt()
-                    }
+                        title: "Screenshots",
+                        subtitle: "Extract from images",
+                        color: .saveSky,
+                        action: focusMediaEvidencePrompt
+                    )
                 }
 
-                AgentCommandRow(
+                AddSpotDivider(title: "OR ADD MANUALLY")
+
+                ManualAddSpotRow(
                     icon: "location.magnifyingglass",
-                    title: "Resolve a fuzzy venue",
-                    subtitle: "Find the real name, address, source links, and save confidence.",
-                    commandLabel: "verifies address",
-                    tone: .cocoa
-                ) {
-                    focusAgentPrompt("""
-                    Find the real venue for this place idea and return review clues with evidence.
+                    title: "Search Location",
+                    subtitle: "Find on the map, then save",
+                    color: .saveMint,
+                    action: focusLocationSearchPrompt
+                )
 
-                    Include official name, address, city, source links, confidence, and whether it is safe to save. Do not save automatically.
-
-                    Place idea:
-                    """)
+                if !reviewCandidates.isEmpty {
+                    ReviewCandidatesSection(
+                        candidates: reviewCandidates,
+                        limit: 2,
+                        onSelect: openReviewCandidateDetail
+                    )
                 }
 
-                AgentCommandRow(
-                    icon: "map.fill",
-                    title: "Ask your saved places",
-                    subtitle: "Decision answers start from your memory, then public discovery if needed.",
-                    commandLabel: "memory first",
-                    tone: .sky
-                ) {
-                    focusAgentPrompt("""
-                    Help me organize my Map Stamps into a practical plan.
-
-                    Use my saved Map Stamps first. If you need public discovery, label it separately. Start with:
-                    """)
+                if let addSpotStatus {
+                    Text(addSpotStatus)
+                        .font(.caption)
+                        .foregroundColor(.saveCocoa.opacity(0.74))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
                 }
             }
-
-            ReviewCandidatesSection(
-                candidates: reviewCandidates,
-                limit: 2,
-                onSelect: openReviewCandidateDetail
-            )
-
-            if let addSpotStatus {
-                Text(addSpotStatus)
-                    .font(.caption)
-                    .foregroundColor(.saveCocoa.opacity(0.74))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 24)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
     }
 
     private var reviewInboxView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: focusSocialInvestigationPrompt)
+                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
 
                 ReviewCandidatesSection(
                     candidates: reviewCandidates,
@@ -1337,7 +1302,7 @@ struct AIDrawerView: View {
     private var collaborativeListsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: focusSocialInvestigationPrompt)
+                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
 
                 VStack(alignment: .leading, spacing: 9) {
                     NotebookBandLabel("Create list")
@@ -1424,6 +1389,7 @@ struct AIDrawerView: View {
     }
 
     private func focusSocialInvestigationPrompt() {
+        showAddSpotsHub = false
         showReviewInbox = false
         if let clipboardText = UIPasteboard.general.string,
            let url = firstURL(in: clipboardText) {
@@ -1444,7 +1410,19 @@ struct AIDrawerView: View {
         """
     }
 
+    private func focusNotesPrompt() {
+        showAddSpotsHub = false
+        focusAgentPrompt("""
+        Turn these notes into reviewable place clues.
+
+        Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
+
+        Notes:
+        """)
+    }
+
     private func focusMediaEvidencePrompt() {
+        showAddSpotsHub = false
         showReviewInbox = false
         addSpotStatus = "Media evidence results stay as review candidates until you choose a place."
         focusAgentPrompt("""
@@ -1458,15 +1436,28 @@ struct AIDrawerView: View {
     }
 
     private func importClipboardURL() {
+        showAddSpotsHub = false
         showReviewInbox = false
         guard let clipboardText = UIPasteboard.general.string,
               let url = firstURL(in: clipboardText) else {
-            addSpotStatus = "Clipboard does not contain a URL yet. Copy a place or social link, then tap Import clipboard again."
+            addSpotStatus = "Clipboard does not contain a URL yet. Copy a place or social link, then tap Paste any URL again."
             return
         }
 
         addSpotStatus = "Clipboard link loaded. SAV-E will save possible places to Review first."
         importURLToReviewCandidates(url)
+    }
+
+    private func focusLocationSearchPrompt() {
+        showAddSpotsHub = false
+        showReviewInbox = false
+        showSavedCategories = false
+        showLists = false
+        viewModel.startNewConversation()
+        viewModel.query = "search nearby unsaved place"
+        addSpotStatus = "Edit the search text, then press Return. SAV-E will show unsaved map results separately."
+        withAnimation { drawerDetent = .medium }
+        searchFocused = true
     }
 
     private func performCandidateAction(
@@ -1513,6 +1504,7 @@ struct AIDrawerView: View {
     }
 
     private func focusAgentPrompt(_ prompt: String) {
+        showAddSpotsHub = false
         showSavedCategories = false
         showReviewInbox = false
         showLists = false
@@ -1541,8 +1533,21 @@ struct AIDrawerView: View {
             }
     }
 
+    private func openAddSpotsHub() {
+        viewModel.returnToCommands()
+        showSavedCategories = false
+        showReviewInbox = false
+        showLists = false
+        searchFocused = false
+        showAddSpotsHub = true
+        withAnimation(.spring(duration: 0.28)) {
+            drawerDetent = .large
+        }
+    }
+
     private func openReviewInbox() {
         viewModel.returnToCommands()
+        showAddSpotsHub = false
         activeCommandTab = .review
         searchFocused = false
         withAnimation { drawerDetent = .large }
@@ -1550,6 +1555,7 @@ struct AIDrawerView: View {
 
     private func openSavedPlaces() {
         viewModel.returnToCommands()
+        showAddSpotsHub = false
         activeCommandTab = .saved
         searchFocused = false
         withAnimation { drawerDetent = .medium }
@@ -1557,6 +1563,7 @@ struct AIDrawerView: View {
 
     private func openCollaborativeLists() {
         viewModel.returnToCommands()
+        showAddSpotsHub = false
         activeCommandTab = .lists
         searchFocused = false
         withAnimation { drawerDetent = .large }
@@ -1593,6 +1600,7 @@ struct AIDrawerView: View {
     }
 
     private func prepareMapDetailOpening() {
+        showAddSpotsHub = false
         showSavedCategories = false
         showReviewInbox = false
         showLists = false
@@ -1705,6 +1713,7 @@ struct AIDrawerView: View {
         }
         showSavedCategories = false
         showReviewInbox = false
+        showAddSpotsHub = false
         showLists = false
         searchFocused = false
         withAnimation { drawerDetent = .height(72) }
@@ -1716,6 +1725,7 @@ struct AIDrawerView: View {
         onClearMapSearchResults()
         showSavedCategories = false
         showReviewInbox = false
+        showAddSpotsHub = false
         showLists = false
         searchFocused = false
         addSpotStatus = nil
@@ -3192,6 +3202,129 @@ private struct SpotSourceChip: View {
     }
 }
 
+private struct AddSpotChoiceCard: View {
+    var icon: String
+    var title: String
+    var subtitle: String
+    var color: Color
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 54, height: 54)
+                    .background(color.opacity(0.30))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.headline.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.84)
+
+                    Text(subtitle)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.saveCocoa.opacity(0.62))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+            .padding(14)
+            .background(Color.saveNotebookPage.opacity(0.86))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
+    }
+}
+
+private struct AddSpotDivider: View {
+    var title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Rectangle()
+                .fill(Color.saveNotebookLine.opacity(0.24))
+                .frame(height: 1)
+            Text(title)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveCocoa.opacity(0.56))
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+                .layoutPriority(1)
+            Rectangle()
+                .fill(Color.saveNotebookLine.opacity(0.24))
+                .frame(height: 1)
+        }
+    }
+}
+
+private struct ManualAddSpotRow: View {
+    var icon: String
+    var title: String
+    var subtitle: String
+    var color: Color
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 26, weight: .black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 58, height: 58)
+                    .background(color.opacity(0.30))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.headline.weight(.black))
+                        .foregroundColor(.saveInk)
+                    Text(subtitle)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundColor(.saveCocoa.opacity(0.62))
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "arrow.up.left")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.64))
+            }
+            .padding(14)
+            .background(Color.saveNotebookPage.opacity(0.90))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
+    }
+}
+
 private struct NotebookSpine: View {
     var color: Color
 
@@ -4280,66 +4413,94 @@ private struct DrawerActionChip: View {
     }
 }
 
-private struct SavedCategoryLensRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let category: PlaceCategory
-    let count: Int
-    let isSelected: Bool
-    let action: () -> Void
+private struct SavedCategoryGrid: View {
+    let categories: [(category: PlaceCategory, count: Int)]
+    let selectedCategories: Set<PlaceCategory>
+    let onToggle: (PlaceCategory) -> Void
+    let onClear: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 11) {
-                Image(systemName: category.iconName)
-                    .font(.subheadline.weight(.black))
-                    .foregroundColor(.saveInk)
-                    .frame(width: 34, height: 34)
-                    .background(Color.saveStampColor(for: category).opacity(isSelected ? 0.82 : 0.42))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(category.displayName)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(primaryText)
-                    Text(isSelected ? "Showing on map" : "Tap to filter map")
-                        .font(.caption2)
-                        .foregroundColor(secondaryText)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Categories")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.72))
 
                 Spacer()
 
-                Text("\(count)")
-                    .font(.caption.monospacedDigit().weight(.black))
-                    .foregroundColor(primaryText)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.24))
-                    .clipShape(Capsule())
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundColor(isSelected ? primaryText : secondaryText.opacity(0.68))
+                if !selectedCategories.isEmpty {
+                    Button(action: onClear) {
+                        Text("All")
+                            .font(.caption2.weight(.black))
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.saveHoney.opacity(0.56))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show all saved categories")
+                }
             }
-            .padding(10)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(categories, id: \.category) { bucket in
+                    SavedCategoryGridButton(
+                        category: bucket.category,
+                        count: bucket.count,
+                        isSelected: selectedCategories.contains(bucket.category)
+                    ) {
+                        onToggle(bucket.category)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SavedCategoryGridButton: View {
+    var category: PlaceCategory
+    var count: Int
+    var isSelected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: category.iconName)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.white)
+                    .frame(width: 28, height: 28)
+                    .background(category.poiIconColor.opacity(isSelected ? 1 : 0.72))
+                    .clipShape(Circle())
+
+                Text(category.displayName)
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Spacer(minLength: 4)
+
+                Text("\(count)")
+                    .font(.caption2.monospacedDigit().weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.74))
+            }
+            .frame(height: 38)
+            .padding(.horizontal, 9)
             .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(isSelected ? Color.saveHoney.opacity(0.26) : Color.white.opacity(0.10))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? Color.saveHoney.opacity(0.42) : Color.saveNotebookPage.opacity(0.72))
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(isSelected ? 0.36 : 0.16), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(isSelected ? 0.50 : 0.20), lineWidth: 1)
             )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    private var primaryText: Color {
-        colorScheme == .dark ? .white : .saveInk
-    }
-
-    private var secondaryText: Color {
-        colorScheme == .dark ? Color.white.opacity(0.68) : Color.saveCocoa.opacity(0.70)
+        .accessibilityLabel("\(category.displayName), \(count) saved")
     }
 }
 
