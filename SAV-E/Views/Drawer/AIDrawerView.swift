@@ -3213,29 +3213,44 @@ private struct SavedPlacesSection: View {
             if places.isEmpty {
                 SavedPlacesEmptyState(isFiltered: isFiltered)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                        SavedPlaceRow(place: place) {
-                            onSelect(place)
-                        }
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(sectionedPlaces, id: \.category) { section in
+                        VStack(alignment: .leading, spacing: 8) {
+                            SavedCategorySectionHeader(category: section.category, count: section.places.count)
 
-                        if index < places.count - 1 {
-                            Divider()
-                                .padding(.leading, 64)
+                            VStack(spacing: 0) {
+                                ForEach(Array(section.places.enumerated()), id: \.element.id) { index, place in
+                                    SavedPlaceRow(place: place) {
+                                        onSelect(place)
+                                    }
+
+                                    if index < section.places.count - 1 {
+                                        Divider()
+                                            .padding(.leading, 64)
+                                    }
+                                }
+                            }
+                            .background {
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(.regularMaterial)
+                                    .overlay(groupTint)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(Color.saveNotebookLine.opacity(0.12), lineWidth: 1)
+                            )
                         }
                     }
                 }
-                .background {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.regularMaterial)
-                        .overlay(groupTint)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.12), lineWidth: 1)
-                )
             }
+        }
+    }
+
+    private var sectionedPlaces: [(category: PlaceCategory, places: [Place])] {
+        PlaceCategory.allCases.compactMap { category in
+            let categoryPlaces = places.filter { $0.category == category }
+            return categoryPlaces.isEmpty ? nil : (category, categoryPlaces)
         }
     }
 
@@ -3262,6 +3277,33 @@ private struct SavedPlacesSection: View {
     }
 }
 
+private struct SavedCategorySectionHeader: View {
+    var category: PlaceCategory
+    var count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: category.iconName)
+                .font(.caption.weight(.black))
+                .foregroundColor(.white)
+                .frame(width: 24, height: 24)
+                .background(category.poiIconColor)
+                .clipShape(Circle())
+
+            Text(category.displayName)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+
+            Spacer(minLength: 0)
+
+            Text("\(count)")
+                .font(.caption2.monospacedDigit().weight(.black))
+                .foregroundColor(.saveCocoa.opacity(0.78))
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
 private struct SavedPlaceRow: View {
     var place: Place
     var onSelect: () -> Void
@@ -3278,10 +3320,12 @@ private struct SavedPlaceRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.red)
+                Image(systemName: place.category.iconName)
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.white)
                     .frame(width: 42, height: 42)
+                    .background(place.category.poiIconColor)
+                    .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(place.name)
@@ -3312,6 +3356,19 @@ private struct SavedPlaceRow: View {
         .accessibilityHint("Open Map Stamp details")
     }
 
+}
+
+private extension PlaceCategory {
+    var poiIconColor: Color {
+        switch self {
+        case .food: return .saveSignal
+        case .cafe: return .saveCocoa
+        case .bar: return .savePink
+        case .attraction: return .saveHoney
+        case .stay: return .saveSky
+        case .shopping: return .saveMint
+        }
+    }
 }
 
 private struct SavedPlacesEmptyState: View {
