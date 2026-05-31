@@ -344,6 +344,8 @@ private struct ShareMetadata {
 }
 
 private let shareMetadataHTMLByteLimit = 2_000_000
+private let sharedImageByteLimit = 12_000_000
+private let sharedImageOCRLineLimit = 80
 
 private struct SocialPlaceEvidenceDiagnostic: Codable {
     var found: [String]
@@ -1030,7 +1032,9 @@ struct ShareExtensionView: View {
             return
         }
 
-        // Extract URL or text
+        var extractedImageData: Data?
+
+        // Extract URL, text, or screenshot image.
         for item in items {
             if let title = item.attributedTitle?.string, !title.isEmpty {
                 sharedTitle = title
@@ -1050,10 +1054,32 @@ struct ShareExtensionView: View {
                         sharedText = text
                     }
                 }
+                if extractedImageData == nil,
+                   attachment.hasItemConformingToTypeIdentifier(UTType.image.identifier),
+                   let imageData = await sharedImageData(from: attachment) {
+                    extractedImageData = imageData
+                }
             }
         }
 
         let content = sharedURL.isEmpty ? sharedText : sharedURL
+        if let imageData = extractedImageData, sharedURL.isEmpty {
+            let candidates = await sharedImageReviewCandidates(
+                from: imageData,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText
+            )
+            if !candidates.isEmpty {
+                reviewCandidates = candidates
+                selectedCategory = reviewCandidates.first?.category ?? "food"
+                isParsing = false
+                return
+            }
+            parseError = "SAV-E could not read enough place text from this screenshot. Try sharing a clearer screenshot, caption, or map link."
+            isParsing = false
+            return
+        }
+
         guard !content.isEmpty else {
             parseError = "No URL or text found in shared content"
             isParsing = false
@@ -1289,6 +1315,37 @@ struct ShareExtensionView: View {
         } catch {
             return nil
         }
+    }
+
+    private func sharedImageData(from provider: NSItemProvider) async -> Data? {
+        if let data = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? Data {
+            return boundedSharedImageData(data)
+        }
+        if let image = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? UIImage,
+           let data = image.jpegData(compressionQuality: 0.88) {
+            return boundedSharedImageData(data)
+        }
+        if let url = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? URL,
+           let data = try? Data(contentsOf: url, options: .mappedIfSafe) {
+            return boundedSharedImageData(data)
+        }
+        if let url = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? NSURL,
+           let data = try? Data(contentsOf: url as URL, options: .mappedIfSafe) {
+            return boundedSharedImageData(data)
+        }
+
+        return await withCheckedContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                continuation.resume(returning: data.flatMap(boundedSharedImageData))
+            }
+        }
+    }
+
+    private func boundedSharedImageData(_ data: Data) -> Data? {
+        guard !data.isEmpty, data.count <= sharedImageByteLimit else {
+            return nil
+        }
+        return data
     }
 
     private func metadataValue(in html: String, keys: [String]) -> String? {
@@ -1747,6 +1804,138 @@ struct ShareExtensionView: View {
             confidence: 0.6,
             missingInfo: SocialPlaceEvidenceScorer.missingInfo(tier: tier, hasAddress: true),
             savedAt: Date()
+        )
+    }
+
+    private func sharedImageReviewCandidates(
+        from imageData: Data,
+        sharedTitle: String,
+        sharedText: String
+    ) async -> [PendingReviewCandidate] {
+        let ocrLines = Array(await recognizedTextLines(from: imageData).prefix(sharedImageOCRLineLimit))
+        guard !ocrLines.isEmpty else { return [] }
+
+        let ocrText = ocrLines.joined(separator: "\n")
+        let evidenceText = [sharedTitle, sharedText, "Shared screenshot OCR:", ocrText]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+        let parser = SocialPlaceParser()
+        let analysis = parser.analyze(
+            evidence: SocialPlaceSourceEvidence(
+                sourceURL: "",
+                resolvedURL: nil,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText,
+                metadataTitle: nil,
+                metadataDescription: nil,
+                ocrLines: ocrLines
+            )
+        )
+
+        let candidates = analysis.placesFound.map { draft in
+            var candidate = pendingReviewCandidate(
+                from: draft,
+                sourceURLString: "",
+                sourceText: evidenceText,
+                ocrLines: ocrLines
+            )
+            candidate.sourceURL = nil
+            candidate.evidence = appendUniqueEvidence(
+                candidate.evidence,
+                [
+                    "Input: shared screenshot",
+                    "OCR text: \(String(ocrText.prefix(300)))"
+                ]
+            )
+            return candidate
+        }
+        if !candidates.isEmpty {
+            return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
+        }
+
+        if let ocrCandidate = sharedImageOCRCandidate(from: ocrLines, evidenceText: evidenceText) {
+            return [ocrCandidate]
+        }
+
+        if analysis.isPlaceBearing {
+            var candidate = placeBearingSourceReviewCandidate(
+                from: analysis,
+                sourceURLString: "",
+                evidenceText: evidenceText
+            )
+            candidate.sourceURL = nil
+            candidate.evidence = appendUniqueEvidence(candidate.evidence, ["Input: shared screenshot"])
+            return [candidate]
+        }
+
+        return [sharedImageSourceOnlyReviewCandidate(ocrText: ocrText, evidenceText: evidenceText)]
+    }
+
+    private func sharedImageOCRCandidate(
+        from ocrLines: [String],
+        evidenceText: String
+    ) -> PendingReviewCandidate? {
+        guard let result = SocialOCRCandidateHeuristics.candidate(from: ocrLines) else { return nil }
+        let ocrText = ocrLines.joined(separator: "\n")
+        let tier: SocialPlaceEvidenceTier = .weakCandidate
+        var evidence = [
+            "Input: shared screenshot",
+            "Evidence tier: \(tier.rawValue)",
+            "OCR-derived candidate: \(result.name)",
+            "OCR text: \(String(ocrText.prefix(300)))"
+        ]
+        if !result.supportingLines.isEmpty {
+            evidence.append("OCR supporting lines: \(result.supportingLines.joined(separator: " | "))")
+        }
+
+        return PendingReviewCandidate(
+            candidateName: result.name,
+            address: "",
+            category: fallbackCategory(from: "\(result.name)\n\(evidenceText)"),
+            sourceURL: nil,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: result.confidence,
+            missingInfo: SocialPlaceEvidenceScorer.missingInfo(
+                tier: tier,
+                hasAddress: false,
+                source: "OCR-derived screenshot candidate; verify venue identity"
+            ),
+            savedAt: Date()
+        )
+    }
+
+    private func sharedImageSourceOnlyReviewCandidate(
+        ocrText: String,
+        evidenceText: String
+    ) -> PendingReviewCandidate {
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: appendUniqueEvidence(
+                ["Input: shared screenshot"],
+                ocrText.isEmpty ? [] : ["OCR text: \(String(ocrText.prefix(300)))"]
+            ),
+            attempts: [
+                "Read the shared screenshot with on-device OCR",
+                "Checked OCR text for explicit place names",
+                "Kept this as a source-only clue instead of inventing a place"
+            ],
+            missingFields: ["Verified place name", "Verified address", "Verified coordinates"],
+            nextBestClue: "Share a clearer screenshot, caption, or map link before saving as a Map Stamp."
+        )
+        return PendingReviewCandidate(
+            candidateName: "Screenshot clue",
+            address: "",
+            category: fallbackCategory(from: ocrText),
+            sourceURL: nil,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + ["Next best clue: \(diagnostic.nextBestClue)"],
+            confidence: 0,
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            isSourceOnly: true
         )
     }
 
