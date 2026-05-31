@@ -1318,20 +1318,22 @@ struct ShareExtensionView: View {
     }
 
     private func sharedImageData(from provider: NSItemProvider) async -> Data? {
-        if let data = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? Data {
-            return boundedSharedImageData(data)
-        }
-        if let image = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? UIImage,
-           let data = image.jpegData(compressionQuality: 0.88) {
-            return boundedSharedImageData(data)
-        }
-        if let url = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? URL,
-           let data = try? Data(contentsOf: url, options: .mappedIfSafe) {
-            return boundedSharedImageData(data)
-        }
-        if let url = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) as? NSURL,
-           let data = try? Data(contentsOf: url as URL, options: .mappedIfSafe) {
-            return boundedSharedImageData(data)
+        if let item = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier) {
+            if let data = item as? Data {
+                return boundedSharedImageData(data)
+            }
+            if let image = item as? UIImage,
+               let data = image.jpegData(compressionQuality: 0.88) {
+                return boundedSharedImageData(data)
+            }
+            if let url = item as? URL,
+               let data = try? Data(contentsOf: url, options: .mappedIfSafe) {
+                return boundedSharedImageData(data)
+            }
+            if let url = item as? NSURL,
+               let data = try? Data(contentsOf: url as URL, options: .mappedIfSafe) {
+                return boundedSharedImageData(data)
+            }
         }
 
         return await withCheckedContinuation { continuation in
