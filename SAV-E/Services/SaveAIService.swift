@@ -10,9 +10,7 @@ final class SaveAIService {
     static let shared = SaveAIService()
 
     static let defaultModelFallbacks = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-flash-lite-latest"
+        "gemini-3-pro"
     ]
 
     private let apiKey: String?

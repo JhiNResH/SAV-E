@@ -177,7 +177,7 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
 
         XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Bright Coffee Bar"])
         XCTAssertEqual(response.fromYourSave.results.first?.userState.displayName, "Saved")
-        XCTAssertTrue(response.assistantMessage?.contains("Saved") == true)
+        XCTAssertTrue(response.assistantMessage?.localizedCaseInsensitiveContains("saved") == true)
         XCTAssertFalse(response.newRecommendations.showsNearbySearchAction)
         XCTAssertFalse(response.shouldAutoSearchNearbyUnsavedCandidates)
     }
@@ -232,9 +232,55 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Ramen"])
         XCTAssertEqual(response.newRecommendations.results.first?.objectType, .mapVisibleUnsavedPlace)
         XCTAssertEqual(response.fromYourSave.results.first?.userState.displayName, "Saved")
-        XCTAssertTrue(response.assistantMessage?.contains("Saved") == true)
+        XCTAssertTrue(response.assistantMessage?.localizedCaseInsensitiveContains("saved") == true)
         XCTAssertTrue(response.assistantMessage?.contains("Review") == true)
         XCTAssertTrue(response.assistantMessage?.contains("unsaved") == true)
+    }
+
+    func testVisitedTasteSignalsCanBeatCloserGenericSavedRestaurant() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let lovedRamen = place(
+            name: "Black Garlic Ramen Memory",
+            category: .food,
+            latitude: 33.6847,
+            longitude: -117.8264,
+            note: "Loved spicy ramen and black garlic broth",
+            extractedDishes: ["spicy ramen", "black garlic"],
+            status: .visited,
+            rating: 4.8,
+            priceRange: "$$"
+        )
+        let genericNearby = place(
+            name: "Closest Generic Grill",
+            category: .food,
+            latitude: 33.68461,
+            longitude: -117.82651,
+            note: "burgers and fries",
+            priceRange: "$"
+        )
+        let similarRamen = place(
+            name: "Future Ramen Shop",
+            category: .food,
+            latitude: 33.6860,
+            longitude: -117.8272,
+            note: "spicy ramen, black garlic broth",
+            extractedDishes: ["black garlic ramen"],
+            priceRange: "$$"
+        )
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "推薦我附近餐廳",
+            places: [genericNearby, similarRamen, lovedRamen],
+            currentLocation: currentLocation
+        ))
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title).prefix(2), ["Black Garlic Ramen Memory", "Future Ramen Shop"])
+        XCTAssertTrue(response.fromYourSave.results[1].evidence.contains("Taste match from places you visited"))
+    }
+
+    func testSharedGeminiFallbacksUseGemini3ProOnly() {
+        XCTAssertEqual(SaveAIService.defaultModelFallbacks, ["gemini-3-pro"])
     }
 
     func testUnsupportedGymQueryDoesNotMapToFoodOrCafe() throws {
@@ -327,7 +373,11 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         latitude: Double = 34.0522,
         longitude: Double = -118.2437,
         note: String? = nil,
-        extractedDishes: [String]? = nil
+        extractedDishes: [String]? = nil,
+        status: PlaceStatus = .wantToGo,
+        rating: Double? = nil,
+        googleRating: Double? = nil,
+        priceRange: String? = nil
     ) -> Place {
         Place(
             id: UUID(),
@@ -337,16 +387,16 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
             longitude: longitude,
             googlePlaceId: nil,
             category: category,
-            status: .wantToGo,
-            rating: nil,
+            status: status,
+            rating: rating,
             note: note,
             sourceUrl: nil,
             sourcePlatform: .other,
             sourceImageUrl: nil,
             extractedDishes: extractedDishes,
-            priceRange: nil,
+            priceRange: priceRange,
             recommender: nil,
-            googleRating: nil,
+            googleRating: googleRating,
             googlePriceLevel: nil,
             openingHours: nil,
             createdAt: Date()
