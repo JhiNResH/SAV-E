@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import AVFoundation
 import Speech
 import CoreLocation
@@ -25,7 +24,6 @@ enum MapDetailDrawerItem: Identifiable {
 }
 
 private enum CommandDrawerTab: String, CaseIterable, Hashable {
-    case add
     case saved
     case review
     case lists
@@ -33,7 +31,6 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .add: return "Add"
         case .saved: return "Stamps"
         case .review: return "Review"
         case .lists: return "Lists"
@@ -43,7 +40,6 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .add: return "plus.circle.fill"
         case .saved: return "list.bullet.rectangle"
         case .review: return "checklist.unchecked"
         case .lists: return "person.2.wave.2.fill"
@@ -98,7 +94,6 @@ struct AIDrawerView: View {
     @State private var mapCandidateActionInFlight: String?
     @State private var showReviewInbox = false
     @State private var showSavedCategories = false
-    @State private var showAddSpotsHub = false
     @State private var isImportingURL = false
     @State private var showProfile = false
     @State private var showLists = false
@@ -683,7 +678,8 @@ struct AIDrawerView: View {
         .padding(.vertical, 10)
         .background {
             Rectangle()
-                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.92) : Color.saveNotebookPage.opacity(0.86))
+                .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+                .background(colorScheme == .dark ? Color.black.opacity(0.20) : Color.white.opacity(0.18))
                 .overlay(navigationHeaderTint)
         }
         .overlay(alignment: .bottom) {
@@ -790,26 +786,20 @@ struct AIDrawerView: View {
 
     private var commandHomeView: some View {
         VStack(spacing: 0) {
-            if showAddSpotsHub {
-                addSpotsHub
-            } else {
-                commandTabBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 8)
+            commandTabBar
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
 
-                switch activeCommandTab {
-                case .add:
-                    addSpotsHub
-                case .saved:
-                    savedPlacesView
-                case .review:
-                    reviewInboxView
-                case .lists:
-                    collaborativeListsView
-                case .friends:
-                    socialMapTabView
-                }
+            switch activeCommandTab {
+            case .saved:
+                savedPlacesView
+            case .review:
+                reviewInboxView
+            case .lists:
+                collaborativeListsView
+            case .friends:
+                socialMapTabView
             }
         }
     }
@@ -821,7 +811,6 @@ struct AIDrawerView: View {
                     activeCommandTab = tab
                     showSavedCategories = false
                     showReviewInbox = false
-                    showAddSpotsHub = false
                     showLists = false
                     searchFocused = false
                 } label: {
@@ -851,7 +840,6 @@ struct AIDrawerView: View {
     private var socialMapTabView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
                 socialSignalSection
                 if let addSpotStatus {
                     Text(addSpotStatus)
@@ -1132,8 +1120,6 @@ struct AIDrawerView: View {
     private var savedPlacesView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
-
                 if !savedCategoryCounts.isEmpty {
                     SavedCategoryGrid(
                         categories: savedCategoryCounts,
@@ -1182,111 +1168,9 @@ struct AIDrawerView: View {
         return places.sorted { $0.createdAt > $1.createdAt }
     }
 
-    // MARK: - Add Spots
-
-    private var addSpotsHub: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Button {
-                        if activeCommandTab == .add {
-                            activeCommandTab = .saved
-                        }
-                        showAddSpotsHub = false
-                        withAnimation { drawerDetent = .medium }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.subheadline.weight(.black))
-                            .foregroundColor(.saveInk)
-                            .frame(width: 36, height: 36)
-                            .background(Color.saveNotebookPage.opacity(0.72))
-                            .overlay(Circle().stroke(Color.saveNotebookLine.opacity(0.54), lineWidth: 1.2))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text("Add Spots")
-                        .font(.title2.weight(.black))
-                        .foregroundColor(.saveInk)
-
-                    Spacer()
-
-                    Color.clear.frame(width: 36, height: 36)
-                }
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    AddSpotChoiceCard(
-                        icon: "sparkle.magnifyingglass",
-                        title: "Social Search",
-                        subtitle: "TikTok or Instagram clues",
-                        color: .savePink,
-                        action: focusSocialInvestigationPrompt
-                    )
-
-                    AddSpotChoiceCard(
-                        icon: "link",
-                        title: "Paste any URL",
-                        subtitle: "Articles, blogs, videos",
-                        color: .saveSignal,
-                        action: importClipboardURL
-                    )
-
-                    AddSpotChoiceCard(
-                        icon: "note.text",
-                        title: "Notes",
-                        subtitle: "Paste a rough list",
-                        color: .saveHoney,
-                        action: focusNotesPrompt
-                    )
-
-                    AddSpotChoiceCard(
-                        icon: "doc.viewfinder",
-                        title: "Screenshots",
-                        subtitle: "Extract from images",
-                        color: .saveSky,
-                        action: focusMediaEvidencePrompt
-                    )
-                }
-
-                AddSpotDivider(title: "OR ADD MANUALLY")
-
-                ManualAddSpotRow(
-                    icon: "location.magnifyingglass",
-                    title: "Search Location",
-                    subtitle: "Find on the map, then save",
-                    color: .saveMint,
-                    action: focusLocationSearchPrompt
-                )
-
-                if !reviewCandidates.isEmpty {
-                    ReviewCandidatesSection(
-                        candidates: reviewCandidates,
-                        limit: 2,
-                        onSelect: openReviewCandidateDetail
-                    )
-                }
-
-                if let addSpotStatus {
-                    Text(addSpotStatus)
-                        .font(.caption)
-                        .foregroundColor(.saveCocoa.opacity(0.74))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 2)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 18)
-            .padding(.bottom, 24)
-        }
-    }
-
     private var reviewInboxView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
-
                 ReviewCandidatesSection(
                     candidates: reviewCandidates,
                     limit: nil,
@@ -1309,8 +1193,6 @@ struct AIDrawerView: View {
     private var collaborativeListsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                SpotDrawerCTA(onAddSpots: openAddSpotsHub)
-
                 VStack(alignment: .leading, spacing: 9) {
                     NotebookBandLabel("Create list")
                     TextField("Tokyo cafes, OC weekend, NYC food", text: $newListTitle)
@@ -1395,78 +1277,6 @@ struct AIDrawerView: View {
         }
     }
 
-    private func focusSocialInvestigationPrompt() {
-        showAddSpotsHub = false
-        showReviewInbox = false
-        if let clipboardText = UIPasteboard.general.string,
-           let url = firstURL(in: clipboardText) {
-            importURLToReviewCandidates(url)
-        } else {
-            addSpotStatus = "Paste a place link, or share to SAV-E from another app. SAV-E will show evidence before saving anything."
-            focusAgentPrompt(socialInvestigationPrompt(for: ""))
-        }
-    }
-
-    private func socialInvestigationPrompt(for url: String) -> String {
-        """
-        Investigate this public social/video link and return candidate places with evidence.
-
-        Use public preview metadata, pasted caption text, and reliable cross-checks only. If there is no explicit venue/address, return review candidates with confidence and missing evidence instead of saving.
-
-        Link: \(url)
-        """
-    }
-
-    private func focusNotesPrompt() {
-        showAddSpotsHub = false
-        focusAgentPrompt("""
-        Turn these notes into reviewable place clues.
-
-        Extract likely place names, city/address clues, category, evidence, confidence, and what is missing. Do not save anything automatically.
-
-        Notes:
-        """)
-    }
-
-    private func focusMediaEvidencePrompt() {
-        showAddSpotsHub = false
-        showReviewInbox = false
-        addSpotStatus = "Media evidence results stay as review candidates until you choose a place."
-        focusAgentPrompt("""
-        Investigate this video or screenshot and return candidate places with evidence.
-
-        Use only evidence from the shared media, pasted caption/link, and reliable cross-checks.
-        Return likely place candidates, evidence for each candidate, confidence, what is missing, and whether it is safe to save.
-
-        Do not save anything automatically.
-        """)
-    }
-
-    private func importClipboardURL() {
-        showAddSpotsHub = false
-        showReviewInbox = false
-        guard let clipboardText = UIPasteboard.general.string,
-              let url = firstURL(in: clipboardText) else {
-            addSpotStatus = "Clipboard does not contain a URL yet. Copy a place or social link, then tap Paste any URL again."
-            return
-        }
-
-        addSpotStatus = "Clipboard link loaded. SAV-E will save possible places to Review first."
-        importURLToReviewCandidates(url)
-    }
-
-    private func focusLocationSearchPrompt() {
-        showAddSpotsHub = false
-        showReviewInbox = false
-        showSavedCategories = false
-        showLists = false
-        viewModel.startNewConversation()
-        viewModel.query = "search nearby unsaved place"
-        addSpotStatus = "Edit the search text, then press Return. SAV-E will show unsaved map results separately."
-        withAnimation { drawerDetent = .medium }
-        searchFocused = true
-    }
-
     private func performCandidateAction(
         _ candidate: PlaceReviewCandidate,
         successMessage: String,
@@ -1511,7 +1321,6 @@ struct AIDrawerView: View {
     }
 
     private func focusAgentPrompt(_ prompt: String) {
-        showAddSpotsHub = false
         showSavedCategories = false
         showReviewInbox = false
         showLists = false
@@ -1540,21 +1349,8 @@ struct AIDrawerView: View {
             }
     }
 
-    private func openAddSpotsHub() {
-        viewModel.returnToCommands()
-        showSavedCategories = false
-        showReviewInbox = false
-        showLists = false
-        searchFocused = false
-        showAddSpotsHub = true
-        withAnimation(.spring(duration: 0.28)) {
-            drawerDetent = .large
-        }
-    }
-
     private func openReviewInbox() {
         viewModel.returnToCommands()
-        showAddSpotsHub = false
         activeCommandTab = .review
         searchFocused = false
         withAnimation { drawerDetent = .large }
@@ -1562,7 +1358,6 @@ struct AIDrawerView: View {
 
     private func openSavedPlaces() {
         viewModel.returnToCommands()
-        showAddSpotsHub = false
         activeCommandTab = .saved
         searchFocused = false
         withAnimation { drawerDetent = .medium }
@@ -1570,7 +1365,6 @@ struct AIDrawerView: View {
 
     private func openCollaborativeLists() {
         viewModel.returnToCommands()
-        showAddSpotsHub = false
         activeCommandTab = .lists
         searchFocused = false
         withAnimation { drawerDetent = .large }
@@ -1607,7 +1401,6 @@ struct AIDrawerView: View {
     }
 
     private func prepareMapDetailOpening() {
-        showAddSpotsHub = false
         showSavedCategories = false
         showReviewInbox = false
         showLists = false
@@ -1720,7 +1513,6 @@ struct AIDrawerView: View {
         }
         showSavedCategories = false
         showReviewInbox = false
-        showAddSpotsHub = false
         showLists = false
         searchFocused = false
         withAnimation { drawerDetent = .height(72) }
@@ -1732,7 +1524,6 @@ struct AIDrawerView: View {
         onClearMapSearchResults()
         showSavedCategories = false
         showReviewInbox = false
-        showAddSpotsHub = false
         showLists = false
         searchFocused = false
         addSpotStatus = nil
@@ -1823,7 +1614,7 @@ private struct DrawerGlassBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
+            .fill(.ultraThinMaterial)
             .background(baseTint)
             .overlay {
                 LinearGradient(
@@ -1843,22 +1634,22 @@ private struct DrawerGlassBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.06),
-                Color.black.opacity(0.18)
+                Color.black.opacity(0.12),
+                Color.black.opacity(0.26)
             ]
         }
         return [
-            Color.white.opacity(0.18),
-            Color.saveCream.opacity(0.20)
+            Color.white.opacity(0.06),
+            Color.saveCream.opacity(0.08)
         ]
     }
 
     private var baseTint: Color {
-        colorScheme == .dark ? Color.saveNotebookBackground.opacity(0.48) : Color.white.opacity(0.18)
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.06)
     }
 
     private var topStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.62)
+        colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.52)
     }
 }
 
@@ -2254,7 +2045,8 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(baseFill)
+            .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+            .background(baseTint)
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2273,18 +2065,18 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.10),
-                Color.black.opacity(0.18)
+                Color.black.opacity(0.16),
+                Color.black.opacity(0.30)
             ]
         }
         return [
-            Color.white.opacity(0.08),
-            Color.saveCream.opacity(0.14)
+            Color.white.opacity(0.06),
+            Color.saveCream.opacity(0.08)
         ]
     }
 
-    private var baseFill: Color {
-        colorScheme == .dark ? Color.saveNotebookBackground.opacity(0.96) : Color.saveNotebookPage.opacity(0.96)
+    private var baseTint: Color {
+        colorScheme == .dark ? Color.black.opacity(0.28) : Color.white.opacity(0.08)
     }
 }
 
@@ -3052,333 +2844,6 @@ extension VoiceQueryController: SFSpeechRecognizerDelegate {
                 self.stopListening()
             }
         }
-    }
-}
-
-private struct SpotDrawerCTA: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var onAddSpots: () -> Void
-
-    var body: some View {
-        HStack(spacing: 0) {
-            NotebookSpine(color: .saveNotebookSpine, opacity: 0.26)
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("ADD SPOTS")
-                            .font(.caption2.weight(.black))
-                            .foregroundColor(.saveInk)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background {
-                                Capsule()
-                                    .fill(.thinMaterial)
-                                    .overlay(Color.saveHoney.opacity(colorScheme == .dark ? 0.30 : 0.42))
-                            }
-                            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.26), lineWidth: 1))
-                            .clipShape(Capsule())
-
-                        Text("All your spots in one place")
-                            .font(.title3.weight(.black))
-                            .foregroundColor(.saveInk)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.82)
-
-                        Text("Links, maps, screenshots, and notes stay in Review until they are ready to save.")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.saveCocoa.opacity(0.78))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    SpotDrawerScene()
-                        .frame(width: 94, height: 78)
-                }
-
-                HStack(spacing: 8) {
-                    SpotSourceChip(systemName: "link", title: "Links", color: .saveSignal)
-                    SpotSourceChip(systemName: "map.fill", title: "Maps", color: .saveSky)
-                    SpotSourceChip(systemName: "photo", title: "Media", color: .saveHoney)
-                }
-
-                Button(action: onAddSpots) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.subheadline.weight(.black))
-                            .foregroundStyle(Color.saveInk)
-
-                        Text("Add Spots")
-                            .font(.subheadline.weight(.black))
-                            .foregroundColor(.saveInk)
-
-                        Spacer(minLength: 0)
-
-                        Image(systemName: "arrow.up.left")
-                            .font(.caption.weight(.black))
-                            .foregroundColor(.saveCocoa.opacity(0.74))
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 44)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay(Color.saveHoney.opacity(colorScheme == .dark ? 0.26 : 0.34))
-                    }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.32), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add Spots")
-            }
-            .padding(14)
-        }
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
-                .overlay(
-                    colorScheme == .dark
-                        ? Color.saveNotebookPage.opacity(0.34)
-                        : Color.white.opacity(0.20)
-                )
-                .overlay(alignment: .topLeading) {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.10 : 0.44),
-                            Color.white.opacity(0)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .allowsHitTesting(false)
-                }
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(colorScheme == .dark ? 0.32 : 0.24), lineWidth: 1.1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-}
-
-private struct SpotDrawerScene: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(Color.saveNotebookPage.opacity(colorScheme == .dark ? 0.28 : 0.20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
-                )
-
-            VStack(spacing: 5) {
-                HStack(spacing: 5) {
-                    miniStamp(systemName: "fork.knife", tint: .saveSignal)
-                    miniStamp(systemName: "cup.and.saucer.fill", tint: .saveCocoa)
-                }
-
-                HStack(spacing: 5) {
-                    miniStamp(systemName: "map.fill", tint: .saveSky)
-                    miniStamp(systemName: "photo", tint: .saveHoney)
-                }
-            }
-        }
-    }
-
-    private func miniStamp(systemName: String, tint: Color) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12, weight: .black))
-            .foregroundColor(tint)
-            .frame(width: 30, height: 30)
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(.thinMaterial)
-                    .overlay(tint.opacity(0.12))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.22), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-    }
-}
-
-private struct SpotSourceChip: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var systemName: String
-    var title: String
-    var color: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemName)
-                .font(.caption2.weight(.black))
-            Text(title)
-                .font(.caption2.weight(.black))
-                .lineLimit(1)
-        }
-        .foregroundColor(.saveInk)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 32)
-        .padding(.vertical, 6)
-        .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(color.opacity(colorScheme == .dark ? 0.16 : 0.18))
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
-private struct AddSpotChoiceCard: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var icon: String
-    var title: String
-    var subtitle: String
-    var color: Color
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .black))
-                    .foregroundColor(.saveInk)
-                    .frame(width: 54, height: 54)
-                    .background {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(.thinMaterial)
-                            .overlay(color.opacity(colorScheme == .dark ? 0.18 : 0.22))
-                    }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                Spacer(minLength: 0)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.headline.weight(.black))
-                        .foregroundColor(.saveInk)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.84)
-
-                    Text(subtitle)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(.saveCocoa.opacity(0.62))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-            .padding(14)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.28) : Color.white.opacity(0.16))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint(subtitle)
-    }
-}
-
-private struct AddSpotDivider: View {
-    var title: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Rectangle()
-                .fill(Color.saveNotebookLine.opacity(0.24))
-                .frame(height: 1)
-            Text(title)
-                .font(.caption.weight(.black))
-                .foregroundColor(.saveCocoa.opacity(0.56))
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-                .layoutPriority(1)
-            Rectangle()
-                .fill(Color.saveNotebookLine.opacity(0.24))
-                .frame(height: 1)
-        }
-    }
-}
-
-private struct ManualAddSpotRow: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var icon: String
-    var title: String
-    var subtitle: String
-    var color: Color
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .black))
-                    .foregroundColor(.saveInk)
-                    .frame(width: 58, height: 58)
-                    .background {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(.thinMaterial)
-                            .overlay(color.opacity(colorScheme == .dark ? 0.18 : 0.22))
-                    }
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.headline.weight(.black))
-                        .foregroundColor(.saveInk)
-                    Text(subtitle)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundColor(.saveCocoa.opacity(0.62))
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "arrow.up.left")
-                    .font(.caption.weight(.black))
-                    .foregroundColor(.saveCocoa.opacity(0.64))
-            }
-            .padding(14)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.30) : Color.white.opacity(0.16))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.saveNotebookLine.opacity(0.20), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint(subtitle)
     }
 }
 
