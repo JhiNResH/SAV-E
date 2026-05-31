@@ -683,7 +683,8 @@ struct AIDrawerView: View {
         .padding(.vertical, 10)
         .background {
             Rectangle()
-                .fill(colorScheme == .dark ? Color.saveNotebookPage.opacity(0.92) : Color.saveNotebookPage.opacity(0.86))
+                .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+                .background(colorScheme == .dark ? Color.black.opacity(0.20) : Color.white.opacity(0.18))
                 .overlay(navigationHeaderTint)
         }
         .overlay(alignment: .bottom) {
@@ -1823,7 +1824,7 @@ private struct DrawerGlassBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
+            .fill(.ultraThinMaterial)
             .background(baseTint)
             .overlay {
                 LinearGradient(
@@ -1843,22 +1844,22 @@ private struct DrawerGlassBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.06),
-                Color.black.opacity(0.18)
+                Color.black.opacity(0.12),
+                Color.black.opacity(0.26)
             ]
         }
         return [
-            Color.white.opacity(0.18),
-            Color.saveCream.opacity(0.20)
+            Color.white.opacity(0.06),
+            Color.saveCream.opacity(0.08)
         ]
     }
 
     private var baseTint: Color {
-        colorScheme == .dark ? Color.saveNotebookBackground.opacity(0.48) : Color.white.opacity(0.18)
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color.white.opacity(0.06)
     }
 
     private var topStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.62)
+        colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.52)
     }
 }
 
@@ -2254,7 +2255,8 @@ private struct MapDetailDrawerBackground: View {
 
     var body: some View {
         Rectangle()
-            .fill(baseFill)
+            .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+            .background(baseTint)
             .overlay {
                 LinearGradient(
                     colors: tintStops,
@@ -2273,18 +2275,18 @@ private struct MapDetailDrawerBackground: View {
     private var tintStops: [Color] {
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.10),
-                Color.black.opacity(0.18)
+                Color.black.opacity(0.16),
+                Color.black.opacity(0.30)
             ]
         }
         return [
-            Color.white.opacity(0.08),
-            Color.saveCream.opacity(0.14)
+            Color.white.opacity(0.06),
+            Color.saveCream.opacity(0.08)
         ]
     }
 
-    private var baseFill: Color {
-        colorScheme == .dark ? Color.saveNotebookBackground.opacity(0.96) : Color.saveNotebookPage.opacity(0.96)
+    private var baseTint: Color {
+        colorScheme == .dark ? Color.black.opacity(0.28) : Color.white.opacity(0.08)
     }
 }
 
