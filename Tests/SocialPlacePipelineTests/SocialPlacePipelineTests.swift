@@ -121,6 +121,32 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
     }
 }
 
+private final class StubPlaceResolverService: PlaceResolverServiceProtocol {
+    var queries: [String] = []
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+        queries.append(query)
+        if query.contains("蟹尊苑") {
+            return [
+                PlaceProviderMatch(
+                    provider: .amap,
+                    id: "amap-xiezunyuan",
+                    name: "蟹尊苑",
+                    address: "上海市黄浦区广东路59号",
+                    latitude: 31.2389,
+                    longitude: 121.4962,
+                    rating: 4.7,
+                    reviewCount: nil,
+                    priceLevel: nil,
+                    types: ["餐饮服务"],
+                    coordinateSystem: .gcj02
+                )
+            ]
+        }
+        return []
+    }
+}
+
 final class SocialPlacePipelineTests: XCTestCase {
     private struct TikTokSourceFixture: Decodable {
         struct Expected: Decodable {
@@ -483,6 +509,57 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(search.queries.contains { $0.contains("士林") && $0.contains("關西壽喜燒") })
         XCTAssertTrue(places.queries.contains { $0.contains("牛喜壽喜燒") && $0.contains("士林") })
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains { $0.contains("Recovered venue candidate: 牛喜壽喜燒") } == true)
+    }
+
+    func testAmapRefinementPromotesChinaRestaurantCandidateToMapReady() async {
+        let resolver = StubPlaceResolverService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: StubGooglePlacesService(),
+            placeResolverService: resolver
+        )
+        let candidate = PendingReviewCandidate(
+            candidateName: "蟹尊苑",
+            address: "上海 黄浦",
+            category: "food",
+            latitude: nil,
+            longitude: nil,
+            sourceURL: "https://www.xiaohongshu.com/explore/china-crab",
+            sourceText: "上海本帮菜 蟹尊苑 黄浦区",
+            evidence: ["Evidence tier: likely"],
+            confidence: 0.62,
+            missingInfo: ["Confirm coordinates"],
+            savedAt: Date()
+        )
+
+        let refined = await service.refineCandidate(candidate, evidenceText: "上海本帮菜 蟹尊苑 黄浦区")
+
+        XCTAssertEqual(refined.reviewState, "map_match_ready")
+        XCTAssertEqual(refined.candidateName, "蟹尊苑")
+        XCTAssertEqual(refined.address, "上海市黄浦区广东路59号")
+        XCTAssertEqual(refined.latitude, 31.2389)
+        XCTAssertEqual(refined.longitude, 121.4962)
+        XCTAssertTrue(resolver.queries.contains { $0.contains("蟹尊苑") && $0.contains("上海") })
+        XCTAssertTrue(refined.evidence.contains("Amap refined match: 蟹尊苑"))
+        XCTAssertTrue(refined.evidence.contains("Amap coordinates (GCJ-02): 31.2389, 121.4962"))
+        XCTAssertEqual(refined.evidenceDiagnostic?.nextBestClue, "Confirm this Amap match before saving it as a Map Stamp.")
+    }
+
+    func testXiaohongshuAndDouyinLinksPreparePlatformSpecificRecoveryQueries() {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+
+        let xhs = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://www.xiaohongshu.com/explore/65abc123"
+        ).first
+        let douyin = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://v.douyin.com/buUywZoMiLw/"
+        ).first
+
+        XCTAssertEqual(xhs?.candidateName, "Xiaohongshu link")
+        XCTAssertEqual(douyin?.candidateName, "Douyin link")
+        XCTAssertTrue(xhs?.evidenceDiagnostic?.suggestedSearchQueries?.contains("xiaohongshu 65abc123 place") == true)
+        XCTAssertTrue(douyin?.evidenceDiagnostic?.suggestedSearchQueries?.contains("douyin buUywZoMiLw place") == true)
     }
 
     func testInstagramReelPublicMetadataExtractsVenueInsteadOfSourceOnly() async throws {
@@ -1308,7 +1385,7 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertNil(candidate.longitude)
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source URL: \(sourceURL)") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Checked public metadata/caption text for explicit place names") == true)
-        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Did not use logged-in Instagram scraping") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Did not use logged-in social scraping") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Prepared public web search fallback queries for source-only recovery") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
         XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries?.first, "instagram reel DYsourceOnly place")

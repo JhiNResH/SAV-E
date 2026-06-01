@@ -374,6 +374,8 @@ struct SaveSearchController {
         if host.matchesDomain("instagram.com") { return .instagram }
         if host.matchesDomain("threads.net") || host.matchesDomain("threads.com") { return .threads }
         if host.matchesDomain("xiaohongshu.com") || host.matchesDomain("xhslink.com") { return .xiaohongshu }
+        if host.matchesDomain("douyin.com") || host.matchesDomain("iesdouyin.com") { return .douyin }
+        if host.matchesDomain("amap.com") { return .amap }
         if host.matchesDomain("google.com") || host.matchesDomain("goo.gl") || host.matchesDomain("maps.app.goo.gl") {
             return .googleMaps
         }
@@ -536,7 +538,9 @@ private struct SaveSearchQuery {
         if containsAny(value, keywords: ["instagram", "ig"]) { result.insert(.instagram) }
         if value.contains("threads") { result.insert(.threads) }
         if containsAny(value, keywords: ["xiaohongshu", "xhs", "小紅書", "小红书"]) { result.insert(.xiaohongshu) }
+        if containsAny(value, keywords: ["douyin", "抖音"]) { result.insert(.douyin) }
         if containsAny(value, keywords: ["google maps", "googlemaps", "maps", "地圖", "地图"]) { result.insert(.googleMaps) }
+        if containsAny(value, keywords: ["amap", "gaode", "高德", "高德地圖", "高德地图"]) { result.insert(.amap) }
         return result
     }
 
