@@ -20,13 +20,14 @@ struct PlatformIcon: View {
         case .douyin: return "play.rectangle.fill"
         case .googleMaps: return "map.fill"
         case .amap: return "map.circle.fill"
+        case .baidu: return "mappin.circle.fill"
         case .other: return "link"
         }
     }
 
     private var iconColor: Color {
         switch platform {
-        case .instagram, .threads, .xiaohongshu, .douyin, .googleMaps, .amap: return .saveCocoa
+        case .instagram, .threads, .xiaohongshu, .douyin, .googleMaps, .amap, .baidu: return .saveCocoa
         case .other: return .saveMutedText
         }
     }

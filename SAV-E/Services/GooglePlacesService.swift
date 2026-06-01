@@ -42,11 +42,13 @@ struct GooglePlaceDetails: Codable {
 enum PlaceMatchProvider: String, Codable, Hashable {
     case googlePlaces = "google_places"
     case amap
+    case baidu
 
     var displayName: String {
         switch self {
         case .googlePlaces: return "Google Places"
         case .amap: return "Amap"
+        case .baidu: return "Baidu Maps"
         }
     }
 
@@ -54,6 +56,7 @@ enum PlaceMatchProvider: String, Codable, Hashable {
         switch self {
         case .googlePlaces: return "Google Places refine skipped or failed; confirm exact address/coordinates"
         case .amap: return "Amap refine skipped or failed; confirm exact address/coordinates"
+        case .baidu: return "Baidu Maps refine skipped or failed; confirm exact address/coordinates"
         }
     }
 }
@@ -61,6 +64,7 @@ enum PlaceMatchProvider: String, Codable, Hashable {
 enum PlaceCoordinateSystem: String, Codable, Hashable {
     case wgs84 = "WGS84"
     case gcj02 = "GCJ-02"
+    case bd09 = "BD-09"
 }
 
 struct PlaceProviderMatch: Identifiable, Codable, Hashable {
@@ -80,7 +84,7 @@ struct PlaceProviderMatch: Identifiable, Codable, Hashable {
         switch coordinateSystem {
         case .wgs84:
             return "\(provider.displayName) coordinates"
-        case .gcj02:
+        case .gcj02, .bd09:
             return "\(provider.displayName) coordinates (\(coordinateSystem.rawValue))"
         }
     }
@@ -91,6 +95,14 @@ protocol PlaceResolverServiceProtocol {
 }
 
 protocol AmapPlaceSearchServiceProtocol {
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch]
+}
+
+protocol BaiduPlaceSearchServiceProtocol {
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch]
+}
+
+protocol BackendPlaceResolverServiceProtocol {
     func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch]
 }
 
@@ -130,6 +142,29 @@ enum AmapPlaceSearchError: LocalizedError {
     }
 }
 
+enum BaiduPlaceSearchError: LocalizedError {
+    case apiKeyMissing
+    case noResults
+    case apiError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .apiKeyMissing:
+            return "Baidu Maps Web Service key missing. China POI fallback requires BAIDU_MAP_WEB_SERVICE_KEY."
+        case .noResults:
+            return "No matching Baidu Maps places found"
+        case .apiError(let message):
+            return "Baidu Maps API: \(message)"
+        }
+    }
+}
+
+enum BackendPlaceResolverError: LocalizedError {
+    case notConfigured
+    case noResults
+    case apiError(String)
+}
+
 // MARK: - Provider Resolver
 
 final class PlaceResolverService: PlaceResolverServiceProtocol {
@@ -137,22 +172,39 @@ final class PlaceResolverService: PlaceResolverServiceProtocol {
 
     private let googlePlacesService: GooglePlacesServiceProtocol
     private let amapPlaceSearchService: AmapPlaceSearchServiceProtocol
+    private let baiduPlaceSearchService: BaiduPlaceSearchServiceProtocol
+    private let backendPlaceResolverService: BackendPlaceResolverServiceProtocol
 
     init(
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
-        amapPlaceSearchService: AmapPlaceSearchServiceProtocol = AmapPlaceSearchService.shared
+        amapPlaceSearchService: AmapPlaceSearchServiceProtocol = AmapPlaceSearchService.shared,
+        baiduPlaceSearchService: BaiduPlaceSearchServiceProtocol = BaiduPlaceSearchService.shared,
+        backendPlaceResolverService: BackendPlaceResolverServiceProtocol = BackendPlaceResolverService.shared
     ) {
         self.googlePlacesService = googlePlacesService
         self.amapPlaceSearchService = amapPlaceSearchService
+        self.baiduPlaceSearchService = baiduPlaceSearchService
+        self.backendPlaceResolverService = backendPlaceResolverService
     }
 
     func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
         var results: [PlaceProviderMatch] = []
         var seen = Set<String>()
+        let shouldTryChinaProviders = Self.shouldTryChinaProviders(for: query)
 
-        if Self.shouldTryAmap(for: query),
+        if shouldTryChinaProviders,
+           let proxyMatches = try? await backendPlaceResolverService.searchPlace(query: query, near: near) {
+            append(proxyMatches, to: &results, seen: &seen)
+        }
+
+        if shouldTryChinaProviders,
            let amapMatches = try? await amapPlaceSearchService.searchPlace(query: query, near: near) {
             append(amapMatches, to: &results, seen: &seen)
+        }
+
+        if shouldTryChinaProviders,
+           let baiduMatches = try? await baiduPlaceSearchService.searchPlace(query: query, near: near) {
+            append(baiduMatches, to: &results, seen: &seen)
         }
 
         if let googleMatches = try? await googlePlacesService.searchPlace(query: query, near: near) {
@@ -172,7 +224,7 @@ final class PlaceResolverService: PlaceResolverServiceProtocol {
         }
     }
 
-    private static func shouldTryAmap(for query: String) -> Bool {
+    private static func shouldTryChinaProviders(for query: String) -> Bool {
         query.unicodeScalars.contains { scalar in
             (0x4E00...0x9FFF).contains(Int(scalar.value)) ||
                 (0x3400...0x4DBF).contains(Int(scalar.value))
@@ -460,5 +512,262 @@ final class AmapPlaceSearchService: AmapPlaceSearchServiceProtocol {
         if let int = value as? Int { return Double(int) }
         if let string = value as? String { return Double(string) }
         return nil
+    }
+}
+
+// MARK: - Baidu Maps
+
+final class BaiduPlaceSearchService: BaiduPlaceSearchServiceProtocol {
+    static let shared = BaiduPlaceSearchService()
+
+    private let apiKey: String?
+
+    init(apiKey: String? = nil) {
+        self.apiKey = Self.normalizedAPIKey(
+            apiKey
+                ?? ProcessInfo.processInfo.environment["BAIDU_MAP_WEB_SERVICE_KEY"]
+                ?? SAVEProductionConfig.keyFromPlist("BAIDU_MAP_WEB_SERVICE_KEY")
+        )
+    }
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+        guard let apiKey, !apiKey.isEmpty else {
+            throw BaiduPlaceSearchError.apiKeyMissing
+        }
+
+        var components = URLComponents(string: "https://api.map.baidu.com/place/v2/search")
+        var queryItems = [
+            URLQueryItem(name: "ak", value: apiKey),
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "tag", value: "美食"),
+            URLQueryItem(name: "region", value: Self.cityHint(in: query) ?? "全国"),
+            URLQueryItem(name: "city_limit", value: Self.cityHint(in: query) == nil ? "false" : "true"),
+            URLQueryItem(name: "output", value: "json"),
+            URLQueryItem(name: "scope", value: "2"),
+            URLQueryItem(name: "page_size", value: "20")
+        ]
+        if let near {
+            queryItems.append(URLQueryItem(name: "location", value: "\(near.latitude),\(near.longitude)"))
+            queryItems.append(URLQueryItem(name: "radius", value: "5000"))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw BaiduPlaceSearchError.noResults
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let status = Self.intValue(json?["status"]) ?? -1
+        guard status == 0 else {
+            let message = Self.stringValue(json?["message"]) ?? "status \(status)"
+            throw BaiduPlaceSearchError.apiError(message)
+        }
+
+        guard let results = json?["results"] as? [[String: Any]], !results.isEmpty else {
+            throw BaiduPlaceSearchError.noResults
+        }
+
+        return results.compactMap { result in
+            guard let name = Self.stringValue(result["name"]),
+                  let location = result["location"] as? [String: Any],
+                  let latitude = Self.doubleValue(location["lat"]),
+                  let longitude = Self.doubleValue(location["lng"]) else { return nil }
+            let id = Self.stringValue(result["uid"]) ?? "baidu-\(name)-\(latitude)-\(longitude)"
+            let address = [
+                Self.stringValue(result["province"]),
+                Self.stringValue(result["city"]),
+                Self.stringValue(result["area"]),
+                Self.stringValue(result["address"])
+            ]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .reduce(into: [String]()) { values, value in
+                    if !values.contains(value) { values.append(value) }
+                }
+                .joined(separator: "")
+            let detailInfo = result["detail_info"] as? [String: Any]
+            return PlaceProviderMatch(
+                provider: .baidu,
+                id: id,
+                name: name,
+                address: address,
+                latitude: latitude,
+                longitude: longitude,
+                rating: Self.doubleValue(detailInfo?["overall_rating"]),
+                reviewCount: Self.intValue(detailInfo?["comment_num"]),
+                priceLevel: nil,
+                types: [Self.stringValue(result["tag"])].compactMap { $0 },
+                coordinateSystem: .bd09
+            )
+        }
+    }
+
+    private static func cityHint(in query: String) -> String? {
+        [
+            "北京", "上海", "广州", "深圳", "杭州", "成都", "重庆", "南京",
+            "苏州", "西安", "武汉", "长沙", "厦门", "青岛", "天津", "宁波"
+        ].first { query.contains($0) }
+    }
+
+    private static func normalizedAPIKey(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        let placeholders: Set<String> = ["YOUR_KEY_HERE", "REPLACE_ME", "BAIDU_MAP_WEB_SERVICE_KEY"]
+        return placeholders.contains(trimmed.uppercased()) ? nil : trimmed
+    }
+
+    fileprivate static func stringValue(_ value: Any?) -> String? {
+        if let string = value as? String { return string }
+        if let array = value as? [Any] { return array.compactMap { $0 as? String }.joined(separator: " ") }
+        return nil
+    }
+
+    fileprivate static func doubleValue(_ value: Any?) -> Double? {
+        if let double = value as? Double { return double }
+        if let int = value as? Int { return Double(int) }
+        if let string = value as? String { return Double(string) }
+        return nil
+    }
+
+    fileprivate static func intValue(_ value: Any?) -> Int? {
+        if let int = value as? Int { return int }
+        if let double = value as? Double { return Int(double) }
+        if let string = value as? String { return Int(string) }
+        return nil
+    }
+}
+
+// MARK: - Backend place resolver proxy
+
+final class BackendPlaceResolverService: BackendPlaceResolverServiceProtocol {
+    static let shared = BackendPlaceResolverService()
+
+    private let apiBaseURL: String?
+    private let accessTokenProvider: (() async throws -> String)?
+
+    init(
+        apiBaseURL: String? = SAVEProductionConfig.URLConfigValue(for: ["SAVE_API_URL", "WANDERLY_API_URL"]),
+        accessTokenProvider: (() async throws -> String)? = {
+            try await PrivyAuthService.shared.accessToken()
+        }
+    ) {
+        self.apiBaseURL = apiBaseURL?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        self.accessTokenProvider = accessTokenProvider
+    }
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+        guard let apiBaseURL, !apiBaseURL.isEmpty,
+              let endpoint = URL(string: "\(apiBaseURL)/place-resolve") else {
+            throw BackendPlaceResolverError.notConfigured
+        }
+        guard let accessTokenProvider else { throw BackendPlaceResolverError.notConfigured }
+
+        var body: [String: Any] = ["query": query, "provider": "china"]
+        if let near {
+            body["near"] = ["latitude": near.latitude, "longitude": near.longitude]
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(try await accessTokenProvider())", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw BackendPlaceResolverError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)")
+        }
+        let decoded = try JSONDecoder().decode(BackendPlaceResolveResponse.self, from: data)
+        guard !decoded.matches.isEmpty else { throw BackendPlaceResolverError.noResults }
+        return decoded.matches
+    }
+}
+
+private struct BackendPlaceResolveResponse: Codable {
+    var matches: [PlaceProviderMatch]
+}
+
+// MARK: - China map deep-link parser
+
+struct ChinaMapDeepLinkParser {
+    static func match(from urlString: String) -> PlaceProviderMatch? {
+        guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let host = url.host?.lowercased() else { return nil }
+        if host.contains("amap.com") || url.scheme?.lowercased() == "iosamap" || url.scheme?.lowercased() == "amapuri" {
+            return amapMatch(from: url)
+        }
+        if host.contains("baidu.com") || url.scheme?.lowercased() == "baidumap" {
+            return baiduMatch(from: url)
+        }
+        return nil
+    }
+
+    private static func amapMatch(from url: URL) -> PlaceProviderMatch? {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name.lowercased(), $0.value ?? "") })
+        let name = query["name"] ?? query["poiname"] ?? query["keywords"] ?? titleFromPath(url) ?? "Amap place"
+        let address = query["address"] ?? query["addr"] ?? ""
+        let coordinate = coordinateFromLngLat(query["position"] ?? query["location"] ?? query["lnglat"])
+        guard let coordinate else { return nil }
+        return PlaceProviderMatch(
+            provider: .amap,
+            id: query["poiid"] ?? "amap-url-\(coordinate.latitude)-\(coordinate.longitude)",
+            name: decoded(name),
+            address: decoded(address),
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            rating: nil,
+            reviewCount: nil,
+            priceLevel: nil,
+            types: [],
+            coordinateSystem: .gcj02
+        )
+    }
+
+    private static func baiduMatch(from url: URL) -> PlaceProviderMatch? {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name.lowercased(), $0.value ?? "") })
+        let name = query["title"] ?? query["name"] ?? query["query"] ?? titleFromPath(url) ?? "Baidu Maps place"
+        let address = query["content"] ?? query["address"] ?? ""
+        let coordinate = coordinateFromLatLng(query["location"] ?? query["center"]) ?? coordinateFromLngLat(query["coord"])
+        guard let coordinate else { return nil }
+        return PlaceProviderMatch(
+            provider: .baidu,
+            id: query["uid"] ?? "baidu-url-\(coordinate.latitude)-\(coordinate.longitude)",
+            name: decoded(name),
+            address: decoded(address),
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            rating: nil,
+            reviewCount: nil,
+            priceLevel: nil,
+            types: [],
+            coordinateSystem: .bd09
+        )
+    }
+
+    private static func coordinateFromLngLat(_ value: String?) -> CLLocationCoordinate2D? {
+        guard let parts = value?.split(separator: ",").map({ String($0).trimmingCharacters(in: .whitespacesAndNewlines) }),
+              parts.count == 2,
+              let longitude = Double(parts[0]),
+              let latitude = Double(parts[1]) else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private static func coordinateFromLatLng(_ value: String?) -> CLLocationCoordinate2D? {
+        guard let parts = value?.split(separator: ",").map({ String($0).trimmingCharacters(in: .whitespacesAndNewlines) }),
+              parts.count == 2,
+              let latitude = Double(parts[0]),
+              let longitude = Double(parts[1]) else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private static func titleFromPath(_ url: URL) -> String? {
+        url.pathComponents.reversed().first { component in
+            component != "/" && component.count > 1 && component.rangeOfCharacter(from: .decimalDigits.inverted) != nil
+        }.map(decoded)
+    }
+
+    private static func decoded(_ value: String) -> String {
+        value.removingPercentEncoding ?? value
     }
 }

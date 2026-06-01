@@ -177,7 +177,11 @@ final class SocialLinkReviewCandidateService {
         } catch {
             var unresolved = candidate
             let failureMessages = containsCJK(query)
-                ? [PlaceMatchProvider.googlePlaces.refinementFailureMessage, PlaceMatchProvider.amap.refinementFailureMessage]
+                ? [
+                    PlaceMatchProvider.googlePlaces.refinementFailureMessage,
+                    PlaceMatchProvider.amap.refinementFailureMessage,
+                    PlaceMatchProvider.baidu.refinementFailureMessage
+                ]
                 : [PlaceMatchProvider.googlePlaces.refinementFailureMessage]
             unresolved.missingInfo = appendUnique(
                 unresolved.missingInfo,
@@ -318,6 +322,10 @@ final class SocialLinkReviewCandidateService {
     }
 
     func reviewCandidatesOrSourceOnly(fromEvidenceText evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
+        if let directMapCandidate = directChinaMapCandidate(evidenceText: evidenceText, sourceURL: sourceURL) {
+            return [directMapCandidate]
+        }
+
         let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
         let candidates = rankedCandidates(
             analysis.placesFound.map { pendingReviewCandidate(from: $0, sourceURL: sourceURL, sourceText: evidenceText) }
@@ -430,6 +438,54 @@ final class SocialLinkReviewCandidateService {
             ["Analysis pipeline: collected metadata/caption anchors, scored candidate evidence, and kept unresolved fields for review"]
         )
         return analyzed
+    }
+
+    private func directChinaMapCandidate(evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
+        let mapURLStrings = ([sourceURL] + embeddedURLStrings(in: evidenceText))
+            .filter { !$0.isEmpty }
+        for urlString in mapURLStrings {
+            guard let match = ChinaMapDeepLinkParser.match(from: urlString) else { continue }
+            let diagnostic = SocialPlaceEvidenceDiagnostic(
+                found: appendUnique(
+                    [],
+                    [
+                        "Source URL: \(sourceURL)",
+                        "Direct \(match.provider.displayName) map link: \(match.name)",
+                        match.address.isEmpty ? "" : "Verified address: \(match.address)",
+                        "Verified coordinates: \(match.latitude), \(match.longitude)",
+                        "Coordinate system: \(match.coordinateSystem.rawValue)"
+                    ]
+                ),
+                attempts: ["Parsed shared map deep link before public metadata recovery"],
+                missingFields: [],
+                nextBestClue: "Confirm this \(match.provider.displayName) deep-link match before saving it as a Map Stamp."
+            )
+            return PendingReviewCandidate(
+                candidateName: match.name,
+                address: match.address,
+                category: category(from: "\(match.name) \(match.address)"),
+                latitude: match.latitude,
+                longitude: match.longitude,
+                sourceURL: sourceURL,
+                sourceText: evidenceText.isEmpty ? nil : evidenceText,
+                evidence: diagnostic.found + diagnostic.attempts + ["Map provider: \(match.provider.rawValue)", "\(match.coordinateEvidenceLabel): \(match.latitude), \(match.longitude)"],
+                confidence: 0.86,
+                missingInfo: ["User confirmation required"],
+                savedAt: Date(),
+                evidenceDiagnostic: diagnostic,
+                reviewState: "map_match_ready"
+            )
+        }
+        return nil
+    }
+
+    private func embeddedURLStrings(in text: String) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: #"https?://[^\s<>\"]+|(?:iosamap|amapuri|baidumap)://[^\s<>\"]+"#, options: [.caseInsensitive]) else { return [] }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.matches(in: text, range: range).compactMap { match in
+            guard let matchRange = Range(match.range, in: text) else { return nil }
+            return String(text[matchRange]).trimmingCharacters(in: CharacterSet(charactersIn: ".,;。；，)）]】\"'"))
+        }
     }
 
     private func pendingReviewCandidate(
@@ -988,21 +1044,41 @@ final class SocialLinkReviewCandidateService {
         if !evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             found.append("Shared text/caption was present but did not contain a verified place candidate")
         }
+        var attempts = [
+            "Checked public metadata/caption text for explicit place names",
+            "Checked social handles without treating creator handles as places",
+            "Prepared public web search fallback queries for source-only recovery",
+            "Did not use logged-in social scraping"
+        ]
+        var missingFields = [
+            "Verified place name",
+            "Verified address",
+            "Verified coordinates"
+        ]
+        var nextBestClue = "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle."
+
+        if let xhs = xiaohongshuLinkContext(sourceURL: sourceURL) {
+            found = appendUnique(found, [
+                "Xiaohongshu note id: \(xhs.noteID)",
+                "Canonical Xiaohongshu URL: \(xhs.canonicalURL)"
+            ])
+            attempts = appendUnique(attempts, [
+                "Resolved Xiaohongshu short/canonical URL and extracted the note id",
+                "Detected blocked or generic Xiaohongshu metadata shell instead of usable caption text"
+            ])
+            missingFields = appendUnique(missingFields, [
+                "Readable Xiaohongshu caption or screenshot OCR",
+                "Xiaohongshu map link or copied place address"
+            ])
+            nextBestClue = "Share a Xiaohongshu screenshot/OCR frame, copied caption, or map link so SAV-E can turn this source into a Review Candidate."
+        }
+
         let searchQueries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL)
         return SocialPlaceEvidenceDiagnostic(
             found: found,
-            attempts: [
-                "Checked public metadata/caption text for explicit place names",
-                "Checked social handles without treating creator handles as places",
-                "Prepared public web search fallback queries for source-only recovery",
-                "Did not use logged-in social scraping"
-            ],
-            missingFields: [
-                "Verified place name",
-                "Verified address",
-                "Verified coordinates"
-            ],
-            nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
+            attempts: attempts,
+            missingFields: missingFields,
+            nextBestClue: nextBestClue,
             suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
         )
     }
@@ -1277,6 +1353,22 @@ final class SocialLinkReviewCandidateService {
         var siteQuery: String
     }
 
+    private struct XiaohongshuLinkContext {
+        var noteID: String
+        var canonicalURL: String
+    }
+
+    private func xiaohongshuLinkContext(sourceURL: String) -> XiaohongshuLinkContext? {
+        guard let url = URL(string: sourceURL) else { return nil }
+        let host = url.host()?.lowercased() ?? ""
+        guard host.matchesSocialDomain("xiaohongshu.com") || host.matchesSocialDomain("xhslink.com") else { return nil }
+        guard let descriptor = socialPostDescriptor(in: url) else { return nil }
+        return XiaohongshuLinkContext(
+            noteID: descriptor.id,
+            canonicalURL: canonicalSearchURL(from: url) ?? sourceURL
+        )
+    }
+
     private func socialPostDescriptor(in url: URL?) -> SocialPostDescriptor? {
         guard let url else { return nil }
         let host = url.host()?.lowercased() ?? ""
@@ -1314,6 +1406,12 @@ final class SocialLinkReviewCandidateService {
             "Source URL: \(sourceURL)",
             "Candidate place name: \(candidate.candidateName)"
         ]
+        if let xhs = xiaohongshuLinkContext(sourceURL: sourceURL) {
+            found = appendUnique(found, [
+                "Xiaohongshu note id: \(xhs.noteID)",
+                "Canonical Xiaohongshu URL: \(xhs.canonicalURL)"
+            ])
+        }
         if !candidate.address.isEmpty {
             found.append("Address/location clue: \(candidate.address)")
         }
@@ -1326,13 +1424,21 @@ final class SocialLinkReviewCandidateService {
         if !candidate.hasReliableCoordinates { missing.append("Verified coordinates") }
         missing.append(contentsOf: candidate.missingInfo)
 
+        var attempts = [
+            "Checked public metadata/caption text for explicit place names",
+            "Kept plausible venue evidence in Review instead of inventing map coordinates",
+            "Did not use logged-in social scraping"
+        ]
+        if xiaohongshuLinkContext(sourceURL: sourceURL) != nil {
+            attempts = appendUnique(attempts, [
+                "Resolved Xiaohongshu short/canonical URL and extracted the note id",
+                "Used readable Xiaohongshu caption/metadata as place evidence"
+            ])
+        }
+
         return SocialPlaceEvidenceDiagnostic(
             found: appendUnique([], found),
-            attempts: [
-                "Checked public metadata/caption text for explicit place names",
-                "Kept plausible venue evidence in Review instead of inventing map coordinates",
-                "Did not use logged-in social scraping"
-            ],
+            attempts: attempts,
             missingFields: appendUnique([], missing),
             nextBestClue: candidate.address.isEmpty
                 ? "Confirm the exact address or share a map link before saving this as a Map Stamp."

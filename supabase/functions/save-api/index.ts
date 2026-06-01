@@ -41,6 +41,9 @@ Deno.serve(async (request) => {
     if (route.resource === "profile") {
       return await handleProfile(request, userId);
     }
+    if (route.resource === "place-resolve") {
+      return await handlePlaceResolve(request);
+    }
 
     return jsonResponse({ error: "Not found" }, 404);
   } catch (error) {
@@ -232,6 +235,142 @@ async function handleProfile(
   }
 
   return jsonResponse({ error: "Unsupported profile route" }, 405);
+}
+
+async function handlePlaceResolve(request: Request): Promise<Response> {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Unsupported place-resolve route" }, 405);
+  }
+
+  const body = await readJson(request);
+  const query = typeof body.query === "string" ? body.query.trim() : "";
+  if (!query) throw new ApiError(400, "query is required");
+
+  const provider = typeof body.provider === "string" ? body.provider : "china";
+  const matches: JsonBody[] = [];
+  if (provider === "china" || provider === "amap") {
+    matches.push(...await amapPlaceSearch(query));
+  }
+  if (provider === "china" || provider === "baidu") {
+    matches.push(...await baiduPlaceSearch(query));
+  }
+
+  return jsonResponse({ matches: dedupePlaceMatches(matches) });
+}
+
+async function amapPlaceSearch(query: string): Promise<JsonBody[]> {
+  const key = Deno.env.get("AMAP_WEB_SERVICE_KEY")?.trim();
+  if (!key) return [];
+  const url = new URL("https://restapi.amap.com/v3/place/text");
+  url.searchParams.set("key", key);
+  url.searchParams.set("keywords", query);
+  url.searchParams.set("types", "050000");
+  url.searchParams.set("offset", "20");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("extensions", "all");
+  const city = chinaCityHint(query);
+  if (city) {
+    url.searchParams.set("city", city);
+    url.searchParams.set("citylimit", "true");
+  }
+  const json = await fetchJson(url);
+  if (json.status !== "1" || !Array.isArray(json.pois)) return [];
+  return json.pois.map((poi: JsonBody) => {
+    const [lng, lat] = parseLngLat(String(poi.location ?? ""));
+    const biz = asOptionalObject(poi.biz_ext);
+    return {
+      provider: "amap",
+      id: String(poi.id ?? `amap-${poi.name}-${lat}-${lng}`),
+      name: String(poi.name ?? ""),
+      address: compactUnique([poi.pname, poi.cityname, poi.adname, poi.address]).join(""),
+      latitude: lat,
+      longitude: lng,
+      rating: numberValue(biz?.rating),
+      reviewCount: null,
+      priceLevel: null,
+      types: compactUnique([poi.type, poi.typecode]),
+      coordinateSystem: "GCJ-02",
+    };
+  }).filter((match: JsonBody) => match.name && match.latitude && match.longitude);
+}
+
+async function baiduPlaceSearch(query: string): Promise<JsonBody[]> {
+  const key = Deno.env.get("BAIDU_MAP_WEB_SERVICE_KEY")?.trim();
+  if (!key) return [];
+  const url = new URL("https://api.map.baidu.com/place/v2/search");
+  url.searchParams.set("ak", key);
+  url.searchParams.set("query", query);
+  url.searchParams.set("tag", "美食");
+  url.searchParams.set("region", chinaCityHint(query) ?? "全国");
+  url.searchParams.set("city_limit", chinaCityHint(query) ? "true" : "false");
+  url.searchParams.set("output", "json");
+  url.searchParams.set("scope", "2");
+  url.searchParams.set("page_size", "20");
+  const json = await fetchJson(url);
+  if (json.status !== 0 || !Array.isArray(json.results)) return [];
+  return json.results.map((place: JsonBody) => {
+    const location = asOptionalObject(place.location);
+    const details = asOptionalObject(place.detail_info);
+    return {
+      provider: "baidu",
+      id: String(place.uid ?? `baidu-${place.name}-${location?.lat}-${location?.lng}`),
+      name: String(place.name ?? ""),
+      address: compactUnique([place.province, place.city, place.area, place.address]).join(""),
+      latitude: numberValue(location?.lat),
+      longitude: numberValue(location?.lng),
+      rating: numberValue(details?.overall_rating),
+      reviewCount: numberValue(details?.comment_num),
+      priceLevel: null,
+      types: compactUnique([place.tag]),
+      coordinateSystem: "BD-09",
+    };
+  }).filter((match: JsonBody) => match.name && match.latitude && match.longitude);
+}
+
+async function fetchJson(url: URL): Promise<JsonBody> {
+  const response = await fetch(url);
+  if (!response.ok) throw new ApiError(response.status, await response.text());
+  return asObject(await response.json());
+}
+
+function dedupePlaceMatches(matches: JsonBody[]): JsonBody[] {
+  const seen = new Set<string>();
+  return matches.filter((match) => {
+    const key = `${match.provider}:${match.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function chinaCityHint(query: string): string | undefined {
+  return [
+    "北京", "上海", "广州", "深圳", "杭州", "成都", "重庆", "南京",
+    "苏州", "西安", "武汉", "长沙", "厦门", "青岛", "天津", "宁波",
+  ].find((city) => query.includes(city));
+}
+
+function parseLngLat(value: string): [number | null, number | null] {
+  const [lng, lat] = value.split(",").map((part) => Number(part.trim()));
+  return [Number.isFinite(lng) ? lng : null, Number.isFinite(lat) ? lat : null];
+}
+
+function compactUnique(values: unknown[]): string[] {
+  const result: string[] = [];
+  for (const value of values) {
+    const text = Array.isArray(value) ? value.join(" ") : String(value ?? "").trim();
+    if (text && !result.includes(text)) result.push(text);
+  }
+  return result;
+}
+
+function numberValue(value: unknown): number | null {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function asOptionalObject(value: unknown): JsonBody | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonBody : undefined;
 }
 
 async function ensureProfile(userId: string): Promise<void> {
