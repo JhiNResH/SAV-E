@@ -99,8 +99,7 @@ private enum FirstRunDemoState: String, CaseIterable {
     }
 
     var pageNumber: Int {
-        guard let index = Self.allCases.firstIndex(of: self) else { return 1 }
-        return index + 1
+        Self.allCases.firstIndex(of: self)! + 1
     }
 
     var visualTitle: String {
@@ -187,79 +186,89 @@ private struct FirstRunVisualCard: View {
     let state: FirstRunDemoState
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(Color.saveNotebookPage.opacity(0.98))
-                .shadow(color: Color.saveInk.opacity(0.08), radius: 16, x: 0, y: 10)
+        GeometryReader { geometry in
+            ZStack {
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(Color.saveNotebookPage.opacity(0.98))
+                    .shadow(color: Color.saveInk.opacity(0.08), radius: 16, x: 0, y: 10)
 
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 2)
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .stroke(Color.saveNotebookLine, lineWidth: 2)
 
-            VStack(spacing: 18) {
-                HStack {
-                    Circle()
-                        .fill(Color.saveInk)
-                        .frame(width: 8, height: 8)
+                VStack(spacing: 18) {
+                    HStack {
+                        Circle()
+                            .fill(Color.saveInk)
+                            .frame(width: 8, height: 8)
 
-                    Spacer()
+                        Spacer()
 
-                    Text("SAV-E")
+                        Text("SAV-E")
+                            .font(.caption)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+
+                        Spacer()
+
+                        Circle()
+                            .fill(state.tint)
+                            .frame(width: 8, height: 8)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
+
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .fill(state.tint.opacity(0.4))
+                            .frame(height: 148)
+
+                        Image(systemName: state.icon)
+                            .font(.system(size: 54, weight: .black))
+                            .foregroundColor(.saveInk)
+
+                        visualAccent
+                    }
+                    .padding(.horizontal, 18)
+
+                    VStack(spacing: 6) {
+                        Text(state.visualTitle)
+                            .font(.title3)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .multilineTextAlignment(.center)
+
+                        Text(state.visualSubtitle)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.saveMutedText)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 22)
+
+                    Text(state.detailText)
                         .font(.caption)
                         .fontWeight(.black)
                         .foregroundColor(.saveInk)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.saveNotebookPage)
+                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                        .clipShape(Capsule())
 
-                    Spacer()
-
-                    Circle()
-                        .fill(state.tint)
-                        .frame(width: 8, height: 8)
+                    Spacer(minLength: 10)
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 16)
-
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(state.tint.opacity(0.4))
-                        .frame(height: 148)
-
-                    Image(systemName: state.icon)
-                        .font(.system(size: 54, weight: .black))
-                        .foregroundColor(.saveInk)
-
-                    visualAccent
-                }
-                .padding(.horizontal, 18)
-
-                VStack(spacing: 6) {
-                    Text(state.visualTitle)
-                        .font(.title3)
-                        .fontWeight(.black)
-                        .foregroundColor(.saveInk)
-                        .multilineTextAlignment(.center)
-
-                    Text(state.visualSubtitle)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.saveMutedText)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 22)
-
-                Text(state.detailText)
-                    .font(.caption)
-                    .fontWeight(.black)
-                    .foregroundColor(.saveInk)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.saveNotebookPage)
-                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
-                    .clipShape(Capsule())
-
-                Spacer(minLength: 10)
             }
+            .frame(width: min(264, max(0, geometry.size.width - 48)), height: 326)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 264, height: 326)
+        .frame(height: 326)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        "\(state.visualTitle). \(state.visualSubtitle). \(state.detailText)."
     }
 
     @ViewBuilder
@@ -348,29 +357,6 @@ private struct FirstRunTrustNote: View {
         )
         .clipShape(Capsule())
         .padding(.horizontal, 24)
-    }
-}
-
-private struct FirstRunEvidenceRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(label.uppercased())
-                .font(.caption2)
-                .fontWeight(.black)
-                .foregroundColor(.saveCocoa)
-                .frame(width: 54, alignment: .leading)
-
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.saveInk)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
-        }
     }
 }
 
