@@ -340,6 +340,29 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testDrawerNearbyRecommendationUsesGroundedAnswerClient() async {
+        let client = StubGroundedAnswerClient(answer: "I would pick Saved Coffee because it matches your saved cafe memory. What budget are you thinking?")
+        let drawer = AIDrawerViewModel(groundedAnswerClient: client)
+        drawer.places = [
+            place(
+                name: "Saved Coffee",
+                address: "1 Main St, Irvine, CA",
+                category: .cafe
+            )
+        ]
+        drawer.query = "coffee"
+
+        await drawer.submit()
+
+        guard case .saveSearchResults(let response) = drawer.drawerState else {
+            return XCTFail("Expected save search results")
+        }
+        XCTAssertEqual(response.assistantMessage, client.answer)
+        XCTAssertEqual(client.requests.map(\.query), ["coffee"])
+        XCTAssertEqual(client.requests.first?.allowedPlaceIds.count, 1)
+    }
+
+    @MainActor
     func testMapSearchClearRemovesUnsavedPinsAndCategoryFilter() {
         let map = MapViewModel()
         let candidate = SaveMapCandidate(
@@ -1175,5 +1198,23 @@ final class SaveSearchControllerTests: XCTestCase {
             openingHours: nil,
             createdAt: Date()
         )
+    }
+}
+
+private final class StubGroundedAnswerClient: SaveLLMClient {
+    let answer: String
+    private(set) var requests: [GroundedAnswerRequest] = []
+
+    init(answer: String) {
+        self.answer = answer
+    }
+
+    func parseIntent(_ request: IntentParseRequest) async throws -> SaveSearchIntent {
+        throw SaveSearchIntentValidationError.malformedJSON
+    }
+
+    func renderGroundedAnswer(_ request: GroundedAnswerRequest) async throws -> String {
+        requests.append(request)
+        return answer
     }
 }

@@ -44,10 +44,11 @@ struct SaveLocationIntentRecommendationService {
             )
         }
 
+        let tasteProfile = SaveTasteProfile(places: places)
         let categoryMatches = places.filter { place in
             intent.requiredCategories.contains(place.category)
         }
-        let rankedCategoryMatches = rank(categoryMatches, for: intent, currentLocation: currentLocation)
+        let rankedCategoryMatches = rank(categoryMatches, for: intent, currentLocation: currentLocation, tasteProfile: tasteProfile)
         let reviewMatches = rankReviewCandidates(
             reviewCandidates.filter { candidate in
                 intent.requiredCategories.contains(inferredCategory(for: candidate))
@@ -83,6 +84,7 @@ struct SaveLocationIntentRecommendationService {
                     mapCandidates: mapMatches,
                     intent: intent,
                     currentLocation: currentLocation,
+                    tasteProfile: tasteProfile,
                     showFallbackAction: true
                 )
             }
@@ -96,6 +98,7 @@ struct SaveLocationIntentRecommendationService {
                 mapCandidates: mapMatches,
                 intent: intent,
                 currentLocation: currentLocation,
+                tasteProfile: tasteProfile,
                 showFallbackAction: false
             )
         }
@@ -118,6 +121,7 @@ struct SaveLocationIntentRecommendationService {
             mapCandidates: mapMatches,
             intent: intent,
             currentLocation: currentLocation,
+            tasteProfile: tasteProfile,
             showFallbackAction: false
         )
     }
@@ -152,11 +156,15 @@ struct SaveLocationIntentRecommendationService {
         )
     }
 
-    private func rank(_ places: [Place], for intent: SaveSearchIntent, currentLocation: CLLocation?) -> [Place] {
+    private func rank(_ places: [Place], for intent: SaveSearchIntent, currentLocation: CLLocation?, tasteProfile: SaveTasteProfile) -> [Place] {
         places.sorted { lhs, rhs in
             let lhsNeedleScore = evidenceScore(lhs, needles: intent.categoryNeedles)
             let rhsNeedleScore = evidenceScore(rhs, needles: intent.categoryNeedles)
             if lhsNeedleScore != rhsNeedleScore { return lhsNeedleScore > rhsNeedleScore }
+
+            let lhsTasteScore = tasteProfile.score(lhs)
+            let rhsTasteScore = tasteProfile.score(rhs)
+            if lhsTasteScore != rhsTasteScore { return lhsTasteScore > rhsTasteScore }
 
             if let currentLocation {
                 return distanceMeters(from: currentLocation, to: lhs) < distanceMeters(from: currentLocation, to: rhs)
@@ -222,13 +230,14 @@ struct SaveLocationIntentRecommendationService {
         mapCandidates: [SaveMapCandidate],
         intent: SaveSearchIntent,
         currentLocation: CLLocation?,
+        tasteProfile: SaveTasteProfile,
         showFallbackAction: Bool
     ) -> SaveSearchResponse {
         let mapResults = searchResults(for: mapCandidates)
         let canSearchNearby = showFallbackAction && mapResults.isEmpty
-        let nearbyResults = searchResults(for: nearby, intent: intent, currentLocation: currentLocation, isNearby: true)
+        let nearbyResults = searchResults(for: nearby, intent: intent, currentLocation: currentLocation, isNearby: true, tasteProfile: tasteProfile)
         let reviewResults = searchResults(for: reviewCandidates, currentLocation: currentLocation)
-        let farResults = searchResults(for: Array(far.prefix(5)), intent: intent, currentLocation: currentLocation, isNearby: false)
+        let farResults = searchResults(for: Array(far.prefix(5)), intent: intent, currentLocation: currentLocation, isNearby: false, tasteProfile: tasteProfile)
         let nearbySection = SaveSearchSection(
                 id: "from-your-save-nearby",
                 label: "FROM YOUR SAV-E",
@@ -313,10 +322,11 @@ struct SaveLocationIntentRecommendationService {
         for places: [Place],
         intent: SaveSearchIntent,
         currentLocation: CLLocation?,
-        isNearby: Bool
+        isNearby: Bool,
+        tasteProfile: SaveTasteProfile
     ) -> [SaveSearchResult] {
         places.map { place in
-            let reasons = reasons(for: place, intent: intent, currentLocation: currentLocation, isNearby: isNearby)
+            let reasons = reasons(for: place, intent: intent, currentLocation: currentLocation, isNearby: isNearby, tasteProfile: tasteProfile)
             return SaveSearchResult(
                 id: "place-\(place.id.uuidString)",
                 objectType: place.status == .visited ? .triedMemory : .savedPlace,
@@ -525,10 +535,15 @@ struct SaveLocationIntentRecommendationService {
         return values.filter { seen.insert($0).inserted }
     }
 
-    private func reasons(for place: Place, intent: SaveSearchIntent, currentLocation: CLLocation?, isNearby: Bool) -> [String] {
+    private func reasons(for place: Place, intent: SaveSearchIntent, currentLocation: CLLocation?, isNearby: Bool, tasteProfile: SaveTasteProfile) -> [String] {
         var values = ["\(place.category.displayName) Map Stamp"]
         if !intent.categoryNeedles.isEmpty, evidenceScore(place, needles: intent.categoryNeedles) > 0 {
             values.append("Saved evidence matches \(intent.categoryNeedles.prefix(2).joined(separator: " / "))")
+        }
+        if tasteProfile.isPositiveVisited(place) {
+            values.append("Visited place you rated well")
+        } else if tasteProfile.score(place) > 0 {
+            values.append("Taste match from places you visited")
         }
         if let currentLocation {
             let meters = distanceMeters(from: currentLocation, to: place)
@@ -567,5 +582,73 @@ struct SaveLocationIntentRecommendationService {
     private func rawPlaceId(from resultId: String) -> String? {
         guard resultId.hasPrefix("place-") else { return nil }
         return String(resultId.dropFirst("place-".count))
+    }
+}
+
+private struct SaveTasteProfile {
+    private let preferredTerms: Set<String>
+    private let preferredPriceRanges: Set<String>
+
+    init(places: [Place]) {
+        let positiveVisited = places.filter(Self.isPositiveVisitedPlace)
+        preferredTerms = Set(positiveVisited.flatMap(Self.tasteTerms))
+        preferredPriceRanges = Set(positiveVisited.compactMap { Self.clean($0.priceRange) })
+    }
+
+    func score(_ place: Place) -> Int {
+        var score = 0
+        if isPositiveVisited(place) {
+            score += 4
+        } else if place.status == .visited {
+            score += 1
+        }
+
+        let matchingTerms = Set(Self.tasteTerms(for: place)).intersection(preferredTerms)
+        score += min(matchingTerms.count, 4)
+
+        if let priceRange = place.priceRange?.trimmingCharacters(in: .whitespacesAndNewlines),
+           preferredPriceRanges.contains(priceRange) {
+            score += 1
+        }
+
+        return score
+    }
+
+    func isPositiveVisited(_ place: Place) -> Bool {
+        Self.isPositiveVisitedPlace(place)
+    }
+
+    private static func isPositiveVisitedPlace(_ place: Place) -> Bool {
+        guard place.status == .visited else { return false }
+        let rating = place.rating ?? place.googleRating
+        return rating == nil || rating.map { $0 >= 4.0 } == true
+    }
+
+    private static func tasteTerms(for place: Place) -> [String] {
+        let text = [
+            place.name,
+            place.address,
+            place.note ?? "",
+            place.extractedDishes?.joined(separator: " ") ?? "",
+            place.priceRange ?? ""
+        ]
+        .joined(separator: " ")
+
+        return SaveSearchIntentParser.normalize(text)
+            .split { !$0.isLetter && !$0.isNumber }
+            .map(String.init)
+            .filter { $0.count >= 3 && !genericTasteTerms.contains($0) }
+    }
+
+    private static let genericTasteTerms: Set<String> = [
+        "restaurant", "restaurants", "food", "cafe", "coffee", "place", "places",
+        "los", "angeles", "irvine", "california", "taipei", "tokyo"
+    ]
+
+    private static func clean(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
     }
 }

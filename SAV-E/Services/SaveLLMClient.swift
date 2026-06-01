@@ -60,6 +60,15 @@ final class GeminiSaveLLMClient: SaveLLMClient {
         self.session = session
     }
 
+    static func liveFromConfig() -> GeminiSaveLLMClient? {
+        let apiKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
+            ?? SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
+        guard let apiKey, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return GeminiSaveLLMClient(apiKey: apiKey)
+    }
+
     func parseIntent(_ request: IntentParseRequest) async throws -> SaveSearchIntent {
         let allowed = request.allowedCategories.map(\.rawValue)
         let payload: [String: Any] = [
@@ -92,22 +101,39 @@ final class GeminiSaveLLMClient: SaveLLMClient {
 
     func renderGroundedAnswer(_ request: GroundedAnswerRequest) async throws -> String {
         let prompt = """
-        Write one short SAV-E drawer answer using ONLY these allowed place IDs:
+        Write one short conversational SAV-E drawer answer using ONLY these allowed result IDs:
         \(request.allowedPlaceIds.joined(separator: ", "))
 
         Query: \(request.query)
         Sections:
         \(sectionSummary(request.sections))
 
-        Do not introduce places outside the allowed IDs.
+        Rules:
+        - Recommend one best place first.
+        - Explain why using saved/visited/review/public labels, distance, rating, review count, and evidence below.
+        - Ask at most one lightweight follow-up, such as budget, cuisine, quick vs sit-down, or mood.
+        - Do not introduce places outside the allowed result IDs.
+        - Keep it under 70 words.
         """
         return try await generateText(prompt: prompt, temperature: 0.2, maxOutputTokens: 384)
     }
 
     private func sectionSummary(_ sections: [SaveSearchSection]) -> String {
         sections.map { section in
-            let titles = section.results.prefix(5).map(\.title).joined(separator: ", ")
-            return "- \(section.title): \(titles.isEmpty ? "none" : titles)"
+            let rows = section.results.prefix(5).map { result in
+                let evidence = result.evidence.prefix(3).joined(separator: " | ")
+                let facts = [
+                    "id=\(result.id)",
+                    "title=\(result.title)",
+                    "state=\(result.objectType.displayName)/\(result.userState.displayName)",
+                    result.distanceLabel.map { "distance=\($0)" },
+                    result.rating.map { String(format: "rating=%.1f", $0) },
+                    result.reviewCount.map { "reviews=\($0)" },
+                    evidence.isEmpty ? nil : "evidence=\(evidence)"
+                ].compactMap { $0 }
+                return "  - " + facts.joined(separator: "; ")
+            }
+            return "- \(section.title):\n\(rows.isEmpty ? "  - none" : rows.joined(separator: "\n"))"
         }
         .joined(separator: "\n")
     }

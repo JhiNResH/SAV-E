@@ -32,6 +32,7 @@ final class AIDrawerViewModel: ObservableObject {
     private let saveSearchController: SaveSearchController
     private let locationIntentRecommendationService: SaveLocationIntentRecommendationService
     private let locationService: LocationService
+    private let groundedAnswerClient: SaveLLMClient?
 
     /// Multi-turn conversation context for the current session.
     private var conversationTurns: [ConversationTurn] = []
@@ -41,12 +42,14 @@ final class AIDrawerViewModel: ObservableObject {
         aiService: SaveAIService = .shared,
         saveSearchController: SaveSearchController = SaveSearchController(),
         locationIntentRecommendationService: SaveLocationIntentRecommendationService = SaveLocationIntentRecommendationService(),
-        locationService: LocationService? = nil
+        locationService: LocationService? = nil,
+        groundedAnswerClient: SaveLLMClient? = GeminiSaveLLMClient.liveFromConfig()
     ) {
         self.aiService = aiService
         self.saveSearchController = saveSearchController
         self.locationIntentRecommendationService = locationIntentRecommendationService
         self.locationService = locationService ?? .shared
+        self.groundedAnswerClient = groundedAnswerClient
     }
 
     func submit(reviewCandidates: [PlaceReviewCandidate] = []) async {
@@ -66,8 +69,7 @@ final class AIDrawerViewModel: ObservableObject {
             mapCandidates: mapCandidates,
             currentLocation: currentLocation
         ) {
-            drawerState = .saveSearchResults(gatedResponse)
-            mapAction = mapAction(for: gatedResponse)
+            await showGroundedRecommendationResponse(gatedResponse, query: trimmed)
             return
         }
 
@@ -250,10 +252,74 @@ final class AIDrawerViewModel: ObservableObject {
         guard !placeIDs.isEmpty else { return nil }
         return MapActionData(type: .filterPins, placeIds: placeIDs, lat: nil, lng: nil, span: nil)
     }
+
+    private func showGroundedRecommendationResponse(_ response: SaveSearchResponse, query: String) async {
+        let requestID = UUID()
+        activeRequestID = requestID
+        drawerState = .loading
+        mapAction = nil
+        rememberQuery(query)
+
+        let groundedResponse: SaveSearchResponse
+        if let groundedAnswerClient,
+           let intent = SaveSearchIntentParser().parse(query) {
+            groundedResponse = await response.withGroundedAnswer(
+                query: query,
+                intent: intent,
+                client: groundedAnswerClient
+            )
+        } else {
+            groundedResponse = response
+        }
+
+        guard activeRequestID == requestID else { return }
+        activeRequestID = nil
+        drawerState = .saveSearchResults(groundedResponse)
+        mapAction = mapAction(for: groundedResponse)
+    }
+
+    private func rememberQuery(_ query: String) {
+        if chatHistory.first?.query != query {
+            chatHistory.insert(ChatEntry(query: query, timestamp: Date()), at: 0)
+            if chatHistory.count > 20 { chatHistory.removeLast() }
+        }
+    }
 }
 
 private extension SaveSearchResponse {
     var hasVisibleResults: Bool {
         !fromYourSave.results.isEmpty || !newRecommendations.results.isEmpty
+    }
+
+    func withGroundedAnswer(query: String, intent: SaveSearchIntent, client: SaveLLMClient) async -> SaveSearchResponse {
+        let request = GroundedAnswerRequest(
+            query: query,
+            intent: intent,
+            allowedPlaceIds: groundedAnswerResultIDs,
+            sections: groundedAnswerSections
+        )
+
+        guard !request.allowedPlaceIds.isEmpty else {
+            return self
+        }
+
+        do {
+            let answer = try await client.renderGroundedAnswer(request)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !answer.isEmpty else { return self }
+            var copy = self
+            copy.assistantMessage = answer
+            return copy
+        } catch {
+            return self
+        }
+    }
+
+    private var groundedAnswerSections: [SaveSearchSection] {
+        [fromYourSave] + additionalSections + [newRecommendations]
+    }
+
+    private var groundedAnswerResultIDs: [String] {
+        groundedAnswerSections.flatMap { $0.results.map(\.id) }
     }
 }
