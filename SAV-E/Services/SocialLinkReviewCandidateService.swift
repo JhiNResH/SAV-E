@@ -80,14 +80,15 @@ final class PublicSourceSearchService: PublicSourceSearchServiceProtocol {
 final class SocialLinkReviewCandidateService {
     static let shared = SocialLinkReviewCandidateService()
 
-    private let googlePlacesService: GooglePlacesServiceProtocol
+    private let placeResolverService: PlaceResolverServiceProtocol
     private let publicSourceSearchService: PublicSourceSearchServiceProtocol
 
     init(
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
-        publicSourceSearchService: PublicSourceSearchServiceProtocol = PublicSourceSearchService.shared
+        publicSourceSearchService: PublicSourceSearchServiceProtocol = PublicSourceSearchService.shared,
+        placeResolverService: PlaceResolverServiceProtocol? = nil
     ) {
-        self.googlePlacesService = googlePlacesService
+        self.placeResolverService = placeResolverService ?? PlaceResolverService(googlePlacesService: googlePlacesService)
         self.publicSourceSearchService = publicSourceSearchService
     }
 
@@ -142,7 +143,7 @@ final class SocialLinkReviewCandidateService {
         guard !query.isEmpty else { return candidate }
 
         do {
-            let matches = try await googlePlacesMatches(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
+            let matches = try await placeResolverMatches(for: candidate, evidenceText: evidenceText ?? candidate.sourceText ?? "")
             guard let match = bestAcceptableRefinement(in: matches, for: candidate) else {
                 return candidate
             }
@@ -157,15 +158,15 @@ final class SocialLinkReviewCandidateService {
                 refined.evidence,
                 [
                     "Evidence tier: \(SocialPlaceEvidenceTier.likely.rawValue)",
-                    "Google Places refined match: \(match.name)",
-                    "Google Places address: \(match.address)",
-                    "Google Places coordinates: \(match.latitude), \(match.longitude)"
+                    "\(match.provider.displayName) refined match: \(match.name)",
+                    "\(match.provider.displayName) address: \(match.address)",
+                    "\(match.coordinateEvidenceLabel): \(match.latitude), \(match.longitude)"
                 ]
             )
             refined.missingInfo = SocialPlaceEvidenceScorer.missingInfo(
                 tier: .likely,
                 hasAddress: !match.address.isEmpty,
-                source: "Google Places refined; user must confirm before saving"
+                source: "\(match.provider.displayName) refined; user must confirm before saving"
             )
             refined.evidenceDiagnostic = refinedDiagnosticAfterPlacesMatch(
                 existing: refined.evidenceDiagnostic,
@@ -175,9 +176,12 @@ final class SocialLinkReviewCandidateService {
             return refined
         } catch {
             var unresolved = candidate
+            let failureMessages = containsCJK(query)
+                ? [PlaceMatchProvider.googlePlaces.refinementFailureMessage, PlaceMatchProvider.amap.refinementFailureMessage]
+                : [PlaceMatchProvider.googlePlaces.refinementFailureMessage]
             unresolved.missingInfo = appendUnique(
                 unresolved.missingInfo,
-                ["Google Places refine skipped or failed; confirm exact address/coordinates"]
+                failureMessages
             )
             return unresolved
         }
@@ -305,11 +309,11 @@ final class SocialLinkReviewCandidateService {
                 "Checked public metadata/caption/OCR text for place-bearing intent",
                 "Ran public web search recovery queries",
                 "Extracted venue candidate from public search snippets",
-                "Prepared Google Places refinement query",
-                "Did not use logged-in Instagram scraping"
+                "Prepared map provider refinement query",
+                "Did not use logged-in social scraping"
             ],
             missingFields: ["Verified address", "Verified coordinates"],
-            nextBestClue: "Confirm the Google Places match before saving this as a Map Stamp."
+            nextBestClue: "Confirm the map provider match before saving this as a Map Stamp."
         )
     }
 
@@ -742,20 +746,22 @@ final class SocialLinkReviewCandidateService {
         }
     }
 
-    private func googlePlacesMatches(for candidate: PendingReviewCandidate, evidenceText: String) async throws -> [GooglePlaceMatch] {
-        var allMatches: [GooglePlaceMatch] = []
+    private func placeResolverMatches(for candidate: PendingReviewCandidate, evidenceText: String) async throws -> [PlaceProviderMatch] {
+        var allMatches: [PlaceProviderMatch] = []
         var seenIDs = Set<String>()
         for query in refinementQueries(for: candidate, evidenceText: evidenceText).prefix(4) {
-            let matches = try await googlePlacesService.searchPlace(query: query, near: nil)
-            for match in matches where !seenIDs.contains(match.id) {
-                seenIDs.insert(match.id)
+            let matches = try await placeResolverService.searchPlace(query: query, near: nil)
+            for match in matches {
+                let key = "\(match.provider.rawValue):\(match.id)"
+                guard !seenIDs.contains(key) else { continue }
+                seenIDs.insert(key)
                 allMatches.append(match)
             }
         }
         return allMatches
     }
 
-    private func bestAcceptableRefinement(in matches: [GooglePlaceMatch], for candidate: PendingReviewCandidate) -> GooglePlaceMatch? {
+    private func bestAcceptableRefinement(in matches: [PlaceProviderMatch], for candidate: PendingReviewCandidate) -> PlaceProviderMatch? {
         matches
             .map { (match: $0, score: refinementScore($0, for: candidate)) }
             .filter { $0.score >= 0.62 }
@@ -763,7 +769,7 @@ final class SocialLinkReviewCandidateService {
             .first?.match
     }
 
-    private func refinementScore(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Double {
+    private func refinementScore(_ match: PlaceProviderMatch, for candidate: PendingReviewCandidate) -> Double {
         guard match.latitude != 0 || match.longitude != 0 else { return 0 }
         var score = 0.0
         let candidateName = normalizedName(candidate.candidateName)
@@ -797,7 +803,7 @@ final class SocialLinkReviewCandidateService {
         return Double(leftTokens.intersection(rightTokens).count) / Double(leftTokens.count)
     }
 
-    private func isAcceptableRefinement(_ match: GooglePlaceMatch, for candidate: PendingReviewCandidate) -> Bool {
+    private func isAcceptableRefinement(_ match: PlaceProviderMatch, for candidate: PendingReviewCandidate) -> Bool {
         guard match.latitude != 0 || match.longitude != 0 else { return false }
 
         // Refinement still requires similarity; address evidence may support a
@@ -842,6 +848,13 @@ final class SocialLinkReviewCandidateService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func containsCJK(_ value: String) -> Bool {
+        value.unicodeScalars.contains { scalar in
+            (0x4E00...0x9FFF).contains(Int(scalar.value)) ||
+                (0x3400...0x4DBF).contains(Int(scalar.value))
+        }
+    }
+
     private func chineseCityClue(in text: String) -> String? {
         let cities = ["台北", "臺北", "台中", "臺中", "台南", "臺南", "高雄", "東京", "大阪", "京都", "北京", "上海", "首爾"]
         return cities.first { text.contains($0) }
@@ -849,7 +862,8 @@ final class SocialLinkReviewCandidateService {
 
     private func sourceOnlyCandidate(evidenceText: String, sourceURL: String) -> PendingReviewCandidate {
         let diagnostic = sourceOnlyDiagnostic(evidenceText: evidenceText, sourceURL: sourceURL)
-        if let candidateName = unresolvedPlaceCandidateName(from: diagnostic.suggestedSearchQueries ?? []) {
+        if let candidateName = unresolvedPlaceCandidateName(from: diagnostic.suggestedSearchQueries ?? []),
+           candidateName != socialPostDescriptor(in: URL(string: sourceURL))?.id {
             let upgradedDiagnostic = unresolvedPlaceDiagnostic(from: diagnostic, candidateName: candidateName)
             return PendingReviewCandidate(
                 candidateName: candidateName,
@@ -954,7 +968,7 @@ final class SocialLinkReviewCandidateService {
                 "Classified the source as place-bearing even though no exact venue was verified",
                 "Kept this in Review instead of inventing a map pin",
                 "Prepared public source-recovery search queries",
-                "Did not use logged-in Instagram scraping"
+                "Did not use logged-in social scraping"
             ],
             missingFields: appendUnique(
                 [],
@@ -981,7 +995,7 @@ final class SocialLinkReviewCandidateService {
                 "Checked public metadata/caption text for explicit place names",
                 "Checked social handles without treating creator handles as places",
                 "Prepared public web search fallback queries for source-only recovery",
-                "Did not use logged-in Instagram scraping"
+                "Did not use logged-in social scraping"
             ],
             missingFields: [
                 "Verified place name",
@@ -1005,7 +1019,7 @@ final class SocialLinkReviewCandidateService {
         var queries: [String] = []
         let url = URL(string: sourceURL)
         let host = url?.host()?.lowercased() ?? ""
-        let reelID = instagramReelID(in: url)
+        let socialPost = socialPostDescriptor(in: url)
         let cleanedEvidence = cleanHTMLText(evidenceText)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1015,17 +1029,17 @@ final class SocialLinkReviewCandidateService {
             let region = primaryRegion(from: analysis.regionClues)
             let topic = analysis.topic
             let phrase = meaningfulPlacePhrase(from: evidenceText)
-            if let reelID {
+            if let socialPost {
                 if let region {
-                    queries.append("\"\(reelID)\" \(keyword) \(region)")
+                    queries.append("\"\(socialPost.id)\" \(keyword) \(region)")
                 }
                 if let phrase {
-                    queries.append("\"\(reelID)\" \"\(phrase)\"")
+                    queries.append("\"\(socialPost.id)\" \"\(phrase)\"")
                 }
                 if let topic {
-                    queries.append("\"\(reelID)\" \"\(topic)\"")
+                    queries.append("\"\(socialPost.id)\" \"\(topic)\"")
                 }
-                queries.append("site:instagram.com/reel/\(reelID) \(keyword)")
+                queries.append("\(socialPost.siteQuery) \(keyword)")
             } else if let url, !host.isEmpty {
                 queries.append("\(host) \(url.lastPathComponent) \(keyword)")
             }
@@ -1038,9 +1052,9 @@ final class SocialLinkReviewCandidateService {
             return Array(appendUnique([], queries).prefix(4))
         }
 
-        if let reelID {
-            queries.append("instagram reel \(reelID) place")
-            queries.append("\(reelID) restaurant venue")
+        if let socialPost {
+            queries.append("\(socialPost.platformName) \(socialPost.id) place")
+            queries.append("\(socialPost.id) restaurant venue")
         } else if let url, !host.isEmpty {
             queries.append("\(host) \(url.lastPathComponent) place")
         }
@@ -1105,7 +1119,8 @@ final class SocialLinkReviewCandidateService {
             .replacingOccurrences(of: #"https?://\S+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"site:\S+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\bD[A-Za-z0-9_-]{6,}\b"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: #"(?i)\binstagram\s+reel\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(?:instagram\s+reel|xiaohongshu|xhs|douyin)\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"(?:小红书|小紅書|抖音)"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:restaurant|venue|place|address|cafe|coffee|hotel|map)\b"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\"'“”"))
@@ -1126,6 +1141,11 @@ final class SocialLinkReviewCandidateService {
         guard candidate.count >= 2, candidate.count <= 80 else { return nil }
         let hasCJK = candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil
         if !hasCJK && candidate.count <= 3 { return nil }
+        if !hasCJK,
+           candidate.range(of: #"^[A-Za-z0-9_-]{6,}$"#, options: .regularExpression) != nil,
+           candidate.range(of: #"\d"#, options: .regularExpression) != nil {
+            return nil
+        }
         guard isUsableCandidateName(candidate) else { return nil }
         guard !looksLikeMarketingLine(candidate) else { return nil }
 
@@ -1136,6 +1156,11 @@ final class SocialLinkReviewCandidateService {
         }
         let genericValues = [
             "instagram",
+            "xiaohongshu",
+            "douyin",
+            "小红书",
+            "小紅書",
+            "抖音",
             "social link",
             "restaurant recommendation",
             "restaurants in",
@@ -1246,14 +1271,33 @@ final class SocialLinkReviewCandidateService {
         return nil
     }
 
-    private func instagramReelID(in url: URL?) -> String? {
-        guard let url,
-              url.host()?.lowercased().contains("instagram") == true else { return nil }
+    private struct SocialPostDescriptor {
+        var platformName: String
+        var id: String
+        var siteQuery: String
+    }
+
+    private func socialPostDescriptor(in url: URL?) -> SocialPostDescriptor? {
+        guard let url else { return nil }
+        let host = url.host()?.lowercased() ?? ""
         let components = url.pathComponents
-        guard let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
-              components.indices.contains(markerIndex + 1) else { return nil }
-        let id = components[markerIndex + 1].trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
-        return id.isEmpty ? nil : id
+        if host.contains("instagram"),
+           let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
+           components.indices.contains(markerIndex + 1) {
+            let id = components[markerIndex + 1].trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+            return id.isEmpty ? nil : SocialPostDescriptor(platformName: "instagram reel", id: id, siteQuery: "site:instagram.com/reel/\(id)")
+        }
+        if host.matchesSocialDomain("xiaohongshu.com") || host.matchesSocialDomain("xhslink.com") {
+            guard let id = components.reversed().first(where: { $0.count >= 4 && $0 != "/" })?.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")),
+                  !id.isEmpty else { return nil }
+            return SocialPostDescriptor(platformName: "xiaohongshu", id: id, siteQuery: "site:xiaohongshu.com \(id)")
+        }
+        if host.matchesSocialDomain("douyin.com") || host.matchesSocialDomain("iesdouyin.com") {
+            guard let id = components.reversed().first(where: { $0.count >= 4 && $0 != "/" })?.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")),
+                  !id.isEmpty else { return nil }
+            return SocialPostDescriptor(platformName: "douyin", id: id, siteQuery: "site:douyin.com \(id)")
+        }
+        return nil
     }
 
     private func canonicalSearchURL(from url: URL?) -> String? {
@@ -1287,7 +1331,7 @@ final class SocialLinkReviewCandidateService {
             attempts: [
                 "Checked public metadata/caption text for explicit place names",
                 "Kept plausible venue evidence in Review instead of inventing map coordinates",
-                "Did not use logged-in Instagram scraping"
+                "Did not use logged-in social scraping"
             ],
             missingFields: appendUnique([], missing),
             nextBestClue: candidate.address.isEmpty
@@ -1298,11 +1342,11 @@ final class SocialLinkReviewCandidateService {
 
     private func refinedDiagnosticAfterPlacesMatch(
         existing: SocialPlaceEvidenceDiagnostic?,
-        match: GooglePlaceMatch
+        match: PlaceProviderMatch
     ) -> SocialPlaceEvidenceDiagnostic {
         let base = existing ?? SocialPlaceEvidenceDiagnostic(found: [], attempts: [], missingFields: [], nextBestClue: "")
         var newFound = [
-            "Google Places match: \(match.name)",
+            "\(match.provider.displayName) match: \(match.name)",
             "Verified coordinates: \(match.latitude), \(match.longitude)"
         ]
         if !match.address.isEmpty {
@@ -1311,7 +1355,7 @@ final class SocialLinkReviewCandidateService {
         let found = appendUnique(base.found, newFound)
         let attempts = appendUnique(
             base.attempts,
-            ["Checked Google Places for a matching place record"]
+            ["Checked \(match.provider.displayName) for a matching place record"]
         )
         let missing = base.missingFields.filter { field in
             field != "Verified address" &&
@@ -1323,7 +1367,7 @@ final class SocialLinkReviewCandidateService {
             found: found,
             attempts: attempts,
             missingFields: appendUnique([], missing),
-            nextBestClue: "Confirm this Google Places match before saving it as a Map Stamp."
+            nextBestClue: "Confirm this \(match.provider.displayName) match before saving it as a Map Stamp."
         )
     }
 
@@ -1332,6 +1376,8 @@ final class SocialLinkReviewCandidateService {
         let path = url.path.lowercased()
         if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
         if url.host?.lowercased().contains("instagram") == true { return "Instagram link" }
+        if url.host?.lowercased().matchesSocialDomain("xiaohongshu.com") == true || url.host?.lowercased().matchesSocialDomain("xhslink.com") == true { return "Xiaohongshu link" }
+        if url.host?.lowercased().matchesSocialDomain("douyin.com") == true || url.host?.lowercased().matchesSocialDomain("iesdouyin.com") == true { return "Douyin link" }
         return "Social link"
     }
 
@@ -1537,7 +1583,7 @@ final class SocialLinkReviewCandidateService {
 
     private func firstSocialHandle(in text: String) -> String? {
         let ignoredHandles: Set<String> = [
-            "instagram", "reels", "reel", "explore", "threads", "tiktok", "xiaohongshu", "save", "media"
+            "instagram", "reels", "reel", "explore", "threads", "tiktok", "xiaohongshu", "xhs", "douyin", "save", "media"
         ]
         guard let regex = try? NSRegularExpression(pattern: #"@([A-Za-z0-9._]{3,30})"#) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -1680,5 +1726,11 @@ final class SocialLinkReviewCandidateService {
             return nil
         }
         return String(text[captureRange])
+    }
+}
+
+private extension String {
+    func matchesSocialDomain(_ domain: String) -> Bool {
+        self == domain || hasSuffix(".\(domain)")
     }
 }

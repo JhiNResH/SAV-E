@@ -17,14 +17,16 @@ struct PlatformIcon: View {
         case .instagram: return "camera.fill"
         case .threads: return "at"
         case .xiaohongshu: return "book.fill"
+        case .douyin: return "play.rectangle.fill"
         case .googleMaps: return "map.fill"
+        case .amap: return "map.circle.fill"
         case .other: return "link"
         }
     }
 
     private var iconColor: Color {
         switch platform {
-        case .instagram, .threads, .xiaohongshu, .googleMaps: return .saveCocoa
+        case .instagram, .threads, .xiaohongshu, .douyin, .googleMaps, .amap: return .saveCocoa
         case .other: return .saveMutedText
         }
     }

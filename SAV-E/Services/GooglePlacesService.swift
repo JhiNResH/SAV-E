@@ -39,6 +39,61 @@ struct GooglePlaceDetails: Codable {
     var types: [String] = []
 }
 
+enum PlaceMatchProvider: String, Codable, Hashable {
+    case googlePlaces = "google_places"
+    case amap
+
+    var displayName: String {
+        switch self {
+        case .googlePlaces: return "Google Places"
+        case .amap: return "Amap"
+        }
+    }
+
+    var refinementFailureMessage: String {
+        switch self {
+        case .googlePlaces: return "Google Places refine skipped or failed; confirm exact address/coordinates"
+        case .amap: return "Amap refine skipped or failed; confirm exact address/coordinates"
+        }
+    }
+}
+
+enum PlaceCoordinateSystem: String, Codable, Hashable {
+    case wgs84 = "WGS84"
+    case gcj02 = "GCJ-02"
+}
+
+struct PlaceProviderMatch: Identifiable, Codable, Hashable {
+    let provider: PlaceMatchProvider
+    let id: String
+    var name: String
+    var address: String
+    var latitude: Double
+    var longitude: Double
+    var rating: Double?
+    var reviewCount: Int?
+    var priceLevel: Int?
+    var types: [String]
+    var coordinateSystem: PlaceCoordinateSystem
+
+    var coordinateEvidenceLabel: String {
+        switch coordinateSystem {
+        case .wgs84:
+            return "\(provider.displayName) coordinates"
+        case .gcj02:
+            return "\(provider.displayName) coordinates (\(coordinateSystem.rawValue))"
+        }
+    }
+}
+
+protocol PlaceResolverServiceProtocol {
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch]
+}
+
+protocol AmapPlaceSearchServiceProtocol {
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch]
+}
+
 // MARK: - Errors
 
 enum GooglePlacesError: LocalizedError {
@@ -55,6 +110,91 @@ enum GooglePlacesError: LocalizedError {
         case .networkError(let error): return "Network error: \(error.localizedDescription)"
         case .apiError(let msg): return "Places API: \(msg)"
         }
+    }
+}
+
+enum AmapPlaceSearchError: LocalizedError {
+    case apiKeyMissing
+    case noResults
+    case apiError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .apiKeyMissing:
+            return "Amap Web Service key missing. China POI refinement requires AMAP_WEB_SERVICE_KEY."
+        case .noResults:
+            return "No matching Amap places found"
+        case .apiError(let message):
+            return "Amap API: \(message)"
+        }
+    }
+}
+
+// MARK: - Provider Resolver
+
+final class PlaceResolverService: PlaceResolverServiceProtocol {
+    static let shared = PlaceResolverService()
+
+    private let googlePlacesService: GooglePlacesServiceProtocol
+    private let amapPlaceSearchService: AmapPlaceSearchServiceProtocol
+
+    init(
+        googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
+        amapPlaceSearchService: AmapPlaceSearchServiceProtocol = AmapPlaceSearchService.shared
+    ) {
+        self.googlePlacesService = googlePlacesService
+        self.amapPlaceSearchService = amapPlaceSearchService
+    }
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+        var results: [PlaceProviderMatch] = []
+        var seen = Set<String>()
+
+        if Self.shouldTryAmap(for: query),
+           let amapMatches = try? await amapPlaceSearchService.searchPlace(query: query, near: near) {
+            append(amapMatches, to: &results, seen: &seen)
+        }
+
+        if let googleMatches = try? await googlePlacesService.searchPlace(query: query, near: near) {
+            append(googleMatches.map(\.providerMatch), to: &results, seen: &seen)
+        }
+
+        guard !results.isEmpty else { throw GooglePlacesError.noResults }
+        return results
+    }
+
+    private func append(_ matches: [PlaceProviderMatch], to results: inout [PlaceProviderMatch], seen: inout Set<String>) {
+        for match in matches {
+            let key = "\(match.provider.rawValue):\(match.id)"
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            results.append(match)
+        }
+    }
+
+    private static func shouldTryAmap(for query: String) -> Bool {
+        query.unicodeScalars.contains { scalar in
+            (0x4E00...0x9FFF).contains(Int(scalar.value)) ||
+                (0x3400...0x4DBF).contains(Int(scalar.value))
+        }
+    }
+}
+
+private extension GooglePlaceMatch {
+    var providerMatch: PlaceProviderMatch {
+        PlaceProviderMatch(
+            provider: .googlePlaces,
+            id: id,
+            name: name,
+            address: address,
+            latitude: latitude,
+            longitude: longitude,
+            rating: rating,
+            reviewCount: reviewCount,
+            priceLevel: priceLevel,
+            types: types,
+            coordinateSystem: .wgs84
+        )
     }
 }
 
@@ -187,5 +327,138 @@ final class GooglePlacesService: GooglePlacesServiceProtocol {
     func photoURL(reference: String, maxWidth: Int = 400) -> URL? {
         guard let apiKey else { return nil }
         return URL(string: "https://maps.googleapis.com/maps/api/place/photo?maxwidth=\(maxWidth)&photo_reference=\(reference)&key=\(apiKey)")
+    }
+}
+
+// MARK: - Amap
+
+final class AmapPlaceSearchService: AmapPlaceSearchServiceProtocol {
+    static let shared = AmapPlaceSearchService()
+
+    private let apiKey: String?
+
+    init(apiKey: String? = nil) {
+        self.apiKey = Self.normalizedAPIKey(
+            apiKey
+                ?? ProcessInfo.processInfo.environment["AMAP_WEB_SERVICE_KEY"]
+                ?? SAVEProductionConfig.keyFromPlist("AMAP_WEB_SERVICE_KEY")
+        )
+    }
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+        guard let apiKey, !apiKey.isEmpty else {
+            throw AmapPlaceSearchError.apiKeyMissing
+        }
+
+        var components = URLComponents(string: "https://restapi.amap.com/v3/place/text")
+        var queryItems = [
+            URLQueryItem(name: "key", value: apiKey),
+            URLQueryItem(name: "keywords", value: query),
+            URLQueryItem(name: "types", value: "050000"),
+            URLQueryItem(name: "offset", value: "20"),
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "extensions", value: "all")
+        ]
+        if let city = Self.cityHint(in: query) {
+            queryItems.append(URLQueryItem(name: "city", value: city))
+            queryItems.append(URLQueryItem(name: "citylimit", value: "true"))
+        }
+        components?.queryItems = queryItems
+
+        guard let url = components?.url else {
+            throw AmapPlaceSearchError.noResults
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard json?["status"] as? String == "1" else {
+            let message = (json?["info"] as? String) ?? (json?["infocode"] as? String) ?? "unknown"
+            throw AmapPlaceSearchError.apiError(message)
+        }
+
+        guard let pois = json?["pois"] as? [[String: Any]], !pois.isEmpty else {
+            throw AmapPlaceSearchError.noResults
+        }
+
+        return pois.compactMap { poi in
+            guard let id = poi["id"] as? String,
+                  let name = poi["name"] as? String,
+                  let location = poi["location"] as? String,
+                  let coordinate = Self.coordinate(from: location) else { return nil }
+
+            let address = [
+                poi["pname"] as? String,
+                poi["cityname"] as? String,
+                poi["adname"] as? String,
+                Self.stringValue(poi["address"])
+            ]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .reduce(into: [String]()) { result, value in
+                    if !result.contains(value) { result.append(value) }
+                }
+                .joined(separator: "")
+
+            let bizExt = poi["biz_ext"] as? [String: Any]
+            return PlaceProviderMatch(
+                provider: .amap,
+                id: id,
+                name: name,
+                address: address,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                rating: Self.doubleValue(bizExt?["rating"]),
+                reviewCount: nil,
+                priceLevel: nil,
+                types: [Self.stringValue(poi["type"]), Self.stringValue(poi["typecode"])].compactMap { $0 },
+                coordinateSystem: .gcj02
+            )
+        }
+    }
+
+    private static func coordinate(from value: String) -> CLLocationCoordinate2D? {
+        let parts = value.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard parts.count == 2,
+              let longitude = Double(parts[0]),
+              let latitude = Double(parts[1]) else {
+            return nil
+        }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private static func cityHint(in query: String) -> String? {
+        [
+            "北京", "上海", "广州", "深圳", "杭州", "成都", "重庆", "南京",
+            "苏州", "西安", "武汉", "长沙", "厦门", "青岛", "天津", "宁波"
+        ].first { query.contains($0) }
+    }
+
+    private static func normalizedAPIKey(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+
+        let placeholders: Set<String> = [
+            "YOUR_KEY_HERE",
+            "REPLACE_ME",
+            "AMAP_WEB_SERVICE_KEY"
+        ]
+        return placeholders.contains(trimmed.uppercased()) ? nil : trimmed
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        if let string = value as? String { return string }
+        if let array = value as? [Any] {
+            return array.compactMap { $0 as? String }.joined(separator: " ")
+        }
+        return nil
+    }
+
+    private static func doubleValue(_ value: Any?) -> Double? {
+        if let double = value as? Double { return double }
+        if let int = value as? Int { return Double(int) }
+        if let string = value as? String { return Double(string) }
+        return nil
     }
 }

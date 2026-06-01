@@ -247,14 +247,16 @@ enum PlaceStatus: String, Codable, Hashable {
 }
 
 enum SourcePlatform: String, Codable, CaseIterable, Hashable {
-    case instagram, threads, xiaohongshu, googleMaps, other
+    case instagram, threads, xiaohongshu, douyin, googleMaps, amap, other
 
     var displayName: String {
         switch self {
         case .instagram: return "Instagram"
         case .threads: return "Threads"
         case .xiaohongshu: return "Xiaohongshu"
+        case .douyin: return "Douyin"
         case .googleMaps: return "Google Maps"
+        case .amap: return "Amap"
         case .other: return "Other"
         }
     }

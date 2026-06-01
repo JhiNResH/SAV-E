@@ -913,6 +913,8 @@ struct ShareExtensionView: View {
         guard let sourceURL = candidate.sourceURL?.lowercased() else { return "Found from shared post" }
         if sourceURL.contains("instagram.com") { return "Found from Instagram source" }
         if sourceURL.contains("tiktok.com") { return "Found from TikTok" }
+        if sourceURL.contains("xiaohongshu.com") || sourceURL.contains("xhslink.com") { return "Found from Xiaohongshu" }
+        if sourceURL.contains("douyin.com") || sourceURL.contains("iesdouyin.com") { return "Found from Douyin" }
         if sourceURL.contains("pin.it") || sourceURL.contains("pinterest.") { return "Found from Pinterest" }
         return "Found from shared link"
     }

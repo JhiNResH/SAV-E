@@ -140,6 +140,8 @@ final class SaveLocalVaultService {
         let path = url.path.lowercased()
         if path.contains("/reel/") || path.contains("/reels/") { return "Instagram reel" }
         if url.host()?.lowercased().contains("instagram") == true { return "Instagram link" }
+        if url.host()?.lowercased().matchesDomain("xiaohongshu.com") == true || url.host()?.lowercased().matchesDomain("xhslink.com") == true { return "Xiaohongshu link" }
+        if url.host()?.lowercased().matchesDomain("douyin.com") == true || url.host()?.lowercased().matchesDomain("iesdouyin.com") == true { return "Douyin link" }
         return url.host() ?? url.absoluteString
     }
 
@@ -271,5 +273,11 @@ private extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+}
+
+private extension String {
+    func matchesDomain(_ domain: String) -> Bool {
+        self == domain || hasSuffix(".\(domain)")
     }
 }
