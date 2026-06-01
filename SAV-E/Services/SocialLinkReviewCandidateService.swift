@@ -1449,9 +1449,9 @@ final class SocialLinkReviewCandidateService {
             "Kept plausible venue evidence in Review instead of inventing map coordinates",
             "Did not use logged-in social scraping"
         ]
-        if xiaohongshuLinkContext(sourceURL: sourceURL) != nil {
+        if let xhs = xiaohongshuLinkContext(sourceURL: sourceURL) {
             attempts = appendUnique(attempts, [
-                xiaohongshuLinkContext(sourceURL: sourceURL)?.resolutionAttempt ?? "Checked Xiaohongshu URL for source context",
+                xhs.resolutionAttempt,
                 "Used readable Xiaohongshu caption/metadata as place evidence"
             ])
         }
