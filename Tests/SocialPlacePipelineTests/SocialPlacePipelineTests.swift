@@ -544,6 +544,80 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(refined.evidenceDiagnostic?.nextBestClue, "Confirm this Amap match before saving it as a Map Stamp.")
     }
 
+    func testBaiduMapDeepLinkPreservesBD09CoordinateProvenance() throws {
+        let match = try XCTUnwrap(ChinaMapDeepLinkParser.match(
+            from: "https://api.map.baidu.com/marker?location=31.2391,121.4964&title=%E8%9F%B9%E5%B0%8A%E8%8B%91&content=%E4%B8%8A%E6%B5%B7%E5%B8%82%E9%BB%84%E6%B5%A6%E5%8C%BA%E5%B9%BF%E4%B8%9C%E8%B7%AF59%E5%8F%B7&output=html"
+        ))
+
+        XCTAssertEqual(match.provider, .baidu)
+        XCTAssertEqual(match.name, "蟹尊苑")
+        XCTAssertEqual(match.address, "上海市黄浦区广东路59号")
+        XCTAssertEqual(match.latitude, 31.2391)
+        XCTAssertEqual(match.longitude, 121.4964)
+        XCTAssertEqual(match.coordinateSystem, .bd09)
+        XCTAssertEqual(match.coordinateEvidenceLabel, "Baidu Maps coordinates (BD-09)")
+    }
+
+    func testAmapMapDeepLinkBecomesMapReadyReviewCandidate() throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "朋友分享高德地图 https://uri.amap.com/marker?position=121.4962,31.2389&name=%E8%9F%B9%E5%B0%8A%E8%8B%91&src=save",
+            sourceURL: "https://uri.amap.com/marker?position=121.4962,31.2389&name=%E8%9F%B9%E5%B0%8A%E8%8B%91&src=save"
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertEqual(candidate.candidateName, "蟹尊苑")
+        XCTAssertEqual(candidate.reviewState, "map_match_ready")
+        XCTAssertEqual(candidate.latitude, 31.2389)
+        XCTAssertEqual(candidate.longitude, 121.4962)
+        XCTAssertTrue(candidate.evidence.contains("Amap coordinates (GCJ-02): 31.2389, 121.4962"))
+        XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Confirm this Amap deep-link match before saving it as a Map Stamp.")
+    }
+
+    func testChinaResolverKeepsBaiduFallbackAfterAmapAndProxyMiss() async throws {
+        final class EmptyBackend: BackendPlaceResolverServiceProtocol {
+            func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] { [] }
+        }
+        final class EmptyAmap: AmapPlaceSearchServiceProtocol {
+            func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] { [] }
+        }
+        final class BaiduOnly: BaiduPlaceSearchServiceProtocol {
+            func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [PlaceProviderMatch] {
+                [PlaceProviderMatch(
+                    provider: .baidu,
+                    id: "baidu-xiezunyuan",
+                    name: "蟹尊苑",
+                    address: "上海市黄浦区广东路59号",
+                    latitude: 31.2391,
+                    longitude: 121.4964,
+                    rating: 4.6,
+                    reviewCount: 88,
+                    priceLevel: nil,
+                    types: ["美食"],
+                    coordinateSystem: .bd09
+                )]
+            }
+        }
+        final class EmptyGoogle: GooglePlacesServiceProtocol {
+            func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [GooglePlaceMatch] { [] }
+            func getPlaceDetails(placeId: String) async throws -> GooglePlaceDetails { throw GooglePlacesError.noResults }
+            func photoURL(reference: String, maxWidth: Int) -> URL? { nil }
+        }
+
+        let resolver = PlaceResolverService(
+            googlePlacesService: EmptyGoogle(),
+            amapPlaceSearchService: EmptyAmap(),
+            baiduPlaceSearchService: BaiduOnly(),
+            backendPlaceResolverService: EmptyBackend()
+        )
+
+        let matches = try await resolver.searchPlace(query: "上海 蟹尊苑 黄浦", near: nil)
+
+        XCTAssertEqual(matches.first?.provider, .baidu)
+        XCTAssertEqual(matches.first?.coordinateSystem, .bd09)
+        XCTAssertEqual(matches.first?.coordinateEvidenceLabel, "Baidu Maps coordinates (BD-09)")
+    }
+
     func testXiaohongshuAndDouyinLinksPreparePlatformSpecificRecoveryQueries() {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
 
@@ -560,6 +634,47 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(douyin?.candidateName, "Douyin link")
         XCTAssertTrue(xhs?.evidenceDiagnostic?.suggestedSearchQueries?.contains("xiaohongshu 65abc123 place") == true)
         XCTAssertTrue(douyin?.evidenceDiagnostic?.suggestedSearchQueries?.contains("douyin buUywZoMiLw place") == true)
+    }
+
+    func testXiaohongshuURLOnlyUsesHermesStyleBlockedLinkAnalysis() throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+
+        let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "小红书",
+            sourceURL: "https://www.xiaohongshu.com/explore/65abc123?xsec_token=abc&utm_source=copy"
+        ).first)
+        let diagnostic = try XCTUnwrap(candidate.evidenceDiagnostic)
+
+        XCTAssertEqual(candidate.candidateName, "Xiaohongshu link")
+        XCTAssertTrue(candidate.isSourceOnly)
+        XCTAssertTrue(diagnostic.found.contains("Xiaohongshu note id: 65abc123"))
+        XCTAssertTrue(diagnostic.found.contains("Canonical Xiaohongshu URL: https://www.xiaohongshu.com/explore/65abc123"))
+        XCTAssertTrue(diagnostic.attempts.contains("Resolved Xiaohongshu short/canonical URL and extracted the note id"))
+        XCTAssertTrue(diagnostic.attempts.contains("Detected blocked or generic Xiaohongshu metadata shell instead of usable caption text"))
+        XCTAssertTrue(diagnostic.missingFields.contains("Readable Xiaohongshu caption or screenshot OCR"))
+        XCTAssertEqual(diagnostic.nextBestClue, "Share a Xiaohongshu screenshot/OCR frame, copied caption, or map link so SAV-E can turn this source into a Review Candidate.")
+        XCTAssertEqual(diagnostic.suggestedSearchQueries?.first, "xiaohongshu 65abc123 place")
+        XCTAssertTrue(diagnostic.suggestedSearchQueries?.contains("\"https://www.xiaohongshu.com/explore/65abc123\"") == true)
+    }
+
+    func testXiaohongshuCaptionMetadataCanBecomeReviewCandidate() throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+
+        let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            小红书：上海蟹尊苑真的太好吃
+            📍蟹尊苑
+            上海市黄浦区广东路59号
+            """,
+            sourceURL: "https://www.xiaohongshu.com/explore/65abc123"
+        ).first)
+
+        XCTAssertEqual(candidate.candidateName, "蟹尊苑")
+        XCTAssertEqual(candidate.address, "上海市黄浦区广东路59号")
+        XCTAssertFalse(candidate.isSourceOnly)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Xiaohongshu note id: 65abc123") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.attempts.contains("Used readable Xiaohongshu caption/metadata as place evidence") == true)
+        XCTAssertTrue(candidate.missingInfo.contains("Confirm coordinates"))
     }
 
     func testInstagramReelPublicMetadataExtractsVenueInsteadOfSourceOnly() async throws {
