@@ -10,6 +10,9 @@ struct SaveApp: App {
     @State private var openedList: SaveCollaborativeList?
     @State private var openedReferral: SaveReferralProfile?
     @State private var minimumOpeningAnimationCompleted = false
+#if DEBUG
+    @State private var smokeHarnessActive = SaveSmokeHarness.isLaunchEnabled
+#endif
 
     private let supabaseService = SupabaseService.shared
     private let minimumOpeningAnimationDuration: UInt64 = 1_800_000_000
@@ -17,28 +20,7 @@ struct SaveApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if !hasCompletedOnboarding {
-                    OnboardingView {
-                        hasCompletedOnboarding = true
-                        minimumOpeningAnimationCompleted = false
-                    }
-                } else if shouldShowOpeningAnimation {
-                    AuthLoadingView()
-                        .task {
-                            await completeMinimumOpeningAnimation()
-                        }
-                } else {
-                    switch authService.authState {
-                    case .unknown:
-                        AuthLoadingView()
-                    case .unauthenticated:
-                        SignInView()
-                            .environmentObject(authService)
-                    case .authenticated:
-                        ContentView()
-                            .environmentObject(authService)
-                    }
-                }
+                rootContent
             }
             .environmentObject(languageSettings)
             .onOpenURL(perform: handleIncomingURL)
@@ -81,6 +63,45 @@ struct SaveApp: App {
         }
     }
 
+    @ViewBuilder
+    private var rootContent: some View {
+#if DEBUG
+        if smokeHarnessActive {
+            SaveSmokeHarnessView()
+        } else {
+            standardRootContent
+        }
+#else
+        standardRootContent
+#endif
+    }
+
+    @ViewBuilder
+    private var standardRootContent: some View {
+        if !hasCompletedOnboarding {
+            OnboardingView {
+                hasCompletedOnboarding = true
+                minimumOpeningAnimationCompleted = false
+            }
+        } else if shouldShowOpeningAnimation {
+            AuthLoadingView()
+                .task {
+                    await completeMinimumOpeningAnimation()
+                }
+        } else {
+            switch authService.authState {
+            case .unknown:
+                AuthLoadingView()
+            case .unauthenticated:
+                SignInView()
+                    .environmentObject(authService)
+            case .authenticated:
+                ContentView()
+                    .environmentObject(authService)
+            }
+        }
+    }
+
     private var shouldShowOpeningAnimation: Bool {
         !minimumOpeningAnimationCompleted || authService.authState == .unknown
     }
@@ -93,6 +114,12 @@ struct SaveApp: App {
     }
 
     private func handleIncomingURL(_ url: URL) {
+#if DEBUG
+        if SaveSmokeHarness.isSmokeURL(url) {
+            smokeHarnessActive = true
+            return
+        }
+#endif
         if let target = SaveReferralLink.target(from: url) {
             Task { await handleReferralTarget(target) }
             return

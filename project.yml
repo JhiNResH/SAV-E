@@ -183,17 +183,34 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: SAVETests
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SAVE.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SAVE"
+
+  SAVEUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/SAVEUITests
+    dependencies:
+      - target: SAVE
+    settings:
+      base:
+        DEVELOPMENT_TEAM: JC6858UYM9
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_BUNDLE_IDENTIFIER: com.wanderly.app.uitests
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: SAVEUITests
 schemes:
   SAV-E:
     build:
       targets:
         SAVE: all
         SAVETests: [test]
+        SAVEUITests: [test]
     run:
       config: Debug
     test:
       targets:
         - SAVETests
+        - SAVEUITests
     archive:
       config: Release
 
@@ -202,11 +219,13 @@ schemes:
       targets:
         SAVE: all
         SAVETests: [test]
+        SAVEUITests: [test]
     run:
       config: Debug
     test:
       targets:
         - SAVETests
+        - SAVEUITests
     archive:
       config: Release
 
