@@ -1070,6 +1070,38 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(savedPlace.saveShareURL?.path.hasPrefix("/p/") == true)
     }
 
+    func testSavedPlaceShareLinkOmitsInternalDiagnostics() throws {
+        let savedPlace = place(
+            name: "FUGU Japanese Gastropub",
+            address: "110台灣臺北市信義區中興里嘉興街30號",
+            category: .food,
+            sourceUrl: "https://www.instagram.com/reel/DWBZBZFkSyV/",
+            note: """
+            Source URL: https://www.instagram.com/reel/DWBZBZFkSyV/
+            Venue name: FUGU Japanese Gastropub
+            Address clue: 110臺北市信義區嘉興街30號
+            Analysis pipeline: collected metadata/caption/OCR anchors, scored candidate evidence, and kept unresolved fields for review
+            Evidence tier: likely
+            Google Places refined match: FUGU Japanese Gastropub
+            Google Places coordinates: 25.0318009, 121.5581535
+            Bring friends here for izakaya night
+            """,
+            latitude: 25.0318009,
+            longitude: 121.5581535
+        )
+
+        let shareText = savedPlace.shareText
+        let shareURL = try XCTUnwrap(savedPlace.saveShareURL)
+        let payload = try XCTUnwrap(SharedPlaceData.from(url: shareURL))
+
+        XCTAssertTrue(shareText.contains("Note: Bring friends here for izakaya night"))
+        XCTAssertFalse(shareText.contains("Analysis pipeline:"))
+        XCTAssertFalse(shareText.contains("Google Places coordinates:"))
+        XCTAssertEqual(payload.note, "Bring friends here for izakaya night")
+        XCTAssertFalse(shareURL.absoluteString.contains("QW5hbHlzaXM"))
+        XCTAssertLessThan(shareURL.absoluteString.count, 700)
+    }
+
     func testUnsavedMapCandidateShareTextIncludesRatingReviewsAndMapLink() throws {
         let candidate = SaveMapCandidate(
             title: "Bright Coffee Bar",

@@ -86,7 +86,7 @@ struct Place: Identifiable, Codable, Hashable {
         if let recommender, !recommender.isEmpty {
             lines.append("Recommended by: \(recommender)")
         }
-        if let note = note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+        if let note = ShareRoutePayloadSanitizer.publicNote(note) {
             lines.append("Note: \(note)")
         }
         if let sourceURL = primarySourceURL {
