@@ -1094,7 +1094,7 @@ final class SocialLinkReviewCandidateService {
         analysis: SocialPlaceAgentAnalysis? = nil
     ) -> [String] {
         var queries: [String] = []
-        let url = URL(string: sourceURL)
+        let url = xiaohongshuContentURL(from: URL(string: sourceURL)) ?? URL(string: sourceURL)
         let host = url?.host()?.lowercased() ?? ""
         let socialPost = socialPostDescriptor(in: url)
         let cleanedEvidence = cleanHTMLText(evidenceText)
@@ -1376,20 +1376,22 @@ final class SocialLinkReviewCandidateService {
 
     private func xiaohongshuLinkContext(sourceURL: String) -> XiaohongshuLinkContext? {
         guard let url = URL(string: sourceURL) else { return nil }
-        let host = url.host()?.lowercased() ?? ""
+        let analysisURL = xiaohongshuContentURL(from: url) ?? url
+        let host = analysisURL.host()?.lowercased() ?? ""
         guard host.matchesSocialDomain("xiaohongshu.com") || host.matchesSocialDomain("xhslink.com") else { return nil }
-        guard let descriptor = socialPostDescriptor(in: url) else { return nil }
+        guard let descriptor = socialPostDescriptor(in: analysisURL) else { return nil }
         return XiaohongshuLinkContext(
             identifier: descriptor.id,
-            canonicalURL: canonicalSearchURL(from: url) ?? sourceURL,
+            canonicalURL: canonicalSearchURL(from: analysisURL) ?? sourceURL,
             isShortLink: host.matchesSocialDomain("xhslink.com")
         )
     }
 
     private func socialPostDescriptor(in url: URL?) -> SocialPostDescriptor? {
         guard let url else { return nil }
-        let host = url.host()?.lowercased() ?? ""
-        let components = url.pathComponents
+        let descriptorURL = xiaohongshuContentURL(from: url) ?? url
+        let host = descriptorURL.host()?.lowercased() ?? ""
+        let components = descriptorURL.pathComponents
         if host.contains("instagram"),
            let markerIndex = components.firstIndex(where: { $0.lowercased() == "reel" || $0.lowercased() == "reels" }),
            components.indices.contains(markerIndex + 1) {
@@ -1400,7 +1402,7 @@ final class SocialLinkReviewCandidateService {
             guard let id = components.reversed().first(where: { $0.count >= 4 && $0 != "/" })?.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")),
                   !id.isEmpty else { return nil }
             if host.matchesSocialDomain("xhslink.com") {
-                return SocialPostDescriptor(platformName: "xiaohongshu short link", id: id, siteQuery: "\"\(canonicalSearchURL(from: url) ?? url.absoluteString)\"")
+                return SocialPostDescriptor(platformName: "xiaohongshu short link", id: id, siteQuery: "\"\(canonicalSearchURL(from: descriptorURL) ?? descriptorURL.absoluteString)\"")
             }
             return SocialPostDescriptor(platformName: "xiaohongshu", id: id, siteQuery: "site:xiaohongshu.com \(id)")
         }
@@ -1414,11 +1416,25 @@ final class SocialLinkReviewCandidateService {
 
     private func canonicalSearchURL(from url: URL?) -> String? {
         guard let url else { return nil }
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let searchURL = xiaohongshuContentURL(from: url) ?? url
+        var components = URLComponents(url: searchURL, resolvingAgainstBaseURL: false)
         components?.query = nil
         components?.fragment = nil
-        let value = components?.url?.absoluteString ?? url.absoluteString
+        let value = components?.url?.absoluteString ?? searchURL.absoluteString
         return value.isEmpty ? nil : value
+    }
+
+    private func xiaohongshuContentURL(from url: URL?) -> URL? {
+        guard let url else { return nil }
+        let host = url.host()?.lowercased() ?? ""
+        guard host.matchesSocialDomain("xiaohongshu.com") else { return url }
+        guard url.path.lowercased().hasPrefix("/404/"),
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let originalURLString = components.queryItems?.first(where: { $0.name == "originalUrl" })?.value,
+              let originalURL = URL(string: originalURLString) else {
+            return url
+        }
+        return originalURL
     }
 
     private func candidateDiagnostic(for candidate: PendingReviewCandidate, evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {

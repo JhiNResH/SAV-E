@@ -678,6 +678,24 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(diagnostic.suggestedSearchQueries?.contains("\"http://xhslink.com/o/3zvbJIowbqS\"") == true)
     }
 
+    func testXiaohongshuBlocked404OriginalURLRecoversCanonicalNoteID() throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+
+        let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "小红书",
+            sourceURL: "https://www.xiaohongshu.com/404/sec_cixRFHQg?source=xhs_sec_server&originalUrl=http%3A%2F%2Fwww.xiaohongshu.com%2Fdiscovery%2Fitem%2F69c3ed88000000001d01c4c3%3Fapp_platform%3Dios%26xsec_source%3Dapp_share"
+        ).first)
+        let diagnostic = try XCTUnwrap(candidate.evidenceDiagnostic)
+
+        XCTAssertEqual(candidate.candidateName, "Xiaohongshu link")
+        XCTAssertTrue(candidate.isSourceOnly)
+        XCTAssertTrue(diagnostic.found.contains("Xiaohongshu note id: 69c3ed88000000001d01c4c3"))
+        XCTAssertTrue(diagnostic.found.contains("Canonical Xiaohongshu URL: http://www.xiaohongshu.com/discovery/item/69c3ed88000000001d01c4c3"))
+        XCTAssertFalse(diagnostic.found.contains("Xiaohongshu note id: sec_cixRFHQg"))
+        XCTAssertEqual(diagnostic.suggestedSearchQueries?.first, "xiaohongshu 69c3ed88000000001d01c4c3 place")
+        XCTAssertTrue(diagnostic.suggestedSearchQueries?.contains("\"http://www.xiaohongshu.com/discovery/item/69c3ed88000000001d01c4c3\"") == true)
+    }
+
     func testXiaohongshuCaptionMetadataCanBecomeReviewCandidate() throws {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
 
