@@ -1533,6 +1533,7 @@ final class SocialLinkReviewCandidateService {
 
     private func bracketedPlaceName(in text: String) -> String? {
         let patterns = [
+            #"[《]\s*([^》\n\r]{2,80})\s*[》]"#,
             #"[\[【]\s*([^\]】]{2,80})\s*[\]】]"#,
             #"(?i)\b(?:at|spot|place)\s+([A-Z][A-Za-z0-9 &'._-]{2,60})\s*(?:[-–—|,]|\n)"#
         ]
@@ -1554,7 +1555,7 @@ final class SocialLinkReviewCandidateService {
             .filter { !$0.isEmpty }
 
         for line in lines where looksLikeVenueIntroLine(line) {
-            if let quoted = firstCapture(in: line, pattern: #"[「『\"]\s*([^」』\"]{2,80})\s*[」』\"]"#) {
+            if let quoted = firstCapture(in: line, pattern: #"[「『《\"]\s*([^」』》\"]{2,80})\s*[」』》\"]"#) {
                 let cleaned = cleanCandidateName(quoted)
                 if isUsableCandidateName(cleaned), !looksLikeMarketingLine(cleaned) {
                     return cleaned
@@ -1670,7 +1671,7 @@ final class SocialLinkReviewCandidateService {
 
         let isVenueIntroLine = line.range(of: #"@|名店|插旗|開幕|新店|店名|餐廳|餐厅|restaurant"#, options: [.regularExpression, .caseInsensitive]) != nil
         if isVenueIntroLine,
-           let quoted = firstCapture(in: line, pattern: #"[「\"]\s*([^」\"]{2,60})\s*[」\"]"#) {
+           let quoted = firstCapture(in: line, pattern: #"[「《\"]\s*([^」》\"]{2,60})\s*[」》\"]"#) {
             let cleaned = cleanCandidateName(quoted)
             if isUsableCandidateName(cleaned), !looksLikeMarketingLine(cleaned) {
                 return cleaned

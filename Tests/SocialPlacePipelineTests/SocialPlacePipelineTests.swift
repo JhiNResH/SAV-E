@@ -731,6 +731,28 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.candidateName == "台中·餐廳" })
     }
 
+    func testInstagramTraditionalChineseBookTitleVenueBeforePinAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            🌸SaSa. Fingerlicking on Instagram: "🍜天母超浮誇牛肉麵
+            厚切半筋半肉的牛肉塊給的份量超多
+
+            《忠誠牛肉麵》
+            📍台北市士林區德行東路80號
+
+            #天母美食 #台北美食 #士林美食 #排隊美食 #牛肉麵"
+            """,
+            sourceURL: "https://www.instagram.com/reel/DXPR6RfAICu/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "忠誠牛肉麵")
+        XCTAssertEqual(candidates.first?.address, "台北市士林區德行東路80號")
+        XCTAssertFalse(candidates.first?.isSourceOnly == true)
+        XCTAssertFalse(candidates.contains { $0.candidateName == "天母超浮誇牛肉麵" })
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("SaSa") })
+    }
+
     func testInstagramPinVenueLineUsesNextLineHighwayAddress() async throws {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
         let candidates = service.reviewCandidates(
