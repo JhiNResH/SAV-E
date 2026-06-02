@@ -1026,6 +1026,16 @@ final class SocialLinkReviewCandidateService {
         found.append(contentsOf: analysis.regionClues.map { "Region clue: \($0)" })
         found.append(contentsOf: analysis.recoveryHints.map { "Recovery hint: \($0.label)=\($0.queryFragment)" })
 
+        let searchQueries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
+        let missingFields = appendUnique(
+            [],
+            [
+                exactVenueMissingField(for: analysis.sourceIntent),
+                "Verified address",
+                "Verified coordinates"
+            ]
+        )
+
         return SocialPlaceEvidenceDiagnostic(
             found: appendUnique([], found),
             attempts: appendUnique(
@@ -1039,16 +1049,21 @@ final class SocialLinkReviewCandidateService {
                     "Did not use logged-in social scraping"
                 ]
             ),
-            missingFields: appendUnique(
-                [],
-                [
-                    exactVenueMissingField(for: analysis.sourceIntent),
-                    "Verified address",
-                    "Verified coordinates"
-                ]
-            ),
+            missingFields: missingFields,
             nextBestClue: "Run source recovery search or add the exact place name/map link before saving as a Map Stamp.",
-            suggestedSearchQueries: sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
+            suggestedSearchQueries: searchQueries,
+            recoveryPlan: recoveryPlan(
+                sourceURL: sourceURL,
+                evidenceText: evidenceText,
+                queries: searchQueries,
+                requiredEvidence: analysis.resolverDecision.requiredEvidence,
+                decision: analysis.resolverDecision.kind,
+                allowsDirectSave: analysis.resolverDecision.allowsDirectSave
+            ),
+            rejectedEvidence: [
+                SocialPlaceRejectedEvidence(value: "creator profile or generic social shell", reason: "not venue proof"),
+                SocialPlaceRejectedEvidence(value: "tracking-only share token", reason: "not a place identity")
+            ]
         )
     }
 
@@ -1115,12 +1130,68 @@ final class SocialLinkReviewCandidateService {
             attempts: attempts,
             missingFields: missingFields,
             nextBestClue: nextBestClue,
-            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries,
+            recoveryPlan: recoveryPlan(
+                sourceURL: sourceURL,
+                evidenceText: evidenceText,
+                queries: searchQueries,
+                requiredEvidence: missingFields,
+                decision: .sourceOnly,
+                allowsDirectSave: false
+            ),
+            rejectedEvidence: [
+                SocialPlaceRejectedEvidence(value: "creator handle", reason: "not promoted to venue without venue proof"),
+                SocialPlaceRejectedEvidence(value: "generic social metadata", reason: "source receipt only until caption, OCR, map, or official place evidence appears")
+            ]
         )
     }
 
     private func diagnosticSearchEvidence(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> [String] {
         (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
+    }
+
+    private func recoveryPlan(
+        sourceURL: String,
+        evidenceText: String,
+        queries: [String],
+        requiredEvidence: [String],
+        decision: SocialPlaceResolverDecisionKind,
+        allowsDirectSave: Bool
+    ) -> SocialPlaceEvidenceRecoveryPlan {
+        SocialPlaceEvidenceRecoveryPlan(
+            sourceURL: sourceURL,
+            evidenceAtoms: evidenceAtoms(sourceURL: sourceURL, evidenceText: evidenceText),
+            queriesToTry: queries,
+            blockedResultHints: [
+                "creator profile without venue name/address",
+                "generic social shell or login wall",
+                "aggregator/list page without address or map coordinates",
+                "map home/directions page without canonical place identity"
+            ],
+            requiredEvidence: appendUnique([], requiredEvidence),
+            decision: decision,
+            allowsDirectSave: allowsDirectSave
+        )
+    }
+
+    private func evidenceAtoms(sourceURL: String, evidenceText: String) -> [String] {
+        var atoms = ["source_url: \(sourceURL)"]
+        let cleaned = cleanHTMLText(evidenceText).trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.isEmpty {
+            atoms.append("readable_text: none")
+        } else {
+            atoms.append("readable_text: present")
+            if streetAddressLine(in: cleaned) != nil {
+                atoms.append("address_clue: present")
+            }
+            if cleaned.range(of: #"@\w+"#, options: .regularExpression) != nil {
+                atoms.append("social_handle: present")
+            }
+        }
+        if let host = URL(string: sourceURL)?.host?.lowercased() {
+            atoms.append("source_host: \(host)")
+        }
+        return appendUnique([], atoms)
     }
 
     private func sourceRecoverySearchQueries(
