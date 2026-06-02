@@ -1622,6 +1622,11 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidence.contains("Suggested public search: instagram reel DYsourceOnly place"))
         XCTAssertEqual(candidate.evidenceDiagnostic?.nextBestClue, "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.")
         XCTAssertTrue(candidate.missingInfo.contains("Verified place name"))
+        XCTAssertEqual(candidate.evidenceDiagnostic?.recoveryPlan?.decision, .sourceOnly)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.recoveryPlan?.allowsDirectSave, false)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.recoveryPlan?.evidenceAtoms.contains("readable_text: none") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.recoveryPlan?.queriesToTry.contains("instagram reel DYsourceOnly place") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.rejectedEvidence?.contains { $0.reason.contains("not promoted to venue") } == true)
     }
 
     func testPlausiblePlaceNameInSearchQueryBecomesUnresolvedCandidate() {
@@ -1679,6 +1684,11 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries?.first, "\"DW2ZpyADbZ6\" restaurant LA")
         XCTAssertFalse(candidate.evidenceDiagnostic?.suggestedSearchQueries?.joined(separator: " ").contains("igsh") == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.nextBestClue.contains("source recovery search") == true)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.recoveryPlan?.decision, .pendingCandidate)
+        XCTAssertEqual(candidate.evidenceDiagnostic?.recoveryPlan?.allowsDirectSave, false)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.recoveryPlan?.requiredEvidence.contains("Public corroboration") == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.recoveryPlan?.blockedResultHints.contains { $0.contains("creator profile") } == true)
+        XCTAssertTrue(candidate.evidenceDiagnostic?.rejectedEvidence?.contains { $0.value.contains("tracking") } == true)
     }
 
     func testURLOnlyInstagramReelSearchPlanRemovesTrackingQuery() {
@@ -1777,6 +1787,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         let diagnostic = try JSONDecoder().decode(SocialPlaceEvidenceDiagnostic.self, from: json)
 
         XCTAssertNil(diagnostic.suggestedSearchQueries)
+        XCTAssertNil(diagnostic.recoveryPlan)
+        XCTAssertNil(diagnostic.rejectedEvidence)
         XCTAssertEqual(diagnostic.found.first, "Source URL: https://www.instagram.com/reel/old/")
     }
 
@@ -1800,6 +1812,10 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Source clue")
         XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add caption / screenshot / map link")
         XCTAssertEqual(record.evidenceDiagnostic?.canSaveAsMapStamp, false)
+        XCTAssertEqual(record.evidenceDiagnostic?.recoveryPlan?.decision, .sourceOnly)
+        XCTAssertEqual(record.evidenceDiagnostic?.recoveryPlan?.allowsDirectSave, false)
+        XCTAssertTrue(record.evidenceDiagnostic?.recoveryPlan?.evidenceAtoms.contains("shared_note: present") == true)
+        XCTAssertTrue(record.evidenceDiagnostic?.rejectedEvidence?.contains { $0.value == "source-only link" } == true)
     }
 
     func testSaveLocalVaultRestoresConfirmedPlaceWithMapMetadata() throws {

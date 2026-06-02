@@ -164,12 +164,46 @@ final class SaveLocalVaultService {
                 "Verified coordinates"
             ],
             nextBestClue: "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.",
-            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries
+            suggestedSearchQueries: searchQueries.isEmpty ? nil : searchQueries,
+            recoveryPlan: SocialPlaceEvidenceRecoveryPlan(
+                sourceURL: url.absoluteString,
+                evidenceAtoms: sourceOnlyEvidenceAtoms(url: url, note: note),
+                queriesToTry: searchQueries,
+                blockedResultHints: [
+                    "creator profile without venue name/address",
+                    "generic social shell or login wall",
+                    "aggregator/list page without address or map coordinates",
+                    "map home/directions page without canonical place identity"
+                ],
+                requiredEvidence: [
+                    "Verified place name",
+                    "Verified address",
+                    "Verified coordinates"
+                ],
+                decision: .sourceOnly,
+                allowsDirectSave: false
+            ),
+            rejectedEvidence: [
+                SocialPlaceRejectedEvidence(value: "source-only link", reason: "kept as receipt until place evidence is verified")
+            ]
         )
     }
 
     private func diagnosticSearchEvidence(_ diagnostic: SocialPlaceEvidenceDiagnostic) -> [String] {
         (diagnostic.suggestedSearchQueries ?? []).map { "Suggested public search: \($0)" }
+    }
+
+    private func sourceOnlyEvidenceAtoms(url: URL, note: String?) -> [String] {
+        var atoms = [
+            "source_url: \(url.absoluteString)",
+            "source_host: \(url.host() ?? "unknown")"
+        ]
+        if note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            atoms.append("shared_note: present")
+        } else {
+            atoms.append("shared_note: none")
+        }
+        return atoms
     }
 
     private func sourceRecoverySearchQueries(url: URL, note: String?) -> [String] {

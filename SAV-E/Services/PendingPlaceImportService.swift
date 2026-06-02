@@ -124,6 +124,8 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
     var missingFields: [String]
     var nextBestClue: String
     var suggestedSearchQueries: [String]? = nil
+    var recoveryPlan: SocialPlaceEvidenceRecoveryPlan? = nil
+    var rejectedEvidence: [SocialPlaceRejectedEvidence]? = nil
 
     var statusLabel: String {
         if canSaveAsMapStamp { return "Map match ready" }
@@ -151,6 +153,21 @@ struct SocialPlaceEvidenceDiagnostic: Codable, Hashable {
     private var lowercasedMissingFields: [String] {
         missingFields.map { $0.lowercased() }
     }
+}
+
+struct SocialPlaceEvidenceRecoveryPlan: Codable, Hashable {
+    var sourceURL: String?
+    var evidenceAtoms: [String]
+    var queriesToTry: [String]
+    var blockedResultHints: [String]
+    var requiredEvidence: [String]
+    var decision: SocialPlaceResolverDecisionKind
+    var allowsDirectSave: Bool
+}
+
+struct SocialPlaceRejectedEvidence: Codable, Hashable {
+    var value: String
+    var reason: String
 }
 
 struct PendingReviewCandidate: Codable {
