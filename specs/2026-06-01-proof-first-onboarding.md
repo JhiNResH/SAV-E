@@ -60,7 +60,7 @@ loop in under 60 seconds:
 - `Review Candidate` explains found source/name and missing address/coordinates.
 - `Map Stamp` state clearly says the place is confirmed only after user action.
 - The final CTA exits onboarding into the app.
-- `Skip for now` remains available.
+- Non-language steps can be skipped one step at a time without exiting the full onboarding.
 - Copy is localized for English and Traditional Chinese.
 - No parser, auth, backend, paywall, TestFlight, or data-model changes.
 

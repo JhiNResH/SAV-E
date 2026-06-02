@@ -86,8 +86,8 @@ struct OnboardingView: View {
             .opacity(stage == .clue && trimmedClue.isEmpty ? 0.58 : 1)
             .padding(.horizontal, 24)
 
-            Button(skipTitle) {
-                onComplete()
+            Button(secondaryActionTitle) {
+                skipCurrentStep()
             }
             .font(.subheadline)
             .fontWeight(.semibold)
@@ -125,8 +125,13 @@ struct OnboardingView: View {
         }
     }
 
-    private var skipTitle: String {
-        localized(english: "Skip for now", traditionalChinese: "先跳過")
+    private var secondaryActionTitle: String {
+        switch stage {
+        case .tag:
+            return localized(english: "Open SAV-E", traditionalChinese: "打開 SAV-E")
+        default:
+            return localized(english: "Skip this step", traditionalChinese: "跳過這一步")
+        }
     }
 
     private var trimmedClue: String {
@@ -139,6 +144,23 @@ struct OnboardingView: View {
             stage = .clue
         case .clue:
             guard !trimmedClue.isEmpty else { return }
+            stage = .candidate
+        case .candidate:
+            stage = .mapStamp
+        case .mapStamp:
+            stage = .ask
+        case .ask:
+            stage = .tag
+        case .tag:
+            onComplete()
+        }
+    }
+
+    private func skipCurrentStep() {
+        switch stage {
+        case .language:
+            break
+        case .clue:
             stage = .candidate
         case .candidate:
             stage = .mapStamp
