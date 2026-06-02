@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
-    @State private var stage: ProofStage = .clue
+    @State private var stage: ProofStage = .language
     @State private var clueText = ""
     @State private var selectedTags: Set<ProofIntentTag> = []
     var onComplete: () -> Void
@@ -24,6 +24,7 @@ struct OnboardingView: View {
                             clueText: $clueText,
                             selectedTags: $selectedTags,
                             language: language,
+                            onChooseLanguage: chooseLanguage,
                             onUseSample: useSampleClue
                         )
                     }
@@ -91,6 +92,8 @@ struct OnboardingView: View {
             .font(.subheadline)
             .fontWeight(.semibold)
             .foregroundColor(.saveMutedText)
+            .opacity(stage == .language ? 0 : 1)
+            .disabled(stage == .language)
         }
         .padding(.bottom, 22)
         .background(Color.saveNotebookPage.opacity(0.72))
@@ -98,6 +101,8 @@ struct OnboardingView: View {
 
     private var primaryActionTitle: String {
         switch stage {
+        case .language:
+            return localized(english: "Continue", traditionalChinese: "繼續")
         case .clue:
             return localized(english: "See what SAV-E finds", traditionalChinese: "看看 SAV-E 找到什麼")
         case .candidate:
@@ -113,6 +118,7 @@ struct OnboardingView: View {
 
     private var primaryActionFill: Color {
         switch stage {
+        case .language: return .saveSky
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
         case .ask, .tag: return .saveSky
@@ -129,6 +135,8 @@ struct OnboardingView: View {
 
     private func advance() {
         switch stage {
+        case .language:
+            stage = .clue
         case .clue:
             guard !trimmedClue.isEmpty else { return }
             stage = .candidate
@@ -150,6 +158,10 @@ struct OnboardingView: View {
         )
     }
 
+    private func chooseLanguage(_ language: AppLanguage) {
+        languageSettings.language = language
+    }
+
     private func localized(english: String, traditionalChinese: String) -> String {
         switch language {
         case .english: return english
@@ -159,6 +171,7 @@ struct OnboardingView: View {
 }
 
 private enum ProofStage: Int, CaseIterable {
+    case language
     case clue
     case candidate
     case mapStamp
@@ -167,6 +180,8 @@ private enum ProofStage: Int, CaseIterable {
 
     func title(language: AppLanguage) -> String {
         switch (self, language) {
+        case (.language, .english): return "Language"
+        case (.language, .traditionalChinese): return "語言"
         case (.clue, .english): return "Clue"
         case (.clue, .traditionalChinese): return "線索"
         case (.candidate, .english): return "Review"
@@ -272,6 +287,7 @@ private struct ProofStageCard: View {
     @Binding var clueText: String
     @Binding var selectedTags: Set<ProofIntentTag>
     let language: AppLanguage
+    let onChooseLanguage: (AppLanguage) -> Void
     let onUseSample: () -> Void
 
     var body: some View {
@@ -323,6 +339,8 @@ private struct ProofStageCard: View {
     @ViewBuilder
     private var stageContent: some View {
         switch stage {
+        case .language:
+            languageChoice
         case .clue:
             clueInput
         case .candidate:
@@ -333,6 +351,46 @@ private struct ProofStageCard: View {
             askProof
         case .tag:
             tagProof
+        }
+    }
+
+    private var languageChoice: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(AppLanguage.allCases) { option in
+                Button {
+                    onChooseLanguage(option)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: option == language ? "checkmark.circle.fill" : "circle")
+                            .font(.title3.weight(.black))
+                            .foregroundColor(.saveInk)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(option.displayName)
+                                .font(.headline)
+                                .fontWeight(.black)
+                                .foregroundColor(.saveInk)
+
+                            Text(languageDescription(for: option))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.saveMutedText)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(option == language ? Color.saveHoney.opacity(0.58) : Color.white.opacity(0.30))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.saveNotebookLine.opacity(option == language ? 0.72 : 0.42), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .accessibilityLabel(option.displayName)
+            }
+
+            FirstRunTrustNote(language: language)
         }
     }
 
@@ -521,6 +579,7 @@ private struct ProofStageCard: View {
 
     private var iconName: String {
         switch stage {
+        case .language: return "globe"
         case .clue: return "square.and.pencil"
         case .candidate: return "checklist.unchecked"
         case .mapStamp: return "mappin.and.ellipse"
@@ -531,6 +590,7 @@ private struct ProofStageCard: View {
 
     private var headerTint: Color {
         switch stage {
+        case .language: return .saveSky
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
         case .ask: return .saveSky
@@ -540,6 +600,8 @@ private struct ProofStageCard: View {
 
     private var title: String {
         switch stage {
+        case .language:
+            return localized(english: "Choose your language", traditionalChinese: "選擇語言")
         case .clue:
             return localized(english: "Paste one messy place clue", traditionalChinese: "貼上一個混亂的地點線索")
         case .candidate:
@@ -555,6 +617,11 @@ private struct ProofStageCard: View {
 
     private var subtitle: String {
         switch stage {
+        case .language:
+            return localized(
+                english: "This comes first so the setup is easy to understand. You can change it later.",
+                traditionalChinese: "先選語言，接下來的設定才看得懂。之後可以再改。"
+            )
         case .clue:
             return localized(english: "Use a Reel caption, Google Maps link, screenshot text, or friend message.", traditionalChinese: "可以用 Reels 文案、Google Maps 連結、截圖文字或朋友訊息。")
         case .candidate:
@@ -577,6 +644,15 @@ private struct ProofStageCard: View {
 
     private var sampleTitle: String {
         localized(english: "Use sample clue", traditionalChinese: "使用範例線索")
+    }
+
+    private func languageDescription(for option: AppLanguage) -> String {
+        switch option {
+        case .english:
+            return "Use SAV-E in English"
+        case .traditionalChinese:
+            return "使用繁體中文操作 SAV-E"
+        }
     }
 
     private var sourceSummary: String {

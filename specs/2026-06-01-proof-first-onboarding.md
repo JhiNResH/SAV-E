@@ -38,17 +38,20 @@ different from Google Maps, Roamy, or a generic AI travel app.
 Replace the explainer with a proof-first interactive setup that teaches the core
 loop in under 60 seconds:
 
-1. enter or sample one real messy place clue;
-2. see what SAV-E found and what is still missing;
-3. confirm it into a Map Stamp;
-4. ask SAV-E from saved memory;
-5. optionally tag why the place matters.
+1. choose English or Traditional Chinese;
+2. enter or sample one real messy place clue;
+3. see what SAV-E found and what is still missing;
+4. confirm it into a Map Stamp;
+5. ask SAV-E from saved memory;
+6. optionally tag why the place matters.
 
 ## Acceptance Criteria
 
-- First screen asks for one messy place clue, not user preferences.
+- First screen asks the user to choose English or Traditional Chinese.
+- Second screen asks for one messy place clue, not user preferences.
 - User can tap a sample clue if they do not want to type.
 - The onboarding surface visibly progresses through:
+  - `Language`;
   - `Clue`;
   - `Review Candidate`;
   - `Map Stamp`;
@@ -80,4 +83,3 @@ xcodebuild build -quiet -project SAV-E.xcodeproj -scheme SAV-E \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
   CODE_SIGNING_ALLOWED=NO
 ```
-
