@@ -309,13 +309,16 @@ final class SocialLinkReviewCandidateService {
                     result.url.isEmpty ? "" : "Public web search URL: \(result.url)"
                 ]
             ),
-            attempts: [
-                "Checked public metadata/caption/OCR text for place-bearing intent",
-                "Ran public web search recovery queries",
+            attempts: appendUnique(
+                analysisMethodAttempts(evidenceText: result.snippet, sourceURL: sourceURL),
+                [
+                    "Checked public metadata/caption/OCR text for place-bearing intent",
+                    "Ran public web search recovery queries",
                 "Extracted venue candidate from public search snippets",
-                "Prepared map provider refinement query",
-                "Did not use logged-in social scraping"
-            ],
+                    "Prepared map provider refinement query",
+                    "Did not use logged-in social scraping"
+                ]
+            ),
             missingFields: ["Verified address", "Verified coordinates"],
             nextBestClue: "Confirm the map provider match before saving this as a Map Stamp."
         )
@@ -456,7 +459,10 @@ final class SocialLinkReviewCandidateService {
                         "Coordinate system: \(match.coordinateSystem.rawValue)"
                     ]
                 ),
-                attempts: ["Parsed shared map deep link before public metadata recovery"],
+                attempts: appendUnique(
+                    analysisMethodAttempts(evidenceText: evidenceText, sourceURL: sourceURL),
+                    ["Parsed shared map deep link before public metadata recovery"]
+                ),
                 missingFields: [],
                 nextBestClue: "Confirm this \(match.provider.displayName) deep-link match before saving it as a Map Stamp."
             )
@@ -1005,7 +1011,10 @@ final class SocialLinkReviewCandidateService {
         evidenceText: String,
         sourceURL: String
     ) -> SocialPlaceEvidenceDiagnostic {
-        var found = ["Source URL: \(sourceURL)"]
+        var found = appendUnique(
+            ["Source URL: \(sourceURL)"],
+            evidenceContentFindings(evidenceText: evidenceText)
+        )
         if let reason = analysis.placeBearingReason {
             found.append("Place-bearing source: \(reason)")
         }
@@ -1019,14 +1028,17 @@ final class SocialLinkReviewCandidateService {
 
         return SocialPlaceEvidenceDiagnostic(
             found: appendUnique([], found),
-            attempts: [
-                "Checked public metadata/caption text for explicit place names",
-                "Applied bounded resolver decision before any save action",
-                "Classified the source as place-bearing even though no exact venue was verified",
-                "Kept this in Review instead of inventing a map pin",
-                "Prepared public source-recovery search queries",
-                "Did not use logged-in social scraping"
-            ],
+            attempts: appendUnique(
+                analysisMethodAttempts(evidenceText: evidenceText, sourceURL: sourceURL),
+                [
+                    "Checked public metadata/caption text for explicit place names",
+                    "Applied bounded resolver decision before any save action",
+                    "Classified the source as place-bearing even though no exact venue was verified",
+                    "Kept this in Review instead of inventing a map pin",
+                    "Prepared public source-recovery search queries",
+                    "Did not use logged-in social scraping"
+                ]
+            ),
             missingFields: appendUnique(
                 [],
                 [
@@ -1040,17 +1052,40 @@ final class SocialLinkReviewCandidateService {
         )
     }
 
+    private func analysisMethodAttempts(evidenceText: String, sourceURL: String) -> [String] {
+        [
+            "Analysis method: classified the shared URL/platform and canonical post id before trusting content",
+            "Analysis method: inspected readable metadata/caption/OCR for venue anchors, address pins, map links, and social handles",
+            "Analysis method: requires a place name plus address or map-provider match before Map Stamp; otherwise keeps Review/Source Clue",
+            "Analysis method: records missing proof so SAV-E asks for the next clue instead of guessing"
+        ]
+    }
+
+    private func evidenceContentFindings(evidenceText: String) -> [String] {
+        let cleaned = cleanHTMLText(evidenceText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else {
+            return ["Readable metadata/caption/OCR: none received"]
+        }
+        if streetAddressLine(in: cleaned) != nil || cleaned.contains("📍") || cleaned.contains("🏠") || cleaned.localizedCaseInsensitiveContains("address") {
+            return ["Readable metadata/caption/OCR: present with location clues"]
+        }
+        return ["Readable metadata/caption/OCR: present but no verified address/map link"]
+    }
+
     private func sourceOnlyDiagnostic(evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {
-        var found = ["Source URL: \(sourceURL)"]
+        var found = appendUnique(["Source URL: \(sourceURL)"], evidenceContentFindings(evidenceText: evidenceText))
         if !evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             found.append("Shared text/caption was present but did not contain a verified place candidate")
         }
-        var attempts = [
-            "Checked public metadata/caption text for explicit place names",
-            "Checked social handles without treating creator handles as places",
-            "Prepared public web search fallback queries for source-only recovery",
-            "Did not use logged-in social scraping"
-        ]
+        var attempts = appendUnique(
+            analysisMethodAttempts(evidenceText: evidenceText, sourceURL: sourceURL),
+            [
+                "Checked public metadata/caption text for explicit place names",
+                "Checked social handles without treating creator handles as places",
+                "Prepared public web search fallback queries for source-only recovery",
+                "Did not use logged-in social scraping"
+            ]
+        )
         var missingFields = [
             "Verified place name",
             "Verified address",
@@ -1422,10 +1457,13 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func candidateDiagnostic(for candidate: PendingReviewCandidate, evidenceText: String, sourceURL: String) -> SocialPlaceEvidenceDiagnostic {
-        var found = [
-            "Source URL: \(sourceURL)",
-            "Candidate place name: \(candidate.candidateName)"
-        ]
+        var found = appendUnique(
+            [
+                "Source URL: \(sourceURL)",
+                "Candidate place name: \(candidate.candidateName)"
+            ],
+            evidenceContentFindings(evidenceText: evidenceText)
+        )
         if let xhs = xiaohongshuLinkContext(sourceURL: sourceURL) {
             found = appendUnique(found, [
                 xhs.identifierEvidence,
@@ -1444,11 +1482,14 @@ final class SocialLinkReviewCandidateService {
         if !candidate.hasReliableCoordinates { missing.append("Verified coordinates") }
         missing.append(contentsOf: candidate.missingInfo)
 
-        var attempts = [
-            "Checked public metadata/caption text for explicit place names",
-            "Kept plausible venue evidence in Review instead of inventing map coordinates",
-            "Did not use logged-in social scraping"
-        ]
+        var attempts = appendUnique(
+            analysisMethodAttempts(evidenceText: evidenceText, sourceURL: sourceURL),
+            [
+                "Checked public metadata/caption text for explicit place names",
+                "Kept plausible venue evidence in Review instead of inventing map coordinates",
+                "Did not use logged-in social scraping"
+            ]
+        )
         if let xhs = xiaohongshuLinkContext(sourceURL: sourceURL) {
             attempts = appendUnique(attempts, [
                 xhs.resolutionAttempt,
