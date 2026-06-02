@@ -45,8 +45,8 @@ struct SharedPlaceData: Codable {
             hours: place.openingHours,
             sourceLabel: place.sourcePlatform == .other ? "SAV-E" : place.sourcePlatform.displayName,
             sourceURL: place.primarySourceURL?.absoluteString,
-            photoURLs: place.businessPhotoURLStrings,
-            note: place.note
+            photoURLs: ShareRoutePayloadSanitizer.publicPhotoURLs(place.businessPhotoURLStrings),
+            note: ShareRoutePayloadSanitizer.publicNote(place.note)
         )
     }
 
@@ -64,8 +64,8 @@ struct SharedPlaceData: Codable {
             hours: nil,
             sourceLabel: candidate.sourcePlatform?.displayName ?? "Map result",
             sourceURL: candidate.sourceURL,
-            photoURLs: candidate.businessPhotoURLStrings,
-            note: candidate.shareNote
+            photoURLs: ShareRoutePayloadSanitizer.publicPhotoURLs(candidate.businessPhotoURLStrings),
+            note: ShareRoutePayloadSanitizer.publicNote(candidate.shareNote)
         )
     }
 
@@ -87,8 +87,8 @@ struct SharedPlaceData: Codable {
             hours: nil,
             sourceLabel: result.sourcePlatform?.displayName ?? result.userState.displayName,
             sourceURL: result.sourceURL,
-            photoURLs: result.businessPhotoURLStrings,
-            note: result.shareNote
+            photoURLs: ShareRoutePayloadSanitizer.publicPhotoURLs(result.businessPhotoURLStrings),
+            note: ShareRoutePayloadSanitizer.publicNote(result.shareNote)
         )
     }
 
@@ -179,6 +179,48 @@ struct SharedTripData: Codable {
         let countLabel = stops.count == 1 ? "1 stop" : "\(stops.count) stops"
         guard !city.isEmpty else { return countLabel }
         return "\(countLabel) in \(city)"
+    }
+}
+
+enum ShareRoutePayloadSanitizer {
+    private static let diagnosticPrefixes = [
+        "Source URL:",
+        "Venue name:",
+        "Address clue:",
+        "Category clue:",
+        "Location clue:",
+        "Analysis pipeline:",
+        "Evidence tier:",
+        "Google Places refined match:",
+        "Google Places address:",
+        "Google Places coordinates:",
+        "Confidence:",
+    ]
+
+    static func publicPhotoURLs(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return Array(values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
+            .prefix(1))
+    }
+
+    static func publicNote(_ value: String?) -> String? {
+        let lines: [String] = value?
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { line in
+                guard !line.isEmpty else { return false }
+                return !diagnosticPrefixes.contains {
+                    line.range(of: $0, options: [.caseInsensitive, .anchored]) != nil
+                }
+            } ?? []
+        let text = lines.prefix(2).joined(separator: " · ").trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        if text.count <= 180 { return text }
+        let end = text.index(text.startIndex, offsetBy: 180)
+        return String(text[..<end]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) + "…"
     }
 }
 
