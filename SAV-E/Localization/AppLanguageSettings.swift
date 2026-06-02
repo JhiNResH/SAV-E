@@ -30,7 +30,11 @@ final class AppLanguageSettings: ObservableObject {
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
         let storedLanguage = userDefaults.string(forKey: storageKey)
-        self.language = AppLanguage(rawValue: storedLanguage ?? "") ?? .english
+        self.language = AppLanguage(rawValue: storedLanguage ?? "") ?? Self.defaultLanguageFromLocale()
+    }
+
+    private static func defaultLanguageFromLocale() -> AppLanguage {
+        Locale.preferredLanguages.contains { $0.hasPrefix("zh") } ? .traditionalChinese : .english
     }
 
     func text(_ key: SaveTextKey) -> String {
