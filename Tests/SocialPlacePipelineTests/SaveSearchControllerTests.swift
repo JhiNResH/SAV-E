@@ -391,6 +391,45 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testDrawerPreparedPublicDiscoveryKeepsRecommendationPathBounded() async {
+        let client = StubGroundedAnswerClient(answer: "I would start with Saved Coffee, then compare Unsaved Coffee as public discovery.")
+        let drawer = AIDrawerViewModel(groundedAnswerClient: client)
+        let savedPlace = place(
+            name: "Saved Coffee",
+            address: "1 Main St, Irvine, CA",
+            category: .cafe
+        )
+        let candidate = SaveMapCandidate(
+            title: "Unsaved Coffee",
+            subtitle: "Irvine, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            category: .cafe,
+            rating: 4.8,
+            reviewCount: 1200,
+            distanceMeters: 180,
+            evidence: ["Apple Maps result"]
+        )
+        drawer.places = [savedPlace]
+        drawer.mapCandidates = [candidate]
+        drawer.query = "coffee"
+
+        await drawer.submit()
+
+        guard case .saveSearchResults(let response) = drawer.drawerState else {
+            return XCTFail("Expected save search results")
+        }
+        XCTAssertEqual(response.fromYourSave.id, "from-your-save-nearby")
+        XCTAssertNotEqual(response.fromYourSave.title, "Spatial memory canvas")
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Saved Coffee"])
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Coffee"])
+        XCTAssertEqual(Set(client.requests.first?.allowedPlaceIds ?? []), Set([
+            "place-\(savedPlace.id.uuidString)",
+            "map-candidate-\(candidate.id)"
+        ]))
+    }
+
+    @MainActor
     func testDrawerPreparedReviewAndPublicResultsUseGroundedAnswerClient() async {
         let client = StubGroundedAnswerClient(answer: "I would review Review Coffee first, then compare Unsaved Coffee before saving anything. Want a sit-down spot?")
         let drawer = AIDrawerViewModel(groundedAnswerClient: client)

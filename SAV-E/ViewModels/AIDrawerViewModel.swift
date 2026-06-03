@@ -59,10 +59,7 @@ final class AIDrawerViewModel: ObservableObject {
         let currentLocation = locationIntentRecommendationService.requiresCurrentLocation(for: trimmed)
             ? await locationService.requestCurrentLocation()
             : locationService.currentLocation
-        let hasPreparedMapCandidates = !mapCandidates.isEmpty &&
-            saveSearchController.shouldPrepareMapCandidates(for: trimmed)
-        if !hasPreparedMapCandidates,
-           let gatedResponse = locationIntentRecommendationService.recommendationSearchResponse(
+        if let gatedResponse = locationIntentRecommendationService.recommendationSearchResponse(
             for: trimmed,
             places: places,
             reviewCandidates: reviewCandidates,
