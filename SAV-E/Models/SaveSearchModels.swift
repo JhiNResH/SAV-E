@@ -250,6 +250,7 @@ struct SavePlaceActionResolution: Hashable {
         case .sourceOnlyClue:
             return .runRecovery
         case .pendingCandidate:
+            // Pending candidates stay in recovery unless the service marks them map-ready.
             if result.primaryAction == .confirmMapStamp {
                 return .confirmMapStamp
             }
