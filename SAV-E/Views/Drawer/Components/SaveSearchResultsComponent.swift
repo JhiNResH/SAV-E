@@ -15,6 +15,9 @@ struct SaveSearchResultsComponent: View {
 
             if leadsWithAgentAnswer {
                 supportingPlacesDisclosure
+                ForEach(separateContextSections) { section in
+                    sectionView(section)
+                }
             } else {
                 ForEach(renderedSections) { section in
                     sectionView(section)
@@ -28,6 +31,16 @@ struct SaveSearchResultsComponent: View {
             .filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
     }
 
+    private var saveUsedEvidenceSections: [SaveSearchSection] {
+        response.saveUsedEvidenceSections
+            .filter { !$0.results.isEmpty }
+    }
+
+    private var separateContextSections: [SaveSearchSection] {
+        (response.farSavedSections + response.publicDiscoverySections)
+            .filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
+    }
+
     private var leadsWithAgentAnswer: Bool {
         response.fromYourSave.id == "from-your-save-nearby" &&
             response.assistantMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -35,12 +48,12 @@ struct SaveSearchResultsComponent: View {
 
     @ViewBuilder
     private var supportingPlacesDisclosure: some View {
-        if renderedSections.isEmpty {
+        if saveUsedEvidenceSections.isEmpty {
             EmptyView()
         } else {
             DisclosureGroup(isExpanded: $showsSupportingPlaces) {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(renderedSections) { section in
+                    ForEach(saveUsedEvidenceSections) { section in
                         sectionView(section)
                     }
                 }
@@ -49,7 +62,7 @@ struct SaveSearchResultsComponent: View {
                 HStack(spacing: 8) {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.caption.weight(.black))
-                    Text("Show places SAV-E used")
+                    Text("Show SAV-E memory used")
                         .font(.caption.weight(.black))
                     Spacer(minLength: 0)
                     Text("\(supportingResultCount)")
@@ -74,7 +87,7 @@ struct SaveSearchResultsComponent: View {
     }
 
     private var supportingResultCount: Int {
-        renderedSections.reduce(0) { $0 + $1.results.count }
+        saveUsedEvidenceSections.reduce(0) { $0 + $1.results.count }
     }
 
     @ViewBuilder

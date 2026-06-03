@@ -517,11 +517,8 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Saved Coffee"])
         XCTAssertEqual(response.additionalSections.first { $0.id == "saved-but-not-nearby" }?.results.map(\.title), ["Far Coffee"])
         XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Coffee"])
-        XCTAssertEqual(Set(client.requests.first?.allowedPlaceIds ?? []), Set([
-            "place-\(savedPlace.id.uuidString)",
-            "place-\(farSavedPlace.id.uuidString)",
-            "map-candidate-\(candidate.id)"
-        ]))
+        XCTAssertEqual(client.requests.first?.allowedPlaceIds, ["place-\(savedPlace.id.uuidString)"])
+        XCTAssertEqual(client.requests.first?.sections.map(\.id), ["from-your-save-nearby"])
     }
 
     @MainActor

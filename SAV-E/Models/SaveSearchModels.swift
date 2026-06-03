@@ -1131,4 +1131,34 @@ extension SaveSearchResponse {
             newRecommendations.showsNearbySearchAction &&
             newRecommendations.results.isEmpty
     }
+
+    var groundedAnswerSections: [SaveSearchSection] {
+        let savedAndReviewSections = saveUsedEvidenceSections
+        if isNearbyRecommendationResponse {
+            guard fromYourSave.results.isEmpty else { return savedAndReviewSections }
+            return savedAndReviewSections + [newRecommendations]
+        }
+        return savedAndReviewSections + farSavedSections + [newRecommendations]
+    }
+
+    var saveUsedEvidenceSections: [SaveSearchSection] {
+        ([fromYourSave] + reviewCandidateSections)
+            .filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
+    }
+
+    var farSavedSections: [SaveSearchSection] {
+        additionalSections.filter { $0.id == "saved-but-not-nearby" }
+    }
+
+    var publicDiscoverySections: [SaveSearchSection] {
+        [newRecommendations].filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
+    }
+
+    private var isNearbyRecommendationResponse: Bool {
+        fromYourSave.id == "from-your-save-nearby"
+    }
+
+    private var reviewCandidateSections: [SaveSearchSection] {
+        additionalSections.filter { $0.id == "review-candidates" }
+    }
 }

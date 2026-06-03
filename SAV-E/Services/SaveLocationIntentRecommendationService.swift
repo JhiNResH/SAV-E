@@ -52,10 +52,11 @@ struct SaveLocationIntentRecommendationService {
             intent.requiredCategories.contains(place.category)
         }
         let rankedCategoryMatches = rank(categoryMatches, for: intent, currentLocation: currentLocation, tasteProfile: tasteProfile)
+        let categoryReviewCandidates = reviewCandidates.filter { candidate in
+            intent.requiredCategories.contains(inferredCategory(for: candidate))
+        }
         let reviewMatches = rankReviewCandidates(
-            reviewCandidates.filter { candidate in
-                intent.requiredCategories.contains(inferredCategory(for: candidate))
-            },
+            categoryReviewCandidates,
             currentLocation: currentLocation
         )
         let mapMatches = rankMapCandidates(
@@ -73,6 +74,15 @@ struct SaveLocationIntentRecommendationService {
             let far = rankedCategoryMatches.filter {
                 distanceMeters(from: currentLocation, to: $0) > radiusMeters
             }
+            let nearbyReviewMatches = rankReviewCandidates(
+                categoryReviewCandidates.filter { candidate in
+                    guard let distance = distanceMeters(from: currentLocation, to: candidate) else {
+                        return false
+                    }
+                    return distance <= radiusMeters
+                },
+                currentLocation: currentLocation
+            )
 
             guard !nearby.isEmpty else {
                 let farContext = far.isEmpty
@@ -83,7 +93,7 @@ struct SaveLocationIntentRecommendationService {
                     message: "你的 SAV-E 裡附近沒有\(localizedCategoryLabel(for: intent))。I did not recommend other categories because you asked for \(categoryLabel(for: intent)).\(farContext)",
                     nearby: [],
                     far: far,
-                    reviewCandidates: reviewMatches,
+                    reviewCandidates: nearbyReviewMatches,
                     mapCandidates: mapMatches,
                     intent: intent,
                     currentLocation: currentLocation,
@@ -97,7 +107,7 @@ struct SaveLocationIntentRecommendationService {
                 message: "Found \(nearby.count) saved nearby \(categoryLabel(for: intent)) place\(nearby.count == 1 ? "" : "s") from your SAV-E.",
                 nearby: nearby,
                 far: far,
-                reviewCandidates: reviewMatches,
+                reviewCandidates: nearbyReviewMatches,
                 mapCandidates: mapMatches,
                 intent: intent,
                 currentLocation: currentLocation,
@@ -464,7 +474,7 @@ struct SaveLocationIntentRecommendationService {
             return agentAnswer(
                 lead: "我會先推 \(top.title)。",
                 reason: reasonLine(for: top, fallback: "It is already a Saved Map Stamp in your place memory."),
-                caveat: "\(supportingSummary(reviewResults: reviewResults, unsavedResults: unsavedResults))If you want, tell me budget, cuisine, or quick vs sit-down and I’ll narrow it."
+                caveat: "\(supportingSummary(reviewResults: reviewResults, unsavedResults: []))Public discovery stays separate below. If you want, tell me budget, cuisine, or quick vs sit-down and I’ll narrow it."
             )
         }
 

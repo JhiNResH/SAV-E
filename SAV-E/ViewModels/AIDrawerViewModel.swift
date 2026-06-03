@@ -352,10 +352,6 @@ private extension SaveSearchResponse {
         }
     }
 
-    private var groundedAnswerSections: [SaveSearchSection] {
-        [fromYourSave] + additionalSections + [newRecommendations]
-    }
-
     private var groundedAnswerResultIDs: [String] {
         groundedAnswerSections.flatMap { $0.results.map(\.id) }
     }

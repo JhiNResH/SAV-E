@@ -236,7 +236,8 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertEqual(response.fromYourSave.results.first?.userState.displayName, "Saved")
         XCTAssertTrue(response.assistantMessage?.localizedCaseInsensitiveContains("saved") == true)
         XCTAssertTrue(response.assistantMessage?.contains("Review") == true)
-        XCTAssertTrue(response.assistantMessage?.contains("unsaved") == true)
+        XCTAssertTrue(response.assistantMessage?.contains("Public discovery stays separate") == true)
+        XCTAssertFalse(response.assistantMessage?.contains("unsaved nearby option") == true)
     }
 
     func testVisitedTasteSignalsCanBeatCloserGenericSavedRestaurant() throws {
@@ -436,6 +437,75 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertEqual(response.additionalSections.first { $0.id == "saved-but-not-nearby" }?.results.map(\.title), ["Tainan Milk Tea"])
         XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Public Boba"])
         XCTAssertTrue(response.assistantMessage?.contains("Nearby Boba") == true)
+    }
+
+    func testNearbyMilkTeaKeepsFarReviewCandidatesOutOfNearbyContext() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let nearbyBoba = place(
+            name: "Nearby Boba",
+            category: .cafe,
+            latitude: 33.6848,
+            longitude: -117.8267,
+            note: "Brown sugar boba milk tea",
+            extractedDishes: ["milk tea", "boba"]
+        )
+        let nearbyReviewCandidate = PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: "Irvine Review Boba",
+            address: "12 Main St",
+            city: "Irvine",
+            latitude: 33.6849,
+            longitude: -117.8268,
+            evidence: ["Caption says milk tea in Irvine"],
+            confidence: 0.82,
+            missingInfo: [],
+            status: "pending",
+            createdAt: Date()
+        )
+        let farReviewCandidate = PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: "Taipei Review Boba",
+            address: "Da'an District",
+            city: "Taipei",
+            latitude: 25.0330,
+            longitude: 121.5654,
+            evidence: ["Caption says milk tea in Taipei"],
+            confidence: 0.86,
+            missingInfo: [],
+            status: "pending",
+            createdAt: Date()
+        )
+        let unlocatedReviewCandidate = PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: "Unlocated Review Boba",
+            address: "",
+            city: "Taiwan",
+            latitude: nil,
+            longitude: nil,
+            evidence: ["Caption says milk tea"],
+            confidence: 0.54,
+            missingInfo: ["coordinates"],
+            status: "pending",
+            createdAt: Date()
+        )
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "推薦我附近的奶茶店",
+            places: [nearbyBoba],
+            reviewCandidates: [farReviewCandidate, unlocatedReviewCandidate, nearbyReviewCandidate],
+            currentLocation: currentLocation
+        ))
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Nearby Boba"])
+        XCTAssertEqual(response.additionalSections.first { $0.id == "review-candidates" }?.results.map(\.title), ["Irvine Review Boba"])
+        XCTAssertFalse(response.additionalSections.flatMap(\.results).map(\.title).contains("Taipei Review Boba"))
+        XCTAssertFalse(response.additionalSections.flatMap(\.results).map(\.title).contains("Unlocated Review Boba"))
+        XCTAssertTrue(response.assistantMessage?.contains("Nearby Boba") == true)
+        XCTAssertFalse(response.assistantMessage?.contains("Taipei Review Boba") == true)
     }
 
     func testDeterministicParserRecognizesNearbyCafeIntent() throws {
