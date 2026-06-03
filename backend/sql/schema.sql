@@ -221,6 +221,25 @@ create index if not exists idx_place_claims_proof on place_claims(user_id, proof
 create index if not exists idx_place_claims_type on place_claims(user_id, claim_type);
 create index if not exists idx_place_claims_visibility on place_claims(user_id, visibility);
 
+create table if not exists claim_usage_receipts (
+    id uuid primary key default gen_random_uuid(),
+    claim_id uuid references place_claims(id) on delete cascade not null,
+    place_id uuid references places(id) on delete cascade not null,
+    consumer_agent_id text not null default 'unknown_agent',
+    consumer_user_id text references profiles(id) on delete set null,
+    action text not null,
+    outcome text not null default 'unknown',
+    created_at timestamptz not null default now(),
+    constraint claim_usage_receipts_action_check check (
+        action in ('recommended_to_user', 'cited', 'saved_to_vault', 'adapted_collection')
+    ),
+    constraint claim_usage_receipts_outcome_check check (outcome in ('accepted', 'rejected', 'unknown'))
+);
+
+create index if not exists idx_claim_usage_receipts_claim on claim_usage_receipts(claim_id, created_at desc);
+create index if not exists idx_claim_usage_receipts_place on claim_usage_receipts(place_id, created_at desc);
+create index if not exists idx_claim_usage_receipts_agent on claim_usage_receipts(consumer_agent_id, created_at desc);
+
 create table if not exists agent_decisions (
     id uuid primary key default gen_random_uuid(),
     candidate_id uuid references place_candidates(id) on delete cascade not null,

@@ -23,6 +23,12 @@ protocol SupabaseServiceProtocol {
     func fetchReferralProfile(target: SaveReferralTarget) async throws -> SaveReferralProfile
     func fetchSocialSignals(lens: SaveSocialLens) async throws -> [Place]
     func updatePlaceVisibility(_ visibility: PlaceVisibility, for placeId: UUID) async throws
+    func fetchVerifiedPlaceClaims(for placeId: UUID, includePrivateEvidence: Bool) async throws -> [VerifiedPlaceClaim]
+    func createVerifiedPlaceClaim(_ draft: VerifiedPlaceClaimDraft, for placeId: UUID) async throws -> VerifiedPlaceClaim
+    func fetchPlaceTrustSummary(for placeId: UUID) async throws -> PlaceTrustSummaryResponse
+    func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse
+    func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard
+    func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool) async throws -> ClaimUsageReceipt
 }
 
 // MARK: - Errors
@@ -290,6 +296,56 @@ final class SupabaseService: SupabaseServiceProtocol {
         return rows.map { $0.toPlace() }
     }
 
+    // MARK: - Verified Place Claims
+
+    func fetchVerifiedPlaceClaims(for placeId: UUID, includePrivateEvidence: Bool = false) async throws -> [VerifiedPlaceClaim] {
+        guard isConfigured else { return [] }
+
+        let suffix = includePrivateEvidence ? "?includePrivateEvidence=true" : ""
+        let data = try await request(path: "/v0/places/\(placeId.uuidString)/verified-claims\(suffix)")
+        let row = try JSONDecoder.supabase.decode(VerifiedPlaceClaimsResponse.self, from: data)
+        return row.claims
+    }
+
+    func createVerifiedPlaceClaim(_ draft: VerifiedPlaceClaimDraft, for placeId: UUID) async throws -> VerifiedPlaceClaim {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let body = try Self.jsonBody(draft.body)
+        let data = try await request(path: "/v0/places/\(placeId.uuidString)/verified-claims", method: "POST", body: body)
+        return try JSONDecoder.supabase.decode(VerifiedPlaceClaim.self, from: data)
+    }
+
+    func fetchPlaceTrustSummary(for placeId: UUID) async throws -> PlaceTrustSummaryResponse {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let data = try await request(path: "/v0/places/\(placeId.uuidString)/trust-summary")
+        return try JSONDecoder.supabase.decode(PlaceTrustSummaryResponse.self, from: data)
+    }
+
+    func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse {
+        guard isConfigured else { return .empty }
+
+        let body = try Self.jsonBody(request.body)
+        let data = try await self.request(path: "/v0/places/recommend-by-claims", method: "POST", body: body)
+        return try JSONDecoder.supabase.decode(ClaimRecommendationResponse.self, from: data)
+    }
+
+    func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let data = try await request(path: "/public/v0/cards/\(cardId.uuidString)", requiresAuth: false)
+        return try JSONDecoder.supabase.decode(PublicPlaceCard.self, from: data)
+    }
+
+    func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool = true) async throws -> ClaimUsageReceipt {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let path = requiresAuth ? "/v0/claims/usage-receipts" : "/public/v0/claim-usage-receipts"
+        let body = try Self.jsonBody(receipt.body)
+        let data = try await request(path: path, method: "POST", body: body, requiresAuth: requiresAuth)
+        return try JSONDecoder.supabase.decode(ClaimUsageReceipt.self, from: data)
+    }
+
     // MARK: - HTTP
 
     @discardableResult
@@ -336,6 +392,284 @@ final class SupabaseService: SupabaseServiceProtocol {
 }
 
 // MARK: - Row DTOs (snake_case ↔ Swift models)
+
+struct VerifiedPlaceClaim: Codable, Identifiable, Equatable {
+    let claimId: UUID
+    let placeId: UUID
+    let claimType: String
+    let claim: String
+    let agentUsableSummary: String
+    let author: VerifiedPlaceClaimAuthor
+    let proofLevel: String
+    let confidence: Double
+    let visibility: String
+    let evidenceSummary: [String]
+    let evidenceRefs: [String]?
+    let observedAt: String?
+    let expiresOrStaleAfter: String?
+    let createdAt: String?
+
+    var id: UUID { claimId }
+
+    enum CodingKeys: String, CodingKey {
+        case claimId = "claim_id"
+        case placeId = "place_id"
+        case claimType = "claim_type"
+        case claim
+        case agentUsableSummary = "agent_usable_summary"
+        case author
+        case proofLevel = "proof_level"
+        case confidence
+        case visibility
+        case evidenceSummary = "evidence_summary"
+        case evidenceRefs = "evidence_refs"
+        case observedAt = "observed_at"
+        case expiresOrStaleAfter = "expires_or_stale_after"
+        case createdAt = "created_at"
+    }
+}
+
+struct VerifiedPlaceClaimAuthor: Codable, Equatable {
+    let authorType: String
+    let publicHandle: String?
+    let relationship: String
+
+    enum CodingKeys: String, CodingKey {
+        case authorType = "author_type"
+        case publicHandle = "public_handle"
+        case relationship
+    }
+}
+
+struct VerifiedPlaceClaimDraft: Equatable {
+    var claimType: String
+    var claim: String
+    var agentUsableSummary: String?
+    var proofLevel: String
+    var evidenceRefs: [String]
+    var visibility: String
+    var confidence: Double
+    var context: [String: Any]
+    var ratings: [String: Any]
+    var observedAt: String?
+    var expiresOrStaleAfter: String?
+
+    var body: [String: Any?] {
+        [
+            "claim_type": claimType,
+            "claim": claim,
+            "agent_usable_summary": agentUsableSummary,
+            "proof_level": proofLevel,
+            "evidence_refs": evidenceRefs,
+            "visibility": visibility,
+            "confidence": confidence,
+            "context": context,
+            "ratings": ratings,
+            "observed_at": observedAt,
+            "expires_or_stale_after": expiresOrStaleAfter,
+        ]
+    }
+
+    static func == (lhs: VerifiedPlaceClaimDraft, rhs: VerifiedPlaceClaimDraft) -> Bool {
+        lhs.claimType == rhs.claimType &&
+            lhs.claim == rhs.claim &&
+            lhs.agentUsableSummary == rhs.agentUsableSummary &&
+            lhs.proofLevel == rhs.proofLevel &&
+            lhs.evidenceRefs == rhs.evidenceRefs &&
+            lhs.visibility == rhs.visibility &&
+            lhs.confidence == rhs.confidence &&
+            lhs.observedAt == rhs.observedAt &&
+            lhs.expiresOrStaleAfter == rhs.expiresOrStaleAfter
+    }
+}
+
+private struct VerifiedPlaceClaimsResponse: Codable {
+    let place_id: UUID
+    let claims: [VerifiedPlaceClaim]
+}
+
+struct PlaceTrustSummaryResponse: Codable, Equatable {
+    let placeId: UUID
+    let trustSummary: PlaceTrustSummary
+    let agentAnswer: String
+
+    enum CodingKeys: String, CodingKey {
+        case placeId = "place_id"
+        case trustSummary = "trust_summary"
+        case agentAnswer = "agent_answer"
+    }
+}
+
+struct PlaceTrustSummary: Codable, Equatable {
+    let verifiedClaimCount: Int
+    let receiptBackedCount: Int
+    let friendVerifiedCount: Int
+    let lastObservedAt: String?
+    let strongestProofLevel: String
+    let confidence: Double
+    let reputation: ClaimReputationSummary?
+    let recommendedUse: [String]
+    let warnings: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case verifiedClaimCount = "verified_claim_count"
+        case receiptBackedCount = "receipt_backed_count"
+        case friendVerifiedCount = "friend_verified_count"
+        case lastObservedAt = "last_observed_at"
+        case strongestProofLevel = "strongest_proof_level"
+        case confidence
+        case reputation
+        case recommendedUse = "recommended_use"
+        case warnings
+    }
+}
+
+struct ClaimReputationSummary: Codable, Equatable {
+    let usageCount: Int
+    let acceptedCount: Int
+    let score: Double
+
+    enum CodingKeys: String, CodingKey {
+        case usageCount = "usage_count"
+        case acceptedCount = "accepted_count"
+        case score
+    }
+}
+
+struct ClaimRecommendationRequest: Equatable {
+    var intent: String
+    var constraints: [String]
+    var proofLevelMin: String
+    var limit: Int
+
+    var body: [String: Any?] {
+        [
+            "intent": intent,
+            "constraints": constraints,
+            "proof_level_min": proofLevelMin,
+            "limit": limit,
+        ]
+    }
+}
+
+struct ClaimRecommendationResponse: Codable, Equatable {
+    let results: [ClaimRecommendationResult]
+    let retrievalReceipt: ClaimRetrievalReceipt
+
+    static let empty = ClaimRecommendationResponse(
+        results: [],
+        retrievalReceipt: ClaimRetrievalReceipt(used: [], skipped: [], publicWebUsed: false)
+    )
+
+    enum CodingKeys: String, CodingKey {
+        case results
+        case retrievalReceipt = "retrieval_receipt"
+    }
+}
+
+struct ClaimRecommendationResult: Codable, Identifiable, Equatable {
+    let placeId: UUID
+    let name: String
+    let why: String
+    let proofLevel: String
+    let confidence: Double
+    let supportingClaims: [UUID]
+    let warnings: [String]
+    let nextActions: [String]
+
+    var id: UUID { placeId }
+
+    enum CodingKeys: String, CodingKey {
+        case placeId = "place_id"
+        case name
+        case why
+        case proofLevel = "proof_level"
+        case confidence
+        case supportingClaims = "supporting_claims"
+        case warnings
+        case nextActions = "next_actions"
+    }
+}
+
+struct ClaimRetrievalReceipt: Codable, Equatable {
+    let used: [String]
+    let skipped: [String]
+    let publicWebUsed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case used
+        case skipped
+        case publicWebUsed = "public_web_used"
+    }
+}
+
+struct PublicPlaceCard: Codable, Identifiable, Equatable {
+    let cardId: UUID
+    let title: String
+    let place: PublicPlaceCardPlace
+    let summary: String
+    let publicClaims: [VerifiedPlaceClaim]
+    let trustSummary: PlaceTrustSummary
+    let agentActions: [String]
+
+    var id: UUID { cardId }
+
+    enum CodingKeys: String, CodingKey {
+        case cardId = "card_id"
+        case title
+        case place
+        case summary
+        case publicClaims = "public_claims"
+        case trustSummary = "trust_summary"
+        case agentActions = "agent_actions"
+    }
+}
+
+struct PublicPlaceCardPlace: Codable, Equatable {
+    let id: UUID
+    let name: String
+    let city: String
+    let address: String
+    let category: String?
+}
+
+struct ClaimUsageReceiptDraft: Equatable {
+    var claimId: UUID
+    var consumerAgentId: String
+    var action: String
+    var outcome: String
+
+    var body: [String: Any?] {
+        [
+            "claim_id": claimId.uuidString,
+            "consumer_agent_id": consumerAgentId,
+            "action": action,
+            "outcome": outcome,
+        ]
+    }
+}
+
+struct ClaimUsageReceipt: Codable, Identifiable, Equatable {
+    let id: UUID
+    let claimId: UUID
+    let placeId: UUID
+    let consumerAgentId: String
+    let consumerUserId: String?
+    let action: String
+    let outcome: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case claimId = "claim_id"
+        case placeId = "place_id"
+        case consumerAgentId = "consumer_agent_id"
+        case consumerUserId = "consumer_user_id"
+        case action
+        case outcome
+        case createdAt = "created_at"
+    }
+}
 
 private struct PlaceRow: Codable {
     let id: UUID

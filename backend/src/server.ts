@@ -2,10 +2,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg from "pg";
 import {
+  buildPublicPlaceCard,
   buildTrustSummary,
   formatPlaceClaim,
   normalizePlaceClaimCreate,
   normalizeRecommendationRequest,
+  normalizeUsageReceiptCreate,
   parseProofLevel,
   proofLevelsAtLeast,
   recommendPlacesByClaims,
@@ -128,6 +130,17 @@ const placeClaimFields = [
   "created_at",
 ] as const;
 
+const claimUsageReceiptFields = [
+  "id",
+  "claim_id",
+  "place_id",
+  "consumer_agent_id",
+  "consumer_user_id",
+  "action",
+  "outcome",
+  "created_at",
+] as const;
+
 const agentDecisionFields = [
   "id",
   "candidate_id",
@@ -207,6 +220,11 @@ createServer(async (request, response) => {
     }
 
     const rawSegments = url.pathname.split("/").filter(Boolean);
+    const isPublicV0 = rawSegments[0] === "public" && rawSegments[1] === "v0";
+    if (isPublicV0) {
+      return await handlePublicV0(request, response, rawSegments.slice(2));
+    }
+
     const isV0 = rawSegments[0] === "v0";
     const segments = isV0 ? rawSegments.slice(1) : rawSegments;
     const [resource, id] = segments;
@@ -220,6 +238,9 @@ createServer(async (request, response) => {
 
     if (isV0 && resource === "places" && id === "recommend-by-claims") {
       return await handleRecommendByClaims(request, response, userId);
+    }
+    if (isV0 && resource === "claims" && id === "usage-receipts") {
+      return await handleAuthenticatedClaimUsageReceipts(request, response, userId);
     }
     if (isV0 && resource === "places" && id && segments[2] === "verified-claims") {
       return await handlePlaceVerifiedClaims(request, response, id, url, userId);
@@ -322,6 +343,113 @@ async function fetchPlacesWithOptionalVisibility(userId: string): Promise<JsonBo
   }
 }
 
+async function handlePublicV0(
+  request: IncomingMessage,
+  response: ServerResponse,
+  segments: string[],
+): Promise<void> {
+  const [resource, id] = segments;
+
+  if (resource === "cards" && id) {
+    return await handlePublicPlaceCard(request, response, id);
+  }
+  if (resource === "claim-usage-receipts") {
+    return await handlePublicClaimUsageReceipts(request, response);
+  }
+
+  return sendJson(response, { error: "Unsupported public v0 route" }, 404);
+}
+
+async function handlePublicPlaceCard(
+  request: IncomingMessage,
+  response: ServerResponse,
+  cardId: string,
+): Promise<void> {
+  if (request.method !== "GET") return sendJson(response, { error: "Unsupported public card route" }, 405);
+
+  const { rows } = await pool.query(
+    `select
+       p.*,
+       pv.visibility as public_visibility,
+       owner.handle as owner_handle
+     from places p
+     join place_visibility pv on pv.place_id = p.id
+     join profiles owner on owner.id = p.user_id
+     where p.id = $1
+       and pv.visibility in ('public_link', 'public_guide')
+     limit 1`,
+    [cardId],
+  );
+  if (!rows[0]) return sendJson(response, { error: "Public card not found" }, 404);
+
+  const { rows: claims } = await pool.query(
+    `select
+       pc.*,
+       coalesce(receipts.usage_count, 0)::int as usage_count,
+       coalesce(receipts.accepted_count, 0)::int as accepted_count
+     from place_claims pc
+     left join (
+       select
+         claim_id,
+         count(*)::int as usage_count,
+         count(*) filter (where outcome = 'accepted')::int as accepted_count
+       from claim_usage_receipts
+       group by claim_id
+     ) receipts on receipts.claim_id = pc.id
+     where pc.place_id = $1
+       and pc.visibility in ('public', 'link_shared')
+       and (pc.expires_or_stale_after is null or pc.expires_or_stale_after >= now())
+     order by pc.created_at desc`,
+    [cardId],
+  );
+
+  return sendJson(response, buildPublicPlaceCard(formatDates(rows[0]), claims.map((claim) => formatDates(claim))));
+}
+
+async function handlePublicClaimUsageReceipts(
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  if (request.method !== "POST") return sendJson(response, { error: "Unsupported usage receipt route" }, 405);
+
+  let body: JsonBody;
+  try {
+    body = normalizeUsageReceiptCreate(await readJson(request));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid usage receipt";
+    return sendJson(response, { error: message }, 400);
+  }
+
+  const claim = await publicClaimForReceipt(String(body.claim_id));
+  body.place_id = claim.place_id;
+  const insert = buildInsert("claim_usage_receipts", body, claimUsageReceiptFields);
+  const { rows } = await pool.query(`${insert.sql} returning *`, insert.values);
+  return sendJson(response, formatDates(rows[0]), 201);
+}
+
+async function handleAuthenticatedClaimUsageReceipts(
+  request: IncomingMessage,
+  response: ServerResponse,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "POST") return sendJson(response, { error: "Unsupported usage receipt route" }, 405);
+
+  let body: JsonBody;
+  try {
+    body = normalizeUsageReceiptCreate(await readJson(request));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid usage receipt";
+    return sendJson(response, { error: message }, 400);
+  }
+
+  const claim = await ownedClaimForReceipt(String(body.claim_id), userId);
+  body.place_id = claim.place_id;
+  body.consumer_user_id = userId;
+  const insert = buildInsert("claim_usage_receipts", body, claimUsageReceiptFields);
+  const { rows } = await pool.query(`${insert.sql} returning *`, insert.values);
+  return sendJson(response, formatDates(rows[0]), 201);
+}
+
 async function handlePlaceVerifiedClaims(
   request: IncomingMessage,
   response: ServerResponse,
@@ -396,9 +524,19 @@ async function handleRecommendByClaims(
        p.status as place_status,
        p.rating as place_rating,
        p.google_rating as place_google_rating,
-       p.price_range as place_price_range
+       p.price_range as place_price_range,
+       coalesce(receipts.usage_count, 0)::int as usage_count,
+       coalesce(receipts.accepted_count, 0)::int as accepted_count
      from place_claims pc
      join places p on p.id = pc.place_id
+     left join (
+       select
+         claim_id,
+         count(*)::int as usage_count,
+         count(*) filter (where outcome = 'accepted')::int as accepted_count
+       from claim_usage_receipts
+       group by claim_id
+     ) receipts on receipts.claim_id = pc.id
      where pc.user_id = $1
        and p.user_id = $1
        and pc.proof_level = any($2::text[])
@@ -419,38 +557,77 @@ async function placeClaimsForPlace(
     visibility?: string | null;
     relationship?: string | null;
     freshness?: string | null;
-  } = {},
+} = {},
 ): Promise<JsonBody[]> {
   const values: QueryValue[] = [placeId, userId];
-  const where = ["place_id = $1", "user_id = $2"];
+  const where = ["pc.place_id = $1", "pc.user_id = $2"];
 
   if (filters.proofLevelMin) {
     values.push(proofLevelsAtLeast(parseProofLevel(filters.proofLevelMin, "source_backed")));
-    where.push(`proof_level = any($${values.length}::text[])`);
+    where.push(`pc.proof_level = any($${values.length}::text[])`);
   }
   if (filters.claimType) {
     values.push(filters.claimType);
-    where.push(`claim_type = $${values.length}`);
+    where.push(`pc.claim_type = $${values.length}`);
   }
   if (filters.visibility) {
     values.push(filters.visibility);
-    where.push(`visibility = $${values.length}`);
+    where.push(`pc.visibility = $${values.length}`);
   }
   if (filters.relationship) {
     values.push(filters.relationship);
-    where.push(`author_relationship = $${values.length}`);
+    where.push(`pc.author_relationship = $${values.length}`);
   }
   if (filters.freshness === "active") {
-    where.push("(expires_or_stale_after is null or expires_or_stale_after >= now())");
+    where.push("(pc.expires_or_stale_after is null or pc.expires_or_stale_after >= now())");
   } else if (filters.freshness === "stale") {
-    where.push("expires_or_stale_after < now()");
+    where.push("pc.expires_or_stale_after < now()");
   }
 
   const { rows } = await pool.query(
-    `select * from place_claims where ${where.join(" and ")} order by created_at desc`,
+    `select
+       pc.*,
+       coalesce(receipts.usage_count, 0)::int as usage_count,
+       coalesce(receipts.accepted_count, 0)::int as accepted_count
+     from place_claims pc
+     left join (
+       select
+         claim_id,
+         count(*)::int as usage_count,
+         count(*) filter (where outcome = 'accepted')::int as accepted_count
+       from claim_usage_receipts
+       group by claim_id
+     ) receipts on receipts.claim_id = pc.id
+     where ${where.join(" and ")}
+     order by pc.created_at desc`,
     values,
   );
   return rows;
+}
+
+async function publicClaimForReceipt(claimId: string): Promise<JsonBody> {
+  const { rows } = await pool.query(
+    `select pc.id, pc.place_id
+     from place_claims pc
+     join place_visibility pv on pv.place_id = pc.place_id
+     where pc.id = $1
+       and pc.visibility in ('public', 'link_shared')
+       and pv.visibility in ('public_link', 'public_guide')
+       and (pc.expires_or_stale_after is null or pc.expires_or_stale_after >= now())
+     limit 1`,
+    [claimId],
+  );
+  if (!rows[0]) throw new ApiError(404, "Public claim not found");
+  return asObject(rows[0]);
+}
+
+async function ownedClaimForReceipt(claimId: string, userId: string): Promise<JsonBody> {
+  const { rows } = await pool.query(
+    "select id, place_id from place_claims where id = $1 and user_id = $2 limit 1",
+    [claimId, userId],
+  );
+  if (!rows[0]) throw new ApiError(404, "Claim not found");
+  return asObject(rows[0]);
 }
 
 async function handleTrips(
