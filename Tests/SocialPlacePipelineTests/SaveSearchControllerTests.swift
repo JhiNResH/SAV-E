@@ -393,11 +393,25 @@ final class SaveSearchControllerTests: XCTestCase {
     @MainActor
     func testDrawerPreparedPublicDiscoveryKeepsRecommendationPathBounded() async {
         let client = StubGroundedAnswerClient(answer: "I would start with Saved Coffee, then compare Unsaved Coffee as public discovery.")
-        let drawer = AIDrawerViewModel(groundedAnswerClient: client)
+        let drawer = AIDrawerViewModel(
+            locationService: StubAIDrawerLocationProvider(
+                currentLocation: CLLocation(latitude: 33.6846, longitude: -117.8265)
+            ),
+            groundedAnswerClient: client
+        )
         let savedPlace = place(
             name: "Saved Coffee",
             address: "1 Main St, Irvine, CA",
-            category: .cafe
+            category: .cafe,
+            latitude: 33.6847,
+            longitude: -117.8266
+        )
+        let farSavedPlace = place(
+            name: "Far Coffee",
+            address: "Los Angeles, CA",
+            category: .cafe,
+            latitude: 34.0522,
+            longitude: -118.2437
         )
         let candidate = SaveMapCandidate(
             title: "Unsaved Coffee",
@@ -410,9 +424,9 @@ final class SaveSearchControllerTests: XCTestCase {
             distanceMeters: 180,
             evidence: ["Apple Maps result"]
         )
-        drawer.places = [savedPlace]
+        drawer.places = [farSavedPlace, savedPlace]
         drawer.mapCandidates = [candidate]
-        drawer.query = "coffee"
+        drawer.query = "推薦我附近咖啡"
 
         await drawer.submit()
 
@@ -422,11 +436,55 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.fromYourSave.id, "from-your-save-nearby")
         XCTAssertNotEqual(response.fromYourSave.title, "Spatial memory canvas")
         XCTAssertEqual(response.fromYourSave.results.map(\.title), ["Saved Coffee"])
+        XCTAssertEqual(response.additionalSections.first { $0.id == "saved-but-not-nearby" }?.results.map(\.title), ["Far Coffee"])
         XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Unsaved Coffee"])
         XCTAssertEqual(Set(client.requests.first?.allowedPlaceIds ?? []), Set([
             "place-\(savedPlace.id.uuidString)",
+            "place-\(farSavedPlace.id.uuidString)",
             "map-candidate-\(candidate.id)"
         ]))
+    }
+
+    @MainActor
+    func testDrawerSourceOnlyRecordSearchResultOpensFallbackDetail() {
+        let drawer = AIDrawerViewModel(
+            locationService: StubAIDrawerLocationProvider(currentLocation: nil),
+            groundedAnswerClient: nil
+        )
+        let result = SaveSearchResult(
+            id: "record-\(UUID().uuidString)",
+            objectType: .sourceOnlyClue,
+            userState: .sourceOnly,
+            title: "Boba reel clue",
+            subtitle: "Needs address confirmation",
+            statusLabel: "Clue · needs exact place",
+            sourceURL: "https://www.instagram.com/reel/boba/",
+            sourcePlatform: .instagram,
+            category: .cafe,
+            cityOrArea: nil,
+            latitude: nil,
+            longitude: nil,
+            rating: nil,
+            reviewCount: nil,
+            confidence: nil,
+            missingInfo: ["exact place", "coordinates"],
+            evidence: ["Caption says milk tea near Irvine"],
+            recoveryQueries: [],
+            createdAt: Date(),
+            canRunRecovery: true,
+            isRecommendationShell: false,
+            primaryAction: .runRecovery
+        )
+
+        drawer.showSearchResult(result)
+
+        guard case .displaying(let response) = drawer.drawerState else {
+            return XCTFail("Expected fallback detail message")
+        }
+        XCTAssertEqual(response.title, "Clue · needs exact place")
+        XCTAssertTrue(response.messageText?.contains("Caption says milk tea near Irvine") == true)
+        XCTAssertTrue(response.messageText?.contains("Missing: exact place, coordinates") == true)
+        XCTAssertTrue(response.messageText?.contains("https://www.instagram.com/reel/boba/") == true)
     }
 
     @MainActor
@@ -1452,5 +1510,13 @@ private final class StubGroundedAnswerClient: SaveLLMClient {
     func renderGroundedAnswer(_ request: GroundedAnswerRequest) async throws -> String {
         requests.append(request)
         return answer
+    }
+}
+
+private struct StubAIDrawerLocationProvider: AIDrawerLocationProviding {
+    let currentLocation: CLLocation?
+
+    func requestCurrentLocation() async -> CLLocation? {
+        currentLocation
     }
 }

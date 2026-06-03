@@ -314,6 +314,8 @@ private struct SaveSearchResultNotebookRow: View {
     private var canOpenDetails: Bool {
         result.objectType == .savedPlace ||
             result.objectType == .triedMemory ||
+            result.objectType == .pendingCandidate ||
+            result.objectType == .sourceOnlyClue ||
             result.objectType == .mapVisibleUnsavedPlace
     }
 
