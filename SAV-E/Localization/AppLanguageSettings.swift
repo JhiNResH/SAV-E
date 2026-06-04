@@ -24,6 +24,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             return traditionalChinese
         }
     }
+
+    var serviceOutputInstruction: String {
+        switch self {
+        case .english:
+            return "English"
+        case .traditionalChinese:
+            return "Traditional Chinese (zh-Hant). Use natural Taiwanese Traditional Chinese. Keep the SAV-E brand name unchanged, but translate product concepts such as Map Stamp into natural Traditional Chinese."
+        }
+    }
 }
 
 final class AppLanguageSettings: ObservableObject {

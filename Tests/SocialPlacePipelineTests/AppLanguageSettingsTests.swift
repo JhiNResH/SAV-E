@@ -9,6 +9,7 @@ final class AppLanguageSettingsTests: XCTestCase {
         XCTAssertEqual(SaveSocialLens.trending.title(language: .traditionalChinese), "熱門")
         XCTAssertEqual(PlaceFilter.wantToGo.title(language: .traditionalChinese), "想去")
         XCTAssertEqual(PlaceSort.nearest.title(language: .traditionalChinese), "最近距離")
+        XCTAssertTrue(AppLanguage.traditionalChinese.serviceOutputInstruction.contains("Map Stamp into natural Traditional Chinese"))
     }
 
     func testEnglishSharedLabelsStayStable() {
