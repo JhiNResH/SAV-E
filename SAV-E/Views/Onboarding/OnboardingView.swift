@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @Namespace private var proofNamespace
     @State private var stage: ProofStage = .language
     @State private var clueText = ""
     @State private var selectedTags: Set<ProofIntentTag> = []
@@ -18,6 +19,12 @@ struct OnboardingView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 18) {
                         header
+                        AnimatedProofHero(
+                            stage: stage,
+                            clueText: clueText,
+                            language: language,
+                            namespace: proofNamespace
+                        )
                         ProofProgressRail(stage: stage, language: language)
                         ProofStageCard(
                             stage: stage,
@@ -241,6 +248,442 @@ private enum ProofIntentTag: String, CaseIterable {
         case (.friends, .english): return "Friend sent"
         case (.friends, .traditionalChinese): return "朋友推薦"
         }
+    }
+}
+
+private struct AnimatedProofHero: View {
+    let stage: ProofStage
+    let clueText: String
+    let language: AppLanguage
+    let namespace: Namespace.ID
+
+    @State private var isFloating = false
+    @State private var scanOffset: CGFloat = -92
+
+    private var progress: CGFloat {
+        CGFloat(stage.rawValue) / CGFloat(max(ProofStage.allCases.count - 1, 1))
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.saveNotebookPage.opacity(0.96),
+                            Color.saveNotebookPage.opacity(0.74)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.62), lineWidth: 1.5)
+                )
+
+            SaveProofRouteShape(progress: progress)
+                .stroke(Color.saveNotebookLine.opacity(0.18), style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                .padding(.horizontal, 28)
+                .padding(.vertical, 34)
+
+            SaveProofRouteShape(progress: progress)
+                .trim(from: 0, to: min(1, max(0.08, progress + 0.08)))
+                .stroke(Color.saveHoney.opacity(0.78), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                .padding(.horizontal, 28)
+                .padding(.vertical, 34)
+
+            proofContent
+                .padding(16)
+
+            if stage == .clue || stage == .candidate {
+                scanningBand
+            }
+        }
+        .frame(height: 214)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .shadow(color: Color.saveInk.opacity(0.08), radius: 16, x: 0, y: 10)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.7).repeatForever(autoreverses: true)) {
+                isFloating = true
+            }
+            withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: false)) {
+                scanOffset = 120
+            }
+        }
+        .animation(.spring(response: 0.52, dampingFraction: 0.82), value: stage)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var proofContent: some View {
+        switch stage {
+        case .language, .clue:
+            messySignalView
+        case .candidate:
+            reviewCandidateView
+        case .mapStamp:
+            mapStampView
+        case .ask, .tag:
+            askMemoryView
+        }
+    }
+
+    private var messySignalView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                SourceBubble(label: "IG", tint: .savePink, offsetY: isFloating ? -4 : 4)
+                SourceBubble(label: "TT", tint: .saveSky, offsetY: isFloating ? 5 : -3)
+                SourceBubble(label: "MAP", tint: .saveMint, offsetY: isFloating ? -2 : 5)
+                Spacer()
+                Image(systemName: "arrow.down.forward.circle.fill")
+                    .font(.title2.weight(.black))
+                    .foregroundColor(.saveInk.opacity(0.62))
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text(localized(english: "Messy place signal", traditionalChinese: "混亂地點線索"))
+                    .font(.caption)
+                    .fontWeight(.black)
+                    .textCase(.uppercase)
+                    .foregroundColor(.saveMutedText)
+
+                Text(signalLine)
+                    .font(.headline)
+                    .fontWeight(.black)
+                    .foregroundColor(.saveInk)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 7) {
+                    miniChip(localized(english: "caption", traditionalChinese: "文案"), tint: .saveHoney)
+                    miniChip(localized(english: "friend tip", traditionalChinese: "朋友推薦"), tint: .saveSky)
+                    miniChip(localized(english: "needs proof", traditionalChinese: "待確認"), tint: .saveMint)
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.34))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .matchedGeometryEffect(id: "proof-card", in: namespace)
+        }
+    }
+
+    private var reviewCandidateView: some View {
+        HStack(alignment: .top, spacing: 14) {
+            stageIcon(systemImage: "checklist.unchecked", tint: .saveHoney)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(localized(english: "Review Candidate", traditionalChinese: "待確認地點"))
+                    .font(.caption)
+                    .fontWeight(.black)
+                    .textCase(.uppercase)
+                    .foregroundColor(.saveMutedText)
+
+                Text("Utopia Euro Caffe")
+                    .font(.title3)
+                    .fontWeight(.black)
+                    .foregroundColor(.saveInk)
+
+                ProofHeroLine(icon: "checkmark.seal.fill", text: localized(english: "Name found", traditionalChinese: "找到名稱"), tint: .saveMint)
+                ProofHeroLine(icon: "link", text: localized(english: "Source kept", traditionalChinese: "保留來源"), tint: .saveSky)
+                ProofHeroLine(icon: "exclamationmark.triangle.fill", text: localized(english: "Missing coordinates", traditionalChinese: "還缺座標"), tint: .saveHoney)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.34))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .matchedGeometryEffect(id: "proof-card", in: namespace)
+    }
+
+    private var mapStampView: some View {
+        ZStack(alignment: .bottomLeading) {
+            SaveMiniMap()
+
+            HStack(spacing: 12) {
+                stageIcon(systemImage: "mappin.and.ellipse", tint: .saveMint)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(localized(english: "Map Stamp saved", traditionalChinese: "已存成地圖章"))
+                        .font(.caption)
+                        .fontWeight(.black)
+                        .textCase(.uppercase)
+                        .foregroundColor(.saveMutedText)
+
+                    Text("Utopia Euro Caffe")
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
+
+                    Text(localized(english: "Coffee · friend sent · private", traditionalChinese: "咖啡 · 朋友推薦 · 私人"))
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.saveMutedText)
+                }
+
+                Spacer()
+            }
+            .padding(14)
+            .background(Color.saveNotebookPage.opacity(0.88))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .matchedGeometryEffect(id: "proof-card", in: namespace)
+        }
+    }
+
+    private var askMemoryView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                stageIcon(systemImage: "sparkles", tint: .saveSky)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(localized(english: "Ask saved memory", traditionalChinese: "詢問已存記憶"))
+                        .font(.caption)
+                        .fontWeight(.black)
+                        .textCase(.uppercase)
+                        .foregroundColor(.saveMutedText)
+                    Text(localized(english: "Saved-first answer", traditionalChinese: "先用你的記憶回答"))
+                        .font(.headline)
+                        .fontWeight(.black)
+                        .foregroundColor(.saveInk)
+                }
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(localized(english: "Recommend nearby coffee", traditionalChinese: "推薦附近咖啡"))
+                    .font(.subheadline)
+                    .fontWeight(.black)
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Color.saveHoney.opacity(0.42))
+                    .clipShape(Capsule())
+
+                Text(localized(
+                    english: "Start with Utopia. It matches your saved coffee clue. Public options stay separate.",
+                    traditionalChinese: "先從 Utopia 開始。它符合你存下的咖啡線索；公開搜尋會分開。"
+                ))
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.saveMint.opacity(0.42))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.34))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .matchedGeometryEffect(id: "proof-card", in: namespace)
+    }
+
+    private var scanningBand: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.white.opacity(0.26),
+                        Color.saveSky.opacity(0.24),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(width: 80)
+            .rotationEffect(.degrees(12))
+            .offset(x: scanOffset)
+            .allowsHitTesting(false)
+    }
+
+    private var signalLine: String {
+        let trimmed = clueText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return localized(
+                english: "Friend sent: quiet coffee date near Irvine",
+                traditionalChinese: "朋友傳：Irvine 附近安靜咖啡約會"
+            )
+        }
+        return String(trimmed.prefix(74))
+    }
+
+    private func stageIcon(systemImage: String, tint: Color) -> some View {
+        Image(systemName: systemImage)
+            .font(.title3.weight(.black))
+            .foregroundColor(.saveInk)
+            .frame(width: 48, height: 48)
+            .background(tint.opacity(0.72))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func miniChip(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.black)
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(tint.opacity(0.50))
+            .clipShape(Capsule())
+    }
+
+    private func localized(english: String, traditionalChinese: String) -> String {
+        switch language {
+        case .english: return english
+        case .traditionalChinese: return traditionalChinese
+        }
+    }
+
+    private var accessibilityLabel: String {
+        switch language {
+        case .english:
+            return "Animated SAV-E proof flow showing \(stage.title(language: language))"
+        case .traditionalChinese:
+            return "SAV-E 動態流程，目前是\(stage.title(language: language))"
+        }
+    }
+}
+
+private struct SourceBubble: View {
+    let label: String
+    let tint: Color
+    let offsetY: CGFloat
+
+    var body: some View {
+        Text(label)
+            .font(.caption2)
+            .fontWeight(.black)
+            .foregroundColor(.saveInk)
+            .frame(width: label.count > 2 ? 42 : 34, height: 34)
+            .background(tint.opacity(0.84))
+            .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+            .clipShape(Circle())
+            .offset(y: offsetY)
+    }
+}
+
+private struct ProofHeroLine: View {
+    let icon: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 22, height: 22)
+                .background(tint.opacity(0.58))
+                .clipShape(Circle())
+
+            Text(text)
+                .font(.caption)
+                .fontWeight(.black)
+                .foregroundColor(.saveInk)
+        }
+    }
+}
+
+private struct SaveMiniMap: View {
+    var body: some View {
+        ZStack {
+            Color.saveMint.opacity(0.28)
+
+            Path { path in
+                path.move(to: CGPoint(x: 20, y: 40))
+                path.addLine(to: CGPoint(x: 130, y: 96))
+                path.addLine(to: CGPoint(x: 250, y: 54))
+                path.move(to: CGPoint(x: 38, y: 156))
+                path.addLine(to: CGPoint(x: 156, y: 88))
+                path.addLine(to: CGPoint(x: 300, y: 170))
+            }
+            .stroke(Color.saveNotebookLine.opacity(0.22), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+
+            ForEach(SaveMiniMapPin.sample) { pin in
+                VStack(spacing: 3) {
+                    Image(systemName: pin.icon)
+                        .font(.caption.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .frame(width: pin.isPrimary ? 38 : 30, height: pin.isPrimary ? 38 : 30)
+                        .background(pin.tint.opacity(0.88))
+                        .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+                        .clipShape(Circle())
+
+                    if pin.isPrimary {
+                        Text("Map Stamp")
+                            .font(.caption2)
+                            .fontWeight(.black)
+                            .foregroundColor(.saveInk)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.saveNotebookPage.opacity(0.88))
+                            .clipShape(Capsule())
+                    }
+                }
+                .position(pin.position)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+private struct SaveMiniMapPin: Identifiable {
+    let id = UUID()
+    let icon: String
+    let tint: Color
+    let position: CGPoint
+    let isPrimary: Bool
+
+    static let sample: [SaveMiniMapPin] = [
+        SaveMiniMapPin(icon: "cup.and.saucer.fill", tint: .saveHoney, position: CGPoint(x: 106, y: 92), isPrimary: true),
+        SaveMiniMapPin(icon: "fork.knife", tint: .saveSky, position: CGPoint(x: 236, y: 48), isPrimary: false),
+        SaveMiniMapPin(icon: "camera.fill", tint: .savePink, position: CGPoint(x: 268, y: 142), isPrimary: false)
+    ]
+}
+
+private struct SaveProofRouteShape: Shape {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.08, y: rect.minY + rect.height * 0.70))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.46, y: rect.minY + rect.height * 0.36),
+            control1: CGPoint(x: rect.minX + rect.width * 0.20, y: rect.minY + rect.height * 0.36),
+            control2: CGPoint(x: rect.minX + rect.width * 0.34, y: rect.minY + rect.height * 0.78)
+        )
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.92, y: rect.minY + rect.height * 0.28),
+            control1: CGPoint(x: rect.minX + rect.width * 0.58, y: rect.minY + rect.height * 0.06),
+            control2: CGPoint(x: rect.minX + rect.width * 0.76, y: rect.minY + rect.height * 0.58)
+        )
+        return path
     }
 }
 
