@@ -21,6 +21,7 @@
 		362D688B8CC9DEA7219CBC87 /* SaveSearchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE718959747F6AEEAE3393B7 /* SaveSearchModels.swift */; };
 		38738CB48DF73890E63D1B2B /* SaveAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51DF55BE93F14D29CE673F5D /* SaveAIService.swift */; };
 		39FF5DB199938DCC8C8CD544 /* PlatformIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E45623E52CFE065303EC21 /* PlatformIcon.swift */; };
+		3AE07A508B3AB47A5B8C4813 /* VerifiedPlaceClaimsClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48E2307D86CDE51DDAC87AB9 /* VerifiedPlaceClaimsClientTests.swift */; };
 		3E9B1B6E38A02AACF2C022D0 /* SaveApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6791E7A348909E816148107C /* SaveApp.swift */; };
 		3EA497DD9126B572939E0D11 /* SaveMemoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0D3A7A18E473C94F819125 /* SaveMemoryRecord.swift */; };
 		3F861CFCBB89E535C6F88B20 /* ClipContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2F29BED31958E2047FAE72E /* ClipContentView.swift */; };
@@ -198,6 +199,7 @@
 		42EC012C324D256BB87EE382 /* NavigationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationService.swift; sourceTree = "<group>"; };
 		468D23D10B68903C13C10154 /* SaveGuideModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGuideModels.swift; sourceTree = "<group>"; };
 		482E0F42191576E75DFAA558 /* SAV-EClip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "SAV-EClip.entitlements"; sourceTree = "<group>"; };
+		48E2307D86CDE51DDAC87AB9 /* VerifiedPlaceClaimsClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifiedPlaceClaimsClientTests.swift; sourceTree = "<group>"; };
 		4BC655EDFB19DA65585D0838 /* PlaceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceCard.swift; sourceTree = "<group>"; };
 		4CF89D27BB41CF8DAC9C08D5 /* TripItineraryComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripItineraryComponent.swift; sourceTree = "<group>"; };
 		4FDE5D64894A6DE1E5916BF6 /* GoogleTakeoutImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleTakeoutImport.swift; sourceTree = "<group>"; };
@@ -570,6 +572,7 @@
 				2A813005C5623C1488B3AE00 /* SaveSearchIntentEvalTests.swift */,
 				24A89101A1BE721021DA73A1 /* ShareRouteCodecTests.swift */,
 				6383E88214348C9728A5C35B /* SocialPlacePipelineTests.swift */,
+				48E2307D86CDE51DDAC87AB9 /* VerifiedPlaceClaimsClientTests.swift */,
 			);
 			name = SocialPlacePipelineTests;
 			path = Tests/SocialPlacePipelineTests;
@@ -897,6 +900,7 @@
 				BC55C57A6C88072A588A5531 /* SaveSearchIntentEvalTests.swift in Sources */,
 				B686B444FCE28C57707BE9C5 /* ShareRouteCodecTests.swift in Sources */,
 				77E9B588DF847D51CD055C59 /* SocialPlacePipelineTests.swift in Sources */,
+				3AE07A508B3AB47A5B8C4813 /* VerifiedPlaceClaimsClientTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
