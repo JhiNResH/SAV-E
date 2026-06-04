@@ -186,7 +186,7 @@ struct SaveSearchResultsComponent: View {
             }
         }
 
-        if section.id == "from-your-save" {
+        if section.id.hasPrefix("from-your-save") {
             return languageSettings.localized(english: "FROM YOUR SAV-E", traditionalChinese: "來自你的 SAV-E")
         }
         return languageSettings.localized(english: "PUBLIC DISCOVERY", traditionalChinese: "公開探索")

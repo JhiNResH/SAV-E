@@ -527,7 +527,7 @@ private struct SaveEvidenceDrawerPreview: View {
             if !model.missingFields.isEmpty {
                 evidenceLine(
                     title: languageSettings.localized(english: "Missing", traditionalChinese: "還缺"),
-                    value: model.missingFields.prefix(3).map(localizedEvidenceText).joined(separator: ", ")
+                    value: model.missingFields.prefix(3).map(localizedEvidenceText).joined(separator: missingFieldsSeparator)
                 )
             }
 
@@ -563,6 +563,10 @@ private struct SaveEvidenceDrawerPreview: View {
         }
     }
 
+    private var missingFieldsSeparator: String {
+        languageSettings.language == .traditionalChinese ? "、" : ", "
+    }
+
     private func iconName(for kind: SaveEvidenceAtomKind) -> String {
         switch kind {
         case .sourceURL: return "link"
@@ -586,8 +590,14 @@ private struct SaveEvidenceDrawerPreview: View {
         }
         switch text {
         case "Clue from Instagram": return "來自 Instagram 的線索"
+        case "Clue from Threads": return "來自 Threads 的線索"
+        case "Clue from Xiaohongshu": return "來自小紅書的線索"
+        case "Clue from Douyin": return "來自抖音的線索"
         case "Clue from TikTok": return "來自 TikTok 的線索"
         case "Clue from Google Maps": return "來自 Google Maps 的線索"
+        case "Clue from Amap": return "來自高德地圖的線索"
+        case "Clue from Baidu Maps": return "來自百度地圖的線索"
+        case "Clue from Other": return "來自其他來源的線索"
         case "Source Clue": return "來源線索"
         case "Review Candidate; confirm before Map Stamp": return "待確認地點；確認後才會成為地圖章"
         case "Unsaved candidate; not a Map Stamp": return "未保存候選地點；還不是地圖章"
