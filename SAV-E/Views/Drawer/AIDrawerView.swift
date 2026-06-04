@@ -199,7 +199,7 @@ struct AIDrawerView: View {
             onPlanAroundPlace: { place in
                 closeMapDetail()
                 viewModel.query = "What should I order at \(place.name)?"
-                Task { await viewModel.submit() }
+                Task { await submitDrawerQuery() }
             },
             onAddMoreClueCandidate: { candidate in
                 addMoreClue(for: candidate)
@@ -522,7 +522,7 @@ struct AIDrawerView: View {
                         }
                     } onPlanAround: {
                         viewModel.query = "What should I order at \(place.name)?"
-                        Task { await viewModel.submit() }
+                        Task { await submitDrawerQuery() }
                     } onUpdateVisibility: { visibility in
                         try await onUpdatePlaceVisibility(place, visibility)
                     }
@@ -607,7 +607,7 @@ struct AIDrawerView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.saveCocoa.opacity(0.72))
 
-                    Button(languageSettings.text(.tryAgain)) { Task { await viewModel.submit() } }
+                    Button(languageSettings.text(.tryAgain)) { Task { await submitDrawerQuery() } }
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.saveCocoa)
@@ -1440,13 +1440,20 @@ struct AIDrawerView: View {
         } else {
             let submittedQuery = viewModel.query
             Task {
-                await viewModel.submit(reviewCandidates: reviewCandidates)
+                await submitDrawerQuery()
                 if viewModel.shouldAutoSearchNearbyUnsavedCandidates() ||
                     viewModel.shouldPrepareNearbyCandidatesAfterAnswer(for: submittedQuery) {
                     searchNearbyUnsavedCandidates(for: submittedQuery)
                 }
             }
         }
+    }
+
+    private func submitDrawerQuery() async {
+        await viewModel.submit(
+            reviewCandidates: reviewCandidates,
+            outputLanguage: languageSettings.language
+        )
     }
 
     private func searchNearbyUnsavedCandidates(for query: String) {
@@ -1469,11 +1476,11 @@ struct AIDrawerView: View {
                 addSpotStatus = isExactSearch
                     ? "No exact map match found yet. Try adding a city, address, or map link."
                     : "No nearby unsaved candidates found yet. Try a more specific place type or city."
-                await viewModel.submit(reviewCandidates: reviewCandidates)
+                await submitDrawerQuery()
             } else {
                 viewModel.mapCandidates = candidates
                 addSpotStatus = nil
-                await viewModel.submit(reviewCandidates: reviewCandidates)
+                await submitDrawerQuery()
                 withAnimation {
                     drawerDetent = .medium
                 }

@@ -511,6 +511,36 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testDrawerGroundedAnswerUsesSelectedOutputLanguage() async {
+        let client = StubGroundedAnswerClient(answer: "我會先選 Saved Coffee，因為它符合你的咖啡記憶。")
+        let drawer = AIDrawerViewModel(groundedAnswerClient: client)
+        let savedPlace = place(
+            name: "Saved Coffee",
+            address: "1 Main St, Irvine, CA",
+            category: .cafe
+        )
+        drawer.places = [savedPlace]
+        drawer.query = "coffee"
+
+        await drawer.submit(outputLanguage: .traditionalChinese)
+
+        XCTAssertEqual(client.requests.first?.query, "coffee")
+        XCTAssertEqual(client.requests.first?.outputLanguage, .traditionalChinese)
+        XCTAssertEqual(client.requests.first?.allowedPlaceIds, ["place-\(savedPlace.id.uuidString)"])
+    }
+
+    func testSaveAIServiceNoPlacesMessageUsesSelectedOutputLanguage() async throws {
+        let service = SaveAIService(apiKey: "")
+        let response = try await service.query(
+            "Plan a day",
+            places: [],
+            outputLanguage: .traditionalChinese
+        )
+
+        XCTAssertEqual(response.messageText, "目前還沒有載入地圖章。先保存或匯入地點，再請我幫你規劃。")
+    }
+
+    @MainActor
     func testDrawerPreparedPublicDiscoveryUsesGroundedAnswerClient() async {
         let client = StubGroundedAnswerClient(answer: "I would try Bright Coffee Bar first because it is nearby, highly rated, and still unsaved. Want quiet or quick?")
         let drawer = AIDrawerViewModel(groundedAnswerClient: client)

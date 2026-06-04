@@ -61,7 +61,10 @@ final class AIDrawerViewModel: ObservableObject {
         self.groundedAnswerClient = groundedAnswerClient
     }
 
-    func submit(reviewCandidates: [PlaceReviewCandidate] = []) async {
+    func submit(
+        reviewCandidates: [PlaceReviewCandidate] = [],
+        outputLanguage: AppLanguage = .english
+    ) async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
@@ -88,7 +91,12 @@ final class AIDrawerViewModel: ObservableObject {
             currentLocation: currentLocation
         )
         if let gatedResponse {
-            await showGroundedRecommendationResponse(gatedResponse, query: trimmed, intent: resolvedIntent)
+            await showGroundedRecommendationResponse(
+                gatedResponse,
+                query: trimmed,
+                intent: resolvedIntent,
+                outputLanguage: outputLanguage
+            )
             return
         }
 
@@ -100,7 +108,12 @@ final class AIDrawerViewModel: ObservableObject {
             mapCandidates: mapCandidates
         )
         if saveSearchResponse.hasVisibleResults {
-            await showGroundedRecommendationResponse(saveSearchResponse, query: trimmed, intent: resolvedIntent)
+            await showGroundedRecommendationResponse(
+                saveSearchResponse,
+                query: trimmed,
+                intent: resolvedIntent,
+                outputLanguage: outputLanguage
+            )
             return
         }
 
@@ -116,7 +129,12 @@ final class AIDrawerViewModel: ObservableObject {
         }
 
         do {
-            let response = try await aiService.query(trimmed, places: places, conversationHistory: conversationTurns)
+            let response = try await aiService.query(
+                trimmed,
+                places: places,
+                conversationHistory: conversationTurns,
+                outputLanguage: outputLanguage
+            )
             guard activeRequestID == requestID else { return }
             activeRequestID = nil
             drawerState = .displaying(response)
@@ -305,7 +323,12 @@ final class AIDrawerViewModel: ObservableObject {
         return MapActionData(type: .filterPins, placeIds: placeIDs, lat: nil, lng: nil, span: nil)
     }
 
-    private func showGroundedRecommendationResponse(_ response: SaveSearchResponse, query: String, intent: SaveSearchIntent? = nil) async {
+    private func showGroundedRecommendationResponse(
+        _ response: SaveSearchResponse,
+        query: String,
+        intent: SaveSearchIntent? = nil,
+        outputLanguage: AppLanguage
+    ) async {
         let requestID = UUID()
         activeRequestID = requestID
         drawerState = .loading
@@ -318,6 +341,7 @@ final class AIDrawerViewModel: ObservableObject {
             groundedResponse = await response.withGroundedAnswer(
                 query: query,
                 intent: intent,
+                outputLanguage: outputLanguage,
                 client: groundedAnswerClient
             )
         } else {
@@ -345,13 +369,19 @@ private extension SaveSearchResponse {
             !newRecommendations.results.isEmpty
     }
 
-    func withGroundedAnswer(query: String, intent: SaveSearchIntent, client: SaveLLMClient) async -> SaveSearchResponse {
+    func withGroundedAnswer(
+        query: String,
+        intent: SaveSearchIntent,
+        outputLanguage: AppLanguage,
+        client: SaveLLMClient
+    ) async -> SaveSearchResponse {
         let grounding = groundedAnswerGrounding
         let request = GroundedAnswerRequest(
             query: query,
             intent: intent,
             allowedPlaceIds: grounding.allowedResultIDs,
-            sections: groundedAnswerSections
+            sections: groundedAnswerSections,
+            outputLanguage: outputLanguage
         )
 
         guard grounding.hasContext else {
