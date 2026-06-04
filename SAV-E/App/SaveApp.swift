@@ -130,6 +130,16 @@ struct SaveApp: App {
             return
         }
 
+        if isPlaceLink(url), SharedPlaceData.shortCode(from: url) != nil {
+            Task {
+                guard let place = await SharedPlaceData.resolveShortCode(from: url) else { return }
+                await MainActor.run {
+                    openedPlace = place
+                }
+            }
+            return
+        }
+
         if isTripLink(url), let trip = SharedTripData.from(url: url) {
             openedTrip = trip
             return

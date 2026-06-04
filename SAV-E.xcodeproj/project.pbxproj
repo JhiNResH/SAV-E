@@ -48,6 +48,7 @@
 		6BA6AA3BA685D1C25A0E9816 /* SaveMemoryBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367F5599ADEF24B59D31AE6F /* SaveMemoryBadge.swift */; };
 		6BC478C8D4778B2BE248D315 /* SharedTripData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85338A305203F41DF18FAE27 /* SharedTripData.swift */; };
 		6F07949E22AA506EE5A64CD7 /* SaveLocalVaultService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5A7F09B9AE3F2129C605FE /* SaveLocalVaultService.swift */; };
+		6F9A7F7D67162AAFC701986F /* SAVEProductionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82EECB77D78AB65A9D806D73 /* SAVEProductionConfig.swift */; };
 		76FC5BA1F7C59B7D0436B3B5 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54876D21CED56B8E43591F6E /* StatsView.swift */; };
 		77E9B588DF847D51CD055C59 /* SocialPlacePipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383E88214348C9728A5C35B /* SocialPlacePipelineTests.swift */; };
 		78BCAADC36E4F2A6E45F076E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8EBE852DE7618089938F9421 /* Assets.xcassets */; };
@@ -80,6 +81,7 @@
 		AEDD117BBD3A0FD842D535BF /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A55AC71904B498274561F2D /* MapView.swift */; };
 		B214EF983BE6DB35168A6EF2 /* SAVEUISmokeHarnessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33940014B7E9BB8072DC45FE /* SAVEUISmokeHarnessTests.swift */; };
 		B4DAEDB0A245CE1D4707844F /* MemoMascotMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = B214436BA38A3A1BEDDD8761 /* MemoMascotMark.swift */; };
+		B686B444FCE28C57707BE9C5 /* ShareRouteCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A89101A1BE721021DA73A1 /* ShareRouteCodecTests.swift */; };
 		B76C75E6A77E56F866167BA1 /* SaveGuideModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468D23D10B68903C13C10154 /* SaveGuideModels.swift */; };
 		B9C3611B77E9CFF24690C115 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = FBBF8A5C536A8CDC47B3B30A /* ZIPFoundation */; };
 		BC55C57A6C88072A588A5531 /* SaveSearchIntentEvalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A813005C5623C1488B3AE00 /* SaveSearchIntentEvalTests.swift */; };
@@ -178,6 +180,7 @@
 		20C3E36D76FC12C5F397674A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		242AE991A2AD504072657488 /* Secrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Secrets.plist; sourceTree = "<group>"; };
 		2482E5F6DAD10800DD570280 /* SaveGuideCustomizationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGuideCustomizationView.swift; sourceTree = "<group>"; };
+		24A89101A1BE721021DA73A1 /* ShareRouteCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareRouteCodecTests.swift; sourceTree = "<group>"; };
 		2A813005C5623C1488B3AE00 /* SaveSearchIntentEvalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveSearchIntentEvalTests.swift; sourceTree = "<group>"; };
 		2BF2F96FC1EA2FD6AEF8E767 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		2C0D3A7A18E473C94F819125 /* SaveMemoryRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveMemoryRecord.swift; sourceTree = "<group>"; };
@@ -551,6 +554,7 @@
 				A652DE25FB690D2F6153F07B /* SAVEProductionConfigTests.swift */,
 				314BD93E28C21731D98997C0 /* SaveSearchControllerTests.swift */,
 				2A813005C5623C1488B3AE00 /* SaveSearchIntentEvalTests.swift */,
+				24A89101A1BE721021DA73A1 /* ShareRouteCodecTests.swift */,
 				6383E88214348C9728A5C35B /* SocialPlacePipelineTests.swift */,
 			);
 			name = SocialPlacePipelineTests;
@@ -876,6 +880,7 @@
 				20EE991C2D2D42E045F23CA5 /* SavePlanAroundControllerTests.swift in Sources */,
 				BCB68390F26FDDB75ADF5ED1 /* SaveSearchControllerTests.swift in Sources */,
 				BC55C57A6C88072A588A5531 /* SaveSearchIntentEvalTests.swift in Sources */,
+				B686B444FCE28C57707BE9C5 /* ShareRouteCodecTests.swift in Sources */,
 				77E9B588DF847D51CD055C59 /* SocialPlacePipelineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -899,6 +904,7 @@
 			files = (
 				3F861CFCBB89E535C6F88B20 /* ClipContentView.swift in Sources */,
 				430205DF9D71CB213764DAEB /* SAV-EClipApp.swift in Sources */,
+				6F9A7F7D67162AAFC701986F /* SAVEProductionConfig.swift in Sources */,
 				991602CD0733FC27340D71D1 /* SharedTripData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
