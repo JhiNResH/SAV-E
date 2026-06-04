@@ -457,12 +457,18 @@ struct AIDrawerView: View {
                         if let place = viewModel.resolvePlace(id: response.navigationPlaceId) {
                             NavigationCardComponent(place: place, mode: response.transportMode)
                         } else {
-                            messageView("Couldn't find that place in your collection.")
+                            messageView(languageSettings.localized(
+                                english: "Couldn't find that place in your collection.",
+                                traditionalChinese: "在你的地點記憶裡找不到這個地點。"
+                            ))
                         }
 
                     case .tripItinerary:
                         TripItineraryComponent(
-                            title: response.title ?? "Your Itinerary",
+                            title: response.title ?? languageSettings.localized(
+                                english: "Your Itinerary",
+                                traditionalChinese: "你的行程"
+                            ),
                             days: response.itineraryDays,
                             aiMessage: response.aiMessage,
                             places: viewModel.places
