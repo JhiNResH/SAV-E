@@ -28,11 +28,29 @@ confirmed/sourced place memory
   requested by the owner.
 - Return retrieval receipt for claim-based recommendation.
 
+## Public Projection / Usage Slice
+
+- Add public projection route:
+  - `GET /public/v0/cards/:placeId`
+- Add bounded usage receipt routes:
+  - `POST /public/v0/claim-usage-receipts`
+  - `POST /v0/claims/usage-receipts`
+- Public cards expose only public-link/public-guide places and public/link-shared
+  claims.
+- Public cards include proof labels, evidence summaries, trust summary, and
+  agent actions, but never raw private `evidence_refs`.
+- Usage receipts aggregate into claim reputation fields:
+  - `usage_count`
+  - `accepted_count`
+  - `score`
+- Claim recommendation may use reputation as a small ranking boost, while still
+  requiring proof-level and owner-scope gates.
+
 ## Out Of Scope
 
-- Public cards and collections.
+- Public collections.
 - OpenAPI / `llms.txt` / agent manifest.
-- Usage receipts or reputation weighting.
+- Paid/API-key-gated claim access or broad reputation graph exports.
 - Booking, ordering, payments, external messages, or phone automation.
 - Publishing raw private sources.
 
@@ -41,7 +59,9 @@ confirmed/sourced place memory
 - Claims attach to a user-owned place with proof level, confidence, visibility,
   evidence refs, context, ratings, and agent-usable summary.
 - Trust summary reports proof-level-weighted counts, strongest proof, confidence,
-  warnings, and recommended use.
+  warnings, reputation, and recommended use.
 - Recommendation by claims ranks owner-scoped places only and reports used/skipped
   claims with `public_web_used=false`.
+- Public place cards expose public claims only and omit raw private evidence.
+- Usage receipt creation validates action/outcome and updates reputation inputs.
 - Backend TypeScript tests pass.

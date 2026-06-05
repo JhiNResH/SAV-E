@@ -22,6 +22,18 @@ export interface ClaimRecommendationRequest {
   limit?: number;
 }
 
+export const usageReceiptActions = [
+  "recommended_to_user",
+  "cited",
+  "saved_to_vault",
+  "adapted_collection",
+] as const;
+
+export const usageReceiptOutcomes = ["accepted", "rejected", "unknown"] as const;
+
+export type UsageReceiptAction = typeof usageReceiptActions[number];
+export type UsageReceiptOutcome = typeof usageReceiptOutcomes[number];
+
 export function normalizePlaceClaimCreate(
   body: JsonObject,
   placeId: string,
@@ -86,6 +98,7 @@ export function buildTrustSummary(placeId: string, claims: JsonObject[]): JsonOb
   const confidence = roundedConfidence(visibleClaims);
   const warnings = trustWarnings(visibleClaims);
   const lastObservedAt = latestDate(visibleClaims.map((claim) => claim.observed_at));
+  const reputation = reputationSummary(visibleClaims);
 
   return {
     place_id: placeId,
@@ -96,10 +109,53 @@ export function buildTrustSummary(placeId: string, claims: JsonObject[]): JsonOb
       last_observed_at: lastObservedAt,
       strongest_proof_level: strongestProofLevel,
       confidence,
+      reputation,
       recommended_use: recommendedUse(strongestProofLevel),
       warnings,
     },
     agent_answer: trustAgentAnswer(strongestProofLevel, confidence, warnings),
+  };
+}
+
+export function buildPublicPlaceCard(place: JsonObject, claims: JsonObject[]): JsonObject {
+  const publicClaimRows = claims
+    .filter((claim) => claim.visibility === "public" || claim.visibility === "link_shared");
+  const publicClaims = publicClaimRows.map((claim) => formatPlaceClaim(claim));
+  const trustSummary = buildTrustSummary(String(place.id), publicClaimRows).trust_summary;
+
+  return {
+    card_id: place.id,
+    title: place.name,
+    place: {
+      id: place.id,
+      name: place.name,
+      city: place.city ?? "",
+      address: place.address ?? "",
+      canonical_refs: {
+        google_place_id: place.google_place_id ?? null,
+      },
+      category: place.category ?? null,
+    },
+    summary: publicSummary(place, publicClaims),
+    public_claims: publicClaims,
+    trust_summary: trustSummary,
+    agent_actions: ["cite_card", "save_to_vault", "adapt_to_user_context"],
+    attribution: {
+      author_handle: place.owner_handle ?? null,
+      source_policy: "raw sources private; proof levels summarized",
+    },
+  };
+}
+
+export function normalizeUsageReceiptCreate(body: JsonObject): JsonObject {
+  const claimId = trimmedString(body.claim_id ?? body.claimId);
+  if (!claimId) throw new Error("claim_id is required");
+
+  return {
+    claim_id: claimId,
+    consumer_agent_id: trimmedString(body.consumer_agent_id ?? body.consumerAgentId) ?? "unknown_agent",
+    action: parseUsageAction(body.action),
+    outcome: parseUsageOutcome(body.outcome),
   };
 }
 
@@ -211,7 +267,8 @@ function claimScore(claim: JsonObject, request: ClaimRecommendationRequest): num
   const textMatches = tokens.filter((token) => haystack.includes(token)).length;
   return proofRank(claim.proof_level) * 2 +
     numberField(claim, "confidence") +
-    textMatches * 0.75;
+    textMatches * 0.75 +
+    reputationBoost(claim);
 }
 
 function whyText(claims: JsonObject[], strongestProofLevel: ClaimProofLevel): string {
@@ -229,6 +286,31 @@ function recommendedUse(proofLevel: ClaimProofLevel): string[] {
 function trustAgentAnswer(proofLevel: ClaimProofLevel, confidence: number, warnings: string[]): string {
   const warningText = warnings.length ? ` Warnings: ${warnings.join(", ")}.` : "";
   return `Trust level ${proofLevel}, confidence ${confidence.toFixed(2)}.${warningText}`;
+}
+
+function publicSummary(place: JsonObject, publicClaims: JsonObject[]): string {
+  const best = publicClaims[0];
+  const claim = trimmedString(best?.agent_usable_summary) ?? trimmedString(best?.claim);
+  if (claim) return claim;
+  return `${trimmedString(place.name) ?? "This place"} has public SAV-E claims with proof labels.`;
+}
+
+function reputationSummary(claims: JsonObject[]): JsonObject {
+  const usageCount = claims.reduce((sum, claim) => sum + numberField(claim, "usage_count"), 0);
+  const acceptedCount = claims.reduce((sum, claim) => sum + numberField(claim, "accepted_count"), 0);
+  return {
+    usage_count: usageCount,
+    accepted_count: acceptedCount,
+    score: usageCount > 0 ? Math.round((acceptedCount / usageCount) * 100) / 100 : 0,
+  };
+}
+
+function reputationBoost(claim: JsonObject): number {
+  const usageCount = numberField(claim, "usage_count");
+  const acceptedCount = numberField(claim, "accepted_count");
+  if (usageCount <= 0) return 0;
+  const acceptanceRate = acceptedCount / usageCount;
+  return Math.min(1.5, Math.log1p(usageCount) * 0.15 + acceptanceRate * 0.35);
 }
 
 function trustWarnings(claims: JsonObject[]): string[] {
@@ -300,6 +382,18 @@ function parseVisibility(value: unknown, fallback: ClaimVisibility): ClaimVisibi
   return typeof value === "string" && claimVisibilities.includes(value as ClaimVisibility)
     ? value as ClaimVisibility
     : fallback;
+}
+
+function parseUsageAction(value: unknown): UsageReceiptAction {
+  return typeof value === "string" && usageReceiptActions.includes(value as UsageReceiptAction)
+    ? value as UsageReceiptAction
+    : "cited";
+}
+
+function parseUsageOutcome(value: unknown): UsageReceiptOutcome {
+  return typeof value === "string" && usageReceiptOutcomes.includes(value as UsageReceiptOutcome)
+    ? value as UsageReceiptOutcome
+    : "unknown";
 }
 
 function boundedNumber(value: unknown, fallback: number): number {

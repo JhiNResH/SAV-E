@@ -28,6 +28,8 @@ protocol SupabaseServiceProtocol {
     func createVerifiedPlaceClaim(_ draft: VerifiedPlaceClaimDraft, for placeId: UUID) async throws -> VerifiedPlaceClaim
     func fetchPlaceTrustSummary(for placeId: UUID) async throws -> PlaceTrustSummaryResponse
     func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse
+    func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard
+    func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool) async throws -> ClaimUsageReceipt
 }
 
 // MARK: - Errors
@@ -166,6 +168,22 @@ final class SupabaseService: SupabaseServiceProtocol {
         let body = try Self.jsonBody(request.body)
         let data = try await self.request(path: "/v0/places/recommend-by-claims", method: "POST", body: body)
         return try JSONDecoder.supabase.decode(ClaimRecommendationResponse.self, from: data)
+    }
+
+    func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let data = try await request(path: "/public/v0/cards/\(cardId.uuidString)", requiresAuth: false)
+        return try JSONDecoder.supabase.decode(PublicPlaceCard.self, from: data)
+    }
+
+    func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool = true) async throws -> ClaimUsageReceipt {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let path = requiresAuth ? "/v0/claims/usage-receipts" : "/public/v0/claim-usage-receipts"
+        let body = try Self.jsonBody(receipt.body)
+        let data = try await request(path: path, method: "POST", body: body, requiresAuth: requiresAuth)
+        return try JSONDecoder.supabase.decode(ClaimUsageReceipt.self, from: data)
     }
 
     // MARK: - Memory Candidates
@@ -596,6 +614,74 @@ struct ClaimRetrievalReceipt: Codable, Equatable {
         case used
         case skipped
         case publicWebUsed = "public_web_used"
+    }
+}
+
+struct PublicPlaceCard: Codable, Identifiable, Equatable {
+    let cardId: UUID
+    let title: String
+    let place: PublicPlaceCardPlace
+    let summary: String
+    let publicClaims: [VerifiedPlaceClaim]
+    let trustSummary: PlaceTrustSummary
+    let agentActions: [String]
+
+    var id: UUID { cardId }
+
+    enum CodingKeys: String, CodingKey {
+        case cardId = "card_id"
+        case title
+        case place
+        case summary
+        case publicClaims = "public_claims"
+        case trustSummary = "trust_summary"
+        case agentActions = "agent_actions"
+    }
+}
+
+struct PublicPlaceCardPlace: Codable, Equatable {
+    let id: UUID
+    let name: String
+    let city: String
+    let address: String
+    let category: String?
+}
+
+struct ClaimUsageReceiptDraft: Equatable {
+    var claimId: UUID
+    var consumerAgentId: String
+    var action: String
+    var outcome: String
+
+    var body: [String: Any?] {
+        [
+            "claim_id": claimId.uuidString,
+            "consumer_agent_id": consumerAgentId,
+            "action": action,
+            "outcome": outcome,
+        ]
+    }
+}
+
+struct ClaimUsageReceipt: Codable, Identifiable, Equatable {
+    let id: UUID
+    let claimId: UUID
+    let placeId: UUID
+    let consumerAgentId: String
+    let consumerUserId: String?
+    let action: String
+    let outcome: String
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case claimId = "claim_id"
+        case placeId = "place_id"
+        case consumerAgentId = "consumer_agent_id"
+        case consumerUserId = "consumer_user_id"
+        case action
+        case outcome
+        case createdAt = "created_at"
     }
 }
 

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildPublicPlaceCard,
   buildTrustSummary,
   formatPlaceClaim,
   normalizePlaceClaimCreate,
   normalizeRecommendationRequest,
+  normalizeUsageReceiptCreate,
   recommendPlacesByClaims,
 } from "./placeClaims.js";
 
@@ -131,4 +133,127 @@ test("recommendPlacesByClaims filters low proof claims and returns a bounded ret
   assert.deepEqual(receipt.used, ["2 owner-scoped places", "2 verified claims"]);
   assert.deepEqual(receipt.skipped, ["1 claims below proof threshold"]);
   assert.equal(receipt.public_web_used, false);
+});
+
+test("buildPublicPlaceCard projects public claims without private evidence refs", () => {
+  const card = buildPublicPlaceCard(
+    {
+      id: "place_1",
+      name: "Spicy Date Noodles",
+      address: "100 Taipei Rd",
+      category: "food",
+      google_place_id: "google_123",
+      owner_handle: "memo",
+    },
+    [
+      {
+        id: "claim_123",
+        place_id: "place_1",
+        claim_type: "good_for_date",
+        claim: "Good casual date dinner.",
+        agent_usable_summary: "date dinner",
+        proof_level: "visited_self_reported",
+        confidence: 0.82,
+        visibility: "public",
+        evidence_refs: ["source_123"],
+        usage_count: 3,
+        accepted_count: 2,
+      },
+      {
+        id: "claim_private",
+        place_id: "place_1",
+        claim_type: "private_note",
+        claim: "Private note.",
+        agent_usable_summary: "private",
+        proof_level: "visited_self_reported",
+        confidence: 0.9,
+        visibility: "private",
+        evidence_refs: ["source_private"],
+      },
+    ],
+  );
+
+  const claims = card.public_claims as Array<Record<string, unknown>>;
+  assert.equal(card.card_id, "place_1");
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0].claim_id, "claim_123");
+  assert.equal("evidence_refs" in claims[0], false);
+  assert.deepEqual(claims[0].evidence_summary, ["saved source evidence"]);
+
+  const trustSummary = card.trust_summary as Record<string, unknown>;
+  assert.deepEqual(trustSummary.reputation, {
+    usage_count: 3,
+    accepted_count: 2,
+    score: 0.67,
+  });
+});
+
+test("normalizeUsageReceiptCreate bounds action and outcome", () => {
+  assert.deepEqual(
+    normalizeUsageReceiptCreate({
+      claimId: "claim_123",
+      consumerAgentId: "agent_456",
+      action: "recommended_to_user",
+      outcome: "accepted",
+    }),
+    {
+      claim_id: "claim_123",
+      consumer_agent_id: "agent_456",
+      action: "recommended_to_user",
+      outcome: "accepted",
+    },
+  );
+
+  assert.deepEqual(
+    normalizeUsageReceiptCreate({
+      claim_id: "claim_123",
+      action: "post_to_social",
+      outcome: "paid",
+    }),
+    {
+      claim_id: "claim_123",
+      consumer_agent_id: "unknown_agent",
+      action: "cited",
+      outcome: "unknown",
+    },
+  );
+});
+
+test("recommendPlacesByClaims uses usage receipts as a small reputation boost", () => {
+  const request = normalizeRecommendationRequest({
+    intent: "date",
+    constraints: ["date"],
+    proofLevelMin: "user_confirmed_place",
+    limit: 1,
+  });
+
+  const output = recommendPlacesByClaims([
+    {
+      id: "claim_low_reputation",
+      place_id: "place_low",
+      place_name: "Quiet Date Spot",
+      claim_type: "good_for_date",
+      claim: "date",
+      agent_usable_summary: "date",
+      proof_level: "user_confirmed_place",
+      confidence: 0.8,
+      usage_count: 0,
+      accepted_count: 0,
+    },
+    {
+      id: "claim_reputation",
+      place_id: "place_high",
+      place_name: "Trusted Date Spot",
+      claim_type: "good_for_date",
+      claim: "date",
+      agent_usable_summary: "date",
+      proof_level: "user_confirmed_place",
+      confidence: 0.8,
+      usage_count: 20,
+      accepted_count: 18,
+    },
+  ], request);
+
+  const results = output.results as Array<Record<string, unknown>>;
+  assert.equal(results[0].place_id, "place_high");
 });
