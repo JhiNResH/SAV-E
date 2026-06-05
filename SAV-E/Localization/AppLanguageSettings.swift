@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import Observation
 import SwiftUI
 
 enum AppLanguage: String, CaseIterable, Identifiable {
@@ -36,11 +37,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+@Observable
 final class AppLanguageSettings: ObservableObject {
-    private let storageKey = "save.appLanguage"
-    private let userDefaults: UserDefaults
+    @ObservationIgnored private let storageKey = "save.appLanguage"
+    @ObservationIgnored private let userDefaults: UserDefaults
 
-    @Published var language: AppLanguage {
+    var language: AppLanguage {
         didSet {
             userDefaults.set(language.rawValue, forKey: storageKey)
         }
