@@ -9,23 +9,33 @@ struct OnboardingView: View {
     var onComplete: () -> Void
 
     private var language: AppLanguage { languageSettings.language }
+    private var isBrandEntryStage: Bool { stage == .language }
 
     var body: some View {
         ZStack {
-            SaveDottedBackground()
-                .ignoresSafeArea()
+            if isBrandEntryStage {
+                SaveBrandEntryBackground()
+                    .ignoresSafeArea()
+            } else {
+                SaveDottedBackground()
+                    .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 18) {
-                        header
-                        AnimatedProofHero(
-                            stage: stage,
-                            clueText: clueText,
-                            language: language,
-                            namespace: proofNamespace
-                        )
-                        ProofProgressRail(stage: stage, language: language)
+                        if isBrandEntryStage {
+                            BrandEntryHero(language: language)
+                        } else {
+                            header
+                            AnimatedProofHero(
+                                stage: stage,
+                                clueText: clueText,
+                                language: language,
+                                namespace: proofNamespace
+                            )
+                            ProofProgressRail(stage: stage, language: language)
+                        }
                         ProofStageCard(
                             stage: stage,
                             clueText: $clueText,
@@ -79,7 +89,7 @@ struct OnboardingView: View {
                 Text(primaryActionTitle)
                     .font(.headline)
                     .fontWeight(.black)
-                    .foregroundColor(.saveInk)
+                    .foregroundColor(primaryActionForeground)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(primaryActionFill)
@@ -103,7 +113,7 @@ struct OnboardingView: View {
             .disabled(stage == .language)
         }
         .padding(.bottom, 22)
-        .background(Color.saveNotebookPage.opacity(0.72))
+        .background(isBrandEntryStage ? Color.black.opacity(0.82) : Color.saveNotebookPage.opacity(0.72))
     }
 
     private var primaryActionTitle: String {
@@ -125,10 +135,17 @@ struct OnboardingView: View {
 
     private var primaryActionFill: Color {
         switch stage {
-        case .language: return .saveSky
+        case .language: return .saveCream
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
         case .ask, .tag: return .saveSky
+        }
+    }
+
+    private var primaryActionForeground: Color {
+        switch stage {
+        case .language: return .black
+        default: return .saveInk
         }
     }
 
@@ -247,6 +264,125 @@ private enum ProofIntentTag: String, CaseIterable {
         case (.travel, .traditionalChinese): return "旅行靈感"
         case (.friends, .english): return "Friend sent"
         case (.friends, .traditionalChinese): return "朋友推薦"
+        }
+    }
+}
+
+private struct SaveBrandEntryBackground: View {
+    var body: some View {
+        ZStack {
+            Color.black
+
+            LinearGradient(
+                colors: [
+                    Color(red: 0.06, green: 0.05, blue: 0.04),
+                    Color.black,
+                    Color(red: 0.02, green: 0.03, blue: 0.025)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [Color.saveMint.opacity(0.22), .clear],
+                center: .topTrailing,
+                startRadius: 20,
+                endRadius: 360
+            )
+
+            RadialGradient(
+                colors: [Color.saveHoney.opacity(0.20), .clear],
+                center: .bottomLeading,
+                startRadius: 30,
+                endRadius: 420
+            )
+
+            Canvas { context, size in
+                let dotColor = Color.saveCream.opacity(0.08)
+                for row in stride(from: 0, through: size.height, by: 18) {
+                    for column in stride(from: 0, through: size.width, by: 18) {
+                        let rect = CGRect(x: column, y: row, width: 2, height: 2)
+                        context.fill(Path(ellipseIn: rect), with: .color(dotColor))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct BrandEntryHero: View {
+    var language: AppLanguage
+    @State private var isBreathing = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            HStack {
+                Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveCream)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.10))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.saveCream.opacity(0.16), lineWidth: 1))
+
+                Spacer()
+            }
+
+            ZStack {
+                Circle()
+                    .fill(Color.saveCream.opacity(0.08))
+                    .frame(width: 138, height: 138)
+                    .scaleEffect(isBreathing ? 1.06 : 0.96)
+                    .animation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true), value: isBreathing)
+
+                MemoMascotMark(size: 96, framed: true)
+                    .shadow(color: Color.saveHoney.opacity(0.30), radius: 26, x: 0, y: 14)
+            }
+
+            VStack(spacing: 10) {
+                Text("SAV-E")
+                    .font(.system(size: 64, weight: .black, design: .rounded))
+                    .foregroundColor(.saveCream)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.72)
+
+                Text(localized(
+                    english: "Your private place memory scout.",
+                    traditionalChinese: "你的私人地點記憶 scout。"
+                ))
+                .font(.title3.weight(.black))
+                .foregroundColor(.saveCream.opacity(0.92))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Text(localized(
+                    english: "Turn messy posts, map links, screenshots, and friend messages into Review Candidates before they become Map Stamps.",
+                    traditionalChinese: "把貼文、地圖連結、截圖和朋友訊息，先整理成待確認地點，再變成地圖章。"
+                ))
+                .font(.subheadline.weight(.semibold))
+                .lineSpacing(3)
+                .foregroundColor(.saveCream.opacity(0.68))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
+                Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+            }
+            .font(.caption.weight(.black))
+            .foregroundColor(.saveCream.opacity(0.82))
+        }
+        .padding(.top, 18)
+        .padding(.bottom, 6)
+        .onAppear { isBreathing = true }
+    }
+
+    private func localized(english: String, traditionalChinese: String) -> String {
+        switch language {
+        case .english: return english
+        case .traditionalChinese: return traditionalChinese
         }
     }
 }
