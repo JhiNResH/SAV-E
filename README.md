@@ -12,7 +12,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 - **Profile** — Stats, world map visualization, collections, subscription management
 - **Onboarding** — 3-step carousel
 - **Place Detail** — Photo carousel, info grid, notes, navigate button, source link
-- **Second-wave surfaces** — App Clip previews, Google Takeout import, collaborative lists, and full trip import stay out of the first public-test gate
+- **Second-wave surfaces** — Google Takeout import, collaborative lists, and full trip import stay out of the first public-test gate
 
 ## Tech Stack
 
@@ -21,7 +21,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 - **Railway Node API + Railway Postgres** for backend persistence
 - **Gemini API** for AI content parsing
 - **Google Places API** for place matching and details
-- **App Clip** target for later shareable-link previews; the main public-test app does not embed it by default
+- **App Clip** target embedded in the iOS app for shareable-link previews once App Store Connect App Clip Experiences are configured
 - **Share Extension** target for cross-app saving
 
 ## Setup
@@ -122,11 +122,11 @@ xcodebuild \
 
 ## First TestFlight Boundary
 
-Ship the native iOS app and Share Extension first. App Clip readiness requires Apple Developer, domain, and App Store Connect setup, so it is a later release gate and is not embedded in the main app target for the public-test slice.
+Ship the native iOS app, Share Extension, and embedded App Clip for SAV-E share links. App Clip invocation still depends on Apple Developer associated-domain capabilities, the production AASA file, App Store Connect App Clip Experiences, and Apple's associated-domain CDN.
 
 Before uploading a build:
 
-- register App IDs for `com.wanderly.app` and `com.wanderly.app.ShareExtension`
+- register App IDs for `com.wanderly.app`, `com.wanderly.app.ShareExtension`, and `com.wanderly.app.Clip`
 - enable the App Group `group.com.wanderly.app` for the app and Share Extension
 
 These Apple identifiers are the existing production compatibility layer. The user-facing product, Xcode targets, release config keys, and share URLs should use SAV-E / SAVE naming.
@@ -136,7 +136,7 @@ These Apple identifiers are the existing production compatibility layer. The use
 
 ## App Clip Share Routes
 
-App Clip support is a second-wave track. The target remains in the project for dedicated App Clip work, but the first public-test main app should rely on regular share links and the full app/web fallback instead of App Clip invocation.
+App Clip support is enabled for SAV-E share links. If the full app is installed, Universal Links should open the app. If the full app is not installed and the App Clip Experience is configured in App Store Connect, iOS should show the App Clip card instead of relying on the web fallback.
 
 SAV-E separates share actions from map actions:
 
@@ -171,14 +171,14 @@ https://sav-e-app.vercel.app/r/<code>
 https://sav-e-app.vercel.app/u/<handle>?ref=<code>
 ```
 
-The App Clip target can later preview place payloads with photo, rating, hours, address, source, and save/open actions. Full trip import, list previews, referral previews, and App Clip handoff are not part of the first public-test gate. The full app still handles `https://sav-e-app.vercel.app/p/...` and `https://sav-e-app.vercel.app/trip/...` links when installed. Legacy `https://wanderly.app/trip?d=...` links remain readable during migration.
+The App Clip target can preview place payloads with photo, rating, hours, address, source, and save/open actions. Full trip import, list previews, and referral previews are still later surfaces. The full app handles `https://sav-e-app.vercel.app/p/...` and `https://sav-e-app.vercel.app/trip/...` links when installed. Legacy `https://wanderly.app/trip?d=...` links remain readable during migration.
 
 Before this works for friends without the full app installed:
 
 - enable Associated Domains on `com.wanderly.app` and `com.wanderly.app.Clip` in Apple Developer
 - keep `applinks:sav-e-app.vercel.app` in the app entitlement
 - keep `appclips:sav-e-app.vercel.app` in the App Clip entitlement
-- when re-enabling App Clip, add `appclips:sav-e-app.vercel.app` and the associated App Clip app identifier back to the main app entitlement
+- keep `appclips:sav-e-app.vercel.app` and `com.apple.developer.associated-appclip-app-identifiers` in the main app entitlement
 - set `APPLE_TEAM_ID` in the Vercel build environment so `npm run export:web` writes the real `/.well-known/apple-app-site-association`
 - keep `APPLE_APP_STORE_ID` and `APP_CLIP_BUNDLE_ID` configured for the Smart App Banner meta written by `save-rn/scripts/patch-web-bundle.js`
 - disable bot challenges/WAF rules for `https://sav-e-app.vercel.app/p*`, `https://sav-e-app.vercel.app/trip*`, and `https://sav-e-app.vercel.app/.well-known/apple-app-site-association`; iOS cannot complete App Clip or Universal Link association through an HTML challenge page
