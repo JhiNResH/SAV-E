@@ -1137,7 +1137,9 @@ struct AIDrawerView: View {
                     places: savedPlacesForDrawer,
                     totalCount: viewModel.places.count,
                     isFiltered: !selectedCategories.isEmpty,
-                    onSelect: openSavedPlace
+                    onSelect: openSavedPlace,
+                    onReview: openReviewInbox,
+                    onAsk: askFromSavedMemory
                 )
 
                 if let addSpotStatus {
@@ -3068,13 +3070,15 @@ private struct SavedPlacesSection: View {
     var totalCount: Int
     var isFiltered: Bool
     var onSelect: (Place) -> Void
+    var onReview: () -> Void
+    var onAsk: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             savedHeader
 
             if places.isEmpty {
-                SavedPlacesEmptyState(isFiltered: isFiltered)
+                SavedPlacesEmptyState(isFiltered: isFiltered, onReview: onReview, onAsk: onAsk)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(sectionedPlaces, id: \.category) { section in
@@ -3241,38 +3245,73 @@ private extension PlaceCategory {
 private struct SavedPlacesEmptyState: View {
     @EnvironmentObject private var languageSettings: AppLanguageSettings
     var isFiltered: Bool
+    var onReview: () -> Void
+    var onAsk: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "mappin.slash")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.saveCocoa)
-                .frame(width: 38, height: 38)
-                .background(Color.saveHoney.opacity(0.34))
-                .clipShape(Circle())
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "sparkles")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.black)
+                    .frame(width: 42, height: 42)
+                    .background(Color.saveCream)
+                    .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(isFiltered
-                     ? languageSettings.localized(english: "No matching Map Stamps", traditionalChinese: "沒有符合條件的地圖章")
-                     : languageSettings.localized(english: "No saved Map Stamps", traditionalChinese: "還沒有保存的地圖章"))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundColor(.saveInk)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(isFiltered
+                         ? languageSettings.localized(english: "No matching Map Stamps", traditionalChinese: "沒有符合條件的地圖章")
+                         : languageSettings.localized(english: "Start your place memory", traditionalChinese: "開始你的地點記憶"))
+                        .font(.headline.weight(.black))
+                        .foregroundColor(.saveCream)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Text(isFiltered
-                     ? languageSettings.localized(english: "Clear filters to show every saved place.", traditionalChinese: "清除篩選即可顯示所有已保存地點。")
-                     : languageSettings.localized(english: "Sign in and refresh SAV-E if this account should already have saved places.", traditionalChinese: "如果這個帳號應該已有保存地點，請登入後重新整理 SAV-E。"))
-                    .font(.caption)
-                    .foregroundColor(.saveMutedText)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(isFiltered
+                         ? languageSettings.localized(english: "Clear filters to show every saved place.", traditionalChinese: "清除篩選即可顯示所有已保存地點。")
+                         : languageSettings.localized(english: "Share a post, map link, screenshot, or message. SAV-E keeps it in Review before saving a Map Stamp.", traditionalChinese: "分享貼文、地圖連結、截圖或訊息。SAV-E 會先放進 Review，再確認成地圖章。"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.saveCream.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !isFiltered {
+                HStack(spacing: 10) {
+                    Button(action: onReview) {
+                        Label(languageSettings.localized(english: "Open Review", traditionalChinese: "打開待確認"), systemImage: "checklist.unchecked")
+                            .font(.caption.weight(.black))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(Color.saveCream)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onAsk) {
+                        Label(languageSettings.localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+                            .font(.caption.weight(.black))
+                            .foregroundColor(.saveCream)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(Color.white.opacity(0.10))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.saveCream.opacity(0.18), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.saveNotebookPage.opacity(0.82))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.black.opacity(0.90))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.saveNotebookLine.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.saveCream.opacity(0.16), lineWidth: 1)
         )
     }
 }
