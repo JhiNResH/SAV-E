@@ -22,7 +22,7 @@ struct SaveApp: App {
             Group {
                 rootContent
             }
-            .environmentObject(languageSettings)
+            .environment(\.appLanguageSettings, languageSettings)
             .onOpenURL(perform: handleIncomingURL)
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 guard let url = activity.webpageURL else { return }
@@ -244,7 +244,7 @@ struct SaveApp: App {
 // MARK: - Auth Loading View
 
 struct AuthLoadingView: View {
-    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @Environment(\.appLanguageSettings) private var languageSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isBreathing = false
     @State private var activeStep = 0
@@ -449,7 +449,7 @@ private struct SaveOpeningHintPill: View {
 
 struct SignInView: View {
     @EnvironmentObject var authService: PrivyAuthService
-    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @Environment(\.appLanguageSettings) private var languageSettings
     @State private var email = ""
     @State private var showEmailCode = false
     @State private var verificationCode = ""
@@ -619,7 +619,7 @@ struct SignInView: View {
 }
 
 private struct SignInHero: View {
-    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @Environment(\.appLanguageSettings) private var languageSettings
 
     var body: some View {
         VStack(spacing: 18) {
@@ -646,7 +646,7 @@ private struct SignInHero: View {
 }
 
 private struct SignInWorkflowStrip: View {
-    @EnvironmentObject private var languageSettings: AppLanguageSettings
+    @Environment(\.appLanguageSettings) private var languageSettings
 
     private var steps: [(String, String, Color)] {
         [

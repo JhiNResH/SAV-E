@@ -1,3 +1,4 @@
+import Observation
 import XCTest
 @testable import SAVE
 
@@ -23,5 +24,25 @@ final class AppLanguageSettingsTests: XCTestCase {
         XCTAssertEqual(PlaceSort.nearest.title(language: .english), "Nearest")
         XCTAssertEqual(SaveSearchObjectType.mapVisibleUnsavedPlace.displayName(language: .english), "Not saved yet")
         XCTAssertEqual(SaveSearchUserState.sourceOnly.displayName(language: .english), "Needs one more clue")
+    }
+
+    func testLanguageSettingsTracksObservationForEnvironmentConsumers() {
+        let suiteName = "AppLanguageSettingsTests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+        let settings = AppLanguageSettings(userDefaults: userDefaults)
+        settings.language = .english
+
+        let invalidated = expectation(description: "language settings observation invalidated")
+        withObservationTracking {
+            _ = settings.text(.language)
+        } onChange: {
+            invalidated.fulfill()
+        }
+
+        settings.language = .traditionalChinese
+        wait(for: [invalidated], timeout: 1)
+        XCTAssertEqual(settings.text(.language), "語言")
+        XCTAssertEqual(userDefaults.string(forKey: "save.appLanguage"), AppLanguage.traditionalChinese.rawValue)
     }
 }
