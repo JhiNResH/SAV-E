@@ -68,7 +68,6 @@ struct SaveApp: App {
 #if DEBUG
         if smokeHarnessActive {
             SaveSmokeHarnessView()
-                .environment(\.appLanguageSettings, languageSettings)
         } else {
             standardRootContent
         }
@@ -84,10 +83,8 @@ struct SaveApp: App {
                 hasCompletedOnboarding = true
                 minimumOpeningAnimationCompleted = false
             }
-            .environment(\.appLanguageSettings, languageSettings)
         } else if shouldShowOpeningAnimation {
             AuthLoadingView()
-                .environment(\.appLanguageSettings, languageSettings)
                 .task {
                     await completeMinimumOpeningAnimation()
                 }
@@ -95,15 +92,12 @@ struct SaveApp: App {
             switch authService.authState {
             case .unknown:
                 AuthLoadingView()
-                    .environment(\.appLanguageSettings, languageSettings)
             case .unauthenticated:
                 SignInView()
                     .environmentObject(authService)
-                    .environment(\.appLanguageSettings, languageSettings)
             case .authenticated:
                 ContentView()
                     .environmentObject(authService)
-                    .environment(\.appLanguageSettings, languageSettings)
             }
         }
     }
