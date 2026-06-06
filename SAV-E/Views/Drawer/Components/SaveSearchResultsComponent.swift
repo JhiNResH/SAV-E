@@ -38,7 +38,7 @@ struct SaveSearchResultsComponent: View {
     }
 
     private var separateContextSections: [SaveSearchSection] {
-        (response.farSavedSections + response.publicDiscoverySections)
+        response.secondaryDisplaySections
             .filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
     }
 

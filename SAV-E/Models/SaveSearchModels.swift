@@ -1266,6 +1266,13 @@ extension SaveSearchResponse {
         [newRecommendations].filter { !$0.results.isEmpty || $0.emptyMessage != nil || $0.showsNearbySearchAction }
     }
 
+    var secondaryDisplaySections: [SaveSearchSection] {
+        if isNearbyRecommendationResponse, fromYourSave.results.isEmpty {
+            return publicDiscoverySections + farSavedSections
+        }
+        return farSavedSections + publicDiscoverySections
+    }
+
     private var isNearbyRecommendationResponse: Bool {
         fromYourSave.id == "from-your-save-nearby"
     }
