@@ -12,6 +12,24 @@ struct OnboardingView: View {
     private var isBrandEntryStage: Bool { stage == .language }
 
     var body: some View {
+        GeometryReader { proxy in
+            let isCompactHeight = proxy.size.height < 760
+            let horizontalPadding: CGFloat = proxy.size.width < 380 ? 16 : 22
+            let verticalSpacing: CGFloat = isCompactHeight ? 12 : 18
+
+            onboardingContent(
+                isCompactHeight: isCompactHeight,
+                horizontalPadding: horizontalPadding,
+                verticalSpacing: verticalSpacing
+            )
+        }
+    }
+
+    private func onboardingContent(
+        isCompactHeight: Bool,
+        horizontalPadding: CGFloat,
+        verticalSpacing: CGFloat
+    ) -> some View {
         ZStack {
             if isBrandEntryStage {
                 SaveBrandEntryBackground()
@@ -21,18 +39,18 @@ struct OnboardingView: View {
                     .ignoresSafeArea()
             }
 
-            VStack(spacing: 0) {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 18) {
+                VStack(spacing: 0) {
+                    VStack(spacing: verticalSpacing) {
                         if isBrandEntryStage {
-                            BrandEntryHero(language: language)
+                            BrandEntryHero(language: language, isCompactHeight: isCompactHeight)
                         } else {
-                            header
+                            header(isCompactHeight: isCompactHeight)
                             AnimatedProofHero(
                                 stage: stage,
                                 clueText: clueText,
                                 language: language,
-                                namespace: proofNamespace
+                                namespace: proofNamespace,
+                                height: isCompactHeight ? 178 : 214
                             )
                             ProofProgressRail(stage: stage, language: language)
                         }
@@ -41,30 +59,34 @@ struct OnboardingView: View {
                             clueText: $clueText,
                             selectedTags: $selectedTags,
                             language: language,
+                            isCompactHeight: isCompactHeight,
                             onChooseLanguage: chooseLanguage,
                             onUseSample: useSampleClue
                         )
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.top, 28)
-                    .padding(.bottom, 18)
-                }
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.top, isCompactHeight ? 8 : 28)
+                    .padding(.bottom, isCompactHeight ? 14 : 18)
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .clipped()
 
-                bottomActions
-            }
+                    bottomActions(isCompactHeight: isCompactHeight)
+                }
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            MemoMascotMark(size: 70, framed: false)
+    private func header(isCompactHeight: Bool) -> some View {
+        VStack(spacing: isCompactHeight ? 8 : 12) {
+            if !isCompactHeight {
+                MemoMascotMark(size: 70, framed: false)
+            }
 
-            VStack(spacing: 8) {
+            VStack(spacing: isCompactHeight ? 5 : 8) {
                 Text(localized(
                     english: "Set up your place memory",
                     traditionalChinese: "設定你的地點記憶"
                 ))
-                .font(.title2)
+                .font(isCompactHeight ? .headline : .title2)
                 .fontWeight(.black)
                 .foregroundColor(.saveInk)
                 .multilineTextAlignment(.center)
@@ -73,9 +95,8 @@ struct OnboardingView: View {
                     english: "Start with one real post, map link, screenshot, or message. SAV-E should prove it can help before asking preferences.",
                     traditionalChinese: "先用一個真的貼文、地圖連結、截圖或訊息。SAV-E 要先證明有用，再問偏好。"
                 ))
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .lineSpacing(3)
+                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                .lineSpacing(2)
                 .foregroundColor(.saveMutedText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -83,15 +104,16 @@ struct OnboardingView: View {
         }
     }
 
-    private var bottomActions: some View {
-        VStack(spacing: 10) {
+    private func bottomActions(isCompactHeight: Bool) -> some View {
+        VStack(spacing: isCompactHeight ? 0 : 10) {
             Button(action: advance) {
                 Text(primaryActionTitle)
-                    .font(.headline)
-                    .fontWeight(.black)
+                    .font(isCompactHeight ? .subheadline.weight(.black) : .headline.weight(.black))
                     .foregroundColor(primaryActionForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, isCompactHeight ? 12 : 16)
                     .background(primaryActionFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -103,16 +125,18 @@ struct OnboardingView: View {
             .opacity(stage == .clue && trimmedClue.isEmpty ? 0.58 : 1)
             .padding(.horizontal, 24)
 
-            Button(secondaryActionTitle) {
-                skipCurrentStep()
+            if !isCompactHeight || stage != .language {
+                Button(secondaryActionTitle) {
+                    skipCurrentStep()
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.saveMutedText)
+                .opacity(stage == .language ? 0 : 1)
+                .disabled(stage == .language)
             }
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(.saveMutedText)
-            .opacity(stage == .language ? 0 : 1)
-            .disabled(stage == .language)
         }
-        .padding(.bottom, 22)
+        .padding(.bottom, isCompactHeight ? 8 : 22)
         .background(isBrandEntryStage ? SaveTheme.Colors.nearBlack.opacity(0.82) : Color.saveNotebookPage.opacity(0.72))
     }
 
@@ -312,37 +336,49 @@ private struct SaveBrandEntryBackground: View {
 
 private struct BrandEntryHero: View {
     var language: AppLanguage
+    var isCompactHeight: Bool
     @State private var isBreathing = false
 
     var body: some View {
-        VStack(spacing: 18) {
-            HStack {
+        VStack(spacing: isCompactHeight ? 7 : 18) {
+            if !isCompactHeight {
+                HStack {
+                    Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
+                        .font(SaveTheme.Typography.eyebrow)
+                        .foregroundColor(SaveTheme.Colors.cream)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.10))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1))
+
+                    Spacer()
+                }
+            } else {
                 Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
                     .font(SaveTheme.Typography.eyebrow)
                     .foregroundColor(SaveTheme.Colors.cream)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .background(Color.white.opacity(0.10))
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1))
-
-                Spacer()
             }
 
             ZStack {
                 Circle()
                     .fill(SaveTheme.Colors.cream.opacity(0.08))
-                    .frame(width: 138, height: 138)
+                    .frame(width: isCompactHeight ? 82 : 138, height: isCompactHeight ? 82 : 138)
                     .scaleEffect(isBreathing ? 1.06 : 0.96)
                     .animation(SaveTheme.Motion.breathing, value: isBreathing)
 
-                MemoMascotMark(size: 96, framed: true)
-                    .shadow(color: SaveTheme.Colors.amber.opacity(0.30), radius: 26, x: 0, y: 14)
+                MemoMascotMark(size: isCompactHeight ? 58 : 96, framed: true)
+                    .shadow(color: SaveTheme.Colors.amber.opacity(0.30), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: isCompactHeight ? 4 : 10) {
                 Text("SAV-E")
-                    .font(SaveTheme.Typography.brandTitle)
+                    .font(.system(size: isCompactHeight ? 38 : 64, weight: .black, design: .rounded))
                     .foregroundColor(SaveTheme.Colors.cream)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.72)
@@ -351,7 +387,7 @@ private struct BrandEntryHero: View {
                     english: "Your private place memory scout.",
                     traditionalChinese: "你的私人地點記憶 scout。"
                 ))
-                .font(SaveTheme.Typography.entryTitle)
+                .font(isCompactHeight ? .subheadline.weight(.black) : SaveTheme.Typography.entryTitle)
                 .foregroundColor(SaveTheme.Colors.cream.opacity(0.92))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -360,21 +396,27 @@ private struct BrandEntryHero: View {
                     english: "Turn messy posts, map links, screenshots, and friend messages into Review Candidates before they become Map Stamps.",
                     traditionalChinese: "把貼文、地圖連結、截圖和朋友訊息，先整理成待確認地點，再變成地圖章。"
                 ))
-                .font(.subheadline.weight(.semibold))
-                .lineSpacing(3)
+                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                .lineSpacing(2)
                 .foregroundColor(SaveTheme.Colors.cream.opacity(0.68))
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(isCompactHeight ? 2 : nil)
+                .minimumScaleFactor(0.84)
+                .fixedSize(horizontal: false, vertical: !isCompactHeight)
             }
 
-            HStack(spacing: 10) {
-                Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
-                Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+            if !isCompactHeight {
+                HStack(spacing: 10) {
+                    Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
+                    Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+                }
+                .font(.caption.weight(.black))
+                .foregroundColor(SaveTheme.Colors.cream.opacity(0.82))
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
             }
-            .font(.caption.weight(.black))
-            .foregroundColor(SaveTheme.Colors.cream.opacity(0.82))
         }
-        .padding(.top, 18)
+        .padding(.top, isCompactHeight ? 3 : 18)
         .padding(.bottom, 6)
         .onAppear { isBreathing = true }
     }
@@ -392,6 +434,7 @@ private struct AnimatedProofHero: View {
     let clueText: String
     let language: AppLanguage
     let namespace: Namespace.ID
+    let height: CGFloat
 
     @State private var isFloating = false
     @State private var scanOffset: CGFloat = -92
@@ -436,7 +479,7 @@ private struct AnimatedProofHero: View {
                 scanningBand
             }
         }
-        .frame(height: 214)
+        .frame(height: height)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: Color.saveInk.opacity(0.08), radius: 16, x: 0, y: 10)
         .onAppear {
@@ -853,14 +896,16 @@ private struct ProofProgressRail: View {
                         .fontWeight(.black)
                         .foregroundColor(item.rawValue <= stage.rawValue ? .saveInk : .saveMutedText.opacity(0.7))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.56)
+                        .frame(maxWidth: .infinity)
                 }
+                .frame(maxWidth: .infinity)
 
                 if item != ProofStage.allCases.last {
                     Rectangle()
                         .fill(item.rawValue < stage.rawValue ? Color.saveHoney : Color.saveNotebookLine.opacity(0.34))
                         .frame(height: 2)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, 2)
                         .offset(y: -13)
                 }
             }
@@ -890,15 +935,16 @@ private struct ProofStageCard: View {
     @Binding var clueText: String
     @Binding var selectedTags: Set<ProofIntentTag>
     let language: AppLanguage
+    let isCompactHeight: Bool
     let onChooseLanguage: (AppLanguage) -> Void
     let onUseSample: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 13 : 18) {
             stageHeader
             stageContent
         }
-        .padding(20)
+        .padding(isCompactHeight ? 16 : 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
@@ -912,9 +958,9 @@ private struct ProofStageCard: View {
     private var stageHeader: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: iconName)
-                .font(.title2.weight(.black))
+                .font((isCompactHeight ? Font.headline : Font.title2).weight(.black))
                 .foregroundColor(.saveInk)
-                .frame(width: 44, height: 44)
+                .frame(width: isCompactHeight ? 38 : 44, height: isCompactHeight ? 38 : 44)
                 .background(headerTint.opacity(0.72))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -924,14 +970,13 @@ private struct ProofStageCard: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-                    .font(.title3)
+                    .font(isCompactHeight ? .headline : .title3)
                     .fontWeight(.black)
                     .foregroundColor(.saveInk)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                     .foregroundColor(.saveMutedText)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -958,31 +1003,30 @@ private struct ProofStageCard: View {
     }
 
     private var languageChoice: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 8 : 12) {
             ForEach(AppLanguage.allCases) { option in
                 Button {
                     onChooseLanguage(option)
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: isCompactHeight ? 9 : 12) {
                         Image(systemName: option == language ? "checkmark.circle.fill" : "circle")
-                            .font(.title3.weight(.black))
+                            .font((isCompactHeight ? Font.headline : Font.title3).weight(.black))
                             .foregroundColor(.saveInk)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(option.displayName)
-                                .font(.headline)
+                                .font(isCompactHeight ? .subheadline : .headline)
                                 .fontWeight(.black)
                                 .foregroundColor(.saveInk)
 
                             Text(languageDescription(for: option))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
+                                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                                 .foregroundColor(.saveMutedText)
                         }
 
                         Spacer()
                     }
-                    .padding(14)
+                    .padding(isCompactHeight ? 10 : 14)
                     .background(option == language ? Color.saveHoney.opacity(0.58) : Color.white.opacity(0.30))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -993,7 +1037,9 @@ private struct ProofStageCard: View {
                 .accessibilityLabel(option.displayName)
             }
 
-            FirstRunTrustNote(language: language)
+            if !isCompactHeight {
+                FirstRunTrustNote(language: language)
+            }
         }
     }
 
