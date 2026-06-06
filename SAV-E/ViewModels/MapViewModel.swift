@@ -606,20 +606,21 @@ final class MapViewModel: ObservableObject {
             mirrorToLocalVault(refinedCandidate)
             var run: PlaceRecoveryWorkflowRun?
             do {
-                run = try await supabaseService.createPlaceRecoveryRun(
+                let createdRun = try await supabaseService.createPlaceRecoveryRun(
                     sourceURL: refinedCandidate.sourceURL,
                     sourceType: nil
                 )
+                run = createdRun
                 let captureId = try await supabaseService.createMemoryCapture(from: refinedCandidate, userId: userId)
                 let candidateId = try await supabaseService.createPlaceCandidate(
                     refinedCandidate,
                     captureId: captureId,
                     userId: userId,
-                    workflowRunId: run?.id
+                    workflowRunId: createdRun.id
                 )
                 _ = try await supabaseService.recordPlaceRecoveryResult(
                     placeRecoveryResult(for: refinedCandidate, candidateId: candidateId),
-                    for: run?.id ?? UUID()
+                    for: createdRun.id
                 )
                 if runSourceRecovery && refinedCandidate.isSourceOnly {
                     _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
@@ -653,17 +654,18 @@ final class MapViewModel: ObservableObject {
             mirrorToLocalVault(candidate)
             var run: PlaceRecoveryWorkflowRun?
             do {
-                run = try await supabaseService.createPlaceRecoveryRun(sourceURL: candidate.sourceURL, sourceType: nil)
+                let createdRun = try await supabaseService.createPlaceRecoveryRun(sourceURL: candidate.sourceURL, sourceType: nil)
+                run = createdRun
                 let captureId = try await supabaseService.createMemoryCapture(from: candidate, userId: userId)
                 let candidateId = try await supabaseService.createPlaceCandidate(
                     candidate,
                     captureId: captureId,
                     userId: userId,
-                    workflowRunId: run?.id
+                    workflowRunId: createdRun.id
                 )
                 _ = try await supabaseService.recordPlaceRecoveryResult(
                     placeRecoveryResult(for: candidate, candidateId: candidateId),
-                    for: run?.id ?? UUID()
+                    for: createdRun.id
                 )
                 if candidate.isSourceOnly {
                     let recovered = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
