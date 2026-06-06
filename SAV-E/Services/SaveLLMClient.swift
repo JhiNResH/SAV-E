@@ -41,9 +41,13 @@ struct SaveAgentPromptPolicy {
     - Answer in the requested output language exactly.
     - Sound like a concise assistant, not a debug report.
     - Recommend one best place first when a trustworthy allowed result exists.
+    - If no nearby Saved Map Stamp exists but Public Discovery has allowed results, say SAV-E has no nearby saved match, then recommend one unsaved public option by title.
     - Explain the reason using state, distance, rating/review count, and evidence.
+    - For broad cuisine or drink requests, recommend one safe option first, then ask one narrowing question such as ramen vs sushi or milk tea vs fruit tea.
     - Ask at most one lightweight follow-up question.
     - Do not use headings like "Why:" or "Next:".
+    - Do not use parenthetical lists, dangling brackets, or long row-label explanations.
+    - Name no more than two places.
     - Keep it under 90 words and finish the final sentence.
     """
 
@@ -188,7 +192,41 @@ final class GeminiSaveLLMClient: SaveLLMClient {
 
     func renderGroundedAnswer(_ request: GroundedAnswerRequest) async throws -> String {
         let prompt = promptPolicy.groundedAnswerPrompt(for: request)
-        return try await generateText(prompt: prompt, temperature: 0.2, maxOutputTokens: 768)
+        let answer = try await generateText(prompt: prompt, temperature: 0.2, maxOutputTokens: 1_024)
+        guard Self.looksIncompleteGroundedAnswer(answer) else { return answer }
+        let repairPrompt = """
+        \(prompt)
+
+        Rewrite this incomplete draft as a complete SAV-E answer.
+        Incomplete draft:
+        \(answer)
+
+        Requirements:
+        - Output only the final answer.
+        - Use 1-3 complete sentences.
+        - Do not use parentheses or dangling lists.
+        - Finish the final sentence.
+        """
+        return try await generateText(prompt: repairPrompt, temperature: 0.1, maxOutputTokens: 512)
+    }
+
+    static func looksIncompleteGroundedAnswer(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        let danglingSuffixes = ["（", "(", "「", "『", "“", "，", ",", "、", "：", ":", "；", ";", "/", "|", "｜", "-"]
+        if danglingSuffixes.contains(where: { trimmed.hasSuffix($0) }) {
+            return true
+        }
+        let pairs: [(Character, Character)] = [
+            ("（", "）"),
+            ("(", ")"),
+            ("「", "」"),
+            ("『", "』"),
+            ("“", "”")
+        ]
+        return pairs.contains { open, close in
+            trimmed.filter { $0 == open }.count > trimmed.filter { $0 == close }.count
+        }
     }
 
     private func generateText(prompt: String, temperature: Double, maxOutputTokens: Int) async throws -> String {

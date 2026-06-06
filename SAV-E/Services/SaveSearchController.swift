@@ -773,6 +773,12 @@ private struct SaveIntentQuery {
                 publicSearchQuery: "hot pot"
             ),
             SaveIntentQuery(
+                id: "japanese",
+                categories: [.food],
+                needles: ["japanese", "japanese restaurant", "japanese food", "sushi", "ramen", "izakaya", "yakiniku", "sukiyaki", "日式", "日式餐廳", "日式餐厅", "日本料理", "日式料理", "壽司", "寿司", "拉麵", "拉面", "居酒屋", "燒肉", "烧肉", "壽喜燒", "寿喜烧"],
+                publicSearchQuery: "japanese restaurant"
+            ),
+            SaveIntentQuery(
                 id: "coffee",
                 categories: [.cafe],
                 needles: ["coffee", "cafe", "咖啡"]
@@ -820,7 +826,7 @@ private struct SaveIntentQuery {
     }
 
     var requiresSpecificEvidenceMatch: Bool {
-        id == "milk-tea" || id == "hot-pot"
+        id == "milk-tea" || id == "hot-pot" || id == "japanese"
     }
 
     func isIntentToken(_ token: String) -> Bool {

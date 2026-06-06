@@ -706,9 +706,166 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Evidence lines starting with \"Search:\" are retrieval context"))
         XCTAssertTrue(prompt.contains("Do not treat generic restaurants as hot pot matches."))
         XCTAssertTrue(prompt.contains("Answer in the requested output language exactly."))
+        XCTAssertTrue(prompt.contains("recommend one unsaved public option by title"))
+        XCTAssertTrue(prompt.contains("Do not use parenthetical lists"))
+        XCTAssertTrue(prompt.contains("Name no more than two places."))
         XCTAssertTrue(prompt.contains("place-saved-hot-pot"))
         XCTAssertTrue(prompt.contains("Happy Lamb Hot Pot"))
         XCTAssertTrue(prompt.contains("Search: hot pot"))
+    }
+
+    func testGeminiGroundedAnswerDetectsIncompleteDrafts() {
+        XCTAssertTrue(GeminiSaveLLMClient.looksIncompleteGroundedAnswer("公開搜尋到的附近選項（"))
+        XCTAssertTrue(GeminiSaveLLMClient.looksIncompleteGroundedAnswer("我會先看 Tea Maru，"))
+        XCTAssertTrue(GeminiSaveLLMClient.looksIncompleteGroundedAnswer("I would pick Tea Maru (nearby"))
+        XCTAssertFalse(GeminiSaveLLMClient.looksIncompleteGroundedAnswer("我會先看 Tea Maru，因為最近且評分高。想喝奶茶還是水果茶？"))
+    }
+
+    func testNearbySearchDisplaysPublicDiscoveryBeforeFarSavedWhenNoNearbyMemory() {
+        let farSavedResult = SaveSearchResult(
+            id: "place-far",
+            objectType: .savedPlace,
+            userState: .wantToGo,
+            title: "Far Saved Place",
+            subtitle: "Taipei",
+            statusLabel: "Map Stamp",
+            sourceURL: nil,
+            sourcePlatform: .googleMaps,
+            category: .food,
+            cityOrArea: "Taipei",
+            latitude: 25.0330,
+            longitude: 121.5654,
+            rating: 4.6,
+            reviewCount: nil,
+            confidence: nil,
+            missingInfo: [],
+            evidence: [],
+            recoveryQueries: [],
+            createdAt: Date(),
+            canRunRecovery: false,
+            isRecommendationShell: false,
+            primaryAction: .recommendOrder
+        )
+        let publicResult = SaveSearchResult(
+            id: "map-candidate-nearby",
+            objectType: .mapVisibleUnsavedPlace,
+            userState: .unsaved,
+            title: "Nearby Japanese",
+            subtitle: "Irvine, CA",
+            statusLabel: "Not saved yet",
+            sourceURL: nil,
+            sourcePlatform: .other,
+            category: .food,
+            cityOrArea: "Irvine",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            rating: 4.8,
+            reviewCount: 1200,
+            confidence: nil,
+            missingInfo: [],
+            evidence: [],
+            recoveryQueries: [],
+            createdAt: Date(),
+            canRunRecovery: false,
+            isRecommendationShell: false,
+            primaryAction: .savePlace,
+            distanceMeters: 180
+        )
+        let response = SaveSearchResponse(
+            query: "推薦我日式餐廳",
+            assistantMessage: "我會先看 Nearby Japanese。",
+            fromYourSave: SaveSearchSection(
+                id: "from-your-save-nearby",
+                title: "From your SAV-E nearby",
+                subtitle: "No nearby saved places.",
+                results: []
+            ),
+            additionalSections: [
+                SaveSearchSection(
+                    id: "saved-but-not-nearby",
+                    label: "SAVED, FAR",
+                    title: "Saved but not nearby",
+                    subtitle: "Same category, outside radius.",
+                    results: [farSavedResult]
+                )
+            ],
+            newRecommendations: SaveSearchSection(
+                id: "nearby-unsaved-candidates",
+                label: "PUBLIC DISCOVERY",
+                title: "Public nearby options",
+                subtitle: "Public discovery stays separate.",
+                results: [publicResult]
+            )
+        )
+
+        XCTAssertEqual(response.secondaryDisplaySections.map { $0.id }, ["nearby-unsaved-candidates", "saved-but-not-nearby"])
+        XCTAssertEqual(response.groundedAnswerSections.map { $0.id }, ["nearby-unsaved-candidates"])
+    }
+
+    func testJapaneseRestaurantSearchRequiresJapaneseEvidenceForSavedPlaces() {
+        let controller = SaveSearchController()
+        let ramen = place(
+            name: "HiroNori Craft Ramen",
+            address: "Irvine, CA",
+            category: .food,
+            note: "Tonkotsu ramen and Japanese noodles",
+            latitude: 33.6846,
+            longitude: -117.8265
+        )
+        let genericFood = place(
+            name: "onns shisha bar",
+            address: "Taipei",
+            category: .food,
+            note: "Food and lounge",
+            latitude: 25.0330,
+            longitude: 121.5654
+        )
+
+        let response = controller.search(
+            query: "推薦我日式餐廳",
+            places: [genericFood, ramen],
+            localRecords: [],
+            mapCandidates: []
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["HiroNori Craft Ramen"])
+        XCTAssertFalse(response.fromYourSave.results.map(\.title).contains("onns shisha bar"))
+    }
+
+    func testJapaneseRestaurantSearchRequiresJapaneseEvidenceForPublicCandidates() {
+        let controller = SaveSearchController()
+        let sushi = SaveMapCandidate(
+            title: "Sushi Gen",
+            subtitle: "Little Tokyo · Japanese",
+            latitude: 34.0478,
+            longitude: -118.2386,
+            category: .food,
+            rating: 4.6,
+            reviewCount: 4100,
+            distanceMeters: 520,
+            evidence: ["Google Places result"]
+        )
+        let genericRestaurant = SaveMapCandidate(
+            title: "Fonda Moderna",
+            subtitle: "Tustin, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            category: .food,
+            rating: 4.7,
+            reviewCount: 900,
+            distanceMeters: 180,
+            evidence: ["Google Places result"]
+        )
+
+        let response = controller.search(
+            query: "推薦我日式餐廳",
+            places: [],
+            localRecords: [],
+            mapCandidates: [genericRestaurant, sushi]
+        )
+
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Sushi Gen"])
+        XCTAssertFalse(response.newRecommendations.results.map(\.title).contains("Fonda Moderna"))
     }
 
     func testAgentPromptPolicyHandlesNoAllowedResultsAsBoundedFollowUp() {
