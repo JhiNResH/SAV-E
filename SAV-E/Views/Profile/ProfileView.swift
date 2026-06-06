@@ -1099,7 +1099,7 @@ struct ProfileGlassBackground: View {
     }
 
     private var materialOpacity: Double {
-        colorScheme == .dark ? 0.24 : 0.24
+        0.24
     }
 
     private var topStroke: Color {
