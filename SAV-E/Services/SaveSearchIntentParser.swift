@@ -136,6 +136,7 @@ struct SaveSearchIntentParser {
             (.cafe, ["milk tea", "boba", "bubble tea", "tea shop", "奶茶", "珍奶", "珍珠奶茶"]),
             (.cafe, ["coffee", "cafe", "coffee shop", "咖啡", "咖啡廳", "咖啡厅"]),
             (.food, ["hot pot", "hotpot", "shabu", "shabu shabu", "火鍋", "火锅", "涮涮鍋", "涮涮锅"]),
+            (.food, ["japanese", "japanese restaurant", "japanese food", "sushi", "ramen", "izakaya", "yakiniku", "sukiyaki", "日式", "日式餐廳", "日式餐厅", "日本料理", "日式料理", "壽司", "寿司", "拉麵", "拉面", "居酒屋", "燒肉", "烧肉", "壽喜燒", "寿喜烧"]),
             (.food, ["food", "restaurant", "restaurants", "dinner", "lunch", "sushi", "ramen", "餐廳", "餐厅", "晚餐", "午餐", "吃飯", "吃饭", "美食"]),
             (.bar, ["bar", "cocktail", "drink", "drinks", "酒吧", "喝酒", "調酒", "调酒"]),
             (.attraction, ["attraction", "museum", "gallery", "exhibition", "spot", "景點", "景点", "展覽", "展览", "美術館", "美术馆", "博物館", "博物馆"]),
@@ -173,6 +174,9 @@ extension SaveSearchIntent {
         if categoryNeedles.contains(where: Self.milkTeaNeedles.contains) {
             return "boba / milk tea"
         }
+        if categoryNeedles.contains(where: Self.japaneseNeedles.contains) {
+            return "Japanese"
+        }
         guard let category = requiredCategories.first else { return "places" }
         return category.displayName.lowercased()
     }
@@ -183,6 +187,9 @@ extension SaveSearchIntent {
         }
         if categoryNeedles.contains(where: Self.milkTeaNeedles.contains) {
             return "奶茶 / 珍奶"
+        }
+        if categoryNeedles.contains(where: Self.japaneseNeedles.contains) {
+            return "日式餐廳"
         }
         guard let category = requiredCategories.first else { return "地點" }
         switch category {
@@ -204,7 +211,8 @@ extension SaveSearchIntent {
 
     private static let milkTeaNeedles: Set<String> = ["milk tea", "boba", "bubble tea", "tea shop", "奶茶", "珍奶", "珍珠奶茶"]
     private static let hotPotNeedles: Set<String> = ["hot pot", "hotpot", "shabu", "shabu shabu", "火鍋", "火锅", "涮涮鍋", "涮涮锅"]
-    private static let specificEvidenceNeedles = milkTeaNeedles.union(hotPotNeedles)
+    private static let japaneseNeedles: Set<String> = ["japanese", "japanese restaurant", "japanese food", "sushi", "ramen", "izakaya", "yakiniku", "sukiyaki", "日式", "日式餐廳", "日式餐厅", "日本料理", "日式料理", "壽司", "寿司", "拉麵", "拉面", "居酒屋", "燒肉", "烧肉", "壽喜燒", "寿喜烧"]
+    private static let specificEvidenceNeedles = milkTeaNeedles.union(hotPotNeedles).union(japaneseNeedles)
 }
 
 enum SaveSearchIntentValidationError: Error, Equatable {

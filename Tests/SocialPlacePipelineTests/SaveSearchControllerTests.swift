@@ -802,6 +802,72 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.groundedAnswerSections.map { $0.id }, ["nearby-unsaved-candidates"])
     }
 
+    func testJapaneseRestaurantSearchRequiresJapaneseEvidenceForSavedPlaces() {
+        let controller = SaveSearchController()
+        let ramen = place(
+            name: "HiroNori Craft Ramen",
+            address: "Irvine, CA",
+            category: .food,
+            note: "Tonkotsu ramen and Japanese noodles",
+            latitude: 33.6846,
+            longitude: -117.8265
+        )
+        let genericFood = place(
+            name: "onns shisha bar",
+            address: "Taipei",
+            category: .food,
+            note: "Food and lounge",
+            latitude: 25.0330,
+            longitude: 121.5654
+        )
+
+        let response = controller.search(
+            query: "推薦我日式餐廳",
+            places: [genericFood, ramen],
+            localRecords: [],
+            mapCandidates: []
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.map(\.title), ["HiroNori Craft Ramen"])
+        XCTAssertFalse(response.fromYourSave.results.map(\.title).contains("onns shisha bar"))
+    }
+
+    func testJapaneseRestaurantSearchRequiresJapaneseEvidenceForPublicCandidates() {
+        let controller = SaveSearchController()
+        let sushi = SaveMapCandidate(
+            title: "Sushi Gen",
+            subtitle: "Little Tokyo · Japanese",
+            latitude: 34.0478,
+            longitude: -118.2386,
+            category: .food,
+            rating: 4.6,
+            reviewCount: 4100,
+            distanceMeters: 520,
+            evidence: ["Google Places result"]
+        )
+        let genericRestaurant = SaveMapCandidate(
+            title: "Fonda Moderna",
+            subtitle: "Tustin, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            category: .food,
+            rating: 4.7,
+            reviewCount: 900,
+            distanceMeters: 180,
+            evidence: ["Google Places result"]
+        )
+
+        let response = controller.search(
+            query: "推薦我日式餐廳",
+            places: [],
+            localRecords: [],
+            mapCandidates: [genericRestaurant, sushi]
+        )
+
+        XCTAssertEqual(response.newRecommendations.results.map(\.title), ["Sushi Gen"])
+        XCTAssertFalse(response.newRecommendations.results.map(\.title).contains("Fonda Moderna"))
+    }
+
     func testAgentPromptPolicyHandlesNoAllowedResultsAsBoundedFollowUp() {
         let policy = SaveAgentPromptPolicy()
         let request = GroundedAnswerRequest(
