@@ -5,6 +5,7 @@ import UIKit
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appLanguageSettings) private var languageSettings
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showEditProfile = false
     @State private var showLanguageSettings = false
@@ -100,12 +101,14 @@ struct ProfileView: View {
                         }
                     }
                     .padding(12)
-                    .saveNotebookPage(cornerRadius: 18)
+                    .profileGlassSurface(cornerRadius: 18, tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, lineWidth: 1.1)
                     .padding(.horizontal)
                 }
                 .padding(.bottom, 32)
+                .profileGlassGroup(spacing: 16)
+                .padding(.top, 2)
             }
-            .background(SaveDottedBackground())
+            .background(ProfileGlassBackground(colorScheme: colorScheme))
             .toolbar(.hidden, for: .navigationBar)
         }
         .task {
@@ -342,25 +345,15 @@ private struct PassportTopBar: View {
                     Text(languageSettings.text(.edit))
                         .font(.caption.weight(.black))
                 }
-                        .foregroundColor(.saveInk)
-                        .padding(.horizontal, 11)
-                        .frame(height: 38)
-                        .background(Color.saveHoney)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 2)
-                        )
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 11)
+                    .frame(height: 38)
+                    .profileGlassSurface(cornerRadius: 14, tint: .saveHoney, fillOpacity: 0.34, strokeOpacity: 0.42, lineWidth: 1.1, isInteractive: true)
             }
             .buttonStyle(.plain)
         }
         .padding(10)
-        .background(Color.saveNotebookPage.opacity(0.96))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 2)
-        )
+        .profileGlassSurface(cornerRadius: 22, tint: .saveCream, fillOpacity: 0.16, strokeOpacity: 0.28)
     }
 }
 
@@ -374,12 +367,7 @@ private struct PassportIconButton: View {
                 .font(.caption.weight(.black))
                 .foregroundColor(.saveInk)
                 .frame(width: 38, height: 38)
-                .background(Color.saveNotebookPage)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine, lineWidth: 2)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .profileGlassSurface(cornerRadius: 14, tint: .saveCream, fillOpacity: 0.12, strokeOpacity: 0.28, isInteractive: true)
         }
         .buttonStyle(.plain)
     }
@@ -401,8 +389,7 @@ private struct PassportHero: View {
                                 .font(.system(size: 18, weight: .black))
                                 .foregroundColor(.saveInk)
                                 .frame(width: 28, height: 28)
-                                .background(Circle().fill(Color.saveNotebookPage))
-                                .overlay(Circle().stroke(Color.saveNotebookLine, lineWidth: 1.2))
+                                .profileGlassCapsule(tint: .saveCream, fillOpacity: 0.12, strokeOpacity: 0.34, lineWidth: 1)
                                 .clipShape(Circle())
                                 .offset(x: 6, y: 6)
                         }
@@ -432,7 +419,7 @@ private struct PassportHero: View {
             }
             .padding(16)
         }
-        .saveNotebookPage(cornerRadius: 22)
+        .profileGlassSurface(cornerRadius: 22, tint: .saveCream, fillOpacity: 0.18, strokeOpacity: 0.32, lineWidth: 1.2)
     }
 
     private var visitedBadgeText: String {
@@ -535,7 +522,7 @@ private struct PassportNotebookSpine: View {
         }
         .frame(width: 24)
         .padding(.top, 18)
-        .background(color.opacity(0.86))
+        .background(color.opacity(0.42))
     }
 }
 
@@ -613,7 +600,7 @@ private struct PassportStampSection: View {
             PassportStampRow(icon: "calendar", title: languageSettings.text(.memberSince), value: profile.createdAt.formatted(date: .abbreviated, time: .omitted))
         }
         .padding()
-        .saveNotebookPage(cornerRadius: 18)
+        .profileGlassSurface(cornerRadius: 18, tint: .saveCream, fillOpacity: 0.16, strokeOpacity: 0.28)
         .padding(.horizontal)
     }
 
@@ -739,12 +726,7 @@ private struct PassportCountingRulesPanel: View {
             }
         }
         .padding(12)
-        .background(Color.saveNotebookPage.opacity(0.78))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .profileGlassSurface(cornerRadius: 16, tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, lineWidth: 1)
         .padding(.horizontal)
     }
 
@@ -823,12 +805,7 @@ private struct PassportVisibilityPanel: View {
             }
         }
         .padding(12)
-        .background(Color.saveNotebookPage.opacity(0.78))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .profileGlassSurface(cornerRadius: 16, tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, lineWidth: 1)
         .padding(.horizontal)
     }
 }
@@ -903,15 +880,12 @@ private struct PassportVisibilityRow: View {
                 .foregroundColor(.saveInk)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .background(Color.saveNotebookPage.opacity(0.58))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1))
+                .profileGlassCapsule(tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, isInteractive: true)
             }
             .disabled(isUpdating)
         }
         .padding(8)
-        .background(Color.saveCream.opacity(0.38))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .profileGlassSurface(cornerRadius: 12, tint: .saveCream, fillOpacity: 0.10, strokeOpacity: 0.18, lineWidth: 1)
         .onChange(of: place.effectiveVisibility) { _, visibility in
             selectedVisibility = visibility
         }
@@ -1001,9 +975,11 @@ struct SettingsRow: View {
                     .font(.caption2)
                     .foregroundColor(.saveMutedText)
             }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 4)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 10)
+            .profileGlassSurface(cornerRadius: 14, tint: color, fillOpacity: 0.10, strokeOpacity: 0.18, lineWidth: 1, isInteractive: true)
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1078,6 +1054,131 @@ private struct LanguageSettingsSheet: View {
             .padding(.horizontal, 18)
             .background(SaveDottedBackground())
             .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+struct ProfileGlassBackground: View {
+    let colorScheme: ColorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .opacity(materialOpacity)
+            .background(baseTint)
+            .overlay {
+                LinearGradient(
+                    colors: tintStops,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(topStroke)
+                    .frame(height: 1)
+            }
+            .ignoresSafeArea()
+    }
+
+    private var tintStops: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color.black.opacity(0.01),
+                Color.black.opacity(0.035)
+            ]
+        }
+        return [
+            Color.white.opacity(0.01),
+            Color.saveCream.opacity(0.025)
+        ]
+    }
+
+    private var baseTint: Color {
+        colorScheme == .dark ? Color.black.opacity(0.04) : Color.white.opacity(0.03)
+    }
+
+    private var materialOpacity: Double {
+        0.24
+    }
+
+    private var topStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.24)
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func profileGlassGroup(spacing: CGFloat) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                self
+            }
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func profileGlassSurface(
+        cornerRadius: CGFloat,
+        tint: Color = .saveCream,
+        fillOpacity: Double = 0.14,
+        strokeOpacity: Double = 0.26,
+        lineWidth: CGFloat = 1,
+        isInteractive: Bool = false
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .background(tint.opacity(fillOpacity))
+                .glassEffect(
+                    .regular
+                        .tint(tint.opacity(0.18))
+                        .interactive(isInteractive),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: lineWidth)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        } else {
+            self
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .background(tint.opacity(fillOpacity), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: lineWidth)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    func profileGlassCapsule(
+        tint: Color = .saveCream,
+        fillOpacity: Double = 0.14,
+        strokeOpacity: Double = 0.26,
+        lineWidth: CGFloat = 1,
+        isInteractive: Bool = false
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .background(tint.opacity(fillOpacity))
+                .glassEffect(
+                    .regular
+                        .tint(tint.opacity(0.18))
+                        .interactive(isInteractive),
+                    in: Capsule()
+                )
+                .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: lineWidth))
+                .clipShape(Capsule())
+        } else {
+            self
+                .background(.ultraThinMaterial, in: Capsule())
+                .background(tint.opacity(fillOpacity), in: Capsule())
+                .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(strokeOpacity), lineWidth: lineWidth))
+                .clipShape(Capsule())
         }
     }
 }

@@ -15,7 +15,7 @@ struct StatsView: View {
             StatItem(value: "\(stats.waitingClues)", label: languageSettings.text(.waitingClues), color: .saveSignal, icon: "circle.hexagongrid")
         }
         .padding(12)
-        .saveNotebookPage(cornerRadius: 18)
+        .profileGlassSurface(cornerRadius: 18, tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, lineWidth: 1)
         .padding(.horizontal)
     }
 }
@@ -52,12 +52,7 @@ struct StatItem: View {
         }
         .frame(maxWidth: .infinity)
         .padding(10)
-        .background(Color.saveNotebookPage.opacity(0.92))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .profileGlassSurface(cornerRadius: 10, tint: color, fillOpacity: 0.10, strokeOpacity: 0.20, lineWidth: 1)
     }
 }
 
@@ -65,5 +60,5 @@ struct StatItem: View {
     StatsView(stats: PassportStats(profile: .mock, savedPlaces: Place.mockList, waitingClues: 2))
         .environment(\.appLanguageSettings, AppLanguageSettings())
         .padding()
-        .background(SaveDottedBackground())
+        .background(ProfileGlassBackground(colorScheme: .light))
 }
