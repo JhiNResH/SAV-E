@@ -1443,6 +1443,192 @@ extension SaveSearchResponse {
     }
 }
 
+
+
+// MARK: - Recommendation Receipts
+
+struct RecommendationReceiptDraft {
+    var query: String
+    var answerSource: String
+    var answerMessage: String
+    var selectedResultID: String?
+    var selectedResultTitle: String?
+    var resultSnapshots: [RecommendationResultSnapshot]
+    var preferenceSignals: [RecommendationPreferenceSignal]
+    var publicFallbackUsed: Bool
+    var createdAt: Date
+
+    var body: [String: Any] {
+        [
+            "query": query,
+            "answer_source": answerSource,
+            "answer_message": answerMessage,
+            "selected_result_id": selectedResultID ?? NSNull(),
+            "selected_result_title": selectedResultTitle ?? NSNull(),
+            "result_snapshots": resultSnapshots.map(\.body),
+            "preference_signals": preferenceSignals.map(\.body),
+            "public_fallback_used": publicFallbackUsed,
+            "created_at": ISO8601DateFormatter().string(from: createdAt),
+        ]
+    }
+}
+
+struct RecommendationResultSnapshot: Hashable {
+    var resultID: String
+    var title: String
+    var objectType: String
+    var userState: String
+    var category: String?
+    var rating: Double?
+    var reviewCount: Int?
+    var distanceMeters: Double?
+    var reasons: [String]
+
+    init(result: SaveSearchResult) {
+        resultID = result.id
+        title = result.title
+        objectType = result.objectType.rawValue
+        userState = result.userState.rawValue
+        category = result.category?.rawValue
+        rating = result.rating
+        reviewCount = result.reviewCount
+        distanceMeters = result.distanceMeters
+        reasons = result.evidence
+    }
+
+    var body: [String: Any] {
+        [
+            "result_id": resultID,
+            "title": title,
+            "object_type": objectType,
+            "user_state": userState,
+            "category": category ?? NSNull(),
+            "rating": rating ?? NSNull(),
+            "review_count": reviewCount ?? NSNull(),
+            "distance_meters": distanceMeters ?? NSNull(),
+            "reasons": reasons,
+        ]
+    }
+}
+
+struct RecommendationPreferenceSignal: Hashable {
+    enum Source: String {
+        case savedMemory = "saved_memory"
+        case visitedMemory = "visited_memory"
+        case reviewCandidate = "review_candidate"
+        case publicQuality = "public_quality"
+    }
+
+    var source: Source
+    var key: String
+    var value: String
+    var weight: Int
+    var evidence: String
+
+    var body: [String: Any] {
+        [
+            "source": source.rawValue,
+            "key": key,
+            "value": value,
+            "weight": weight,
+            "evidence": evidence,
+        ]
+    }
+}
+
+extension SaveSearchResponse {
+    func recommendationReceiptDraft(createdAt: Date = Date()) -> RecommendationReceiptDraft? {
+        guard let answer = resolvedAgentAnswer else { return nil }
+        let snapshots = groundedAnswerSections
+            .flatMap(\.results)
+            .prefix(8)
+            .map(RecommendationResultSnapshot.init(result:))
+        guard !snapshots.isEmpty else { return nil }
+
+        let selected = selectedRecommendationResult
+        return RecommendationReceiptDraft(
+            query: query,
+            answerSource: answer.source.rawValue,
+            answerMessage: answer.message,
+            selectedResultID: selected?.id,
+            selectedResultTitle: selected?.title,
+            resultSnapshots: Array(snapshots),
+            preferenceSignals: recommendationPreferenceSignals,
+            publicFallbackUsed: fromYourSave.results.isEmpty && !newRecommendations.results.isEmpty,
+            createdAt: createdAt
+        )
+    }
+
+    private var selectedRecommendationResult: SaveSearchResult? {
+        fromYourSave.results.first ??
+            additionalSections.flatMap(\.results).first ??
+            newRecommendations.results.first
+    }
+
+    var recommendationPreferenceSignals: [RecommendationPreferenceSignal] {
+        let results = groundedAnswerSections.flatMap(\.results)
+        var signals: [RecommendationPreferenceSignal] = []
+
+        for result in results.prefix(8) {
+            let source = preferenceSource(for: result)
+            if let category = result.category {
+                signals.append(RecommendationPreferenceSignal(
+                    source: source,
+                    key: "category",
+                    value: category.rawValue,
+                    weight: source == .publicQuality ? 1 : 3,
+                    evidence: result.title
+                ))
+            }
+            if let rating = result.rating, rating >= 4.0 {
+                signals.append(RecommendationPreferenceSignal(
+                    source: source,
+                    key: "rating",
+                    value: String(format: "%.1f", rating),
+                    weight: rating >= 4.5 ? 3 : 2,
+                    evidence: result.title
+                ))
+            }
+            for reason in result.evidence.prefix(3) {
+                let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                signals.append(RecommendationPreferenceSignal(
+                    source: source,
+                    key: "reason",
+                    value: trimmed,
+                    weight: source == .publicQuality ? 1 : 2,
+                    evidence: result.title
+                ))
+            }
+        }
+
+        return Array(signals.uniquedByStableKey().prefix(24))
+    }
+
+    private func preferenceSource(for result: SaveSearchResult) -> RecommendationPreferenceSignal.Source {
+        switch result.objectType {
+        case .triedMemory:
+            return .visitedMemory
+        case .savedPlace:
+            return .savedMemory
+        case .pendingCandidate, .sourceOnlyClue:
+            return .reviewCandidate
+        case .mapVisibleUnsavedPlace, .newRecommendation, .review, .tripStop:
+            return .publicQuality
+        }
+    }
+}
+
+private extension Array where Element == RecommendationPreferenceSignal {
+    func uniquedByStableKey() -> [RecommendationPreferenceSignal] {
+        var seen = Set<String>()
+        return filter { signal in
+            let key = "\(signal.source.rawValue)|\(signal.key)|\(signal.value)|\(signal.evidence)"
+            return seen.insert(key).inserted
+        }
+    }
+}
+
 struct FoodPlaceInsight: Identifiable, Hashable {
     var id: String
     var title: String

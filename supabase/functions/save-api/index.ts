@@ -44,6 +44,9 @@ Deno.serve(async (request) => {
     if (route.resource === "place-resolve") {
       return await handlePlaceResolve(request);
     }
+    if (route.resource === "v0" && route.id === "recommendation-receipts") {
+      return await handleRecommendationReceipts(request, userId);
+    }
 
     return jsonResponse({ error: "Not found" }, 404);
   } catch (error) {
@@ -104,6 +107,39 @@ async function handlePlaces(
   }
 
   return jsonResponse({ error: "Unsupported places route" }, 405);
+}
+
+async function handleRecommendationReceipts(
+  request: Request,
+  userId: string,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return jsonResponse(
+      { error: "Unsupported recommendation-receipts route" },
+      405,
+    );
+  }
+
+  const body = await readJson(request);
+  const query = typeof body.query === "string" ? body.query.trim() : "";
+  if (!query) throw new ApiError(400, "query is required");
+
+  const row = {
+    user_id: userId,
+    query,
+    answer_source: stringValue(body.answer_source, "deterministic"),
+    answer_message: stringValue(body.answer_message, ""),
+    selected_result_id: nullableString(body.selected_result_id),
+    selected_result_title: nullableString(body.selected_result_title),
+    result_snapshots: arrayValue(body.result_snapshots),
+    preference_signals: arrayValue(body.preference_signals),
+    public_fallback_used: Boolean(body.public_fallback_used),
+    created_at: nullableString(body.created_at) ?? new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase.from("recommendation_receipts")
+    .insert(row).select("id, created_at").single();
+  return result(data, error, 201);
 }
 
 async function handleTrips(
@@ -282,7 +318,8 @@ async function amapPlaceSearch(query: string): Promise<JsonBody[]> {
       provider: "amap",
       id: String(poi.id ?? `amap-${poi.name}-${lat}-${lng}`),
       name: String(poi.name ?? ""),
-      address: compactUnique([poi.pname, poi.cityname, poi.adname, poi.address]).join(""),
+      address: compactUnique([poi.pname, poi.cityname, poi.adname, poi.address])
+        .join(""),
       latitude: lat,
       longitude: lng,
       rating: numberValue(biz?.rating),
@@ -291,7 +328,9 @@ async function amapPlaceSearch(query: string): Promise<JsonBody[]> {
       types: compactUnique([poi.type, poi.typecode]),
       coordinateSystem: "GCJ-02",
     };
-  }).filter((match: JsonBody) => match.name && match.latitude && match.longitude);
+  }).filter((match: JsonBody) =>
+    match.name && match.latitude && match.longitude
+  );
 }
 
 async function baiduPlaceSearch(query: string): Promise<JsonBody[]> {
@@ -313,9 +352,16 @@ async function baiduPlaceSearch(query: string): Promise<JsonBody[]> {
     const details = asOptionalObject(place.detail_info);
     return {
       provider: "baidu",
-      id: String(place.uid ?? `baidu-${place.name}-${location?.lat}-${location?.lng}`),
+      id: String(
+        place.uid ?? `baidu-${place.name}-${location?.lat}-${location?.lng}`,
+      ),
       name: String(place.name ?? ""),
-      address: compactUnique([place.province, place.city, place.area, place.address]).join(""),
+      address: compactUnique([
+        place.province,
+        place.city,
+        place.area,
+        place.address,
+      ]).join(""),
       latitude: numberValue(location?.lat),
       longitude: numberValue(location?.lng),
       rating: numberValue(details?.overall_rating),
@@ -324,7 +370,9 @@ async function baiduPlaceSearch(query: string): Promise<JsonBody[]> {
       types: compactUnique([place.tag]),
       coordinateSystem: "BD-09",
     };
-  }).filter((match: JsonBody) => match.name && match.latitude && match.longitude);
+  }).filter((match: JsonBody) =>
+    match.name && match.latitude && match.longitude
+  );
 }
 
 async function fetchJson(url: URL): Promise<JsonBody> {
@@ -345,8 +393,22 @@ function dedupePlaceMatches(matches: JsonBody[]): JsonBody[] {
 
 function chinaCityHint(query: string): string | undefined {
   return [
-    "北京", "上海", "广州", "深圳", "杭州", "成都", "重庆", "南京",
-    "苏州", "西安", "武汉", "长沙", "厦门", "青岛", "天津", "宁波",
+    "北京",
+    "上海",
+    "广州",
+    "深圳",
+    "杭州",
+    "成都",
+    "重庆",
+    "南京",
+    "苏州",
+    "西安",
+    "武汉",
+    "长沙",
+    "厦门",
+    "青岛",
+    "天津",
+    "宁波",
   ].find((city) => query.includes(city));
 }
 
@@ -355,10 +417,24 @@ function parseLngLat(value: string): [number | null, number | null] {
   return [Number.isFinite(lng) ? lng : null, Number.isFinite(lat) ? lat : null];
 }
 
+function stringValue(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function compactUnique(values: unknown[]): string[] {
   const result: string[] = [];
   for (const value of values) {
-    const text = Array.isArray(value) ? value.join(" ") : String(value ?? "").trim();
+    const text = Array.isArray(value)
+      ? value.join(" ")
+      : String(value ?? "").trim();
     if (text && !result.includes(text)) result.push(text);
   }
   return result;
@@ -370,7 +446,9 @@ function numberValue(value: unknown): number | null {
 }
 
 function asOptionalObject(value: unknown): JsonBody | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonBody : undefined;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonBody
+    : undefined;
 }
 
 async function ensureProfile(userId: string): Promise<void> {

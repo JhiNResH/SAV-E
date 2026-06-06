@@ -34,6 +34,7 @@ protocol SupabaseServiceProtocol {
     func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse
     func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard
     func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool) async throws -> ClaimUsageReceipt
+    func recordRecommendationReceipt(_ receipt: RecommendationReceiptDraft) async throws
 }
 
 // MARK: - Errors
@@ -188,6 +189,13 @@ final class SupabaseService: SupabaseServiceProtocol {
         let body = try Self.jsonBody(receipt.body)
         let data = try await request(path: path, method: "POST", body: body, requiresAuth: requiresAuth)
         return try JSONDecoder.supabase.decode(ClaimUsageReceipt.self, from: data)
+    }
+
+    func recordRecommendationReceipt(_ receipt: RecommendationReceiptDraft) async throws {
+        guard isConfigured else { return }
+
+        let body = try Self.jsonBody(receipt.body)
+        try await request(path: "/v0/recommendation-receipts", method: "POST", body: body)
     }
 
     // MARK: - Memory Candidates

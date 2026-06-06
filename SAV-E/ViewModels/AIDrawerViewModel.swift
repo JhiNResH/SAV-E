@@ -42,24 +42,44 @@ final class AIDrawerViewModel: ObservableObject {
     private let locationIntentRecommendationService: SaveLocationIntentRecommendationService
     private let locationService: any AIDrawerLocationProviding
     private let groundedAnswerClient: SaveLLMClient?
+    private let persistenceService: SupabaseServiceProtocol
 
     /// Multi-turn conversation context for the current session.
     private var conversationTurns: [ConversationTurn] = []
     private var activeRequestID: UUID?
     private var lastSaveSearchResponse: SaveSearchResponse?
 
-    init(
+    convenience init(
         aiService: SaveAIService = .shared,
         saveSearchController: SaveSearchController = SaveSearchController(),
         locationIntentRecommendationService: SaveLocationIntentRecommendationService = SaveLocationIntentRecommendationService(),
         locationService: (any AIDrawerLocationProviding)? = nil,
         groundedAnswerClient: SaveLLMClient? = GeminiSaveLLMClient.liveFromConfig()
     ) {
+        self.init(
+            aiService: aiService,
+            saveSearchController: saveSearchController,
+            locationIntentRecommendationService: locationIntentRecommendationService,
+            locationService: locationService,
+            groundedAnswerClient: groundedAnswerClient,
+            persistenceService: SupabaseService.shared
+        )
+    }
+
+    init(
+        aiService: SaveAIService = .shared,
+        saveSearchController: SaveSearchController = SaveSearchController(),
+        locationIntentRecommendationService: SaveLocationIntentRecommendationService = SaveLocationIntentRecommendationService(),
+        locationService: (any AIDrawerLocationProviding)? = nil,
+        groundedAnswerClient: SaveLLMClient? = GeminiSaveLLMClient.liveFromConfig(),
+        persistenceService: SupabaseServiceProtocol
+    ) {
         self.aiService = aiService
         self.saveSearchController = saveSearchController
         self.locationIntentRecommendationService = locationIntentRecommendationService
         self.locationService = locationService ?? LocationService.shared
         self.groundedAnswerClient = groundedAnswerClient
+        self.persistenceService = persistenceService
     }
 
     func submit(
@@ -422,6 +442,7 @@ final class AIDrawerViewModel: ObservableObject {
         drawerState = .saveSearchResults(groundedResponse)
         lastSaveSearchResponse = groundedResponse
         mapAction = mapAction(for: groundedResponse)
+        await recordRecommendationReceiptIfNeeded(for: groundedResponse)
     }
 
     private func showSearchFollowUpResponse(
@@ -456,6 +477,7 @@ final class AIDrawerViewModel: ObservableObject {
         drawerState = .saveSearchResults(groundedResponse)
         lastSaveSearchResponse = groundedResponse
         mapAction = mapAction(for: groundedResponse)
+        await recordRecommendationReceiptIfNeeded(for: groundedResponse)
     }
 
     private func showTripPlanningResponse(query: String, outputLanguage: AppLanguage) async {
@@ -519,6 +541,16 @@ final class AIDrawerViewModel: ObservableObject {
         if chatHistory.first?.query != query {
             chatHistory.insert(ChatEntry(query: query, timestamp: Date()), at: 0)
             if chatHistory.count > 20 { chatHistory.removeLast() }
+        }
+    }
+
+    private func recordRecommendationReceiptIfNeeded(for response: SaveSearchResponse) async {
+        guard let receipt = response.recommendationReceiptDraft() else { return }
+        do {
+            try await persistenceService.recordRecommendationReceipt(receipt)
+        } catch {
+            // Recommendation receipts are learning telemetry, not a UI blocker.
+            // Keep the answer visible even when the backend is offline/unconfigured.
         }
     }
 

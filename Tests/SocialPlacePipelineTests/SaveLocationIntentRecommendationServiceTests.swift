@@ -355,6 +355,54 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertFalse(response.shouldAutoSearchNearbyUnsavedCandidates)
     }
 
+    func testRecommendationReceiptCapturesSelectedSavedPlaceAndPreferenceSignals() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let nearbyCafe = place(
+            name: "Bright Coffee Bar",
+            category: .cafe,
+            latitude: 33.6849,
+            longitude: -117.8262,
+            note: "quiet tables match work cafe preference",
+            googleRating: 4.6
+        )
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "我今天想喝咖啡推薦一家咖啡給我",
+            places: [nearbyCafe],
+            currentLocation: currentLocation
+        ))
+        let receipt = try XCTUnwrap(response.recommendationReceiptDraft(createdAt: Date(timeIntervalSince1970: 0)))
+
+        XCTAssertEqual(receipt.query, "我今天想喝咖啡推薦一家咖啡給我")
+        XCTAssertEqual(receipt.selectedResultTitle, "Bright Coffee Bar")
+        XCTAssertFalse(receipt.publicFallbackUsed)
+        XCTAssertTrue(receipt.resultSnapshots.contains { $0.title == "Bright Coffee Bar" && $0.objectType == SaveSearchObjectType.savedPlace.rawValue })
+        XCTAssertTrue(receipt.preferenceSignals.contains { $0.source == .savedMemory && $0.key == "category" && $0.value == PlaceCategory.cafe.rawValue })
+        XCTAssertTrue(receipt.preferenceSignals.contains { $0.key == "rating" && $0.value == "4.6" })
+        XCTAssertNoThrow(try JSONSerialization.data(withJSONObject: receipt.body))
+    }
+
+    func testRecommendationReceiptMarksPublicFallbackSeparately() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let publicCoffee = mapCandidate(name: "Public Coffee", category: .cafe)
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "推薦我咖啡廳",
+            places: [],
+            mapCandidates: [publicCoffee],
+            currentLocation: currentLocation,
+            outputLanguage: .traditionalChinese
+        ))
+        let receipt = try XCTUnwrap(response.recommendationReceiptDraft(createdAt: Date(timeIntervalSince1970: 0)))
+
+        XCTAssertEqual(receipt.selectedResultTitle, "Public Coffee")
+        XCTAssertTrue(receipt.publicFallbackUsed)
+        XCTAssertTrue(receipt.preferenceSignals.contains { $0.source == .publicQuality })
+        XCTAssertFalse(receipt.preferenceSignals.contains { $0.source == .savedMemory })
+    }
+
     func testRestaurantRecommendationUsesCurrentLocationAndIncludesReviewCandidates() throws {
         let service = SaveLocationIntentRecommendationService()
         let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
