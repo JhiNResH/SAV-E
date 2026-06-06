@@ -621,15 +621,18 @@ struct ClaimRecommendationRequest: Equatable {
 struct ClaimRecommendationResponse: Codable, Equatable {
     let results: [ClaimRecommendationResult]
     let retrievalReceipt: ClaimRetrievalReceipt
+    let agentShackReceiptEnvelope: AgentShackReceiptEnvelope?
 
     static let empty = ClaimRecommendationResponse(
         results: [],
-        retrievalReceipt: ClaimRetrievalReceipt(used: [], skipped: [], publicWebUsed: false)
+        retrievalReceipt: ClaimRetrievalReceipt(used: [], skipped: [], publicWebUsed: false),
+        agentShackReceiptEnvelope: nil
     )
 
     enum CodingKeys: String, CodingKey {
         case results
         case retrievalReceipt = "retrieval_receipt"
+        case agentShackReceiptEnvelope = "agent_shack_receipt_envelope"
     }
 }
 
@@ -666,6 +669,72 @@ struct ClaimRetrievalReceipt: Codable, Equatable {
         case used
         case skipped
         case publicWebUsed = "public_web_used"
+    }
+}
+
+struct AgentShackReceiptEnvelope: Codable, Equatable {
+    let product: String
+    let receiptType: String
+    let userId: String
+    let agentId: String
+    let capability: String
+    let inputHash: String
+    let outputHash: String
+    let privatePayloadRef: String
+    let publicSummary: RecommendationAnalysisPublicSummary
+    let preferenceSignals: [String]
+    let evaluatorVerdict: String
+    let settlementState: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case product
+        case receiptType = "receipt_type"
+        case userId = "user_id"
+        case agentId = "agent_id"
+        case capability
+        case inputHash = "input_hash"
+        case outputHash = "output_hash"
+        case privatePayloadRef = "private_payload_ref"
+        case publicSummary = "public_summary"
+        case preferenceSignals = "preference_signals"
+        case evaluatorVerdict = "evaluator_verdict"
+        case settlementState = "settlement_state"
+        case createdAt = "created_at"
+    }
+}
+
+struct RecommendationAnalysisPublicSummary: Codable, Equatable {
+    let summary: String
+    let capability: String
+    let resultCount: Int
+    let savedResultCount: Int
+    let publicResultCount: Int
+    let proofLevelMin: String?
+    let publicWebUsed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case summary
+        case capability
+        case resultCount = "result_count"
+        case savedResultCount = "saved_result_count"
+        case publicResultCount = "public_result_count"
+        case proofLevelMin = "proof_level_min"
+        case publicWebUsed = "public_web_used"
+    }
+}
+
+struct SaveRecommendationAnalysisReceipt: Codable, Identifiable, Equatable {
+    let id: UUID
+    let envelope: AgentShackReceiptEnvelope
+    let fullPayloadJSON: String
+
+    var agentShackProjection: AgentShackReceiptEnvelope { envelope }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case envelope
+        case fullPayloadJSON = "full_payload_json"
     }
 }
 

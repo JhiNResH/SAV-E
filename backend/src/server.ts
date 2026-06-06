@@ -32,6 +32,10 @@ import {
   placeRecoveryWorkflowId,
   receiptForResult,
 } from "./workflowContracts.js";
+import {
+  buildRecommendationAnalysisReceiptDraft,
+  envelopeForRecommendationAnalysisReceipt,
+} from "./receiptEnvelope.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -153,6 +157,24 @@ const claimUsageReceiptFields = [
   "consumer_user_id",
   "action",
   "outcome",
+  "created_at",
+] as const;
+
+const recommendationAnalysisReceiptFields = [
+  "id",
+  "user_id",
+  "product",
+  "receipt_type",
+  "agent_id",
+  "capability",
+  "input_hash",
+  "output_hash",
+  "private_payload_ref",
+  "private_payload",
+  "public_summary",
+  "preference_signals",
+  "evaluator_verdict",
+  "settlement_state",
   "created_at",
 ] as const;
 
@@ -315,6 +337,8 @@ const jsonbFields = new Set([
   "output",
   "output_schema",
   "payload",
+  "private_payload",
+  "public_summary",
   "ratings",
 ]);
 
@@ -660,7 +684,23 @@ async function handleRecommendByClaims(
     [userId, proofLevels],
   );
 
-  return sendJson(response, recommendPlacesByClaims(rows.map((row) => formatDates(row)), recommendationRequest));
+  const recommendationOutput = recommendPlacesByClaims(rows.map((row) => formatDates(row)), recommendationRequest);
+  const receiptDraft = buildRecommendationAnalysisReceiptDraft({
+    userId,
+    request: recommendationRequest as JsonBody,
+    output: recommendationOutput,
+  });
+  const receiptInsert = buildInsert(
+    "recommendation_analysis_receipts",
+    receiptDraft,
+    recommendationAnalysisReceiptFields,
+  );
+  const { rows: receiptRows } = await pool.query(`${receiptInsert.sql} returning *`, receiptInsert.values);
+
+  return sendJson(response, {
+    ...recommendationOutput,
+    agent_shack_receipt_envelope: envelopeForRecommendationAnalysisReceipt(formatDates(receiptRows[0])),
+  });
 }
 
 async function placeClaimsForPlace(

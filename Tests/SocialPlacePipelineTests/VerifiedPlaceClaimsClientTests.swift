@@ -91,6 +91,111 @@ final class VerifiedPlaceClaimsClientTests: XCTestCase {
         XCTAssertEqual(response.results.first?.supportingClaims, [claimId])
         XCTAssertEqual(response.retrievalReceipt.used, ["1 owner-scoped places", "1 verified claims"])
         XCTAssertFalse(response.retrievalReceipt.publicWebUsed)
+        XCTAssertNil(response.agentShackReceiptEnvelope)
+    }
+
+    func testClaimRecommendationResponseDecodesAgentShackEnvelope() throws {
+        let placeId = UUID()
+        let claimId = UUID()
+        let json = """
+        {
+          "results": [
+            {
+              "place_id": "\(placeId.uuidString)",
+              "name": "Kato",
+              "why": "matches menu_item; strongest proof is user_confirmed_place",
+              "proof_level": "user_confirmed_place",
+              "confidence": 0.91,
+              "supporting_claims": ["\(claimId.uuidString)"],
+              "warnings": [],
+              "next_actions": ["view_card", "get_trust_summary"]
+            }
+          ],
+          "retrieval_receipt": {
+            "used": ["1 owner-scoped places", "1 verified claims"],
+            "skipped": [],
+            "public_web_used": false
+          },
+          "agent_shack_receipt_envelope": {
+            "product": "save",
+            "receipt_type": "recommendation_analysis",
+            "user_id": "user_123",
+            "agent_id": "save-ios",
+            "capability": "place_claim_recommendation",
+            "input_hash": "input_hash_123",
+            "output_hash": "output_hash_123",
+            "private_payload_ref": "save://receipts/recommendation_analysis/receipt_123",
+            "public_summary": {
+              "summary": "SAV-E analyzed owner-scoped saved places and kept public discovery separate.",
+              "capability": "place_claim_recommendation",
+              "result_count": 1,
+              "saved_result_count": 1,
+              "public_result_count": 0,
+              "proof_level_min": "user_confirmed_place",
+              "public_web_used": false
+            },
+            "preference_signals": ["coffee", "nearby", "proof_level:user_confirmed_place"],
+            "evaluator_verdict": "pass",
+            "settlement_state": "not_settled",
+            "created_at": "2026-06-06T12:00:00Z"
+          }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder.supabase.decode(ClaimRecommendationResponse.self, from: json)
+        let envelope = try XCTUnwrap(response.agentShackReceiptEnvelope)
+
+        XCTAssertEqual(envelope.product, "save")
+        XCTAssertEqual(envelope.receiptType, "recommendation_analysis")
+        XCTAssertEqual(envelope.capability, "place_claim_recommendation")
+        XCTAssertEqual(envelope.privatePayloadRef, "save://receipts/recommendation_analysis/receipt_123")
+        XCTAssertEqual(envelope.publicSummary.resultCount, 1)
+        XCTAssertEqual(envelope.publicSummary.publicResultCount, 0)
+        XCTAssertEqual(envelope.preferenceSignals, ["coffee", "nearby", "proof_level:user_confirmed_place"])
+        XCTAssertEqual(envelope.evaluatorVerdict, "pass")
+        XCTAssertEqual(envelope.settlementState, "not_settled")
+    }
+
+    func testRecommendationAnalysisInternalReceiptKeepsAgentShackProjectionSafe() throws {
+        let receiptId = UUID()
+        let envelope = AgentShackReceiptEnvelope(
+            product: "save",
+            receiptType: "recommendation_analysis",
+            userId: "user_123",
+            agentId: "save-ios",
+            capability: "place_claim_recommendation",
+            inputHash: "input_hash_123",
+            outputHash: "output_hash_123",
+            privatePayloadRef: "save://receipts/recommendation_analysis/\(receiptId.uuidString)",
+            publicSummary: RecommendationAnalysisPublicSummary(
+                summary: "SAV-E analyzed owner-scoped saved places and kept public discovery separate.",
+                capability: "place_claim_recommendation",
+                resultCount: 1,
+                savedResultCount: 1,
+                publicResultCount: 0,
+                proofLevelMin: "user_confirmed_place",
+                publicWebUsed: false
+            ),
+            preferenceSignals: ["coffee", "nearby"],
+            evaluatorVerdict: "pass",
+            settlementState: "not_settled",
+            createdAt: "2026-06-06T12:00:00Z"
+        )
+        let internalReceipt = SaveRecommendationAnalysisReceipt(
+            id: receiptId,
+            envelope: envelope,
+            fullPayloadJSON: #"{"result_name":"Utopia Euro Caffe","private_note":"birthday plan"}"#
+        )
+
+        let projection = internalReceipt.agentShackProjection
+        let encodedProjection = try JSONEncoder.supabase.encode(projection)
+        let projectionJSON = String(data: encodedProjection, encoding: .utf8) ?? ""
+
+        XCTAssertEqual(projection.receiptType, "recommendation_analysis")
+        XCTAssertTrue(projectionJSON.contains("private_payload_ref"))
+        XCTAssertFalse(projectionJSON.contains("full_payload_json"))
+        XCTAssertFalse(projectionJSON.contains("Utopia Euro Caffe"))
+        XCTAssertFalse(projectionJSON.contains("birthday plan"))
     }
 
     func testPublicPlaceCardDecodesPublicProjection() throws {
