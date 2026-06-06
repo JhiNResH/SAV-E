@@ -339,8 +339,30 @@ create table if not exists shared_place_links (
 create index if not exists idx_shared_place_links_user_id on shared_place_links(user_id, created_at desc);
 create index if not exists idx_shared_place_links_source_place_id on shared_place_links(source_place_id);
 
+create table if not exists work_orders (
+    id uuid primary key default gen_random_uuid(),
+    workflow_id text not null,
+    listing_id text not null,
+    user_id text references profiles(id) on delete cascade not null,
+    intent text not null,
+    input_type text not null default 'url',
+    input_ref text,
+    source_url text,
+    evaluator_policy_id text not null,
+    settlement_mode text not null,
+    budget_policy jsonb not null default '{}'::jsonb,
+    status text not null default 'queued',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint work_orders_status_check check (status in ('queued', 'running', 'completed', 'failed', 'needs_review', 'cancelled'))
+);
+
+create index if not exists idx_work_orders_user_id on work_orders(user_id, created_at desc);
+create index if not exists idx_work_orders_listing on work_orders(listing_id, status, created_at desc);
+
 create table if not exists workflow_runs (
     id uuid primary key default gen_random_uuid(),
+    work_order_id uuid references work_orders(id) on delete set null,
     workflow_id text not null,
     listing_id text not null,
     user_id text references profiles(id) on delete cascade not null,
@@ -368,6 +390,8 @@ create table if not exists workflow_runs (
 
 create index if not exists idx_workflow_runs_user_id on workflow_runs(user_id, created_at desc);
 create index if not exists idx_workflow_runs_listing on workflow_runs(listing_id, status, created_at desc);
+alter table workflow_runs add column if not exists work_order_id uuid references work_orders(id) on delete set null;
+create index if not exists idx_workflow_runs_work_order_id on workflow_runs(work_order_id, created_at desc);
 
 create table if not exists workflow_steps (
     id uuid primary key default gen_random_uuid(),
@@ -610,6 +634,10 @@ create trigger update_recommendation_sets_updated_at before update on recommenda
 
 drop trigger if exists update_agent_tool_calls_updated_at on agent_tool_calls;
 create trigger update_agent_tool_calls_updated_at before update on agent_tool_calls
+    for each row execute procedure update_updated_at();
+
+drop trigger if exists update_work_orders_updated_at on work_orders;
+create trigger update_work_orders_updated_at before update on work_orders
     for each row execute procedure update_updated_at();
 
 drop trigger if exists update_workflow_runs_updated_at on workflow_runs;

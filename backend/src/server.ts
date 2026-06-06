@@ -24,6 +24,7 @@ import {
   parseLens,
 } from "./socialContracts.js";
 import {
+  normalizePlaceRecoveryWorkOrderCreate,
   normalizePlaceRecoveryRunCreate,
   normalizePlaceRecoveryWorkerResult,
   normalizeUserDecision,
@@ -220,6 +221,7 @@ const sharedPlaceLinkFields = [
 ] as const;
 
 const workflowRunFields = [
+  "work_order_id",
   "workflow_id",
   "listing_id",
   "user_id",
@@ -235,6 +237,20 @@ const workflowRunFields = [
   "credit_settlement",
   "receipt_id",
   "completed_at",
+] as const;
+
+const workOrderFields = [
+  "workflow_id",
+  "listing_id",
+  "user_id",
+  "intent",
+  "input_type",
+  "input_ref",
+  "source_url",
+  "evaluator_policy_id",
+  "settlement_mode",
+  "budget_policy",
+  "status",
 ] as const;
 
 const userDecisionFields = [
@@ -272,6 +288,7 @@ const jsonbFields = new Set([
   "edited_payload",
   "input",
   "input_schema",
+  "budget_policy",
   "output",
   "output_schema",
   "payload",
@@ -941,12 +958,46 @@ async function handleWorkflows(
   segments: string[],
   userId: string,
 ): Promise<void> {
-  if (segments[0] !== "place-recovery" || segments[1] !== "runs") {
+  if (segments[0] !== "place-recovery") {
     return sendJson(response, { error: "Unsupported workflows route" }, 405);
   }
 
-  const runId = segments[2];
+  const kind = segments[1];
+  const id = segments[2];
   const action = segments[3];
+
+  if (kind === "work-orders") {
+    if (request.method === "GET" && !id) {
+      const { rows } = await pool.query(
+        `select *
+         from work_orders
+         where user_id = $1 and workflow_id = $2
+         order by created_at desc
+         limit 100`,
+        [userId, placeRecoveryWorkflowId],
+      );
+      return sendJson(response, rows.map((row) => formatDates(row)));
+    }
+
+    if (request.method === "POST" && !id) {
+      const workOrder = normalizePlaceRecoveryWorkOrderCreate(await readJson(request));
+      const client = await pool.connect();
+      try {
+        const row = await createPlaceRecoveryWorkOrder(client, userId, workOrder);
+        return sendJson(response, formatDates(row), 201);
+      } finally {
+        client.release();
+      }
+    }
+
+    return sendJson(response, { error: "Unsupported work order route" }, 405);
+  }
+
+  if (kind !== "runs") {
+    return sendJson(response, { error: "Unsupported workflows route" }, 405);
+  }
+
+  const runId = id;
 
   if (request.method === "GET" && !runId) {
     const { rows } = await pool.query(
@@ -961,11 +1012,22 @@ async function handleWorkflows(
   }
 
   if (request.method === "POST" && !runId) {
-    const run = normalizePlaceRecoveryRunCreate(await readJson(request));
+    const body = await readJson(request);
+    const run = normalizePlaceRecoveryRunCreate(body);
+    const workOrder = normalizePlaceRecoveryWorkOrderCreate({
+      ...body,
+      source_url: run.sourceUrl,
+      source_type: run.sourceType,
+      credit_reserved: run.creditReserved,
+    });
     const client = await pool.connect();
     try {
       await client.query("begin");
+      const workOrderId = run.workOrderId
+        ? await ensureWorkOrderOwner(run.workOrderId, userId, client)
+        : String((await createPlaceRecoveryWorkOrder(client, userId, workOrder)).id);
       const insert = buildInsert("workflow_runs", {
+        work_order_id: workOrderId,
         workflow_id: run.workflowId,
         listing_id: run.listingId,
         user_id: userId,
@@ -977,6 +1039,7 @@ async function handleWorkflows(
       }, workflowRunFields);
       const { rows } = await client.query(`${insert.sql} returning *`, insert.values);
       const created = asObject(rows[0]);
+      await client.query("update work_orders set status = 'running' where id = $1 and user_id = $2", [workOrderId, userId]);
       await insertCreditLedger(client, {
         run_id: String(created.id),
         user_id: userId,
@@ -1026,6 +1089,7 @@ async function handleWorkflows(
         userId,
       ],
     );
+    await syncWorkOrderStatusForRun(asObject(rows[0]), status);
     return sendJson(response, formatDates(rows[0]));
   }
 
@@ -1085,6 +1149,13 @@ async function handleWorkflows(
          returning *`,
         [receipt.creditSettlement, receiptRow.id, runId, userId],
       );
+      const completedRun = asObject(rows[0]);
+      if (completedRun.work_order_id) {
+        await client.query(
+          "update work_orders set status = 'completed' where id = $1 and user_id = $2",
+          [completedRun.work_order_id, userId],
+        );
+      }
       await client.query("commit");
       return sendJson(response, {
         run: formatDates(rows[0]),
@@ -1829,6 +1900,35 @@ async function ensureOwnedRecommendationSetReference(recommendationSetId: unknow
   if (!rows[0]) throw new ApiError(404, "Recommendation not found");
 }
 
+async function createPlaceRecoveryWorkOrder(
+  client: PoolClient,
+  userId: string,
+  workOrder: ReturnType<typeof normalizePlaceRecoveryWorkOrderCreate>,
+): Promise<JsonBody> {
+  const insert = buildInsert("work_orders", {
+    workflow_id: workOrder.workflowId,
+    listing_id: workOrder.listingId,
+    user_id: userId,
+    intent: workOrder.intent,
+    input_type: workOrder.inputType,
+    input_ref: workOrder.inputRef ?? null,
+    source_url: workOrder.sourceUrl ?? null,
+    evaluator_policy_id: workOrder.evaluatorPolicyId,
+    settlement_mode: workOrder.settlementMode,
+    budget_policy: workOrder.budgetPolicy,
+    status: "queued",
+  }, workOrderFields);
+  const { rows } = await client.query(`${insert.sql} returning *`, insert.values);
+  return asObject(rows[0]);
+}
+
+async function ensureWorkOrderOwner(workOrderId: string, userId: string, client?: PoolClient): Promise<string> {
+  const db = client ?? pool;
+  const { rows } = await db.query("select id from work_orders where id = $1 and user_id = $2", [workOrderId, userId]);
+  if (!rows[0]) throw new ApiError(404, "Work order not found");
+  return workOrderId;
+}
+
 async function ensureWorkflowRunOwner(runId: string, userId: string): Promise<void> {
   const { rows } = await pool.query("select id from workflow_runs where id = $1 and user_id = $2", [runId, userId]);
   if (!rows[0]) throw new ApiError(404, "Workflow run not found");
@@ -1838,6 +1938,13 @@ async function workflowRunForUser(runId: string, userId: string): Promise<JsonBo
   const { rows } = await pool.query("select * from workflow_runs where id = $1 and user_id = $2", [runId, userId]);
   if (!rows[0]) throw new ApiError(404, "Workflow run not found");
   return asObject(rows[0]);
+}
+
+async function syncWorkOrderStatusForRun(run: JsonBody, status: string): Promise<void> {
+  const workOrderId = stringValue(run.work_order_id);
+  const userId = stringValue(run.user_id);
+  if (!workOrderId || !userId) return;
+  await pool.query("update work_orders set status = $1 where id = $2 and user_id = $3", [status, workOrderId, userId]);
 }
 
 async function uniqueShareCode(): Promise<string> {
