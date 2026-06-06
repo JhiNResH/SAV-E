@@ -495,7 +495,7 @@ private struct AnimatedProofHero: View {
             }
             .padding(15)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.34))
+            .background(Color.saveNotebookPage.opacity(0.52))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
@@ -528,7 +528,7 @@ private struct AnimatedProofHero: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.34))
+        .background(Color.saveNotebookPage.opacity(0.52))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
@@ -615,7 +615,7 @@ private struct AnimatedProofHero: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.34))
+        .background(Color.saveNotebookPage.opacity(0.52))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
@@ -630,7 +630,7 @@ private struct AnimatedProofHero: View {
                 LinearGradient(
                     colors: [
                         Color.clear,
-                        Color.white.opacity(0.26),
+                        Color.saveNotebookPage.opacity(0.34),
                         Color.saveSky.opacity(0.24),
                         Color.clear
                     ],
@@ -709,7 +709,7 @@ private struct SourceBubble: View {
             .foregroundColor(.saveInk)
             .frame(width: label.count > 2 ? 42 : 34, height: 34)
             .background(tint.opacity(0.84))
-            .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+            .overlay(Circle().stroke(Color.saveNotebookBackground.opacity(0.82), lineWidth: 2))
             .clipShape(Circle())
             .offset(y: offsetY)
     }
@@ -761,7 +761,7 @@ private struct SaveMiniMap: View {
                         .foregroundColor(.saveInk)
                         .frame(width: pin.isPrimary ? 38 : 30, height: pin.isPrimary ? 38 : 30)
                         .background(pin.tint.opacity(0.88))
-                        .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+                        .overlay(Circle().stroke(Color.saveNotebookBackground.opacity(0.82), lineWidth: 2))
                         .clipShape(Circle())
 
                     if pin.isPrimary {
@@ -980,7 +980,7 @@ private struct ProofStageCard: View {
                         Spacer()
                     }
                     .padding(isCompactHeight ? 10 : 14)
-                    .background(option == language ? Color.saveHoney.opacity(0.58) : Color.white.opacity(0.30))
+                    .background(option == language ? Color.saveHoney.opacity(0.58) : Color.saveNotebookPage.opacity(0.58))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.saveNotebookLine.opacity(option == language ? 0.72 : 0.42), lineWidth: 1)
@@ -1000,7 +1000,7 @@ private struct ProofStageCard: View {
         VStack(alignment: .leading, spacing: 12) {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.42))
+                    .fill(Color.saveNotebookPage.opacity(0.62))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1)
@@ -1144,7 +1144,7 @@ private struct ProofStageCard: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
-                            .background(selectedTags.contains(tag) ? Color.saveHoney.opacity(0.64) : Color.white.opacity(0.28))
+                            .background(selectedTags.contains(tag) ? Color.saveHoney.opacity(0.64) : Color.saveNotebookPage.opacity(0.54))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .stroke(Color.saveNotebookLine.opacity(0.48), lineWidth: 1)
