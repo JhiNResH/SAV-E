@@ -12,70 +12,86 @@ struct OnboardingView: View {
     private var isBrandEntryStage: Bool { stage == .language }
 
     var body: some View {
+        GeometryReader { proxy in
+            let isCompactHeight = proxy.size.height < 760
+            let horizontalPadding: CGFloat = proxy.size.width < 380 ? 16 : 22
+            let verticalSpacing: CGFloat = isCompactHeight ? 12 : 18
+
+            onboardingContent(
+                isCompactHeight: isCompactHeight,
+                horizontalPadding: horizontalPadding,
+                verticalSpacing: verticalSpacing
+            )
+        }
+    }
+
+    private func onboardingContent(
+        isCompactHeight: Bool,
+        horizontalPadding: CGFloat,
+        verticalSpacing: CGFloat
+    ) -> some View {
         ZStack {
-            if isBrandEntryStage {
-                SaveBrandEntryBackground()
-                    .ignoresSafeArea()
-            } else {
-                SaveDottedBackground()
-                    .ignoresSafeArea()
-            }
+            SaveDottedBackground()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 18) {
-                        if isBrandEntryStage {
-                            BrandEntryHero(language: language)
-                        } else {
-                            header
-                            AnimatedProofHero(
-                                stage: stage,
-                                clueText: clueText,
-                                language: language,
-                                namespace: proofNamespace
-                            )
-                            ProofProgressRail(stage: stage, language: language)
-                        }
-                        ProofStageCard(
+                VStack(spacing: verticalSpacing) {
+                    if isBrandEntryStage {
+                        BrandEntryHero(language: language, isCompactHeight: isCompactHeight)
+                    } else {
+                        header(isCompactHeight: isCompactHeight)
+                        AnimatedProofHero(
                             stage: stage,
-                            clueText: $clueText,
-                            selectedTags: $selectedTags,
+                            clueText: clueText,
                             language: language,
-                            onChooseLanguage: chooseLanguage,
-                            onUseSample: useSampleClue
+                            namespace: proofNamespace,
+                            height: isCompactHeight ? 178 : 214
                         )
+                        ProofProgressRail(stage: stage, language: language)
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.top, 28)
-                    .padding(.bottom, 18)
+                    ProofStageCard(
+                        stage: stage,
+                        clueText: $clueText,
+                        selectedTags: $selectedTags,
+                        language: language,
+                        isCompactHeight: isCompactHeight,
+                        onChooseLanguage: chooseLanguage,
+                        onUseSample: useSampleClue
+                    )
                 }
+                .padding(.horizontal, horizontalPadding)
+                .padding(.top, isCompactHeight ? 8 : 28)
+                .padding(.bottom, isCompactHeight ? 14 : 18)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .clipped()
 
-                bottomActions
+                bottomActions(isCompactHeight: isCompactHeight)
             }
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            MemoMascotMark(size: 70, framed: false)
+    private func header(isCompactHeight: Bool) -> some View {
+        VStack(spacing: isCompactHeight ? 8 : 12) {
+            if !isCompactHeight {
+                MemoMascotMark(size: 70, framed: false)
+            }
 
-            VStack(spacing: 8) {
+            VStack(spacing: isCompactHeight ? 5 : 8) {
                 Text(localized(
                     english: "Set up your place memory",
                     traditionalChinese: "設定你的地點記憶"
                 ))
-                .font(.title2)
+                .font(isCompactHeight ? .headline : .title2)
                 .fontWeight(.black)
                 .foregroundColor(.saveInk)
                 .multilineTextAlignment(.center)
 
                 Text(localized(
-                    english: "Start with one real post, map link, screenshot, or message. SAV-E should prove it can help before asking preferences.",
-                    traditionalChinese: "先用一個真的貼文、地圖連結、截圖或訊息。SAV-E 要先證明有用，再問偏好。"
+                    english: "Add one real post, map link, screenshot, or message. SAV-E will show what it found before it saves anything.",
+                    traditionalChinese: "先加入一個真的貼文、地圖連結、截圖或訊息。SAV-E 會先顯示找到什麼，不會直接存。"
                 ))
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .lineSpacing(3)
+                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                .lineSpacing(2)
                 .foregroundColor(.saveMutedText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -83,15 +99,16 @@ struct OnboardingView: View {
         }
     }
 
-    private var bottomActions: some View {
-        VStack(spacing: 10) {
+    private func bottomActions(isCompactHeight: Bool) -> some View {
+        VStack(spacing: isCompactHeight ? 0 : 10) {
             Button(action: advance) {
                 Text(primaryActionTitle)
-                    .font(.headline)
-                    .fontWeight(.black)
+                    .font(isCompactHeight ? .subheadline.weight(.black) : .headline.weight(.black))
                     .foregroundColor(primaryActionForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, isCompactHeight ? 12 : 16)
                     .background(primaryActionFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -103,23 +120,25 @@ struct OnboardingView: View {
             .opacity(stage == .clue && trimmedClue.isEmpty ? 0.58 : 1)
             .padding(.horizontal, 24)
 
-            Button(secondaryActionTitle) {
-                skipCurrentStep()
+            if !isCompactHeight || stage != .language {
+                Button(secondaryActionTitle) {
+                    skipCurrentStep()
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.saveMutedText)
+                .opacity(stage == .language ? 0 : 1)
+                .disabled(stage == .language)
             }
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(.saveMutedText)
-            .opacity(stage == .language ? 0 : 1)
-            .disabled(stage == .language)
         }
-        .padding(.bottom, 22)
-        .background(isBrandEntryStage ? SaveTheme.Colors.nearBlack.opacity(0.82) : Color.saveNotebookPage.opacity(0.72))
+        .padding(.bottom, isCompactHeight ? 8 : 22)
+        .background(Color.saveNotebookPage.opacity(0.72))
     }
 
     private var primaryActionTitle: String {
         switch stage {
         case .language:
-            return localized(english: "Continue", traditionalChinese: "繼續")
+            return localized(english: "Start setup", traditionalChinese: "開始設定")
         case .clue:
             return localized(english: "See what SAV-E finds", traditionalChinese: "看看 SAV-E 找到什麼")
         case .candidate:
@@ -135,7 +154,7 @@ struct OnboardingView: View {
 
     private var primaryActionFill: Color {
         switch stage {
-        case .language: return SaveTheme.Colors.cream
+        case .language: return .saveHoney
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
         case .ask, .tag: return .saveSky
@@ -144,7 +163,7 @@ struct OnboardingView: View {
 
     private var primaryActionForeground: Color {
         switch stage {
-        case .language: return SaveTheme.Colors.nearBlack
+        case .language: return .saveInk
         default: return .saveInk
         }
     }
@@ -236,8 +255,8 @@ private enum ProofStage: Int, CaseIterable {
         case (.mapStamp, .traditionalChinese): return "地圖章"
         case (.ask, .english): return "Ask"
         case (.ask, .traditionalChinese): return "提問"
-        case (.tag, .english): return "Reason"
-        case (.tag, .traditionalChinese): return "理由"
+        case (.tag, .english): return "Taste"
+        case (.tag, .traditionalChinese): return "偏好"
         }
     }
 }
@@ -268,113 +287,74 @@ private enum ProofIntentTag: String, CaseIterable {
     }
 }
 
-private struct SaveBrandEntryBackground: View {
-    var body: some View {
-        ZStack {
-            SaveTheme.Colors.nearBlack
-
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.05, blue: 0.04),
-                    SaveTheme.Colors.nearBlack,
-                    Color(red: 0.02, green: 0.03, blue: 0.025)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [SaveTheme.Colors.mint.opacity(0.22), .clear],
-                center: .topTrailing,
-                startRadius: 20,
-                endRadius: 360
-            )
-
-            RadialGradient(
-                colors: [SaveTheme.Colors.amber.opacity(0.20), .clear],
-                center: .bottomLeading,
-                startRadius: 30,
-                endRadius: 420
-            )
-
-            Canvas { context, size in
-                let dotColor = SaveTheme.Colors.cream.opacity(0.08)
-                for row in stride(from: 0, through: size.height, by: 18) {
-                    for column in stride(from: 0, through: size.width, by: 18) {
-                        let rect = CGRect(x: column, y: row, width: 2, height: 2)
-                        context.fill(Path(ellipseIn: rect), with: .color(dotColor))
-                    }
-                }
-            }
-        }
-    }
-}
-
 private struct BrandEntryHero: View {
     var language: AppLanguage
+    var isCompactHeight: Bool
     @State private var isBreathing = false
 
     var body: some View {
-        VStack(spacing: 18) {
-            HStack {
-                Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
-                    .font(SaveTheme.Typography.eyebrow)
-                    .foregroundColor(SaveTheme.Colors.cream)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.10))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1))
-
-                Spacer()
+        VStack(spacing: isCompactHeight ? 7 : 18) {
+            if !isCompactHeight {
+                HStack {
+                    entryBadge
+                    Spacer()
+                }
+            } else {
+                entryBadge
             }
 
             ZStack {
                 Circle()
-                    .fill(SaveTheme.Colors.cream.opacity(0.08))
-                    .frame(width: 138, height: 138)
+                    .fill(Color.saveHoney.opacity(0.18))
+                    .frame(width: isCompactHeight ? 82 : 138, height: isCompactHeight ? 82 : 138)
                     .scaleEffect(isBreathing ? 1.06 : 0.96)
                     .animation(SaveTheme.Motion.breathing, value: isBreathing)
 
-                MemoMascotMark(size: 96, framed: true)
-                    .shadow(color: SaveTheme.Colors.amber.opacity(0.30), radius: 26, x: 0, y: 14)
+                MemoMascotMark(size: isCompactHeight ? 58 : 96, framed: true)
+                    .shadow(color: Color.saveInk.opacity(0.10), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: isCompactHeight ? 4 : 10) {
                 Text("SAV-E")
-                    .font(SaveTheme.Typography.brandTitle)
-                    .foregroundColor(SaveTheme.Colors.cream)
+                    .font(.system(size: isCompactHeight ? 38 : 64, weight: .black, design: .rounded))
+                    .foregroundColor(.saveInk)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.72)
 
                 Text(localized(
-                    english: "Your private place memory scout.",
-                    traditionalChinese: "你的私人地點記憶 scout。"
+                    english: "Your private place memory.",
+                    traditionalChinese: "你的私人地點記憶。"
                 ))
-                .font(SaveTheme.Typography.entryTitle)
-                .foregroundColor(SaveTheme.Colors.cream.opacity(0.92))
+                .font(isCompactHeight ? .subheadline.weight(.black) : SaveTheme.Typography.entryTitle)
+                .foregroundColor(.saveInk)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
                 Text(localized(
-                    english: "Turn messy posts, map links, screenshots, and friend messages into Review Candidates before they become Map Stamps.",
-                    traditionalChinese: "把貼文、地圖連結、截圖和朋友訊息，先整理成待確認地點，再變成地圖章。"
+                    english: "Keep the source, review the match, then ask your saved places when it is time to decide.",
+                    traditionalChinese: "保留來源、先確認地點，之後要決定去哪時就能直接問 SAV-E。"
                 ))
-                .font(.subheadline.weight(.semibold))
-                .lineSpacing(3)
-                .foregroundColor(SaveTheme.Colors.cream.opacity(0.68))
+                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                .lineSpacing(2)
+                .foregroundColor(.saveMutedText)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(isCompactHeight ? 2 : nil)
+                .minimumScaleFactor(0.84)
+                .fixedSize(horizontal: false, vertical: !isCompactHeight)
             }
 
-            HStack(spacing: 10) {
-                Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
-                Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+            if !isCompactHeight {
+                HStack(spacing: 10) {
+                    Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
+                    Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
+                }
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
             }
-            .font(.caption.weight(.black))
-            .foregroundColor(SaveTheme.Colors.cream.opacity(0.82))
         }
-        .padding(.top, 18)
+        .padding(.top, isCompactHeight ? 3 : 18)
         .padding(.bottom, 6)
         .onAppear { isBreathing = true }
     }
@@ -385,6 +365,17 @@ private struct BrandEntryHero: View {
         case .traditionalChinese: return traditionalChinese
         }
     }
+
+    private var entryBadge: some View {
+        Text(localized(english: "MEMO SETUP", traditionalChinese: "Memo 設定"))
+            .font(SaveTheme.Typography.eyebrow)
+            .foregroundColor(.saveInk)
+            .padding(.horizontal, isCompactHeight ? 9 : 10)
+            .padding(.vertical, isCompactHeight ? 5 : 6)
+            .background(Color.saveHoney.opacity(0.48))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
+    }
 }
 
 private struct AnimatedProofHero: View {
@@ -392,6 +383,7 @@ private struct AnimatedProofHero: View {
     let clueText: String
     let language: AppLanguage
     let namespace: Namespace.ID
+    let height: CGFloat
 
     @State private var isFloating = false
     @State private var scanOffset: CGFloat = -92
@@ -436,7 +428,7 @@ private struct AnimatedProofHero: View {
                 scanningBand
             }
         }
-        .frame(height: 214)
+        .frame(height: height)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadow(color: Color.saveInk.opacity(0.08), radius: 16, x: 0, y: 10)
         .onAppear {
@@ -499,7 +491,7 @@ private struct AnimatedProofHero: View {
             }
             .padding(15)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.34))
+            .background(Color.saveNotebookPage.opacity(0.52))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.saveNotebookLine.opacity(0.34), lineWidth: 1)
@@ -532,7 +524,7 @@ private struct AnimatedProofHero: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.34))
+        .background(Color.saveNotebookPage.opacity(0.52))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
@@ -619,7 +611,7 @@ private struct AnimatedProofHero: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.34))
+        .background(Color.saveNotebookPage.opacity(0.52))
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
@@ -634,7 +626,7 @@ private struct AnimatedProofHero: View {
                 LinearGradient(
                     colors: [
                         Color.clear,
-                        Color.white.opacity(0.26),
+                        Color.saveNotebookPage.opacity(0.34),
                         Color.saveSky.opacity(0.24),
                         Color.clear
                     ],
@@ -713,7 +705,7 @@ private struct SourceBubble: View {
             .foregroundColor(.saveInk)
             .frame(width: label.count > 2 ? 42 : 34, height: 34)
             .background(tint.opacity(0.84))
-            .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+            .overlay(Circle().stroke(Color.saveNotebookBackground.opacity(0.82), lineWidth: 2))
             .clipShape(Circle())
             .offset(y: offsetY)
     }
@@ -765,7 +757,7 @@ private struct SaveMiniMap: View {
                         .foregroundColor(.saveInk)
                         .frame(width: pin.isPrimary ? 38 : 30, height: pin.isPrimary ? 38 : 30)
                         .background(pin.tint.opacity(0.88))
-                        .overlay(Circle().stroke(Color.white.opacity(0.82), lineWidth: 2))
+                        .overlay(Circle().stroke(Color.saveNotebookBackground.opacity(0.82), lineWidth: 2))
                         .clipShape(Circle())
 
                     if pin.isPrimary {
@@ -853,14 +845,16 @@ private struct ProofProgressRail: View {
                         .fontWeight(.black)
                         .foregroundColor(item.rawValue <= stage.rawValue ? .saveInk : .saveMutedText.opacity(0.7))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.56)
+                        .frame(maxWidth: .infinity)
                 }
+                .frame(maxWidth: .infinity)
 
                 if item != ProofStage.allCases.last {
                     Rectangle()
                         .fill(item.rawValue < stage.rawValue ? Color.saveHoney : Color.saveNotebookLine.opacity(0.34))
                         .frame(height: 2)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, 2)
                         .offset(y: -13)
                 }
             }
@@ -890,15 +884,16 @@ private struct ProofStageCard: View {
     @Binding var clueText: String
     @Binding var selectedTags: Set<ProofIntentTag>
     let language: AppLanguage
+    let isCompactHeight: Bool
     let onChooseLanguage: (AppLanguage) -> Void
     let onUseSample: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 13 : 18) {
             stageHeader
             stageContent
         }
-        .padding(20)
+        .padding(isCompactHeight ? 16 : 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
@@ -912,9 +907,9 @@ private struct ProofStageCard: View {
     private var stageHeader: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: iconName)
-                .font(.title2.weight(.black))
+                .font((isCompactHeight ? Font.headline : Font.title2).weight(.black))
                 .foregroundColor(.saveInk)
-                .frame(width: 44, height: 44)
+                .frame(width: isCompactHeight ? 38 : 44, height: isCompactHeight ? 38 : 44)
                 .background(headerTint.opacity(0.72))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -924,14 +919,13 @@ private struct ProofStageCard: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-                    .font(.title3)
+                    .font(isCompactHeight ? .headline : .title3)
                     .fontWeight(.black)
                     .foregroundColor(.saveInk)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                     .foregroundColor(.saveMutedText)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -958,32 +952,31 @@ private struct ProofStageCard: View {
     }
 
     private var languageChoice: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 8 : 12) {
             ForEach(AppLanguage.allCases) { option in
                 Button {
                     onChooseLanguage(option)
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: isCompactHeight ? 9 : 12) {
                         Image(systemName: option == language ? "checkmark.circle.fill" : "circle")
-                            .font(.title3.weight(.black))
+                            .font((isCompactHeight ? Font.headline : Font.title3).weight(.black))
                             .foregroundColor(.saveInk)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(option.displayName)
-                                .font(.headline)
+                                .font(isCompactHeight ? .subheadline : .headline)
                                 .fontWeight(.black)
                                 .foregroundColor(.saveInk)
 
                             Text(languageDescription(for: option))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
+                                .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                                 .foregroundColor(.saveMutedText)
                         }
 
                         Spacer()
                     }
-                    .padding(14)
-                    .background(option == language ? Color.saveHoney.opacity(0.58) : Color.white.opacity(0.30))
+                    .padding(isCompactHeight ? 10 : 14)
+                    .background(option == language ? Color.saveHoney.opacity(0.58) : Color.saveNotebookPage.opacity(0.58))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.saveNotebookLine.opacity(option == language ? 0.72 : 0.42), lineWidth: 1)
@@ -993,7 +986,9 @@ private struct ProofStageCard: View {
                 .accessibilityLabel(option.displayName)
             }
 
-            FirstRunTrustNote(language: language)
+            if !isCompactHeight {
+                FirstRunTrustNote(language: language)
+            }
         }
     }
 
@@ -1001,7 +996,7 @@ private struct ProofStageCard: View {
         VStack(alignment: .leading, spacing: 12) {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.42))
+                    .fill(Color.saveNotebookPage.opacity(0.62))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1)
@@ -1060,8 +1055,8 @@ private struct ProofStageCard: View {
             )
 
             Text(localized(
-                english: "This waits in Review. SAV-E should not create fake confirmed pins.",
-                traditionalChinese: "這會先留在 Review。SAV-E 不應該亂產生已確認地點。"
+                english: "This stays in Review until you confirm the exact place.",
+                traditionalChinese: "這會先留在 Review，等你確認正確地點後再保存。"
             ))
             .font(.footnote)
             .fontWeight(.bold)
@@ -1145,7 +1140,7 @@ private struct ProofStageCard: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
-                            .background(selectedTags.contains(tag) ? Color.saveHoney.opacity(0.64) : Color.white.opacity(0.28))
+                            .background(selectedTags.contains(tag) ? Color.saveHoney.opacity(0.64) : Color.saveNotebookPage.opacity(0.54))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .stroke(Color.saveNotebookLine.opacity(0.48), lineWidth: 1)
@@ -1206,15 +1201,15 @@ private struct ProofStageCard: View {
         case .language:
             return localized(english: "Choose your language", traditionalChinese: "選擇語言")
         case .clue:
-            return localized(english: "Paste one messy place clue", traditionalChinese: "貼上一個混亂的地點線索")
+            return localized(english: "Add one place clue", traditionalChinese: "加入一個地點線索")
         case .candidate:
-            return localized(english: "SAV-E makes a Review Candidate", traditionalChinese: "SAV-E 先做成待確認地點")
+            return localized(english: "Review before saving", traditionalChinese: "先確認，再保存")
         case .mapStamp:
             return localized(english: "Confirm it into a Map Stamp", traditionalChinese: "確認成你的地圖章")
         case .ask:
             return localized(english: "Ask from memory first", traditionalChinese: "先問你的地點記憶")
         case .tag:
-            return localized(english: "Configure your scout from proof", traditionalChinese: "從真實記憶設定你的 scout")
+            return localized(english: "Teach SAV-E your taste", traditionalChinese: "讓 SAV-E 學你的偏好")
         }
     }
 
@@ -1228,13 +1223,13 @@ private struct ProofStageCard: View {
         case .clue:
             return localized(english: "Use a Reel caption, Google Maps link, screenshot text, or friend message.", traditionalChinese: "可以用 Reels 文案、Google Maps 連結、截圖文字或朋友訊息。")
         case .candidate:
-            return localized(english: "A candidate shows evidence and missing info before anything is saved.", traditionalChinese: "候選地點會先顯示證據和缺什麼，不會直接存成已確認。")
+            return localized(english: "SAV-E shows what it knows, what is missing, and the next action.", traditionalChinese: "SAV-E 會顯示已找到什麼、還缺什麼，以及下一步。")
         case .mapStamp:
             return localized(english: "Only confirmed places become private map memory.", traditionalChinese: "只有確認後，才會變成你的私人地圖記憶。")
         case .ask:
-            return localized(english: "SAV-E should answer from places you saved before public discovery.", traditionalChinese: "SAV-E 應該先用你存過的地方回答，再分開標示公開搜尋。")
+            return localized(english: "SAV-E starts with places you saved, then labels public discovery separately.", traditionalChinese: "SAV-E 會先用你存過的地方回答，再分開標示公開搜尋。")
         case .tag:
-            return localized(english: "Tags help later recommendations learn why you saved it.", traditionalChinese: "標籤會幫之後的推薦理解你為什麼想存。")
+            return localized(english: "A few tags help future recommendations understand why you saved it.", traditionalChinese: "用幾個標籤，讓之後的推薦知道你為什麼想存。")
         }
     }
 
