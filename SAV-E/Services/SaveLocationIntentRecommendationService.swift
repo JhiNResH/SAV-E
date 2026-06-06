@@ -605,7 +605,7 @@ struct SaveLocationIntentRecommendationService {
         }
         if let top = savedResults.first {
             return agentAnswer(
-                lead: "I’d start with \(top.title).",
+                lead: "I’d start with \(top.title) because it is already in your SAV-E memory, not a random Google result.",
                 reason: reasonLine(for: top, fallback: "It is already a Saved Map Stamp in your place memory.", outputLanguage: outputLanguage),
                 caveat: "\(supportingSummary(reviewResults: reviewResults, unsavedResults: [], outputLanguage: outputLanguage))Public discovery stays separate below. If you want, tell me budget, cuisine, or quick vs sit-down and I’ll narrow it."
             )
@@ -620,9 +620,15 @@ struct SaveLocationIntentRecommendationService {
         }
 
         if !unsavedResults.isEmpty {
+            let top = unsavedResults[0]
+            let topReason = reasonLine(
+                for: top,
+                fallback: "it has the strongest public quality signals in this result set",
+                outputLanguage: outputLanguage
+            )
             return agentAnswer(
                 lead: "I do not see a saved nearby \(categoryLabel) in your SAV-E yet.",
-                reason: "I found \(unsavedResults.count) public nearby option\(unsavedResults.count == 1 ? "" : "s") below; they are ranked by public quality signals first, then distance",
+                reason: "I found \(unsavedResults.count) public nearby option\(unsavedResults.count == 1 ? "" : "s") below; the first one to inspect is \(top.title) because \(topReason)",
                 caveat: "Pick one to save if it looks right, or tell me budget, vibe, or quick vs sit-down and I’ll narrow the list."
             )
         }
@@ -658,7 +664,7 @@ struct SaveLocationIntentRecommendationService {
     ) -> String {
         if let top = savedResults.first {
             return agentAnswer(
-                lead: "我會先推 \(top.title)。",
+                lead: "我會先推 \(top.title)，因為它已經在你的 SAV-E 記憶裡，不是隨機 Google 結果。",
                 reason: reasonLine(for: top, fallback: "它已經是 SAV-E 裡的地圖章", outputLanguage: .traditionalChinese),
                 caveat: "\(supportingSummary(reviewResults: reviewResults, unsavedResults: [], outputLanguage: .traditionalChinese))公開探索會分開列在下面。你可以再補預算、想坐一下或外帶，我再幫你縮小。"
             )
@@ -673,9 +679,15 @@ struct SaveLocationIntentRecommendationService {
         }
 
         if !unsavedResults.isEmpty {
+            let top = unsavedResults[0]
+            let topReason = reasonLine(
+                for: top,
+                fallback: "它在這批公開結果裡的公開品質訊號最強",
+                outputLanguage: .traditionalChinese
+            )
             return agentAnswer(
                 lead: "你的 SAV-E 記憶裡還沒有附近已保存\(categoryLabel)。",
-                reason: "下面找到 \(unsavedResults.count) 個附近公開選項，會先看公開品質訊號，再看距離",
+                reason: "下面找到 \(unsavedResults.count) 個附近公開選項；如果要先看一家，我會先看 \(top.title)，原因是 \(topReason)",
                 caveat: "你可以挑一個保存，或補預算、氛圍、想外帶還是坐一下，我再幫你縮小清單。"
             )
         }
