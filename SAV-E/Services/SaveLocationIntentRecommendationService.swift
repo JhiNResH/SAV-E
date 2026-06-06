@@ -274,14 +274,29 @@ struct SaveLocationIntentRecommendationService {
 
     private func rankMapCandidates(_ candidates: [SaveMapCandidate]) -> [SaveMapCandidate] {
         candidates.sorted { lhs, rhs in
-            if let lhsDistance = lhs.distanceMeters, let rhsDistance = rhs.distanceMeters, lhsDistance != rhsDistance {
-                return lhsDistance < rhsDistance
-            }
-            if let lhsRating = lhs.rating, let rhsRating = rhs.rating, lhsRating != rhsRating {
-                return lhsRating > rhsRating
-            }
+            let lhsQuality = mapCandidateQualityScore(lhs)
+            let rhsQuality = mapCandidateQualityScore(rhs)
+            if lhsQuality != rhsQuality { return lhsQuality > rhsQuality }
+
             return lhs.createdAt > rhs.createdAt
         }
+    }
+
+    private func mapCandidateQualityScore(_ candidate: SaveMapCandidate) -> Int {
+        var score = 0
+        if let rating = candidate.rating {
+            score += Int((rating * 10).rounded())
+            if rating >= 4.5 { score += 20 }
+            else if rating >= 4.0 { score += 10 }
+            else if rating < 3.8 { score -= 30 }
+        }
+        if let reviewCount = candidate.reviewCount {
+            score += min(reviewCount / 25, 20)
+        }
+        if let distance = candidate.distanceMeters {
+            score -= min(Int(distance / 500), 8)
+        }
+        return score
     }
 
     private func evidenceScore(_ place: Place, needles: [String]) -> Int {
@@ -604,11 +619,11 @@ struct SaveLocationIntentRecommendationService {
             )
         }
 
-        if let top = unsavedResults.first {
+        if !unsavedResults.isEmpty {
             return agentAnswer(
-                lead: "Your SAV-E memory does not have a saved nearby \(categoryLabel) yet, but I’d start with \(top.title) from public nearby options.",
-                reason: reasonLine(for: top, fallback: "It is a nearby public result, not saved memory yet.", outputLanguage: outputLanguage),
-                caveat: "Tell me budget or food mood, or save it first so SAV-E can remember whether you liked it later."
+                lead: "I do not see a saved nearby \(categoryLabel) in your SAV-E yet.",
+                reason: "I found \(unsavedResults.count) public nearby option\(unsavedResults.count == 1 ? "" : "s") below; they are ranked by public quality signals first, then distance",
+                caveat: "Pick one to save if it looks right, or tell me budget, vibe, or quick vs sit-down and I’ll narrow the list."
             )
         }
 
@@ -657,11 +672,11 @@ struct SaveLocationIntentRecommendationService {
             )
         }
 
-        if let top = unsavedResults.first {
+        if !unsavedResults.isEmpty {
             return agentAnswer(
-                lead: "你的 SAV-E 記憶裡還沒有附近已保存\(categoryLabel)，但公開探索我會先看 \(top.title)。",
-                reason: reasonLine(for: top, fallback: "它是附近公開結果，還不是 SAV-E 記憶", outputLanguage: .traditionalChinese),
-                caveat: "你可以補預算或想要的氛圍，或先保存它，之後 SAV-E 才會記得你喜不喜歡。"
+                lead: "你的 SAV-E 記憶裡還沒有附近已保存\(categoryLabel)。",
+                reason: "下面找到 \(unsavedResults.count) 個附近公開選項，會先看公開品質訊號，再看距離",
+                caveat: "你可以挑一個保存，或補預算、氛圍、想外帶還是坐一下，我再幫你縮小清單。"
             )
         }
 
