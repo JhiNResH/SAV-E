@@ -240,6 +240,39 @@ create index if not exists idx_claim_usage_receipts_claim on claim_usage_receipt
 create index if not exists idx_claim_usage_receipts_place on claim_usage_receipts(place_id, created_at desc);
 create index if not exists idx_claim_usage_receipts_agent on claim_usage_receipts(consumer_agent_id, created_at desc);
 
+create table if not exists recommendation_analysis_receipts (
+    id uuid primary key default gen_random_uuid(),
+    user_id text references profiles(id) on delete cascade not null,
+    product text not null default 'save',
+    receipt_type text not null default 'recommendation_analysis',
+    agent_id text not null,
+    capability text not null,
+    input_hash text not null,
+    output_hash text not null,
+    private_payload_ref text not null,
+    private_payload jsonb not null default '{}'::jsonb,
+    public_summary jsonb not null default '{}'::jsonb,
+    preference_signals text[] not null default '{}',
+    evaluator_verdict text not null,
+    settlement_state text not null,
+    created_at timestamptz not null default now(),
+    constraint recommendation_analysis_receipts_product_check check (product = 'save'),
+    constraint recommendation_analysis_receipts_type_check check (receipt_type = 'recommendation_analysis'),
+    constraint recommendation_analysis_receipts_verdict_check check (
+        evaluator_verdict in ('pass', 'partial', 'fail', 'manual_review')
+    ),
+    constraint recommendation_analysis_receipts_settlement_check check (
+        settlement_state in ('not_settled', 'pending', 'settled', 'refunded', 'manual_review')
+    )
+);
+
+create unique index if not exists idx_recommendation_analysis_receipts_ref
+    on recommendation_analysis_receipts(private_payload_ref);
+create index if not exists idx_recommendation_analysis_receipts_user
+    on recommendation_analysis_receipts(user_id, created_at desc);
+create index if not exists idx_recommendation_analysis_receipts_hashes
+    on recommendation_analysis_receipts(input_hash, output_hash);
+
 create table if not exists agent_decisions (
     id uuid primary key default gen_random_uuid(),
     candidate_id uuid references place_candidates(id) on delete cascade not null,
