@@ -472,6 +472,42 @@ create table if not exists workflow_receipts (
 create unique index if not exists idx_workflow_receipts_hash on workflow_receipts(receipt_hash);
 create index if not exists idx_workflow_receipts_run_id on workflow_receipts(run_id, created_at desc);
 
+create table if not exists clearing_blocks (
+    id uuid primary key default gen_random_uuid(),
+    chain_namespace text not null,
+    user_id text references profiles(id) on delete cascade,
+    block_number bigint not null,
+    previous_block_hash text,
+    merkle_root text not null,
+    receipt_count integer not null,
+    block_hash text not null,
+    signer_agent_id text not null default 'save-backend',
+    anchor_status text not null default 'offchain',
+    anchor_chain text,
+    anchor_tx_hash text,
+    created_at timestamptz not null default now(),
+    constraint clearing_blocks_receipt_count_check check (receipt_count > 0),
+    constraint clearing_blocks_anchor_status_check check (anchor_status in ('offchain', 'batch_anchored', 'onchain'))
+);
+
+create unique index if not exists idx_clearing_blocks_namespace_user_number on clearing_blocks(chain_namespace, (coalesce(user_id, '')), block_number);
+create unique index if not exists idx_clearing_blocks_hash on clearing_blocks(block_hash);
+create index if not exists idx_clearing_blocks_user_id on clearing_blocks(user_id, created_at desc);
+
+create table if not exists clearing_block_items (
+    id uuid primary key default gen_random_uuid(),
+    block_id uuid references clearing_blocks(id) on delete cascade not null,
+    receipt_id uuid references workflow_receipts(id) on delete cascade not null,
+    receipt_hash text not null,
+    merkle_proof text[] not null default '{}',
+    position integer not null,
+    created_at timestamptz not null default now(),
+    constraint clearing_block_items_position_check check (position >= 0)
+);
+
+create unique index if not exists idx_clearing_block_items_receipt_id on clearing_block_items(receipt_id);
+create index if not exists idx_clearing_block_items_block_id on clearing_block_items(block_id, position);
+
 create table if not exists credit_ledger (
     id uuid primary key default gen_random_uuid(),
     run_id uuid references workflow_runs(id) on delete set null,
