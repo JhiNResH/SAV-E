@@ -623,7 +623,7 @@ final class MapViewModel: ObservableObject {
                     for: createdRun.id
                 )
                 if runSourceRecovery && refinedCandidate.isSourceOnly {
-                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId, workflowRunId: createdRun.id)
                 }
             } catch {
                 await recordPlaceRecoveryFailureIfNeeded(run: run, candidate: refinedCandidate, error: error)
@@ -668,7 +668,7 @@ final class MapViewModel: ObservableObject {
                     for: createdRun.id
                 )
                 if candidate.isSourceOnly {
-                    let recovered = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                    let recovered = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId, workflowRunId: createdRun.id)
                     importedCount += recovered?.count ?? 0
                 }
             } catch {

@@ -9,7 +9,7 @@ protocol SupabaseServiceProtocol {
     func deletePlace(_ placeId: UUID) async throws
     func createMemoryCapture(from candidate: PendingReviewCandidate, userId: String) async throws -> UUID
     func createPlaceCandidate(_ candidate: PendingReviewCandidate, captureId: UUID, userId: String, workflowRunId: UUID?) async throws -> UUID
-    func recoverSourceOnlyReviewCandidates(captureId: UUID) async throws -> [PlaceReviewCandidate]
+    func recoverSourceOnlyReviewCandidates(captureId: UUID, workflowRunId: UUID?) async throws -> [PlaceReviewCandidate]
     func fetchReviewCandidates() async throws -> [PlaceReviewCandidate]
     func updatePlaceCandidateStatus(_ candidateId: UUID, status: String, placeId: UUID?) async throws
     func createPlaceRecoveryRun(sourceURL: String?, sourceType: String?) async throws -> PlaceRecoveryWorkflowRun
@@ -228,10 +228,12 @@ final class SupabaseService: SupabaseServiceProtocol {
         return row.id
     }
 
-    func recoverSourceOnlyReviewCandidates(captureId: UUID) async throws -> [PlaceReviewCandidate] {
+    func recoverSourceOnlyReviewCandidates(captureId: UUID, workflowRunId: UUID? = nil) async throws -> [PlaceReviewCandidate] {
         guard isConfigured else { return [] }
 
-        let body = try Self.jsonBody([:])
+        let body = try Self.jsonBody([
+            "workflow_run_id": workflowRunId?.uuidString,
+        ])
         let data = try await request(
             path: "/memory/captures/\(captureId.uuidString)/search-recovery",
             method: "POST",

@@ -233,7 +233,7 @@ final class PlaceListViewModel: ObservableObject {
                     for: createdRun.id
                 )
                 if runSourceRecovery && refinedCandidate.isSourceOnly {
-                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId)
+                    _ = try? await supabaseService.recoverSourceOnlyReviewCandidates(captureId: captureId, workflowRunId: createdRun.id)
                 }
             } catch {
                 await recordPlaceRecoveryFailureIfNeeded(run: run, candidate: refinedCandidate, error: error)
