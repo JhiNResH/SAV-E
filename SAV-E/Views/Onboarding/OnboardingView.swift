@@ -31,13 +31,8 @@ struct OnboardingView: View {
         verticalSpacing: CGFloat
     ) -> some View {
         ZStack {
-            if isBrandEntryStage {
-                SaveBrandEntryBackground()
-                    .ignoresSafeArea()
-            } else {
-                SaveDottedBackground()
-                    .ignoresSafeArea()
-            }
+            SaveDottedBackground()
+                .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     VStack(spacing: verticalSpacing) {
@@ -137,7 +132,7 @@ struct OnboardingView: View {
             }
         }
         .padding(.bottom, isCompactHeight ? 8 : 22)
-        .background(isBrandEntryStage ? SaveTheme.Colors.nearBlack.opacity(0.82) : Color.saveNotebookPage.opacity(0.72))
+        .background(Color.saveNotebookPage.opacity(0.72))
     }
 
     private var primaryActionTitle: String {
@@ -159,7 +154,7 @@ struct OnboardingView: View {
 
     private var primaryActionFill: Color {
         switch stage {
-        case .language: return SaveTheme.Colors.cream
+        case .language: return .saveHoney
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
         case .ask, .tag: return .saveSky
@@ -168,7 +163,7 @@ struct OnboardingView: View {
 
     private var primaryActionForeground: Color {
         switch stage {
-        case .language: return SaveTheme.Colors.nearBlack
+        case .language: return .saveInk
         default: return .saveInk
         }
     }
@@ -292,48 +287,6 @@ private enum ProofIntentTag: String, CaseIterable {
     }
 }
 
-private struct SaveBrandEntryBackground: View {
-    var body: some View {
-        ZStack {
-            SaveTheme.Colors.nearBlack
-
-            LinearGradient(
-                colors: [
-                    Color(red: 0.06, green: 0.05, blue: 0.04),
-                    SaveTheme.Colors.nearBlack,
-                    Color(red: 0.02, green: 0.03, blue: 0.025)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [SaveTheme.Colors.mint.opacity(0.22), .clear],
-                center: .topTrailing,
-                startRadius: 20,
-                endRadius: 360
-            )
-
-            RadialGradient(
-                colors: [SaveTheme.Colors.amber.opacity(0.20), .clear],
-                center: .bottomLeading,
-                startRadius: 30,
-                endRadius: 420
-            )
-
-            Canvas { context, size in
-                let dotColor = SaveTheme.Colors.cream.opacity(0.08)
-                for row in stride(from: 0, through: size.height, by: 18) {
-                    for column in stride(from: 0, through: size.width, by: 18) {
-                        let rect = CGRect(x: column, y: row, width: 2, height: 2)
-                        context.fill(Path(ellipseIn: rect), with: .color(dotColor))
-                    }
-                }
-            }
-        }
-    }
-}
-
 private struct BrandEntryHero: View {
     var language: AppLanguage
     var isCompactHeight: Bool
@@ -345,41 +298,41 @@ private struct BrandEntryHero: View {
                 HStack {
                     Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
                         .font(SaveTheme.Typography.eyebrow)
-                        .foregroundColor(SaveTheme.Colors.cream)
+                        .foregroundColor(.saveInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.10))
+                        .background(Color.saveHoney.opacity(0.48))
                         .clipShape(Capsule())
-                        .overlay(Capsule().stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1))
+                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
 
                     Spacer()
                 }
             } else {
                 Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
                     .font(SaveTheme.Typography.eyebrow)
-                    .foregroundColor(SaveTheme.Colors.cream)
+                    .foregroundColor(.saveInk)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.10))
+                    .background(Color.saveHoney.opacity(0.48))
                     .clipShape(Capsule())
-                    .overlay(Capsule().stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1))
+                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
             }
 
             ZStack {
                 Circle()
-                    .fill(SaveTheme.Colors.cream.opacity(0.08))
+                    .fill(Color.saveHoney.opacity(0.18))
                     .frame(width: isCompactHeight ? 82 : 138, height: isCompactHeight ? 82 : 138)
                     .scaleEffect(isBreathing ? 1.06 : 0.96)
                     .animation(SaveTheme.Motion.breathing, value: isBreathing)
 
                 MemoMascotMark(size: isCompactHeight ? 58 : 96, framed: true)
-                    .shadow(color: SaveTheme.Colors.amber.opacity(0.30), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
+                    .shadow(color: Color.saveInk.opacity(0.10), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
             }
 
             VStack(spacing: isCompactHeight ? 4 : 10) {
                 Text("SAV-E")
                     .font(.system(size: isCompactHeight ? 38 : 64, weight: .black, design: .rounded))
-                    .foregroundColor(SaveTheme.Colors.cream)
+                    .foregroundColor(.saveInk)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.72)
 
@@ -388,7 +341,7 @@ private struct BrandEntryHero: View {
                     traditionalChinese: "你的私人地點記憶 scout。"
                 ))
                 .font(isCompactHeight ? .subheadline.weight(.black) : SaveTheme.Typography.entryTitle)
-                .foregroundColor(SaveTheme.Colors.cream.opacity(0.92))
+                .foregroundColor(.saveInk)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -398,7 +351,7 @@ private struct BrandEntryHero: View {
                 ))
                 .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                 .lineSpacing(2)
-                .foregroundColor(SaveTheme.Colors.cream.opacity(0.68))
+                .foregroundColor(.saveMutedText)
                 .multilineTextAlignment(.center)
                 .lineLimit(isCompactHeight ? 2 : nil)
                 .minimumScaleFactor(0.84)
@@ -411,7 +364,7 @@ private struct BrandEntryHero: View {
                     Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
                 }
                 .font(.caption.weight(.black))
-                .foregroundColor(SaveTheme.Colors.cream.opacity(0.82))
+                .foregroundColor(.saveInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
             }
