@@ -34,39 +34,39 @@ struct OnboardingView: View {
             SaveDottedBackground()
                 .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    VStack(spacing: verticalSpacing) {
-                        if isBrandEntryStage {
-                            BrandEntryHero(language: language, isCompactHeight: isCompactHeight)
-                        } else {
-                            header(isCompactHeight: isCompactHeight)
-                            AnimatedProofHero(
-                                stage: stage,
-                                clueText: clueText,
-                                language: language,
-                                namespace: proofNamespace,
-                                height: isCompactHeight ? 178 : 214
-                            )
-                            ProofProgressRail(stage: stage, language: language)
-                        }
-                        ProofStageCard(
+            VStack(spacing: 0) {
+                VStack(spacing: verticalSpacing) {
+                    if isBrandEntryStage {
+                        BrandEntryHero(language: language, isCompactHeight: isCompactHeight)
+                    } else {
+                        header(isCompactHeight: isCompactHeight)
+                        AnimatedProofHero(
                             stage: stage,
-                            clueText: $clueText,
-                            selectedTags: $selectedTags,
+                            clueText: clueText,
                             language: language,
-                            isCompactHeight: isCompactHeight,
-                            onChooseLanguage: chooseLanguage,
-                            onUseSample: useSampleClue
+                            namespace: proofNamespace,
+                            height: isCompactHeight ? 178 : 214
                         )
+                        ProofProgressRail(stage: stage, language: language)
                     }
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.top, isCompactHeight ? 8 : 28)
-                    .padding(.bottom, isCompactHeight ? 14 : 18)
-                    .frame(maxHeight: .infinity, alignment: .center)
-                    .clipped()
-
-                    bottomActions(isCompactHeight: isCompactHeight)
+                    ProofStageCard(
+                        stage: stage,
+                        clueText: $clueText,
+                        selectedTags: $selectedTags,
+                        language: language,
+                        isCompactHeight: isCompactHeight,
+                        onChooseLanguage: chooseLanguage,
+                        onUseSample: useSampleClue
+                    )
                 }
+                .padding(.horizontal, horizontalPadding)
+                .padding(.top, isCompactHeight ? 8 : 28)
+                .padding(.bottom, isCompactHeight ? 14 : 18)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .clipped()
+
+                bottomActions(isCompactHeight: isCompactHeight)
+            }
         }
     }
 
@@ -87,8 +87,8 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
 
                 Text(localized(
-                    english: "Start with one real post, map link, screenshot, or message. SAV-E should prove it can help before asking preferences.",
-                    traditionalChinese: "先用一個真的貼文、地圖連結、截圖或訊息。SAV-E 要先證明有用，再問偏好。"
+                    english: "Add one real post, map link, screenshot, or message. SAV-E will show what it found before it saves anything.",
+                    traditionalChinese: "先加入一個真的貼文、地圖連結、截圖或訊息。SAV-E 會先顯示找到什麼，不會直接存。"
                 ))
                 .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                 .lineSpacing(2)
@@ -138,7 +138,7 @@ struct OnboardingView: View {
     private var primaryActionTitle: String {
         switch stage {
         case .language:
-            return localized(english: "Continue", traditionalChinese: "繼續")
+            return localized(english: "Start setup", traditionalChinese: "開始設定")
         case .clue:
             return localized(english: "See what SAV-E finds", traditionalChinese: "看看 SAV-E 找到什麼")
         case .candidate:
@@ -255,8 +255,8 @@ private enum ProofStage: Int, CaseIterable {
         case (.mapStamp, .traditionalChinese): return "地圖章"
         case (.ask, .english): return "Ask"
         case (.ask, .traditionalChinese): return "提問"
-        case (.tag, .english): return "Reason"
-        case (.tag, .traditionalChinese): return "理由"
+        case (.tag, .english): return "Taste"
+        case (.tag, .traditionalChinese): return "偏好"
         }
     }
 }
@@ -296,26 +296,11 @@ private struct BrandEntryHero: View {
         VStack(spacing: isCompactHeight ? 7 : 18) {
             if !isCompactHeight {
                 HStack {
-                    Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
-                        .font(SaveTheme.Typography.eyebrow)
-                        .foregroundColor(.saveInk)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.saveHoney.opacity(0.48))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
-
+                    entryBadge
                     Spacer()
                 }
             } else {
-                Text(localized(english: "PUBLIC iOS BETA", traditionalChinese: "公開 iOS Beta"))
-                    .font(SaveTheme.Typography.eyebrow)
-                    .foregroundColor(.saveInk)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.saveHoney.opacity(0.48))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
+                entryBadge
             }
 
             ZStack {
@@ -337,8 +322,8 @@ private struct BrandEntryHero: View {
                     .minimumScaleFactor(0.72)
 
                 Text(localized(
-                    english: "Your private place memory scout.",
-                    traditionalChinese: "你的私人地點記憶 scout。"
+                    english: "Your private place memory.",
+                    traditionalChinese: "你的私人地點記憶。"
                 ))
                 .font(isCompactHeight ? .subheadline.weight(.black) : SaveTheme.Typography.entryTitle)
                 .foregroundColor(.saveInk)
@@ -346,8 +331,8 @@ private struct BrandEntryHero: View {
                 .fixedSize(horizontal: false, vertical: true)
 
                 Text(localized(
-                    english: "Turn messy posts, map links, screenshots, and friend messages into Review Candidates before they become Map Stamps.",
-                    traditionalChinese: "把貼文、地圖連結、截圖和朋友訊息，先整理成待確認地點，再變成地圖章。"
+                    english: "Keep the source, review the match, then ask your saved places when it is time to decide.",
+                    traditionalChinese: "保留來源、先確認地點，之後要決定去哪時就能直接問 SAV-E。"
                 ))
                 .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                 .lineSpacing(2)
@@ -379,6 +364,17 @@ private struct BrandEntryHero: View {
         case .english: return english
         case .traditionalChinese: return traditionalChinese
         }
+    }
+
+    private var entryBadge: some View {
+        Text(localized(english: "MEMO SETUP", traditionalChinese: "Memo 設定"))
+            .font(SaveTheme.Typography.eyebrow)
+            .foregroundColor(.saveInk)
+            .padding(.horizontal, isCompactHeight ? 9 : 10)
+            .padding(.vertical, isCompactHeight ? 5 : 6)
+            .background(Color.saveHoney.opacity(0.48))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
     }
 }
 
@@ -1059,8 +1055,8 @@ private struct ProofStageCard: View {
             )
 
             Text(localized(
-                english: "This waits in Review. SAV-E should not create fake confirmed pins.",
-                traditionalChinese: "這會先留在 Review。SAV-E 不應該亂產生已確認地點。"
+                english: "This stays in Review until you confirm the exact place.",
+                traditionalChinese: "這會先留在 Review，等你確認正確地點後再保存。"
             ))
             .font(.footnote)
             .fontWeight(.bold)
@@ -1205,15 +1201,15 @@ private struct ProofStageCard: View {
         case .language:
             return localized(english: "Choose your language", traditionalChinese: "選擇語言")
         case .clue:
-            return localized(english: "Paste one messy place clue", traditionalChinese: "貼上一個混亂的地點線索")
+            return localized(english: "Add one place clue", traditionalChinese: "加入一個地點線索")
         case .candidate:
-            return localized(english: "SAV-E makes a Review Candidate", traditionalChinese: "SAV-E 先做成待確認地點")
+            return localized(english: "Review before saving", traditionalChinese: "先確認，再保存")
         case .mapStamp:
             return localized(english: "Confirm it into a Map Stamp", traditionalChinese: "確認成你的地圖章")
         case .ask:
             return localized(english: "Ask from memory first", traditionalChinese: "先問你的地點記憶")
         case .tag:
-            return localized(english: "Configure your scout from proof", traditionalChinese: "從真實記憶設定你的 scout")
+            return localized(english: "Teach SAV-E your taste", traditionalChinese: "讓 SAV-E 學你的偏好")
         }
     }
 
@@ -1227,13 +1223,13 @@ private struct ProofStageCard: View {
         case .clue:
             return localized(english: "Use a Reel caption, Google Maps link, screenshot text, or friend message.", traditionalChinese: "可以用 Reels 文案、Google Maps 連結、截圖文字或朋友訊息。")
         case .candidate:
-            return localized(english: "A candidate shows evidence and missing info before anything is saved.", traditionalChinese: "候選地點會先顯示證據和缺什麼，不會直接存成已確認。")
+            return localized(english: "SAV-E shows what it knows, what is missing, and the next action.", traditionalChinese: "SAV-E 會顯示已找到什麼、還缺什麼，以及下一步。")
         case .mapStamp:
             return localized(english: "Only confirmed places become private map memory.", traditionalChinese: "只有確認後，才會變成你的私人地圖記憶。")
         case .ask:
-            return localized(english: "SAV-E should answer from places you saved before public discovery.", traditionalChinese: "SAV-E 應該先用你存過的地方回答，再分開標示公開搜尋。")
+            return localized(english: "SAV-E starts with places you saved, then labels public discovery separately.", traditionalChinese: "SAV-E 會先用你存過的地方回答，再分開標示公開搜尋。")
         case .tag:
-            return localized(english: "Tags help later recommendations learn why you saved it.", traditionalChinese: "標籤會幫之後的推薦理解你為什麼想存。")
+            return localized(english: "A few tags help future recommendations understand why you saved it.", traditionalChinese: "用幾個標籤，讓之後的推薦知道你為什麼想存。")
         }
     }
 
