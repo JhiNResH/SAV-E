@@ -109,6 +109,7 @@ const captureFields = [
 const placeCandidateFields = [
   "id",
   "capture_id",
+  "workflow_run_id",
   "place_id",
   "name",
   "address",
@@ -1307,6 +1308,10 @@ async function handleMemoryCandidates(
     const captureId = typeof body.capture_id === "string" ? body.capture_id : undefined;
     if (!captureId) return sendJson(response, { error: "capture_id is required" }, 400);
     await ensureCaptureOwner(captureId, userId);
+    if (body.workflow_run_id !== undefined && typeof body.workflow_run_id !== "string") {
+      return sendJson(response, { error: "workflow_run_id must be a string" }, 400);
+    }
+    if (body.workflow_run_id) await ensureWorkflowRunOwner(body.workflow_run_id, userId);
     await ensureOwnedPlaceReference(body.place_id, userId);
 
     const insert = buildInsert("place_candidates", body, placeCandidateFields);
