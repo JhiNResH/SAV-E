@@ -582,9 +582,10 @@ struct SaveEvidenceDrawerModel: Hashable {
     }
 
     private static func prefixedEvidenceValue(_ prefix: String, in evidence: [String]) -> String? {
-        evidence.first { $0.localizedCaseInsensitiveContains(prefix) }?
-            .replacingOccurrences(of: prefix, with: "", options: [.caseInsensitive])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let line = evidence.first(where: { $0.range(of: prefix, options: [.anchored, .caseInsensitive]) != nil }) else {
+            return nil
+        }
+        return String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func evidenceAtoms(for result: SaveSearchResult) -> [SaveEvidenceAtom] {

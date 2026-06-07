@@ -1972,6 +1972,40 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value.contains("best pasta in LA") })
     }
 
+    func testSourceOnlyEvidenceDrawerIgnoresMidLineConfidenceReasonToken() throws {
+        let controller = SaveSearchController()
+        let midLineEvidence = "Caption says pasta in LA. Confidence reason: this is user caption text, not resolver metadata."
+        let response = controller.search(
+            query: "pasta",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "https://www.instagram.com/reel/pasta-midline/",
+                    title: "Mid-line pasta clue",
+                    evidence: [midLineEvidence],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source URL: https://www.instagram.com/reel/pasta-midline/"],
+                        attempts: ["Checked public metadata/caption text"],
+                        missingFields: ["exact venue", "address", "coordinates"],
+                        nextBestClue: "Run source recovery search",
+                        suggestedSearchQueries: ["pasta midline LA instagram reel"]
+                    )
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.fromYourSave.results.first)
+        let drawer = result.evidenceDrawer
+
+        XCTAssertEqual(result.objectType, .sourceOnlyClue)
+        XCTAssertEqual(drawer.missingFields, ["exact venue", "address", "coordinates"])
+        XCTAssertEqual(drawer.recoveryQueries, ["pasta midline LA instagram reel"])
+        XCTAssertEqual(drawer.candidateExplanation, "SAV-E is preserving the source clue without creating a Map Stamp.")
+        XCTAssertFalse(drawer.candidateExplanation?.contains("Confidence reason:") == true)
+        XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value == midLineEvidence })
+    }
+
     func testUnsavedMapCandidateEvidenceDrawerShowsMapEvidenceWithoutMemoryClaim() throws {
         let controller = SaveSearchController()
         let response = controller.search(
