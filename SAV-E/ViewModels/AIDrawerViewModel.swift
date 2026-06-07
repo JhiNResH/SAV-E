@@ -534,7 +534,7 @@ final class AIDrawerViewModel: ObservableObject {
         do {
             _ = try await persistenceService.recordRecommendationAnalysisReceipt(receipt)
         } catch {
-            logger.debug("Recommendation analysis receipt recording skipped: \(error.localizedDescription, privacy: .public)")
+            logger.debug("Recommendation analysis receipt recording skipped")
         }
     }
 

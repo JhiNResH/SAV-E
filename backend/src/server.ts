@@ -35,6 +35,9 @@ import {
 import {
   buildRecommendationAnalysisReceiptDraft,
   envelopeForRecommendationAnalysisReceipt,
+  normalizeRecommendationAnalysisReceiptPayload,
+  RecommendationAnalysisReceiptPayloadError,
+  recommendationAnalysisReceiptPayloadMaxBytes,
 } from "./receiptEnvelope.js";
 
 type JsonBody = Record<string, unknown>;
@@ -715,12 +718,22 @@ async function handleRecommendationAnalysisReceipts(
     return sendJson(response, { error: "Unsupported recommendation analysis receipt route" }, 405);
   }
 
-  const body = await readJson(request);
+  const body = await readJson(request, recommendationAnalysisReceiptPayloadMaxBytes);
+  let payload;
+  try {
+    payload = normalizeRecommendationAnalysisReceiptPayload(body);
+  } catch (error) {
+    if (error instanceof RecommendationAnalysisReceiptPayloadError) {
+      const status = error.message.includes("too large") ? 413 : 400;
+      return sendJson(response, { error: error.message }, status);
+    }
+    throw error;
+  }
   const receiptDraft = buildRecommendationAnalysisReceiptDraft({
     userId,
-    agentId: stringValue(body.agent_id),
-    request: asObject(body.request ?? {}),
-    output: asObject(body.output ?? {}),
+    agentId: payload.agentId,
+    request: payload.request,
+    output: payload.output,
   });
   const receiptInsert = buildInsert(
     "recommendation_analysis_receipts",
@@ -2290,10 +2303,14 @@ function normalizePem(key: string): string {
   return `-----BEGIN PUBLIC KEY-----\n${value}\n-----END PUBLIC KEY-----`;
 }
 
-async function readJson(request: IncomingMessage): Promise<JsonBody> {
+async function readJson(request: IncomingMessage, maxBytes = Number.POSITIVE_INFINITY): Promise<JsonBody> {
   const chunks: Buffer[] = [];
+  let byteLength = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    byteLength += buffer.byteLength;
+    if (byteLength > maxBytes) throw new ApiError(413, "JSON payload is too large");
+    chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8").trim();
   if (!raw) return {};

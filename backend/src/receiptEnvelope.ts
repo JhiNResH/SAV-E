@@ -64,6 +64,20 @@ export interface RecommendationAnalysisReceiptInput {
   createdAt?: string;
 }
 
+export interface BoundedRecommendationAnalysisReceiptPayload {
+  agentId?: string;
+  request: JsonObject;
+  output: JsonObject;
+}
+
+export class RecommendationAnalysisReceiptPayloadError extends Error {}
+
+export const recommendationAnalysisReceiptPayloadMaxBytes = 64 * 1024;
+const recommendationAnalysisReceiptMaxResults = 50;
+const recommendationAnalysisReceiptMaxSignals = 64;
+const recommendationAnalysisReceiptMaxConstraints = 64;
+const recommendationAnalysisReceiptMaxStringLength = 2048;
+
 export function buildRecommendationAnalysisReceiptDraft(
   input: RecommendationAnalysisReceiptInput,
 ): RecommendationAnalysisReceiptDraft {
@@ -93,6 +107,27 @@ export function buildRecommendationAnalysisReceiptDraft(
     evaluator_verdict: evaluatorVerdict,
     settlement_state: "not_settled",
     created_at: createdAt,
+  };
+}
+
+export function normalizeRecommendationAnalysisReceiptPayload(
+  body: JsonObject,
+): BoundedRecommendationAnalysisReceiptPayload {
+  if (Buffer.byteLength(JSON.stringify(body), "utf8") > recommendationAnalysisReceiptPayloadMaxBytes) {
+    throw new RecommendationAnalysisReceiptPayloadError("Recommendation analysis receipt payload is too large");
+  }
+
+  assertBoundedStrings(body);
+  const request = optionalJsonObject(body.request, "request");
+  const output = optionalJsonObject(body.output, "output");
+  assertArrayLength(output.results, recommendationAnalysisReceiptMaxResults, "output.results");
+  assertArrayLength(output.preference_signals, recommendationAnalysisReceiptMaxSignals, "output.preference_signals");
+  assertArrayLength(request.constraints, recommendationAnalysisReceiptMaxConstraints, "request.constraints");
+
+  return {
+    agentId: cleanText(body.agent_id),
+    request,
+    output,
   };
 }
 
@@ -154,8 +189,11 @@ function preferenceSignalsFor(request: JsonObject, output: JsonObject): string[]
   for (const signal of stringArray(output.preference_signals).map(safePreferenceSignal).filter(isString)) {
     signals.add(signal);
   }
-  signals.add(`proof_level:${cleanText(request.proof_level_min ?? request.proofLevelMin) ?? "user_confirmed_place"}`);
-  return [...signals].slice(0, 12);
+  const proofSignal = `proof_level:${safeProofLevel(request.proof_level_min ?? request.proofLevelMin)}`;
+  return [
+    ...[...signals].filter((signal) => !signal.startsWith("proof_level:")).slice(0, 11),
+    proofSignal,
+  ];
 }
 
 function countResultsBySource(results: unknown[], source: "saved" | "public"): number | undefined {
@@ -175,7 +213,46 @@ function countResultsBySource(results: unknown[], source: "saved" | "public"): n
 function safePreferenceSignal(value: string): string | undefined {
   const signal = cleanText(value)?.toLowerCase();
   if (!signal || signal.length > 80) return undefined;
-  return /^[a-z0-9_:-]+$/.test(signal) ? signal : undefined;
+  if (safeExactPreferenceSignals.has(signal)) return signal;
+
+  const parts = signal.split(":");
+  if (parts.length !== 2) return undefined;
+  const [prefix, suffix] = parts;
+  if (!prefix || !suffix) return undefined;
+  return safePreferenceSignalPrefixes[prefix]?.has(suffix) === true ? signal : undefined;
+}
+
+const safeExactPreferenceSignals = new Set([
+  "coffee",
+  "milk_tea",
+  "restaurant",
+  "brunch",
+  "dessert",
+  "bar",
+  "saved_memory",
+  "visited_memory",
+  "nearby",
+]);
+
+const safePreferenceSignalPrefixes: Record<string, Set<string>> = {
+  category: new Set(["food", "cafe", "bar", "attraction", "stay", "shopping"]),
+  source: new Set(["saved_memory", "visited_memory", "review_candidate", "public_quality"]),
+  rating: new Set(["high", "positive"]),
+};
+
+const safeProofLevels = new Set([
+  "source_backed",
+  "user_confirmed_place",
+  "visited_self_reported",
+  "friend_verified",
+  "receipt_backed",
+  "merchant_confirmed",
+  "network_reputation",
+]);
+
+function safeProofLevel(value: unknown): string {
+  const proofLevel = cleanText(value);
+  return proofLevel && safeProofLevels.has(proofLevel) ? proofLevel : "user_confirmed_place";
 }
 
 function isString(value: string | undefined): value is string {
@@ -226,6 +303,35 @@ function numberValue(value: unknown): number {
 
 function objectValue(value: unknown): JsonObject | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : undefined;
+}
+
+function optionalJsonObject(value: unknown, field: string): JsonObject {
+  if (value === undefined || value === null) return {};
+  const object = objectValue(value);
+  if (!object) throw new RecommendationAnalysisReceiptPayloadError(`${field} must be a JSON object`);
+  return object;
+}
+
+function assertArrayLength(value: unknown, max: number, field: string): void {
+  if (value === undefined || value === null) return;
+  if (!Array.isArray(value)) throw new RecommendationAnalysisReceiptPayloadError(`${field} must be an array`);
+  if (value.length > max) throw new RecommendationAnalysisReceiptPayloadError(`${field} has too many items`);
+}
+
+function assertBoundedStrings(value: unknown): void {
+  if (typeof value === "string") {
+    if (value.length > recommendationAnalysisReceiptMaxStringLength) {
+      throw new RecommendationAnalysisReceiptPayloadError("Recommendation analysis receipt string is too long");
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) assertBoundedStrings(item);
+    return;
+  }
+  const object = objectValue(value);
+  if (!object) return;
+  for (const item of Object.values(object)) assertBoundedStrings(item);
 }
 
 function stringArray(value: unknown): string[] {

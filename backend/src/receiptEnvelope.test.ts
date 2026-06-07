@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildRecommendationAnalysisReceiptDraft,
   envelopeForRecommendationAnalysisReceipt,
+  normalizeRecommendationAnalysisReceiptPayload,
+  RecommendationAnalysisReceiptPayloadError,
   sha256CanonicalJson,
 } from "./receiptEnvelope.js";
 
@@ -81,6 +83,9 @@ test("client recommendation output projects mixed saved and public counts safely
         "category:cafe",
         "source:saved_memory",
         "Bright Coffee Bar",
+        "bright_coffee_bar",
+        "private_note:anniversary",
+        "source:saved_memory:anniversary",
         "source:public_quality",
       ],
       results: [
@@ -112,6 +117,68 @@ test("client recommendation output projects mixed saved and public counts safely
   assert.ok(envelope.preference_signals.includes("source:saved_memory"));
   assert.ok(envelope.preference_signals.includes("source:public_quality"));
   assert.equal(envelope.preference_signals.includes("bright coffee bar"), false);
+  assert.equal(envelope.preference_signals.includes("bright_coffee_bar"), false);
+  assert.equal(envelope.preference_signals.includes("private_note:anniversary"), false);
+  assert.equal(envelope.preference_signals.includes("source:saved_memory:anniversary"), false);
   assert.equal(envelopeJson.includes("Bright Coffee Bar"), false);
   assert.equal(envelopeJson.includes("private quiet table note"), false);
+  assert.equal(envelopeJson.includes("anniversary"), false);
+});
+
+test("recommendation analysis preference signals reserve proof level under truncation", () => {
+  const receipt = buildRecommendationAnalysisReceiptDraft({
+    userId: "user_123",
+    request: {
+      intent: "nearby saved coffee milk tea restaurant brunch dessert bar",
+      constraints: ["nearby", "saved"],
+      proof_level_min: "receipt_backed",
+    },
+    output: {
+      preference_signals: [
+        "category:food",
+        "category:cafe",
+        "category:bar",
+        "category:attraction",
+        "category:stay",
+        "category:shopping",
+        "source:saved_memory",
+        "source:visited_memory",
+        "source:review_candidate",
+        "source:public_quality",
+        "rating:high",
+        "rating:positive",
+        "visited_memory",
+      ],
+      results: [],
+    },
+  });
+
+  assert.equal(receipt.preference_signals.length, 12);
+  assert.ok(receipt.preference_signals.includes("proof_level:receipt_backed"));
+});
+
+test("recommendation analysis receipt payload normalization rejects oversized client payloads", () => {
+  assert.throws(
+    () => normalizeRecommendationAnalysisReceiptPayload({
+      request: {},
+      output: { results: Array.from({ length: 51 }, () => ({})) },
+    }),
+    RecommendationAnalysisReceiptPayloadError,
+  );
+
+  assert.throws(
+    () => normalizeRecommendationAnalysisReceiptPayload({
+      request: {},
+      output: { preference_signals: Array.from({ length: 65 }, (_, index) => `signal_${index}`) },
+    }),
+    RecommendationAnalysisReceiptPayloadError,
+  );
+
+  assert.throws(
+    () => normalizeRecommendationAnalysisReceiptPayload({
+      request: { intent: "x".repeat(2049) },
+      output: {},
+    }),
+    RecommendationAnalysisReceiptPayloadError,
+  );
 });
