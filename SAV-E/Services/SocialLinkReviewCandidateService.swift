@@ -21,6 +21,76 @@ protocol PublicSourceSearchServiceProtocol {
     func search(query: String) async throws -> [PublicSourceSearchResult]
 }
 
+enum SocialPlaceEvidenceResolverOutcome: String, Codable, Hashable {
+    case mapStamp
+    case reviewCandidate
+    case sourceOnly
+}
+
+struct SocialPlaceEvidenceResolverInput {
+    var sourceURL: String
+    var resolvedURL: String?
+    var caption: String?
+    var authorHandle: String?
+    var visibleLocationTags: [String]
+    var taggedHandles: [String]
+    var cityClues: [String]
+    var categoryClues: [String]
+    var ocrLines: [String]
+
+    init(
+        sourceURL: String,
+        resolvedURL: String? = nil,
+        caption: String? = nil,
+        authorHandle: String? = nil,
+        visibleLocationTags: [String] = [],
+        taggedHandles: [String] = [],
+        cityClues: [String] = [],
+        categoryClues: [String] = [],
+        ocrLines: [String] = []
+    ) {
+        self.sourceURL = sourceURL
+        self.resolvedURL = resolvedURL
+        self.caption = caption
+        self.authorHandle = authorHandle
+        self.visibleLocationTags = visibleLocationTags
+        self.taggedHandles = taggedHandles
+        self.cityClues = cityClues
+        self.categoryClues = categoryClues
+        self.ocrLines = ocrLines
+    }
+}
+
+struct SocialPlaceRawSource {
+    var sourceURL: String
+    var resolvedURL: String?
+    var caption: String?
+    var authorHandle: String?
+    var ocrLines: [String]
+}
+
+struct SocialPlaceExtractedClues {
+    var caption: String?
+    var authorHandle: String?
+    var visibleLocationTags: [String]
+    var taggedHandles: [String]
+    var cityClues: [String]
+    var categoryClues: [String]
+    var placeClues: [String]
+}
+
+struct SocialPlaceEvidenceResolverResult {
+    var rawSource: SocialPlaceRawSource
+    var extracted: SocialPlaceExtractedClues
+    var searchQueries: [String]
+    var outcome: SocialPlaceEvidenceResolverOutcome
+    var candidate: PendingReviewCandidate
+    var evidence: [String]
+    var missingFields: [String]
+    var confidence: Double
+    var confidenceReason: String
+}
+
 final class PublicSourceSearchService: PublicSourceSearchServiceProtocol {
     static let shared = PublicSourceSearchService()
 
@@ -90,6 +160,45 @@ final class SocialLinkReviewCandidateService {
     ) {
         self.placeResolverService = placeResolverService ?? PlaceResolverService(googlePlacesService: googlePlacesService)
         self.publicSourceSearchService = publicSourceSearchService
+    }
+
+    func resolveEvidence(_ input: SocialPlaceEvidenceResolverInput) async -> SocialPlaceEvidenceResolverResult {
+        let evidenceText = resolverEvidenceText(from: input)
+        let sourceURL = input.resolvedURL ?? input.sourceURL
+        let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
+        let generatedQueries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
+        let candidates = (try? await recoverReviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)) ??
+            reviewCandidatesOrSourceOnly(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+        let candidate = candidates.first ?? sourceOnlyCandidate(evidenceText: evidenceText, sourceURL: sourceURL)
+        let outcome = resolverOutcome(for: candidate)
+        let extracted = extractedClues(from: input, analysis: analysis, candidate: candidate)
+        let confidenceReason = resolverConfidenceReason(outcome: outcome, candidate: candidate, analysis: analysis)
+        let missingFields = appendUnique(candidate.evidenceDiagnostic?.missingFields ?? [], candidate.missingInfo)
+        let evidence = resolverEvidence(
+            input: input,
+            extracted: extracted,
+            candidate: candidate,
+            outcome: outcome,
+            confidenceReason: confidenceReason
+        )
+
+        return SocialPlaceEvidenceResolverResult(
+            rawSource: SocialPlaceRawSource(
+                sourceURL: input.sourceURL,
+                resolvedURL: input.resolvedURL,
+                caption: input.caption,
+                authorHandle: extracted.authorHandle,
+                ocrLines: input.ocrLines
+            ),
+            extracted: extracted,
+            searchQueries: appendUnique(generatedQueries, candidate.evidenceDiagnostic?.suggestedSearchQueries ?? []),
+            outcome: outcome,
+            candidate: candidate,
+            evidence: evidence,
+            missingFields: missingFields,
+            confidence: candidate.confidence,
+            confidenceReason: confidenceReason
+        )
     }
 
     private struct PublicMetadata {
@@ -197,6 +306,110 @@ final class SocialLinkReviewCandidateService {
             refined.append(await refineCandidate(candidate, evidenceText: evidenceText))
         }
         return refined
+    }
+
+    private func resolverEvidenceText(from input: SocialPlaceEvidenceResolverInput) -> String {
+        [
+            input.caption,
+            input.visibleLocationTags.joined(separator: " "),
+            input.taggedHandles.map { "@\($0)" }.joined(separator: " "),
+            input.cityClues.joined(separator: " "),
+            input.categoryClues.joined(separator: " "),
+            input.ocrLines.joined(separator: "\n")
+        ]
+        .compactMap { $0 }
+        .map(cleanHTMLText)
+        .filter { !$0.isEmpty }
+        .joined(separator: "\n")
+    }
+
+    private func resolverOutcome(for candidate: PendingReviewCandidate) -> SocialPlaceEvidenceResolverOutcome {
+        if candidate.isSourceOnly { return .sourceOnly }
+        if candidate.evidenceDiagnostic?.canSaveAsMapStamp == true || (candidate.hasReliableCoordinates && !candidate.address.isEmpty) {
+            return .mapStamp
+        }
+        return .reviewCandidate
+    }
+
+    private func extractedClues(
+        from input: SocialPlaceEvidenceResolverInput,
+        analysis: SocialPlaceAgentAnalysis,
+        candidate: PendingReviewCandidate
+    ) -> SocialPlaceExtractedClues {
+        let authorHandle = cleanHandle(input.authorHandle) ?? analysis.sourceActors.first(where: { $0.role == .creatorHandle || $0.role == .sourceAccount })?.handle
+        let taggedHandles = appendUnique(
+            input.taggedHandles.compactMap(cleanHandle),
+            analysis.placesFound.flatMap(\.venueHandles) + analysis.groups.flatMap(\.venueHandles)
+        )
+        let cityClues = appendUnique(input.cityClues, analysis.regionClues + [candidate.address].filter { !$0.isEmpty })
+        let categoryClues = appendUnique(input.categoryClues, [candidate.category, analysis.sourceIntent.rawValue])
+        let placeClues = appendUnique(
+            analysis.placesFound.map(\.displayName),
+            [candidate.candidateName].filter { !$0.isEmpty && !candidate.isSourceOnly }
+        )
+
+        return SocialPlaceExtractedClues(
+            caption: input.caption?.trimmingCharacters(in: .whitespacesAndNewlines),
+            authorHandle: authorHandle,
+            visibleLocationTags: appendUnique(input.visibleLocationTags, analysis.regionClues),
+            taggedHandles: taggedHandles,
+            cityClues: cityClues,
+            categoryClues: categoryClues,
+            placeClues: placeClues
+        )
+    }
+
+    private func resolverConfidenceReason(
+        outcome: SocialPlaceEvidenceResolverOutcome,
+        candidate: PendingReviewCandidate,
+        analysis: SocialPlaceAgentAnalysis
+    ) -> String {
+        switch outcome {
+        case .mapStamp:
+            return "Places resolver verified a matching address/coordinates; user still confirms before Map Stamp."
+        case .reviewCandidate:
+            let reason = analysis.placeBearingReason ?? "source has place-bearing caption/tag/location clues"
+            return "\(reason); kept as Review Candidate until address/coordinates are verified."
+        case .sourceOnly:
+            return "Raw source was preserved, but SAV-E found no verified place identity yet."
+        }
+    }
+
+    private func resolverEvidence(
+        input: SocialPlaceEvidenceResolverInput,
+        extracted: SocialPlaceExtractedClues,
+        candidate: PendingReviewCandidate,
+        outcome: SocialPlaceEvidenceResolverOutcome,
+        confidenceReason: String
+    ) -> [String] {
+        var evidence = [
+            "Raw source saved: \(input.sourceURL)",
+            "Resolver outcome: \(outcome.rawValue)",
+            "Confidence reason: \(confidenceReason)"
+        ]
+        if let caption = extracted.caption, !caption.isEmpty {
+            evidence.append("Caption captured: \(String(caption.prefix(220)))")
+        }
+        if let authorHandle = extracted.authorHandle {
+            evidence.append("Author handle: @\(authorHandle)")
+        }
+        evidence.append(contentsOf: extracted.taggedHandles.map { "Tagged/venue handle: @\($0)" })
+        evidence.append(contentsOf: extracted.visibleLocationTags.map { "Visible location/tag: \($0)" })
+        evidence.append(contentsOf: extracted.placeClues.map { "Place clue: \($0)" })
+        evidence.append(contentsOf: candidate.evidence)
+        if let diagnostic = candidate.evidenceDiagnostic {
+            evidence.append(contentsOf: diagnostic.found)
+            evidence.append(contentsOf: diagnostic.attempts)
+        }
+        return appendUnique([], evidence)
+    }
+
+    private func cleanHandle(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let cleaned = value
+            .trimmingCharacters(in: CharacterSet(charactersIn: " @\n\t\r"))
+            .lowercased()
+        return cleaned.isEmpty ? nil : cleaned
     }
 
     private func publicSearchResults(for queries: [String]) async -> [PublicSourceSearchResult] {

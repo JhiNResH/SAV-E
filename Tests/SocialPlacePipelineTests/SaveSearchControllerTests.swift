@@ -1946,7 +1946,10 @@ final class SaveSearchControllerTests: XCTestCase {
                     state: .sourceOnly,
                     sourceURL: "https://www.instagram.com/reel/pasta/",
                     title: "Best pasta reel",
-                    evidence: ["Caption says best pasta in LA"],
+                    evidence: [
+                        "Caption says best pasta in LA",
+                        "Confidence reason: Raw source was preserved, but SAV-E found no verified place identity yet."
+                    ],
                     evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
                         found: ["Source URL: https://www.instagram.com/reel/pasta/"],
                         attempts: ["Checked public metadata/caption text"],
@@ -1965,7 +1968,7 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(drawer.sourcePlatform, .instagram)
         XCTAssertEqual(drawer.missingFields, ["exact venue", "address", "coordinates"])
         XCTAssertEqual(drawer.recoveryQueries, ["best pasta LA instagram reel"])
-        XCTAssertTrue(drawer.candidateExplanation?.contains("without creating a Map Stamp") == true)
+        XCTAssertEqual(drawer.candidateExplanation, "Why SAV-E guessed this: Raw source was preserved, but SAV-E found no verified place identity yet.")
         XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value.contains("best pasta in LA") })
     }
 
