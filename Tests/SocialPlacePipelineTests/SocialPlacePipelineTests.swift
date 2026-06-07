@@ -26,6 +26,15 @@ private final class StubPublicSourceSearchService: PublicSourceSearchServiceProt
                 )
             ]
         }
+        if query.contains("賀鴨郎") || query.contains("houyacantoneserestaurant") {
+            return [
+                PublicSourceSearchResult(
+                    title: "賀鴨郎｜粵菜烤鴨中餐廳-承億酒店",
+                    url: "https://www.taiurbanresort.com.tw/restaurant-detail/HOU_YA/",
+                    snippet: "賀鴨郎 粵菜烤鴨中餐廳｜B1。餐廳地點 高雄市前鎮區林森四路189號B1。電話訂位 07-3333999。"
+                )
+            ]
+        }
         return []
     }
 }
@@ -621,6 +630,69 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(search.queries.contains { $0.contains("士林") && $0.contains("關西壽喜燒") })
         XCTAssertTrue(places.queries.contains { $0.contains("牛喜壽喜燒") && $0.contains("士林") })
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains { $0.contains("Recovered venue candidate: 牛喜壽喜燒") } == true)
+    }
+
+    func testInstagramCityNameHandleCaptionRecoversOfficialAddressAsReviewCandidate() async throws {
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: search
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: """
+            KEKE帶我去旅行｜艾琳 on Instagram: "這次讓我念念不忘的
+            是高雄的賀鴨郎
+            從酥脆鴨皮到多層次的搭配吃法
+            每一口都吃得出細節
+            難怪很多人吃過一次，
+            下次聚餐又默默訂回來🦆✨
+            @houyacantoneserestaurant"
+            """,
+            sourceURL: "https://www.instagram.com/reel/DZSU9JsSkB1/"
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertEqual(candidate.candidateName, "賀鴨郎")
+        XCTAssertEqual(candidate.address, "高雄市前鎮區林森四路189號B1")
+        XCTAssertEqual(candidate.reviewState, "source_recovered_candidate")
+        XCTAssertFalse(candidate.isSourceOnly)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertTrue(search.queries.contains { $0.contains("賀鴨郎") && $0.contains("高雄") && $0.contains("地址") })
+        XCTAssertTrue(search.queries.contains { $0.contains("houyacantoneserestaurant") && $0.contains("賀鴨郎") })
+        XCTAssertTrue(search.queries.contains { $0.contains("賀鴨郎") && $0.contains("官方") && $0.contains("餐廳") })
+        XCTAssertTrue(candidate.evidence.contains { $0.contains("Public web search URL: https://www.taiurbanresort.com.tw/restaurant-detail/HOU_YA/") })
+        XCTAssertTrue(candidate.evidence.contains { $0.contains("Recovered address evidence: 高雄市前鎮區林森四路189號B1") })
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
+        XCTAssertTrue(candidate.missingInfo.contains("User confirmation required"))
+        XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified coordinates") == true)
+    }
+
+    func testInstagramCityGenericPhraseCreatorHandleWithoutSearchConfirmationStaysSourceOnly() async throws {
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: search
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: """
+            旅人日記 on Instagram: "這次讓我念念不忘的是高雄的那間店
+            氣氛很好，下次還想再去。
+            @keke_travel"
+            """,
+            sourceURL: "https://www.instagram.com/reel/DGenericCityOnly/"
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertTrue(candidate.isSourceOnly)
+        XCTAssertEqual(candidate.candidateName, "Instagram reel")
+        XCTAssertEqual(candidate.address, "")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertFalse(search.queries.contains { $0.contains("那間店") && $0.contains("地址") })
+        XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
     }
 
     func testAmapRefinementPromotesChinaRestaurantCandidateToMapReady() async {

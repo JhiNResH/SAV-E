@@ -221,7 +221,9 @@ final class SocialLinkReviewCandidateService {
 
     func recoverReviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) async throws -> [PendingReviewCandidate] {
         let initial = reviewCandidatesOrSourceOnly(fromEvidenceText: evidenceText, sourceURL: sourceURL)
-        let shouldRunRecovery = initial.contains { $0.isPlaceBearingSource || $0.isSourceOnly }
+        let shouldRunRecovery = initial.contains {
+            $0.isPlaceBearingSource || $0.isSourceOnly || $0.reviewState == "unresolved_place_candidate"
+        }
         guard shouldRunRecovery else {
             return await refineCandidates(initial, evidenceText: evidenceText)
         }
@@ -438,6 +440,8 @@ final class SocialLinkReviewCandidateService {
         return results.compactMap { result in
             guard let name = recoveredVenueName(from: result, analysis: analysis), isUsableCandidateName(name) else { return nil }
             let combinedText = sourceRecoveryEvidenceText(evidenceText: evidenceText, results: [result])
+            let recoveredAddress = sourceRecoveryAddress(from: result)
+            let address = recoveredAddress ?? region ?? ""
             let tier = SocialPlaceEvidenceTier.weakCandidate
             let evidence = appendUnique(
                 [],
@@ -445,25 +449,30 @@ final class SocialLinkReviewCandidateService {
                     "Source URL: \(sourceURL)",
                     "Evidence tier: \(tier.rawValue)",
                     "Recovered venue candidate: \(name)",
+                    recoveredAddress.map { "Recovered address evidence: \($0)" } ?? "",
                     "Public web search result: \(result.title) — \(result.snippet)",
                     result.url.isEmpty ? "" : "Public web search URL: \(result.url)"
                 ]
             )
             return PendingReviewCandidate(
                 candidateName: name,
-                address: region ?? "",
+                address: address,
                 category: category(for: analysis.sourceIntent),
                 sourceURL: sourceURL,
                 sourceText: combinedText,
                 evidence: evidence,
-                confidence: 0.58,
-                missingInfo: ["Google Places match required", "User confirmation required"],
+                confidence: recoveredAddress == nil ? 0.58 : 0.64,
+                missingInfo: appendUnique(
+                    recoveredAddress == nil ? ["Verified address"] : [],
+                    ["Google Places match required", "Verified coordinates", "User confirmation required"]
+                ),
                 savedAt: Date(),
                 evidenceDiagnostic: sourceRecoveryDiagnostic(
                     analysis: analysis,
                     sourceURL: sourceURL,
                     result: result,
-                    recoveredName: name
+                    recoveredName: name,
+                    recoveredAddress: recoveredAddress
                 ),
                 reviewState: "source_recovered_candidate"
             )
@@ -472,6 +481,10 @@ final class SocialLinkReviewCandidateService {
 
     private func recoveredVenueName(from result: PublicSourceSearchResult, analysis: SocialPlaceAgentAnalysis) -> String? {
         let text = "\(result.title)\n\(result.snippet)"
+        if let hinted = sourceRecoveryVenueNameHint(phrase: nil, topic: analysis.topic, evidenceText: analysis.recoveryHints.map(\.queryFragment).joined(separator: "\n")),
+           text.localizedCaseInsensitiveContains(hinted) {
+            return hinted
+        }
         let patterns = [
             #"(?i)favorite restaurants? in [A-Za-z .'-]{2,40}\s+is\s+([A-Z][A-Za-z0-9 &'’'\-.]{2,70})"#,
             #"(?i)favorite restaurants? in [A-Za-z .'-]{2,40}\s*[:\-–—]\s*([A-Z][A-Za-z0-9 &'’'\-.]{2,70})"#,
@@ -487,6 +500,36 @@ final class SocialLinkReviewCandidateService {
         if let quoted = firstCapture(in: text, pattern: #"[“\"]([A-Z][A-Za-z0-9 &'’'\-.]{2,70})[”\"]"#) {
             let cleaned = cleanRecoveredVenueName(quoted)
             if isUsableCandidateName(cleaned) { return cleaned }
+        }
+        if let titleName = recoveredVenueNameFromSearchTitle(result.title) {
+            return titleName
+        }
+        return nil
+    }
+
+    private func recoveredVenueNameFromSearchTitle(_ title: String) -> String? {
+        let cleanedTitle = cleanHTMLText(title)
+        let candidates = cleanedTitle
+            .components(separatedBy: CharacterSet(charactersIn: "|｜-–—"))
+            .map(cleanRecoveredVenueName)
+        for candidate in candidates where isUsableCandidateName(candidate) && !looksLikeMarketingLine(candidate) {
+            return candidate
+        }
+        return nil
+    }
+
+    private func sourceRecoveryAddress(from result: PublicSourceSearchResult) -> String? {
+        let text = "\(result.title)\n\(result.snippet)"
+        let patterns = [
+            #"((?:台灣)?(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)市[^\n\r，,。；;]{0,40}\d{1,6}\s*(?:號|号)?(?:B\d|[0-9一二三四五六七八九十]+樓)?)"#,
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)市[^\n\r，,。；;]{0,50})"#,
+            #"(\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy)\b(?:,\s*[A-Za-z .'-]{2,40})?)"#
+        ]
+        for pattern in patterns {
+            guard let match = firstCapture(in: text, pattern: pattern) else { continue }
+            let cleaned = cleanLocationMarker(from: match)
+                .replacingOccurrences(of: #"^(?:餐廳地點|餐厅地点|地點|地点|地址)\s*[:：]?\s*"#, with: "", options: .regularExpression)
+            if !cleaned.isEmpty { return cleaned }
         }
         return nil
     }
@@ -509,7 +552,8 @@ final class SocialLinkReviewCandidateService {
         analysis: SocialPlaceAgentAnalysis,
         sourceURL: String,
         result: PublicSourceSearchResult,
-        recoveredName: String
+        recoveredName: String,
+        recoveredAddress: String?
     ) -> SocialPlaceEvidenceDiagnostic {
         SocialPlaceEvidenceDiagnostic(
             found: appendUnique(
@@ -518,6 +562,7 @@ final class SocialLinkReviewCandidateService {
                     "Source URL: \(sourceURL)",
                     "Place-bearing source: \(analysis.placeBearingReason ?? analysis.sourceIntent.rawValue)",
                     "Recovered venue candidate: \(recoveredName)",
+                    recoveredAddress.map { "Recovered address evidence: \($0)" } ?? "",
                     "Public web search result: \(result.title)",
                     result.url.isEmpty ? "" : "Public web search URL: \(result.url)"
                 ]
@@ -532,7 +577,7 @@ final class SocialLinkReviewCandidateService {
                     "Did not use logged-in social scraping"
                 ]
             ),
-            missingFields: ["Verified address", "Verified coordinates"],
+            missingFields: appendUnique(recoveredAddress == nil ? ["Verified address"] : [], ["Verified coordinates"]),
             nextBestClue: "Confirm the map provider match before saving this as a Map Stamp."
         )
     }
@@ -1436,6 +1481,16 @@ final class SocialLinkReviewCandidateService {
             let region = primaryRegion(from: analysis.regionClues)
             let topic = analysis.topic
             let phrase = meaningfulPlacePhrase(from: evidenceText)
+            let recoveredNameHint = sourceRecoveryVenueNameHint(phrase: phrase, topic: topic, evidenceText: evidenceText)
+            if let recoveredNameHint, let region {
+                queries.append("\(recoveredNameHint) \(region) 地址")
+            }
+            if let recoveredNameHint, let handle = firstSocialHandle(in: evidenceText) {
+                queries.append("\(handle) \(recoveredNameHint)")
+            }
+            if let recoveredNameHint {
+                queries.append("\(recoveredNameHint) 官方 餐廳 訂位")
+            }
             if let socialPost {
                 if let region {
                     queries.append("\"\(socialPost.id)\" \(keyword) \(region)")
@@ -1526,6 +1581,7 @@ final class SocialLinkReviewCandidateService {
             .replacingOccurrences(of: #"https?://\S+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"site:\S+"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"\bD[A-Za-z0-9_-]{6,}\b"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"@[A-Za-z0-9._]{3,30}"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:instagram\s+reel|xiaohongshu|xhs|douyin)\b"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"(?:小红书|小紅書|抖音)"#, with: " ", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:restaurant|venue|place|address|cafe|coffee|hotel|map)\b"#, with: " ", options: .regularExpression)
@@ -1533,6 +1589,10 @@ final class SocialLinkReviewCandidateService {
             .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\"'“”"))
 
         if candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil {
+            if candidate.range(of: #"^(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的"#, options: .regularExpression) != nil {
+                guard let cityScopedName = venueNameFromCityQualifiedPhrase(candidate) else { return nil }
+                candidate = cityScopedName
+            }
             for marker in [" 台北", " 臺北", " Taipei", " Taiwan", " 士林站", " Shilin Station"] {
                 if let range = candidate.range(of: marker, options: [.caseInsensitive]) {
                     candidate = String(candidate[..<range.lowerBound])
@@ -1558,7 +1618,10 @@ final class SocialLinkReviewCandidateService {
 
         let lowered = candidate.lowercased()
         if ["la", "oc", "nyc", "sf", "taipei", "tokyo"].contains(lowered) { return nil }
-        if ["士林", "西門", "大安", "信義", "萬華", "中山", "松山", "內湖", "板橋", "新莊", "蘆洲", "台北", "臺北"].contains(candidate) {
+        if [
+            "士林", "西門", "大安", "信義", "萬華", "中山", "松山", "內湖", "板橋", "新莊", "蘆洲",
+            "台北", "臺北", "台南", "臺南", "台中", "臺中", "高雄", "新北", "桃園"
+        ].contains(candidate) {
             return nil
         }
         let genericValues = [
@@ -1659,7 +1722,8 @@ final class SocialLinkReviewCandidateService {
         let patterns = [
             #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
             #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#,
-            #"((?:士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)[^\n\r]{0,60}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食))"#
+            #"((?:士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)[^\n\r]{0,60}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食))"#,
+            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的[^\n\r，,。！!？?@#]{2,24})"#
         ]
         for pattern in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
@@ -1676,6 +1740,30 @@ final class SocialLinkReviewCandidateService {
             }
         }
         return nil
+    }
+
+    private func sourceRecoveryVenueNameHint(phrase: String?, topic: String?, evidenceText: String) -> String? {
+        for value in [phrase, topic, cityQualifiedVenuePhrase(in: evidenceText)] {
+            guard let value, let name = venueNameFromCityQualifiedPhrase(value) else { continue }
+            return name
+        }
+        return nil
+    }
+
+    private func cityQualifiedVenuePhrase(in text: String) -> String? {
+        firstCapture(in: text, pattern: #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的[^\n\r，,。！!？?@#]{2,24})"#)
+            .map(cleanHTMLText)
+    }
+
+    private func venueNameFromCityQualifiedPhrase(_ value: String) -> String? {
+        guard let rawName = firstCapture(in: value, pattern: #"^(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的([^\n\r，,。！!？?@#]{2,24})"#) else {
+            return nil
+        }
+        let name = cleanRecoveredVenueName(rawName)
+        let genericNames = ["那間店", "那家店", "這間店", "这间店", "這家店", "这家店", "那個地方", "那个地方"]
+        guard !genericNames.contains(name) else { return nil }
+        guard isUsableCandidateName(name), !looksLikeMarketingLine(name) else { return nil }
+        return name
     }
 
     private struct SocialPostDescriptor {

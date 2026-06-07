@@ -19,6 +19,28 @@ test("buildSourceRecoveryQueries strips Instagram tracking query", () => {
   ]);
 });
 
+test("buildSourceRecoveryQueries adds city venue and handle recovery queries", () => {
+  const queries = buildSourceRecoveryQueries({
+    sourceUrl: "https://www.instagram.com/reel/DZSU9JsSkB1/",
+    rawText: `這次讓我念念不忘的是高雄的賀鴨郎
+@houyacantoneserestaurant`,
+  });
+
+  assert.ok(queries.includes("賀鴨郎 高雄 地址"));
+  assert.ok(queries.includes("houyacantoneserestaurant 賀鴨郎"));
+  assert.ok(queries.includes("賀鴨郎 官方 餐廳 訂位"));
+});
+
+test("buildSourceRecoveryQueries does not promote generic city creator handle clues", () => {
+  const queries = buildSourceRecoveryQueries({
+    sourceUrl: "https://www.instagram.com/reel/DGenericCityOnly/",
+    rawText: `這次讓我念念不忘的是高雄的那間店
+@keke_travel`,
+  });
+
+  assert.ok(!queries.some((query) => query.includes("那間店") && query.includes("地址")));
+});
+
 test("parseDuckDuckGoResults extracts titles snippets and canonical target URLs", () => {
   const html = `
     <div class="result">
@@ -94,6 +116,22 @@ test("candidatesFromSearchResults allows official venue evidence without coordin
   assert.equal(candidates[0].name, "Fabel Friet");
   assert.equal(candidates[0].address, "");
   assert.equal(candidates[0].confidence, 0.38);
+});
+
+test("candidatesFromSearchResults extracts Taiwanese official venue and address evidence", () => {
+  const candidates = candidatesFromSearchResults([
+    {
+      query: "賀鴨郎 高雄 地址",
+      title: "賀鴨郎｜粵菜烤鴨中餐廳-承億酒店",
+      url: "https://www.taiurbanresort.com.tw/restaurant-detail/HOU_YA/",
+      snippet: "賀鴨郎 粵菜烤鴨中餐廳｜B1。餐廳地點 高雄市前鎮區林森四路189號B1。電話訂位 07-3333999。",
+    },
+  ]);
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].name, "賀鴨郎");
+  assert.equal(candidates[0].address, "高雄市前鎮區林森四路189號B1");
+  assert.ok(candidates[0].missingInfo.includes("Verified coordinates"));
 });
 
 test("runSourceSearchRecovery uses injected fetcher and returns candidates", async () => {
