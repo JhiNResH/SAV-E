@@ -35,6 +35,9 @@ import {
 import {
   buildRecommendationAnalysisReceiptDraft,
   envelopeForRecommendationAnalysisReceipt,
+  normalizeRecommendationAnalysisReceiptPayload,
+  RecommendationAnalysisReceiptPayloadError,
+  recommendationAnalysisReceiptPayloadMaxBytes,
 } from "./receiptEnvelope.js";
 
 type JsonBody = Record<string, unknown>;
@@ -376,6 +379,9 @@ createServer(async (request, response) => {
     if (isV0 && resource === "places" && id === "recommend-by-claims") {
       return await handleRecommendByClaims(request, response, userId);
     }
+    if (isV0 && resource === "recommendation-analysis-receipts") {
+      return await handleRecommendationAnalysisReceipts(request, response, userId);
+    }
     if (isV0 && resource === "claims" && id === "usage-receipts") {
       return await handleAuthenticatedClaimUsageReceipts(request, response, userId);
     }
@@ -701,6 +707,47 @@ async function handleRecommendByClaims(
     ...recommendationOutput,
     agent_shack_receipt_envelope: envelopeForRecommendationAnalysisReceipt(formatDates(receiptRows[0])),
   });
+}
+
+async function handleRecommendationAnalysisReceipts(
+  request: IncomingMessage,
+  response: ServerResponse,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "POST") {
+    return sendJson(response, { error: "Unsupported recommendation analysis receipt route" }, 405);
+  }
+
+  const body = await readJson(request, recommendationAnalysisReceiptPayloadMaxBytes);
+  let payload;
+  try {
+    payload = normalizeRecommendationAnalysisReceiptPayload(body);
+  } catch (error) {
+    if (error instanceof RecommendationAnalysisReceiptPayloadError) {
+      const status = error.message.includes("too large") ? 413 : 400;
+      return sendJson(response, { error: error.message }, status);
+    }
+    throw error;
+  }
+  const receiptDraft = buildRecommendationAnalysisReceiptDraft({
+    userId,
+    agentId: payload.agentId,
+    request: payload.request,
+    output: payload.output,
+  });
+  const receiptInsert = buildInsert(
+    "recommendation_analysis_receipts",
+    receiptDraft,
+    recommendationAnalysisReceiptFields,
+  );
+  const { rows } = await pool.query(`${receiptInsert.sql} returning *`, receiptInsert.values);
+  const row = formatDates(rows[0]);
+
+  return sendJson(response, {
+    id: row.id,
+    envelope: envelopeForRecommendationAnalysisReceipt(row),
+    full_payload_json: JSON.stringify(row.private_payload),
+  }, 201);
 }
 
 async function placeClaimsForPlace(
@@ -2256,10 +2303,14 @@ function normalizePem(key: string): string {
   return `-----BEGIN PUBLIC KEY-----\n${value}\n-----END PUBLIC KEY-----`;
 }
 
-async function readJson(request: IncomingMessage): Promise<JsonBody> {
+async function readJson(request: IncomingMessage, maxBytes = Number.POSITIVE_INFINITY): Promise<JsonBody> {
   const chunks: Buffer[] = [];
+  let byteLength = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    byteLength += buffer.byteLength;
+    if (byteLength > maxBytes) throw new ApiError(413, "JSON payload is too large");
+    chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8").trim();
   if (!raw) return {};

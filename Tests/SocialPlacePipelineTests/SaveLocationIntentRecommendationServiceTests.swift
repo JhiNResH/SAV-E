@@ -355,6 +355,65 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertFalse(response.shouldAutoSearchNearbyUnsavedCandidates)
     }
 
+    func testRecommendationAnalysisReceiptDraftUsesSafeEnvelopeSignalsAndPrivateSnapshots() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let savedCoffee = place(
+            name: "Bright Coffee Bar",
+            category: .cafe,
+            latitude: 33.6849,
+            longitude: -117.8262,
+            googleRating: 4.6
+        )
+        let publicCoffee = mapCandidate(name: "Public Coffee", category: .cafe)
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "推薦我附近咖啡",
+            places: [savedCoffee],
+            mapCandidates: [publicCoffee],
+            currentLocation: currentLocation
+        ))
+        let shownAt = Date(timeIntervalSince1970: 0)
+
+        let draft = try XCTUnwrap(response.recommendationAnalysisReceiptDraft(shownAt: shownAt))
+        let body = draft.body
+        let request = try XCTUnwrap(body["request"] as? [String: Any])
+        let output = try XCTUnwrap(body["output"] as? [String: Any])
+        let results = try XCTUnwrap(output["results"] as? [[String: Any]])
+        let signals = try XCTUnwrap(output["preference_signals"] as? [String])
+
+        XCTAssertNil(body["created_at"])
+        XCTAssertEqual(request["shown_at"] as? String, shownAt.ISO8601Format())
+        XCTAssertEqual(output["public_fallback_used"] as? Bool, false)
+        XCTAssertTrue(results.contains { $0["title"] as? String == "Bright Coffee Bar" })
+        XCTAssertTrue(signals.contains("category:cafe"))
+        XCTAssertTrue(signals.contains("source:saved_memory"))
+        XCTAssertTrue(signals.contains("rating:high"))
+        XCTAssertTrue(signals.contains("nearby"))
+        XCTAssertFalse(signals.contains { $0.contains("Bright Coffee Bar") })
+    }
+
+    func testRecommendationAnalysisReceiptTreatsReviewAndTripStopAsSavedMemorySignals() throws {
+        let review = searchResult(id: "review-1", objectType: .review)
+        let tripStop = searchResult(id: "trip-1", objectType: .tripStop)
+        let section = SaveSearchSection(
+            id: "from-your-save",
+            title: "From your SAV-E",
+            subtitle: "",
+            results: [review, tripStop]
+        )
+        let response = SaveSearchResponse(
+            query: "dinner from my saved reviews",
+            assistantMessage: "Use your saved review and trip stop.",
+            fromYourSave: section,
+            newRecommendations: SaveSearchSection(id: "public", title: "Public", subtitle: "", results: [])
+        )
+
+        let signals = response.recommendationAnalysisPreferenceSignals
+
+        XCTAssertTrue(signals.contains("source:saved_memory"))
+        XCTAssertFalse(signals.contains("source:public_quality"))
+    }
+
     func testRestaurantRecommendationUsesCurrentLocationAndIncludesReviewCandidates() throws {
         let service = SaveLocationIntentRecommendationService()
         let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
@@ -1095,6 +1154,33 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
             reviewCount: 240,
             distanceMeters: 180,
             evidence: ["Apple Maps result"]
+        )
+    }
+
+    private func searchResult(id: String, objectType: SaveSearchObjectType) -> SaveSearchResult {
+        SaveSearchResult(
+            id: id,
+            objectType: objectType,
+            userState: .wantToGo,
+            title: "Saved private result",
+            subtitle: "Los Angeles",
+            statusLabel: "Saved",
+            sourceURL: nil,
+            sourcePlatform: nil,
+            category: .food,
+            cityOrArea: "Los Angeles",
+            latitude: nil,
+            longitude: nil,
+            rating: nil,
+            reviewCount: nil,
+            confidence: nil,
+            missingInfo: [],
+            evidence: ["Private saved memory"],
+            recoveryQueries: [],
+            createdAt: Date(),
+            canRunRecovery: false,
+            isRecommendationShell: false,
+            primaryAction: .none
         )
     }
 }

@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import OSLog
 
 @MainActor
 protocol AIDrawerLocationProviding {
@@ -42,6 +43,8 @@ final class AIDrawerViewModel: ObservableObject {
     private let locationIntentRecommendationService: SaveLocationIntentRecommendationService
     private let locationService: any AIDrawerLocationProviding
     private let groundedAnswerClient: SaveLLMClient?
+    private let persistenceService: SupabaseServiceProtocol
+    private let logger = Logger(subsystem: "SAV-E", category: "RecommendationAnalysisReceipt")
 
     /// Multi-turn conversation context for the current session.
     private var conversationTurns: [ConversationTurn] = []
@@ -53,13 +56,15 @@ final class AIDrawerViewModel: ObservableObject {
         saveSearchController: SaveSearchController = SaveSearchController(),
         locationIntentRecommendationService: SaveLocationIntentRecommendationService = SaveLocationIntentRecommendationService(),
         locationService: (any AIDrawerLocationProviding)? = nil,
-        groundedAnswerClient: SaveLLMClient? = GeminiSaveLLMClient.liveFromConfig()
+        groundedAnswerClient: SaveLLMClient? = GeminiSaveLLMClient.liveFromConfig(),
+        persistenceService: SupabaseServiceProtocol = SupabaseService.shared
     ) {
         self.aiService = aiService
         self.saveSearchController = saveSearchController
         self.locationIntentRecommendationService = locationIntentRecommendationService
         self.locationService = locationService ?? LocationService.shared
         self.groundedAnswerClient = groundedAnswerClient
+        self.persistenceService = persistenceService
     }
 
     func submit(
@@ -422,6 +427,7 @@ final class AIDrawerViewModel: ObservableObject {
         drawerState = .saveSearchResults(groundedResponse)
         lastSaveSearchResponse = groundedResponse
         mapAction = mapAction(for: groundedResponse)
+        Task { await recordRecommendationAnalysisReceiptIfNeeded(for: groundedResponse) }
     }
 
     private func showSearchFollowUpResponse(
@@ -456,6 +462,7 @@ final class AIDrawerViewModel: ObservableObject {
         drawerState = .saveSearchResults(groundedResponse)
         lastSaveSearchResponse = groundedResponse
         mapAction = mapAction(for: groundedResponse)
+        Task { await recordRecommendationAnalysisReceiptIfNeeded(for: groundedResponse) }
     }
 
     private func showTripPlanningResponse(query: String, outputLanguage: AppLanguage) async {
@@ -519,6 +526,15 @@ final class AIDrawerViewModel: ObservableObject {
         if chatHistory.first?.query != query {
             chatHistory.insert(ChatEntry(query: query, timestamp: Date()), at: 0)
             if chatHistory.count > 20 { chatHistory.removeLast() }
+        }
+    }
+
+    private func recordRecommendationAnalysisReceiptIfNeeded(for response: SaveSearchResponse) async {
+        guard let receipt = response.recommendationAnalysisReceiptDraft() else { return }
+        do {
+            _ = try await persistenceService.recordRecommendationAnalysisReceipt(receipt)
+        } catch {
+            logger.debug("Recommendation analysis receipt recording skipped")
         }
     }
 
