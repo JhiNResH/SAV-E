@@ -981,6 +981,23 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: falls back to source-only when readable metadata is missing/blocked, only a creator handle exists, only OCR/headline text exists, only menu/items exist, multiple list places need selection, or no address/map-provider match is available"))
     }
 
+    func testInstagramStandaloneLowercaseLatinVenueLineBeforePinAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            coffee notes on Instagram: "saved this one for a slow morning
+
+            blue bottle coffee
+            📍300 Webster St, Oakland
+            """,
+            sourceURL: "https://www.instagram.com/reel/DLowercaseVenue/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "blue bottle coffee")
+        XCTAssertEqual(candidates.first?.address, "300 Webster St, Oakland")
+        XCTAssertFalse(candidates.first?.isSourceOnly == true)
+    }
+
     func testInstagramTraditionalChineseBookTitleDiagnosticExplainsAnalysisMethod() throws {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
         let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(

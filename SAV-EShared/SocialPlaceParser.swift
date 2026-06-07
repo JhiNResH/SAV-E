@@ -1033,7 +1033,7 @@ struct SocialPlaceParser {
               value.range(of: #"最強|最强|免費|免费|吃到飽|吃到饱|超浮誇|超浮夸|必吃|必喝|必訪|必访|推薦|推荐|隱身|隐藏|隱藏|份量|服務|服务|重頭戲|重头戏|銷魂|销魂|超好吃|打卡|排隊|排队"#, options: .regularExpression) == nil else {
             return false
         }
-        if value.range(of: #"^[A-Z][A-Za-z0-9 &'._-]{1,50}(?:\s+[A-Z][A-Za-z0-9 &'._-]{1,50}){0,4}$"#, options: .regularExpression) != nil {
+        if value.range(of: #"^[A-Za-z][A-Za-z0-9 &'._-]{1,50}(?:\s+[A-Za-z][A-Za-z0-9 &'._-]{1,50}){0,4}$"#, options: .regularExpression) != nil {
             return true
         }
         return value.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil &&
