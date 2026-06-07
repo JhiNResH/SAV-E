@@ -70,7 +70,7 @@ export function buildRecommendationAnalysisReceiptDraft(
   const id = randomUUID();
   const createdAt = input.createdAt ?? new Date().toISOString();
   const publicSummary = publicSummaryFor(input.request, input.output);
-  const preferenceSignals = preferenceSignalsFor(input.request);
+  const preferenceSignals = preferenceSignalsFor(input.request, input.output);
   const evaluatorVerdict = evaluatorVerdictFor(input.output);
 
   return {
@@ -121,19 +121,21 @@ export function sha256CanonicalJson(value: unknown): string {
 function publicSummaryFor(request: JsonObject, output: JsonObject): RecommendationAnalysisPublicSummary {
   const results = Array.isArray(output.results) ? output.results : [];
   const receipt = objectValue(output.retrieval_receipt) ?? {};
+  const savedResultCount = countResultsBySource(results, "saved");
+  const publicResultCount = countResultsBySource(results, "public");
 
   return {
     summary: "SAV-E analyzed owner-scoped saved places and kept public discovery separate.",
     capability: recommendationAnalysisCapability,
     result_count: results.length,
-    saved_result_count: results.length,
-    public_result_count: 0,
+    saved_result_count: savedResultCount ?? results.length,
+    public_result_count: publicResultCount ?? 0,
     proof_level_min: cleanText(request.proof_level_min ?? request.proofLevelMin) ?? null,
-    public_web_used: receipt.public_web_used === true,
+    public_web_used: receipt.public_web_used === true || output.public_fallback_used === true,
   };
 }
 
-function preferenceSignalsFor(request: JsonObject): string[] {
+function preferenceSignalsFor(request: JsonObject, output: JsonObject): string[] {
   const text = [
     cleanText(request.intent),
     ...stringArray(request.constraints),
@@ -149,8 +151,35 @@ function preferenceSignalsFor(request: JsonObject): string[] {
   addSignal(signals, text, "saved_memory", /saved|memory|存過|記憶/i);
   addSignal(signals, text, "nearby", /nearby|near me|附近/i);
 
+  for (const signal of stringArray(output.preference_signals).map(safePreferenceSignal).filter(isString)) {
+    signals.add(signal);
+  }
   signals.add(`proof_level:${cleanText(request.proof_level_min ?? request.proofLevelMin) ?? "user_confirmed_place"}`);
   return [...signals].slice(0, 12);
+}
+
+function countResultsBySource(results: unknown[], source: "saved" | "public"): number | undefined {
+  let matched = 0;
+  let sawTypedResult = false;
+  for (const result of results) {
+    const object = objectValue(result);
+    const type = cleanText(object?.object_type ?? object?.objectType);
+    if (!type) continue;
+    sawTypedResult = true;
+    if (source === "saved" && ["saved_place", "tried_memory", "review", "trip_stop"].includes(type)) matched += 1;
+    if (source === "public" && ["map_visible_unsaved_place", "new_recommendation"].includes(type)) matched += 1;
+  }
+  return sawTypedResult ? matched : undefined;
+}
+
+function safePreferenceSignal(value: string): string | undefined {
+  const signal = cleanText(value)?.toLowerCase();
+  if (!signal || signal.length > 80) return undefined;
+  return /^[a-z0-9_:-]+$/.test(signal) ? signal : undefined;
+}
+
+function isString(value: string | undefined): value is string {
+  return typeof value === "string";
 }
 
 function evaluatorVerdictFor(output: JsonObject): EvaluatorVerdict {

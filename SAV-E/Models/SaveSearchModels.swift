@@ -1451,6 +1451,134 @@ extension SaveSearchResponse {
     private var reviewCandidateSections: [SaveSearchSection] {
         additionalSections.filter { $0.id == "review-candidates" }
     }
+
+    func recommendationAnalysisReceiptDraft(shownAt: Date = Date()) -> RecommendationAnalysisReceiptDraft? {
+        guard let answer = resolvedAgentAnswer else { return nil }
+        let snapshots = groundedAnswerSections
+            .flatMap(\.results)
+            .prefix(8)
+            .map(RecommendationAnalysisResultSnapshot.init(result:))
+        guard !snapshots.isEmpty else { return nil }
+
+        let signals = recommendationAnalysisPreferenceSignals
+        return RecommendationAnalysisReceiptDraft(
+            query: query,
+            answerSource: answer.source.rawValue,
+            answerMessage: answer.message,
+            resultSnapshots: Array(snapshots),
+            preferenceSignals: signals,
+            publicFallbackUsed: fromYourSave.results.isEmpty && !newRecommendations.results.isEmpty,
+            shownAt: shownAt
+        )
+    }
+
+    var recommendationAnalysisPreferenceSignals: [String] {
+        var signals = Set<String>()
+        let results = groundedAnswerSections.flatMap(\.results)
+
+        for result in results.prefix(8) {
+            signals.insert("source:\(recommendationAnalysisSource(for: result))")
+            if let category = result.category {
+                signals.insert("category:\(category.rawValue)")
+            }
+            if let rating = result.rating {
+                if rating >= 4.5 {
+                    signals.insert("rating:high")
+                } else if rating >= 4.0 {
+                    signals.insert("rating:positive")
+                }
+            }
+            if result.evidence.contains(where: { $0.localizedCaseInsensitiveContains("visited") }) {
+                signals.insert("visited_memory")
+            }
+        }
+
+        if query.localizedCaseInsensitiveContains("nearby") || query.contains("附近") {
+            signals.insert("nearby")
+        }
+        signals.insert("proof_level:user_confirmed_place")
+        return Array(Array(signals).sorted().prefix(12))
+    }
+
+    private func recommendationAnalysisSource(for result: SaveSearchResult) -> String {
+        switch result.objectType {
+        case .triedMemory:
+            return "visited_memory"
+        case .savedPlace, .review, .tripStop:
+            return "saved_memory"
+        case .pendingCandidate, .sourceOnlyClue:
+            return "review_candidate"
+        case .mapVisibleUnsavedPlace, .newRecommendation:
+            return "public_quality"
+        }
+    }
+}
+
+struct RecommendationAnalysisReceiptDraft {
+    var query: String
+    var answerSource: String
+    var answerMessage: String
+    var resultSnapshots: [RecommendationAnalysisResultSnapshot]
+    var preferenceSignals: [String]
+    var publicFallbackUsed: Bool
+    var shownAt: Date
+
+    var body: [String: Any] {
+        [
+            "agent_id": "save-ios",
+            "request": [
+                "intent": query,
+                "constraints": preferenceSignals,
+                "proof_level_min": "user_confirmed_place",
+                "shown_at": shownAt.ISO8601Format(),
+            ],
+            "output": [
+                "answer_source": answerSource,
+                "answer_message": answerMessage,
+                "public_fallback_used": publicFallbackUsed,
+                "results": resultSnapshots.map(\.body),
+                "preference_signals": preferenceSignals,
+            ],
+        ]
+    }
+}
+
+struct RecommendationAnalysisResultSnapshot: Hashable {
+    var resultID: String
+    var title: String
+    var objectType: String
+    var userState: String
+    var category: String?
+    var rating: Double?
+    var reviewCount: Int?
+    var distanceMeters: Double?
+    var reasons: [String]
+
+    init(result: SaveSearchResult) {
+        resultID = result.id
+        title = result.title
+        objectType = result.objectType.rawValue
+        userState = result.userState.rawValue
+        category = result.category?.rawValue
+        rating = result.rating
+        reviewCount = result.reviewCount
+        distanceMeters = result.distanceMeters
+        reasons = result.evidence
+    }
+
+    var body: [String: Any] {
+        [
+            "result_id": resultID,
+            "title": title,
+            "object_type": objectType,
+            "user_state": userState,
+            "category": category ?? NSNull(),
+            "rating": rating ?? NSNull(),
+            "review_count": reviewCount ?? NSNull(),
+            "distance_meters": distanceMeters ?? NSNull(),
+            "reasons": reasons,
+        ]
+    }
 }
 
 struct FoodPlaceInsight: Identifiable, Hashable {

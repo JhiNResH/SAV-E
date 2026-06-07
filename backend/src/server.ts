@@ -376,6 +376,9 @@ createServer(async (request, response) => {
     if (isV0 && resource === "places" && id === "recommend-by-claims") {
       return await handleRecommendByClaims(request, response, userId);
     }
+    if (isV0 && resource === "recommendation-analysis-receipts") {
+      return await handleRecommendationAnalysisReceipts(request, response, userId);
+    }
     if (isV0 && resource === "claims" && id === "usage-receipts") {
       return await handleAuthenticatedClaimUsageReceipts(request, response, userId);
     }
@@ -701,6 +704,37 @@ async function handleRecommendByClaims(
     ...recommendationOutput,
     agent_shack_receipt_envelope: envelopeForRecommendationAnalysisReceipt(formatDates(receiptRows[0])),
   });
+}
+
+async function handleRecommendationAnalysisReceipts(
+  request: IncomingMessage,
+  response: ServerResponse,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "POST") {
+    return sendJson(response, { error: "Unsupported recommendation analysis receipt route" }, 405);
+  }
+
+  const body = await readJson(request);
+  const receiptDraft = buildRecommendationAnalysisReceiptDraft({
+    userId,
+    agentId: stringValue(body.agent_id),
+    request: asObject(body.request ?? {}),
+    output: asObject(body.output ?? {}),
+  });
+  const receiptInsert = buildInsert(
+    "recommendation_analysis_receipts",
+    receiptDraft,
+    recommendationAnalysisReceiptFields,
+  );
+  const { rows } = await pool.query(`${receiptInsert.sql} returning *`, receiptInsert.values);
+  const row = formatDates(rows[0]);
+
+  return sendJson(response, {
+    id: row.id,
+    envelope: envelopeForRecommendationAnalysisReceipt(row),
+    full_payload_json: JSON.stringify(row.private_payload),
+  }, 201);
 }
 
 async function placeClaimsForPlace(

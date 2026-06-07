@@ -32,6 +32,7 @@ protocol SupabaseServiceProtocol {
     func createVerifiedPlaceClaim(_ draft: VerifiedPlaceClaimDraft, for placeId: UUID) async throws -> VerifiedPlaceClaim
     func fetchPlaceTrustSummary(for placeId: UUID) async throws -> PlaceTrustSummaryResponse
     func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse
+    func recordRecommendationAnalysisReceipt(_ receipt: RecommendationAnalysisReceiptDraft) async throws -> SaveRecommendationAnalysisReceipt
     func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard
     func createClaimUsageReceipt(_ receipt: ClaimUsageReceiptDraft, requiresAuth: Bool) async throws -> ClaimUsageReceipt
 }
@@ -172,6 +173,14 @@ final class SupabaseService: SupabaseServiceProtocol {
         let body = try Self.jsonBody(request.body)
         let data = try await self.request(path: "/v0/places/recommend-by-claims", method: "POST", body: body)
         return try JSONDecoder.supabase.decode(ClaimRecommendationResponse.self, from: data)
+    }
+
+    func recordRecommendationAnalysisReceipt(_ receipt: RecommendationAnalysisReceiptDraft) async throws -> SaveRecommendationAnalysisReceipt {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let body = try Self.jsonBody(receipt.body)
+        let data = try await request(path: "/v0/recommendation-analysis-receipts", method: "POST", body: body)
+        return try JSONDecoder.supabase.decode(SaveRecommendationAnalysisReceipt.self, from: data)
     }
 
     func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard {

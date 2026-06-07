@@ -50,6 +50,7 @@ Persistence routes accept either `Authorization: Bearer <Privy access token>` or
 - `POST /v0/places/:id/verified-claims` — attaches an owner-scoped claim with proof level, confidence, visibility, context, ratings, and evidence refs.
 - `GET /v0/places/:id/trust-summary` — returns a compact agent-readable proof summary for a saved place.
 - `POST /v0/places/recommend-by-claims` — ranks owner-scoped saved places by verified claims, stores a private recommendation-analysis receipt, and returns a retrieval receipt plus AgentShack-safe envelope.
+- `POST /v0/recommendation-analysis-receipts` — stores an authenticated SAV-E recommendation-analysis receipt from bounded client request/output payloads and returns the AgentShack-safe envelope projection.
 - `GET /public/v0/cards/:id` — returns a public projection for a public-link/public-guide place with public/link-shared claims only.
 - `POST /public/v0/claim-usage-receipts` — records bounded public usage receipts for public/link-shared claims.
 - `POST /v0/claims/usage-receipts` — records authenticated owner-scoped usage receipts.
