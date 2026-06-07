@@ -1020,11 +1020,24 @@ struct SocialPlaceParser {
         guard SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned),
               !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(cleaned),
               !SocialPlaceEvidenceScorer.looksLikeMarketingLine(cleaned),
-              cleaned.range(of: #"[A-Za-z]"#, options: .regularExpression) != nil,
-              cleaned.range(of: #"^[A-Z][A-Za-z0-9 &'._-]{1,50}(?:\s+[A-Z][A-Za-z0-9 &'._-]{1,50}){0,4}$"#, options: .regularExpression) != nil else {
+              looksLikeStandaloneNameNearAddress(cleaned) else {
             return nil
         }
         return cleaned
+    }
+
+    private func looksLikeStandaloneNameNearAddress(_ value: String) -> Bool {
+        guard value.count >= 2,
+              value.count <= 40,
+              value.range(of: #"[@#<>📍📌🚩🗺，,。！!？?；;：:]"#, options: .regularExpression) == nil,
+              value.range(of: #"最強|最强|免費|免费|吃到飽|吃到饱|超浮誇|超浮夸|必吃|必喝|必訪|必访|推薦|推荐|隱身|隐藏|隱藏|份量|服務|服务|重頭戲|重头戏|銷魂|销魂|超好吃|打卡|排隊|排队"#, options: .regularExpression) == nil else {
+            return false
+        }
+        if value.range(of: #"^[A-Z][A-Za-z0-9 &'._-]{1,50}(?:\s+[A-Z][A-Za-z0-9 &'._-]{1,50}){0,4}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return value.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil &&
+            value.range(of: #"(?:店|館|馆|亭|坊|堂|屋|家|本家|食堂|餐廳|餐厅|咖啡|茶館|茶馆|麵|面|鍋|锅|燒肉|烧肉|壽司|寿司|甜點|甜点|酒吧|Bar|Cafe|Kitchen|Bistro)"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private func addressOnlyCandidates(from lines: [String], sourceURL: String, fullText: String) -> [SocialPlaceCandidateDraft] {

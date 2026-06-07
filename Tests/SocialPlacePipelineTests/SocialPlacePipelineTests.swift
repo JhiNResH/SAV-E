@@ -948,6 +948,39 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("滷肉飯免費吃到飽") })
     }
 
+    func testInstagramStandaloneChineseVenueLineBeforePinAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: """
+            foodies__eric.sharon on Instagram: "內湖好吃到我連吃兩碗的超濃郁蟹黃麵
+            隱身瑞光路上生意超好的麵食館！
+            餐點份量很夠，服務也很親切🫶🏻
+
+            常客幾乎都點香麻帶勁的紅油燃麵
+            鮮蝦抄手&麵條緊緊扒附醬汁超好吃！
+            重頭戲絕對是鮮到不行的蟹黃拌麵🦀
+            滿滿蟹肉蟹黃裹滿麵條，鮮味爆擊太銷魂了～～
+
+            墨竹亭 燃麵本家 內湖瑞光店
+            📍臺北市內湖區港墘里瑞光路289號
+            ⏰ 11:00-15:00 / 17:00-20:30
+            """,
+            sourceURL: "https://www.instagram.com/reel/DY9UL8JTb5p/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "墨竹亭 燃麵本家 內湖瑞光店")
+        XCTAssertEqual(candidates.first?.address, "臺北市內湖區港墘里瑞光路289號")
+        XCTAssertFalse(candidates.first?.isSourceOnly == true)
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("foodies__eric") })
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("蟹黃麵") && $0.candidateName != "墨竹亭 燃麵本家 內湖瑞光店" })
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("隱身瑞光路") })
+        let diagnostic = try XCTUnwrap(candidates.first?.evidenceDiagnostic)
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: pairs venue-looking lines with nearby strong evidence such as a pinned/street address before creating a Review Candidate"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: accepts explicit venue anchors including labels, quotes/brackets, generic emoji/symbol markers, and standalone CJK/Latin venue lines before an address"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: rejects creator profiles, hashtags, marketing headlines, menu/price items, operating hours, transit/access lines, review metrics, and generic social shells as venue names"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: falls back to source-only when readable metadata is missing/blocked, only a creator handle exists, only OCR/headline text exists, only menu/items exist, multiple list places need selection, or no address/map-provider proof is available"))
+    }
+
     func testInstagramTraditionalChineseBookTitleDiagnosticExplainsAnalysisMethod() throws {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
         let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(
