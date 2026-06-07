@@ -909,6 +909,45 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("台北最強的便當店") })
     }
 
+    func testInstagramGenericEmojiVenueMarkerBeforePinAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            台北新店分享 on Instagram: "這間最近很多人收藏
+
+            🧋春水堂人文茶館
+            📍臺北市信義區松壽路9號
+            🕛11：00～22：00
+            """,
+            sourceURL: "https://www.instagram.com/reel/DGenericEmoji/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "春水堂人文茶館")
+        XCTAssertEqual(candidates.first?.address, "臺北市信義區松壽路9號")
+        XCTAssertFalse(candidates.first?.isSourceOnly == true)
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("台北新店分享") })
+    }
+
+    func testInstagramGenericEmojiMarkerRejectsMarketingHeadlineBeforeAddress() async throws {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
+        let candidates = service.reviewCandidates(
+            fromEvidenceText: """
+            煮惑甜心 • 廚娘在 Instagram: "
+            😋台北最強的便當店
+            滷肉飯免費吃到飽，飲料喝到飽！！
+
+            🍴食來運轉
+            📍臺北市士林區仁勇里小東街31號
+            """,
+            sourceURL: "https://www.instagram.com/reel/DZM8vmZBuNM/"
+        )
+
+        XCTAssertEqual(candidates.first?.candidateName, "食來運轉")
+        XCTAssertEqual(candidates.first?.address, "臺北市士林區仁勇里小東街31號")
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("台北最強的便當店") })
+        XCTAssertFalse(candidates.contains { $0.candidateName.localizedCaseInsensitiveContains("滷肉飯免費吃到飽") })
+    }
+
     func testInstagramTraditionalChineseBookTitleDiagnosticExplainsAnalysisMethod() throws {
         let service = SocialLinkReviewCandidateService(googlePlacesService: StubGooglePlacesService())
         let candidate = try XCTUnwrap(service.reviewCandidatesOrSourceOnly(
