@@ -134,6 +134,23 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
     }
 }
 
+private final class EmptyGooglePlacesService: GooglePlacesServiceProtocol {
+    var queries: [String] = []
+
+    func searchPlace(query: String, near: CLLocationCoordinate2D?) async throws -> [GooglePlaceMatch] {
+        queries.append(query)
+        return []
+    }
+
+    func getPlaceDetails(placeId: String) async throws -> GooglePlaceDetails {
+        throw GooglePlacesError.noResults
+    }
+
+    func photoURL(reference: String, maxWidth: Int) -> URL? {
+        nil
+    }
+}
+
 private final class StubPlaceResolverService: PlaceResolverServiceProtocol {
     var queries: [String] = []
 
@@ -469,6 +486,88 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidence.contains { $0.contains("Public web search result") && $0.contains("Quarter Sheets Pizza Club") })
         XCTAssertTrue(candidate.evidenceDiagnostic?.canSaveAsMapStamp == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains { $0.contains("Recovered venue candidate: Quarter Sheets Pizza Club") } == true)
+    }
+
+    func testSocialPlaceEvidenceResolverReturnsMapStampReadyEvidenceBackedCandidate() async throws {
+        let places = StubGooglePlacesService()
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: places,
+            publicSourceSearchService: search
+        )
+
+        let result = await service.resolveEvidence(SocialPlaceEvidenceResolverInput(
+            sourceURL: "https://www.instagram.com/reel/DW2ZpyADbZ6/",
+            caption: """
+            Talia on Instagram: "This is one of my absolutely favorite restaurants in LA.
+            Save this for a slow dinner night."
+            """,
+            authorHandle: "taliaeats",
+            visibleLocationTags: ["LA"],
+            categoryClues: ["restaurant"]
+        ))
+
+        XCTAssertEqual(result.outcome, .mapStamp)
+        XCTAssertEqual(result.rawSource.sourceURL, "https://www.instagram.com/reel/DW2ZpyADbZ6/")
+        XCTAssertEqual(result.extracted.caption?.contains("favorite restaurants in LA"), true)
+        XCTAssertEqual(result.extracted.authorHandle, "taliaeats")
+        XCTAssertTrue(result.extracted.cityClues.contains("LA"))
+        XCTAssertTrue(result.searchQueries.contains { $0.contains("DW2ZpyADbZ6") })
+        XCTAssertEqual(result.candidate.candidateName, "Quarter Sheets Pizza Club")
+        XCTAssertEqual(result.candidate.address, "1305 Portia St, Los Angeles, CA 90026")
+        XCTAssertEqual(result.candidate.latitude, 34.0779)
+        XCTAssertEqual(result.candidate.longitude, -118.2543)
+        XCTAssertTrue(result.evidence.contains { $0.contains("Raw source saved") })
+        XCTAssertTrue(result.evidence.contains { $0.contains("Caption captured") })
+        XCTAssertTrue(result.evidence.contains { $0.contains("Confidence reason: Places resolver verified") })
+    }
+
+    func testSocialPlaceEvidenceResolverKeepsHandleOnlyInstagramAsReviewCandidateWithoutCoordinates() async throws {
+        let places = EmptyGooglePlacesService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: places,
+            publicSourceSearchService: StubPublicSourceSearchService()
+        )
+
+        let result = await service.resolveEvidence(SocialPlaceEvidenceResolverInput(
+            sourceURL: "https://www.instagram.com/reel/DXReviewOnly/",
+            caption: #"Jess on Instagram: "Trying pastries at @hiddenmooncafe today. #LAcoffee""#,
+            authorHandle: "jessfood",
+            taggedHandles: ["hiddenmooncafe"],
+            cityClues: ["LA"],
+            categoryClues: ["cafe"]
+        ))
+
+        XCTAssertEqual(result.outcome, .reviewCandidate)
+        XCTAssertFalse(result.candidate.isSourceOnly)
+        XCTAssertNil(result.candidate.latitude)
+        XCTAssertNil(result.candidate.longitude)
+        XCTAssertTrue(result.missingFields.contains("Verified address"))
+        XCTAssertTrue(result.missingFields.contains("Verified coordinates"))
+        XCTAssertTrue(result.extracted.taggedHandles.contains("hiddenmooncafe"))
+        XCTAssertTrue(result.evidence.contains { $0.contains("Tagged/venue handle: @hiddenmooncafe") })
+        XCTAssertTrue(result.confidenceReason.contains("Review Candidate"))
+    }
+
+    func testSocialPlaceEvidenceResolverKeepsBareInstagramURLSourceOnlyWithoutHallucinatingPlace() async throws {
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: StubPublicSourceSearchService()
+        )
+
+        let result = await service.resolveEvidence(SocialPlaceEvidenceResolverInput(
+            sourceURL: "https://www.instagram.com/reel/DBareOnly/"
+        ))
+
+        XCTAssertEqual(result.outcome, .sourceOnly)
+        XCTAssertTrue(result.candidate.isSourceOnly)
+        XCTAssertNil(result.candidate.latitude)
+        XCTAssertNil(result.candidate.longitude)
+        XCTAssertEqual(result.candidate.address, "")
+        XCTAssertTrue(result.searchQueries.contains { $0.contains("DBareOnly") && $0.contains("place") })
+        XCTAssertTrue(result.missingFields.contains("Verified place name"))
+        XCTAssertTrue(result.evidence.contains { $0.contains("Raw source saved") })
+        XCTAssertTrue(result.confidenceReason.contains("no verified place identity"))
     }
 
     func testInstagramShilinSukiyakiCaptionStaysRecoveryScopedInsteadOfCreatorOnly() {

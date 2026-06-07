@@ -562,6 +562,9 @@ struct SaveEvidenceDrawerModel: Hashable {
     }
 
     private static func candidateExplanation(for result: SaveSearchResult) -> String? {
+        if let confidenceReason = prefixedEvidenceValue("Confidence reason:", in: result.evidence) {
+            return "Why SAV-E guessed this: \(confidenceReason)"
+        }
         switch result.objectType {
         case .sourceOnlyClue:
             return "SAV-E is preserving the source clue without creating a Map Stamp."
@@ -576,6 +579,13 @@ struct SaveEvidenceDrawerModel: Hashable {
         case .triedMemory, .review, .tripStop:
             return nil
         }
+    }
+
+    private static func prefixedEvidenceValue(_ prefix: String, in evidence: [String]) -> String? {
+        guard let line = evidence.first(where: { $0.range(of: prefix, options: [.anchored, .caseInsensitive]) != nil }) else {
+            return nil
+        }
+        return String(line.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func evidenceAtoms(for result: SaveSearchResult) -> [SaveEvidenceAtom] {

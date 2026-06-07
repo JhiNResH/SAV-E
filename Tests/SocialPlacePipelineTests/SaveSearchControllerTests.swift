@@ -1946,7 +1946,10 @@ final class SaveSearchControllerTests: XCTestCase {
                     state: .sourceOnly,
                     sourceURL: "https://www.instagram.com/reel/pasta/",
                     title: "Best pasta reel",
-                    evidence: ["Caption says best pasta in LA"],
+                    evidence: [
+                        "Caption says best pasta in LA",
+                        "Confidence reason: Raw source was preserved, but SAV-E found no verified place identity yet."
+                    ],
                     evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
                         found: ["Source URL: https://www.instagram.com/reel/pasta/"],
                         attempts: ["Checked public metadata/caption text"],
@@ -1965,8 +1968,42 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(drawer.sourcePlatform, .instagram)
         XCTAssertEqual(drawer.missingFields, ["exact venue", "address", "coordinates"])
         XCTAssertEqual(drawer.recoveryQueries, ["best pasta LA instagram reel"])
-        XCTAssertTrue(drawer.candidateExplanation?.contains("without creating a Map Stamp") == true)
+        XCTAssertEqual(drawer.candidateExplanation, "Why SAV-E guessed this: Raw source was preserved, but SAV-E found no verified place identity yet.")
         XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value.contains("best pasta in LA") })
+    }
+
+    func testSourceOnlyEvidenceDrawerIgnoresMidLineConfidenceReasonToken() throws {
+        let controller = SaveSearchController()
+        let midLineEvidence = "Caption says pasta in LA. Confidence reason: this is user caption text, not resolver metadata."
+        let response = controller.search(
+            query: "pasta",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "https://www.instagram.com/reel/pasta-midline/",
+                    title: "Mid-line pasta clue",
+                    evidence: [midLineEvidence],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source URL: https://www.instagram.com/reel/pasta-midline/"],
+                        attempts: ["Checked public metadata/caption text"],
+                        missingFields: ["exact venue", "address", "coordinates"],
+                        nextBestClue: "Run source recovery search",
+                        suggestedSearchQueries: ["pasta midline LA instagram reel"]
+                    )
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.fromYourSave.results.first)
+        let drawer = result.evidenceDrawer
+
+        XCTAssertEqual(result.objectType, .sourceOnlyClue)
+        XCTAssertEqual(drawer.missingFields, ["exact venue", "address", "coordinates"])
+        XCTAssertEqual(drawer.recoveryQueries, ["pasta midline LA instagram reel"])
+        XCTAssertEqual(drawer.candidateExplanation, "SAV-E is preserving the source clue without creating a Map Stamp.")
+        XCTAssertFalse(drawer.candidateExplanation?.contains("Confidence reason:") == true)
+        XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value == midLineEvidence })
     }
 
     func testUnsavedMapCandidateEvidenceDrawerShowsMapEvidenceWithoutMemoryClaim() throws {
