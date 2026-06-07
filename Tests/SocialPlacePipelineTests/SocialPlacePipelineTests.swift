@@ -978,7 +978,7 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: pairs venue-looking lines with nearby strong evidence such as a pinned/street address before creating a Review Candidate"))
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: accepts explicit venue anchors including labels, quotes/brackets, generic emoji/symbol markers, and standalone CJK/Latin venue lines before an address"))
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: rejects creator profiles, hashtags, marketing headlines, menu/price items, operating hours, transit/access lines, review metrics, and generic social shells as venue names"))
-        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: falls back to source-only when readable metadata is missing/blocked, only a creator handle exists, only OCR/headline text exists, only menu/items exist, multiple list places need selection, or no address/map-provider proof is available"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: falls back to source-only when readable metadata is missing/blocked, only a creator handle exists, only OCR/headline text exists, only menu/items exist, multiple list places need selection, or no address/map-provider match is available"))
     }
 
     func testInstagramTraditionalChineseBookTitleDiagnosticExplainsAnalysisMethod() throws {
@@ -1002,8 +1002,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(diagnostic.found.contains("Readable metadata/caption/OCR: present with location clues"))
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: classified the shared URL/platform and canonical post id before trusting content"))
         XCTAssertTrue(diagnostic.attempts.contains("Analysis method: inspected readable metadata/caption/OCR for venue anchors, address pins, map links, and social handles"))
-        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: requires a place name plus address or map-provider match before Map Stamp; otherwise keeps Review/Source Clue"))
-        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: records missing proof so SAV-E asks for the next clue instead of guessing"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: requires a place name plus address or map-provider match before saving directly; otherwise keeps it in Review"))
+        XCTAssertTrue(diagnostic.attempts.contains("Analysis method: records unresolved details internally so SAV-E can keep trying instead of guessing"))
     }
 
     func testInstagramPinVenueLineUsesNextLineHighwayAddress() async throws {
@@ -1857,7 +1857,7 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
         XCTAssertFalse(candidate.missingInfo.contains("Verified place name"))
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Candidate place name: 東京家庭義大利麵 士林店") == true)
-        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Needs confirmation")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Review candidate")
     }
 
     func testPlaceBearingInstagramMetadataCreatesWeakReviewCandidateInsteadOfSourceOnly() {
@@ -1885,8 +1885,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains(where: { $0.contains("Place-bearing source") }) == true)
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Source intent: restaurantRecommendation") == true)
-        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Place clue")
-        XCTAssertEqual(candidate.evidenceDiagnostic?.primaryActionLabel, "Run recovery search")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.statusLabel, "Possible place")
+        XCTAssertEqual(candidate.evidenceDiagnostic?.primaryActionLabel, "Review options")
         XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains("Resolver decision: pendingCandidate") == true)
         XCTAssertEqual(candidate.evidenceDiagnostic?.suggestedSearchQueries?.first, "\"DW2ZpyADbZ6\" restaurant LA")
         XCTAssertFalse(candidate.evidenceDiagnostic?.suggestedSearchQueries?.joined(separator: " ").contains("igsh") == true)
@@ -2016,8 +2016,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(record.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
         XCTAssertEqual(record.evidenceDiagnostic?.suggestedSearchQueries?.first, "instagram reel DYfallback place")
         XCTAssertEqual(record.evidenceDiagnostic?.nextBestClue, "Run the suggested public searches, or share a caption, screenshot/OCR frame, map link, or visible venue handle.")
-        XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Source clue")
-        XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add caption / screenshot / map link")
+        XCTAssertEqual(record.evidenceDiagnostic?.statusLabel, "Saved for later")
+        XCTAssertEqual(record.evidenceDiagnostic?.primaryActionLabel, "Add details")
         XCTAssertEqual(record.evidenceDiagnostic?.canSaveAsMapStamp, false)
         XCTAssertEqual(record.evidenceDiagnostic?.recoveryPlan?.decision, .sourceOnly)
         XCTAssertEqual(record.evidenceDiagnostic?.recoveryPlan?.allowsDirectSave, false)
@@ -2113,8 +2113,8 @@ final class SocialPlacePipelineTests: XCTestCase {
 
         let refined = await service.refineCandidate(candidate)
 
-        XCTAssertEqual(refined.evidenceDiagnostic?.statusLabel, "Map match ready")
-        XCTAssertEqual(refined.evidenceDiagnostic?.primaryActionLabel, "Confirm map match")
+        XCTAssertEqual(refined.evidenceDiagnostic?.statusLabel, "Ready to save")
+        XCTAssertEqual(refined.evidenceDiagnostic?.primaryActionLabel, "Save place")
         XCTAssertEqual(refined.evidenceDiagnostic?.canSaveAsMapStamp, true)
     }
 
