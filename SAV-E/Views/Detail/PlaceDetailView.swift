@@ -13,6 +13,9 @@ struct PlaceDetailView: View {
     @State private var deleteError: String?
     @State private var enrichedPlace: Place?
     @State private var localVisibility: PlaceVisibility?
+    @State private var maatAnalysis: MaatPlaceAnalysisResponse?
+    @State private var maatAnalysisError: String?
+    @State private var isLoadingMaatAnalysis = false
 
     private var detailPlace: Place {
         var value = enrichedPlace?.id == place.id ? enrichedPlace ?? place : place
@@ -35,6 +38,16 @@ struct PlaceDetailView: View {
 
                 PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
                     .padding(.horizontal)
+
+                PlaceMaatAnalysisPanel(
+                    analysis: maatAnalysis,
+                    isLoading: isLoadingMaatAnalysis,
+                    error: maatAnalysisError,
+                    languageSettings: languageSettings
+                ) {
+                    Task { await loadMaatAnalysis(force: true) }
+                }
+                .padding(.horizontal)
 
                 // Mini map
                 Map(position: .constant(.region(MKCoordinateRegion(
@@ -90,6 +103,7 @@ struct PlaceDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: place.id) {
             await enrichBusinessDetails()
+            await loadMaatAnalysis()
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -218,6 +232,24 @@ struct PlaceDetailView: View {
         enrichedPlace = updatedPlace
     }
 
+    private func loadMaatAnalysis(force: Bool = false) async {
+        guard force || maatAnalysis == nil else { return }
+        isLoadingMaatAnalysis = true
+        maatAnalysisError = nil
+        defer { isLoadingMaatAnalysis = false }
+
+        do {
+            maatAnalysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
+                for: detailPlace.id,
+                includePrivateEvidence: false
+            )
+        } catch SupabaseError.notConfigured {
+            maatAnalysis = nil
+        } catch {
+            maatAnalysisError = error.localizedDescription
+        }
+    }
+
     private func businessDetails(for place: Place) async -> (photoURLs: [URL], rating: Double?, priceRange: String?, openingHours: String?)? {
         let service = GooglePlacesService.shared
         let details: GooglePlaceDetails?
@@ -284,6 +316,79 @@ struct PlaceDetailView: View {
         } catch {
             deleteError = error.localizedDescription
         }
+    }
+}
+
+// MARK: - Ma'at Analysis
+
+private struct PlaceMaatAnalysisPanel: View {
+    let analysis: MaatPlaceAnalysisResponse?
+    let isLoading: Bool
+    let error: String?
+    let languageSettings: AppLanguageSettings
+    let onRefresh: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "scalemass.fill")
+                    .foregroundColor(.saveCocoa)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(languageSettings.localized(english: "Ma'at analysis", traditionalChinese: "Ma'at 分析"))
+                        .font(.headline.weight(.bold))
+                        .foregroundColor(.saveInk)
+                    Text(languageSettings.localized(
+                        english: "Selected-place evidence only",
+                        traditionalChinese: "只使用此地點的可引用證據"
+                    ))
+                    .font(.caption)
+                    .foregroundColor(.saveMutedText)
+                }
+                Spacer()
+                Button(action: onRefresh) {
+                    Image(systemName: isLoading ? "hourglass" : "arrow.clockwise")
+                }
+                .disabled(isLoading)
+            }
+
+            if let analysis {
+                Text(analysis.summary)
+                    .font(.subheadline)
+                    .foregroundColor(.saveInk)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                FlowLayout(spacing: 8) {
+                    InfoChip(icon: "checkmark.seal", text: analysis.verdict.replacingOccurrences(of: "_", with: " "), color: .saveCocoa)
+                    InfoChip(icon: "scope", text: analysis.analysisReceipt.inputScope.replacingOccurrences(of: "_", with: " "), color: .saveCocoa)
+                    InfoChip(icon: "quote.bubble", text: "\(analysis.analysisReceipt.citedClaimCount) cited", color: .saveCocoa)
+                }
+
+                if !analysis.warnings.isEmpty {
+                    Text(analysis.warnings.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundColor(.saveMutedText)
+                }
+            } else if let error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            } else {
+                Text(languageSettings.localized(
+                    english: "No server analysis loaded yet. Refresh after this place has notes, claims, source evidence, or receipts.",
+                    traditionalChinese: "尚未載入伺服器分析。此地點有筆記、claims、來源或收據後可重新整理。"
+                ))
+                .font(.caption)
+                .foregroundColor(.saveMutedText)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.saveNotebookPage.opacity(0.82))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.72), lineWidth: 1)
+        )
     }
 }
 

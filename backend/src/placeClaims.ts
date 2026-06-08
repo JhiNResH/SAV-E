@@ -22,6 +22,11 @@ export interface ClaimRecommendationRequest {
   limit?: number;
 }
 
+export interface MaatPlaceAnalysisRequest {
+  includePrivateEvidence?: boolean;
+  maxCitedClaims?: number;
+}
+
 export const usageReceiptActions = [
   "recommended_to_user",
   "cited",
@@ -143,6 +148,61 @@ export function buildPublicPlaceCard(place: JsonObject, claims: JsonObject[]): J
     attribution: {
       author_handle: place.owner_handle ?? null,
       source_policy: "raw sources private; proof levels summarized",
+    },
+  };
+}
+
+export function buildMaatPlaceAnalysis(
+  place: JsonObject,
+  claims: JsonObject[],
+  request: MaatPlaceAnalysisRequest = {},
+): JsonObject {
+  const scopedClaims = claims
+    .filter((claim) => request.includePrivateEvidence || claim.visibility !== "private")
+    .filter((claim) => !isStale(claim));
+  const maxCitedClaims = Math.max(1, Math.min(5, Math.trunc(request.maxCitedClaims ?? 3)));
+  const citedClaims = scopedClaims
+    .sort((a, b) => analysisEvidenceScore(b) - analysisEvidenceScore(a))
+    .slice(0, maxCitedClaims);
+  const placeEvidence = placeEvidenceLines(place);
+  const citedEvidence = [
+    ...placeEvidence,
+    ...citedClaims.map(claimEvidenceLine),
+  ].filter(Boolean).slice(0, 8);
+  const strongestProofLevel = citedClaims.length ? strongestProof(citedClaims) : "source_backed";
+  const confidence = citedClaims.length ? roundedConfidence(citedClaims) : (placeEvidence.length ? 0.42 : 0);
+  const warnings = analysisWarnings(place, citedClaims, scopedClaims, claims, request);
+  const status = citedEvidence.length >= 2 || citedClaims.length > 0 ? "ready" : "not_enough_evidence";
+  const title = status === "ready"
+    ? `Ma'at analysis for ${trimmedString(place.name) ?? "selected place"}`
+    : "Not enough evidence for Ma'at analysis";
+  const summary = status === "ready"
+    ? analysisSummary(place, citedClaims, strongestProofLevel)
+    : "SAV-E has the selected place, but not enough saved notes, claims, receipts, or source evidence to analyze without guessing.";
+
+  return {
+    place_id: place.id,
+    capability: "maat_place_analysis_v0",
+    status,
+    title,
+    summary,
+    verdict: status === "ready" ? verdictForProof(strongestProofLevel, confidence) : "insufficient_evidence",
+    confidence,
+    strongest_proof_level: strongestProofLevel,
+    cited_claim_ids: citedClaims.map((claim) => claim.id).filter(Boolean),
+    cited_evidence: citedEvidence,
+    warnings,
+    next_actions: nextAnalysisActions(status, strongestProofLevel, warnings),
+    analysis_receipt: {
+      input_scope: "selected_place_only",
+      place_id: place.id,
+      claim_count: scopedClaims.length,
+      cited_claim_count: citedClaims.length,
+      includes_private_claim_summaries: Boolean(request.includePrivateEvidence),
+      raw_private_evidence_included: false,
+      whole_map_used: false,
+      public_web_used: false,
+      model_used: false,
     },
   };
 }
@@ -339,6 +399,77 @@ function evidenceSummary(row: JsonObject): string[] {
     if (ref.startsWith("source_")) return "saved source evidence";
     return "private evidence";
   });
+}
+
+function analysisEvidenceScore(claim: JsonObject): number {
+  return proofRank(claim.proof_level) * 2 + numberField(claim, "confidence") + reputationBoost(claim);
+}
+
+function placeEvidenceLines(place: JsonObject): string[] {
+  const lines = [
+    evidenceLine("place name", place.name),
+    evidenceLine("address", place.address),
+    evidenceLine("saved note", place.note),
+    evidenceLine("saved source", place.source_url),
+    evidenceLine("google place id", place.google_place_id),
+    typeof place.google_rating === "number" ? `google rating: ${place.google_rating}` : undefined,
+    evidenceLine("price range", place.price_range),
+  ];
+  return lines.filter((line): line is string => Boolean(line));
+}
+
+function evidenceLine(label: string, value: unknown): string | undefined {
+  const text = trimmedString(value);
+  return text ? `${label}: ${text}` : undefined;
+}
+
+function claimEvidenceLine(claim: JsonObject): string {
+  const claimType = trimmedString(claim.claim_type) ?? "claim";
+  const summary = trimmedString(claim.agent_usable_summary) ?? trimmedString(claim.claim) ?? "saved claim";
+  const proofLevel = parseProofLevel(claim.proof_level, "source_backed");
+  return `${claimType}: ${summary} (${proofLevel})`;
+}
+
+function analysisWarnings(
+  place: JsonObject,
+  citedClaims: JsonObject[],
+  scopedClaims: JsonObject[],
+  allClaims: JsonObject[],
+  request: MaatPlaceAnalysisRequest,
+): string[] {
+  const warnings = new Set<string>(trustWarnings(citedClaims));
+  if (!trimmedString(place.source_url) && !trimmedString(place.note) && scopedClaims.length === 0) {
+    warnings.add("thin_place_evidence");
+  }
+  if (!request.includePrivateEvidence && allClaims.some((claim) => claim.visibility === "private")) {
+    warnings.add("private_claims_excluded");
+  }
+  if (citedClaims.length === 0) warnings.add("no_verified_claims_cited");
+  return [...warnings];
+}
+
+function analysisSummary(place: JsonObject, citedClaims: JsonObject[], strongestProofLevel: ClaimProofLevel): string {
+  const name = trimmedString(place.name) ?? "This place";
+  const bestClaim = citedClaims[0];
+  const bestSummary = trimmedString(bestClaim?.agent_usable_summary) ?? trimmedString(bestClaim?.claim);
+  if (bestSummary) return `${name}: ${bestSummary}. Strongest proof is ${strongestProofLevel}.`;
+  const note = trimmedString(place.note);
+  if (note) return `${name}: ${note}. Analysis is based on selected-place evidence only.`;
+  return `${name} has enough selected-place metadata for a lightweight Ma'at analysis, but no verified claims were cited.`;
+}
+
+function verdictForProof(proofLevel: ClaimProofLevel, confidence: number): string {
+  if (proofRank(proofLevel) >= proofRank("receipt_backed") && confidence >= 0.7) return "strong_evidence";
+  if (proofRank(proofLevel) >= proofRank("user_confirmed_place")) return "usable_with_caveats";
+  return "context_only";
+}
+
+function nextAnalysisActions(status: string, proofLevel: ClaimProofLevel, warnings: string[]): string[] {
+  if (status !== "ready") return ["add_note", "confirm_place", "attach_source_or_receipt"];
+  const actions = ["cite_analysis", "open_place_detail"];
+  if (proofRank(proofLevel) < proofRank("user_confirmed_place")) actions.push("confirm_place_before_recommending");
+  if (warnings.includes("private_claims_excluded")) actions.push("rerun_private_view_if_owner_approved");
+  return actions;
 }
 
 function strongestProof(claims: JsonObject[]): ClaimProofLevel {

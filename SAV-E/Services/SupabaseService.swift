@@ -31,6 +31,7 @@ protocol SupabaseServiceProtocol {
     func fetchVerifiedPlaceClaims(for placeId: UUID, includePrivateEvidence: Bool) async throws -> [VerifiedPlaceClaim]
     func createVerifiedPlaceClaim(_ draft: VerifiedPlaceClaimDraft, for placeId: UUID) async throws -> VerifiedPlaceClaim
     func fetchPlaceTrustSummary(for placeId: UUID) async throws -> PlaceTrustSummaryResponse
+    func fetchPlaceMaatAnalysis(for placeId: UUID, includePrivateEvidence: Bool) async throws -> MaatPlaceAnalysisResponse
     func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse
     func recordRecommendationAnalysisReceipt(_ receipt: RecommendationAnalysisReceiptDraft) async throws -> SaveRecommendationAnalysisReceipt
     func fetchPublicPlaceCard(cardId: UUID) async throws -> PublicPlaceCard
@@ -165,6 +166,14 @@ final class SupabaseService: SupabaseServiceProtocol {
 
         let data = try await request(path: "/v0/places/\(placeId.uuidString)/trust-summary")
         return try JSONDecoder.supabase.decode(PlaceTrustSummaryResponse.self, from: data)
+    }
+
+    func fetchPlaceMaatAnalysis(for placeId: UUID, includePrivateEvidence: Bool = false) async throws -> MaatPlaceAnalysisResponse {
+        guard isConfigured else { throw SupabaseError.notConfigured }
+
+        let suffix = includePrivateEvidence ? "?includePrivateEvidence=true" : ""
+        let data = try await request(path: "/v0/places/\(placeId.uuidString)/maat-analysis\(suffix)")
+        return try JSONDecoder.supabase.decode(MaatPlaceAnalysisResponse.self, from: data)
     }
 
     func recommendPlacesByClaims(_ request: ClaimRecommendationRequest) async throws -> ClaimRecommendationResponse {
@@ -609,6 +618,62 @@ struct ClaimReputationSummary: Codable, Equatable {
         case usageCount = "usage_count"
         case acceptedCount = "accepted_count"
         case score
+    }
+}
+
+struct MaatPlaceAnalysisResponse: Codable, Equatable {
+    let placeId: UUID
+    let capability: String
+    let status: String
+    let title: String
+    let summary: String
+    let verdict: String
+    let confidence: Double
+    let strongestProofLevel: String
+    let citedClaimIds: [UUID]
+    let citedEvidence: [String]
+    let warnings: [String]
+    let nextActions: [String]
+    let analysisReceipt: MaatPlaceAnalysisReceipt
+
+    enum CodingKeys: String, CodingKey {
+        case placeId = "place_id"
+        case capability
+        case status
+        case title
+        case summary
+        case verdict
+        case confidence
+        case strongestProofLevel = "strongest_proof_level"
+        case citedClaimIds = "cited_claim_ids"
+        case citedEvidence = "cited_evidence"
+        case warnings
+        case nextActions = "next_actions"
+        case analysisReceipt = "analysis_receipt"
+    }
+}
+
+struct MaatPlaceAnalysisReceipt: Codable, Equatable {
+    let inputScope: String
+    let placeId: UUID
+    let claimCount: Int
+    let citedClaimCount: Int
+    let includesPrivateClaimSummaries: Bool
+    let rawPrivateEvidenceIncluded: Bool
+    let wholeMapUsed: Bool
+    let publicWebUsed: Bool
+    let modelUsed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case inputScope = "input_scope"
+        case placeId = "place_id"
+        case claimCount = "claim_count"
+        case citedClaimCount = "cited_claim_count"
+        case includesPrivateClaimSummaries = "includes_private_claim_summaries"
+        case rawPrivateEvidenceIncluded = "raw_private_evidence_included"
+        case wholeMapUsed = "whole_map_used"
+        case publicWebUsed = "public_web_used"
+        case modelUsed = "model_used"
     }
 }
 
