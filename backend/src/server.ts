@@ -1449,6 +1449,7 @@ async function handleCaptureSearchRecovery(
     queries: recovery.queries,
     search_results: recovery.searchResults,
     created_candidates: createdCandidates,
+    media_evidence: recovery.mediaEvidence,
     errors: recovery.errors,
     receipt: recovery.receipt,
   });

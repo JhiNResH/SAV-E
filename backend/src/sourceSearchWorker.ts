@@ -1,3 +1,12 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
 export type SourceSearchInput = {
   sourceUrl?: string | null;
   rawText?: string | null;
@@ -23,7 +32,7 @@ export type SourceSearchCandidate = {
 
 export type SourceRecoveryReceipt = {
   input: "social_url" | "web_url" | "text";
-  capabilityLevel: "metadata_enrichment" | "public_search_recovery";
+  capabilityLevel: "metadata_enrichment" | "public_search_recovery" | "media_evidence_recovery";
   found: string[];
   tried: string[];
   missing: string[];
@@ -31,10 +40,20 @@ export type SourceRecoveryReceipt = {
   nextBestClue: string;
 };
 
+export type SourceMediaEvidence = {
+  kind: "thumbnail" | "video" | "video_keyframe";
+  url: string;
+  contentType?: string;
+  byteLength?: number;
+  sha256?: string;
+  frameSecond?: number;
+};
+
 export type SourceSearchOutput = {
   queries: string[];
   searchResults: SourceSearchResult[];
   candidates: SourceSearchCandidate[];
+  mediaEvidence: SourceMediaEvidence[];
   errors: string[];
   receipt: SourceRecoveryReceipt;
 };
@@ -43,9 +62,12 @@ type SourceMetadata = {
   resolvedURL?: string;
   title?: string;
   description?: string;
+  imageURL?: string;
+  videoURL?: string;
 };
 
 type FetchText = (url: string) => Promise<string>;
+type FetchMediaEvidence = (metadata: SourceMetadata) => Promise<SourceMediaEvidence[]>;
 
 const defaultMaxQueries = 4;
 const maxResultsPerQuery = 5;
@@ -53,9 +75,11 @@ const maxResultsPerQuery = 5;
 export async function runSourceSearchRecovery(
   input: SourceSearchInput,
   fetchText: FetchText = defaultFetchText,
+  fetchMediaEvidence: FetchMediaEvidence = defaultFetchMediaEvidence,
 ): Promise<SourceSearchOutput> {
   const errors: string[] = [];
   const sourceMetadata = await fetchSourceMetadata(input.sourceUrl, fetchText, errors);
+  const mediaEvidence = await recoverSourceMediaEvidence(sourceMetadata, fetchMediaEvidence, errors);
   const enrichedInput = inputWithSourceMetadata(input, sourceMetadata);
   const queries = buildSourceRecoveryQueries(enrichedInput).slice(0, input.maxQueries ?? defaultMaxQueries);
   const searchResults: SourceSearchResult[] = [];
@@ -79,8 +103,9 @@ export async function runSourceSearchRecovery(
     queries,
     searchResults,
     candidates,
+    mediaEvidence,
     errors,
-    receipt: buildSourceRecoveryReceipt(input, sourceMetadata, queries, searchResults, candidates, errors),
+    receipt: buildSourceRecoveryReceipt(input, sourceMetadata, queries, searchResults, candidates, mediaEvidence, errors),
   };
 }
 
@@ -187,6 +212,7 @@ function buildSourceRecoveryReceipt(
   queries: string[],
   searchResults: SourceSearchResult[],
   candidates: SourceSearchCandidate[],
+  mediaEvidence: SourceMediaEvidence[],
   errors: string[],
 ): SourceRecoveryReceipt {
   const found: string[] = [];
@@ -204,11 +230,17 @@ function buildSourceRecoveryReceipt(
   if (sourceURL) found.push("source_url");
   if (input.rawText?.trim()) found.push("user_shared_text");
   if (metadata?.title || metadata?.description) found.push("public_metadata");
+  if (metadata?.imageURL) found.push("public_thumbnail_url");
+  if (metadata?.videoURL) found.push("public_video_url");
+  if (mediaEvidence.some((item) => item.kind === "thumbnail")) found.push("public_thumbnail_fetch");
+  if (mediaEvidence.some((item) => item.kind === "video_keyframe")) found.push("server_keyframe_extraction");
   if (searchResults.length > 0) found.push("search_results");
   if (candidates.some((candidate) => candidate.address)) found.push("explicit_address");
   if (candidates.length > 0) found.push("review_candidate");
 
   if (sourceURL) tried.push("public_source_metadata");
+  if (metadata?.imageURL || metadata?.videoURL) tried.push("public_media_fetch");
+  if (metadata?.videoURL) tried.push("server_keyframe_extraction");
   if (queries.length > 0) tried.push("public_search");
   if (candidates.length > 0) tried.push("candidate_quality_gate");
   if (errors.length > 0) tried.push("error_capture");
@@ -228,11 +260,13 @@ function buildSourceRecoveryReceipt(
 
   return {
     input: inputKind,
-    capabilityLevel: candidates.some((candidate) =>
-      candidate.evidence.some((item) => item.startsWith("Source metadata contains")),
-    )
-      ? "metadata_enrichment"
-      : "public_search_recovery",
+    capabilityLevel: mediaEvidence.some((item) => item.kind === "video_keyframe")
+      ? "media_evidence_recovery"
+      : candidates.some((candidate) =>
+        candidate.evidence.some((item) => item.startsWith("Source metadata contains")),
+      )
+        ? "metadata_enrichment"
+        : "public_search_recovery",
     found: unique(found),
     tried: unique(tried),
     missing: unique([...missing]),
@@ -509,7 +543,7 @@ async function fetchSourceMetadata(
   try {
     const html = await fetchText(url.toString());
     const metadata = sourceMetadataFromHTML(html, url.toString());
-    return metadata.title || metadata.description || metadata.resolvedURL ? metadata : undefined;
+    return metadata.title || metadata.description || metadata.resolvedURL || metadata.imageURL || metadata.videoURL ? metadata : undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown source metadata error";
     errors.push(`source metadata ${url.toString()}: ${message}`);
@@ -518,10 +552,13 @@ async function fetchSourceMetadata(
 }
 
 function sourceMetadataFromHTML(html: string, resolvedURL?: string): SourceMetadata {
+  const baseURL = resolvedURL ? safeURL(resolvedURL) : undefined;
   return {
     resolvedURL,
     title: metadataValue(html, ["og:title", "twitter:title"]) ?? htmlTitle(html),
     description: metadataValue(html, ["og:description", "twitter:description", "description"]),
+    imageURL: safePublicMediaURL(metadataValue(html, ["og:image:secure_url", "og:image", "twitter:image"]), baseURL),
+    videoURL: safePublicMediaURL(metadataValue(html, ["og:video:secure_url", "og:video", "og:video:url", "twitter:player:stream"]), baseURL),
   };
 }
 
@@ -551,6 +588,137 @@ function decodedMetadataText(metadata: SourceMetadata): string {
     .filter(Boolean)
     .map((value) => decodeHTML(value ?? ""))
     .join("\n");
+}
+
+
+async function recoverSourceMediaEvidence(
+  metadata: SourceMetadata | undefined,
+  fetchMediaEvidence: FetchMediaEvidence,
+  errors: string[],
+): Promise<SourceMediaEvidence[]> {
+  if (!metadata?.imageURL && !metadata?.videoURL) return [];
+  try {
+    return await fetchMediaEvidence(metadata);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown source media error";
+    errors.push(`source media recovery: ${message}`);
+    return [];
+  }
+}
+
+async function defaultFetchMediaEvidence(metadata: SourceMetadata): Promise<SourceMediaEvidence[]> {
+  const evidence: SourceMediaEvidence[] = [];
+  if (metadata.imageURL) {
+    const image = await fetchBoundedMedia(metadata.imageURL, 6_000_000);
+    if (image) {
+      evidence.push({
+        kind: "thumbnail",
+        url: metadata.imageURL,
+        contentType: image.contentType,
+        byteLength: image.data.byteLength,
+        sha256: sha256(image.data),
+      });
+    }
+  }
+
+  // Keep server-side keyframe extraction opt-in because many social video URLs are
+  // signed, large, or rate-limited. The code path is deterministic and bounded so
+  // production can enable it without letting a Reel fetch consume the worker.
+  if (metadata.videoURL && process.env.SAVE_ENABLE_SERVER_KEYFRAME_EXTRACTION === "true") {
+    const video = await fetchBoundedMedia(metadata.videoURL, 24_000_000);
+    if (video) {
+      evidence.push({
+        kind: "video",
+        url: metadata.videoURL,
+        contentType: video.contentType,
+        byteLength: video.data.byteLength,
+        sha256: sha256(video.data),
+      });
+      const frame = await extractFirstKeyframe(video.data, metadata.videoURL);
+      if (frame) evidence.push(frame);
+    }
+  }
+  return evidence;
+}
+
+async function fetchBoundedMedia(url: string, maxBytes: number): Promise<{ data: Uint8Array; contentType?: string } | undefined> {
+  const parsed = safeURL(url);
+  if (!parsed || !isSafePublicHTTPURL(parsed)) return undefined;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(parsed.toString(), {
+      headers: {
+        "User-Agent": "SAV-E source recovery media fetcher/1.0",
+        "Accept": "image/avif,image/webp,image/apng,image/*,video/*,*/*;q=0.8",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return undefined;
+    const length = Number(response.headers.get("content-length") ?? "0");
+    if (length > maxBytes) return undefined;
+    const data = new Uint8Array(await response.arrayBuffer());
+    if (data.byteLength > maxBytes) return undefined;
+    return { data, contentType: response.headers.get("content-type") ?? undefined };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function extractFirstKeyframe(videoData: Uint8Array, sourceUrl: string): Promise<SourceMediaEvidence | undefined> {
+  const dir = await mkdtemp(join(tmpdir(), "save-reel-frame-"));
+  const input = join(dir, "input.bin");
+  const output = join(dir, "frame.jpg");
+  try {
+    await writeFile(input, videoData);
+    await execFileAsync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-ss",
+      "1",
+      "-i",
+      input,
+      "-frames:v",
+      "1",
+      "-vf",
+      "scale='min(1024,iw)':-2",
+      output,
+    ], { timeout: 12_000, maxBuffer: 200_000 });
+    const frameData = new Uint8Array(await readFile(output));
+    if (frameData.byteLength === 0 || frameData.byteLength > 6_000_000) return undefined;
+    return {
+      kind: "video_keyframe",
+      url: sourceUrl,
+      contentType: "image/jpeg",
+      byteLength: frameData.byteLength,
+      sha256: sha256(frameData),
+      frameSecond: 1,
+    };
+  } catch {
+    return undefined;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function safePublicMediaURL(value: string | undefined, baseURL: URL | undefined): string | undefined {
+  if (!value) return undefined;
+  const url = safeURL(baseURL ? new URL(value, baseURL).toString() : value);
+  return url && isSafePublicHTTPURL(url) ? url.toString() : undefined;
+}
+
+function isSafePublicHTTPURL(url: URL): boolean {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".localhost") || host === "0.0.0.0" || host === "::1") return false;
+  return ![/^127\./, /^10\./, /^192\.168\./, /^169\.254\./, /^172\.(1[6-9]|2[0-9]|3[0-1])\./].some((pattern) => pattern.test(host));
+}
+
+function sha256(data: Uint8Array): string {
+  return createHash("sha256").update(data).digest("hex");
 }
 
 function safeURL(value: string): URL | undefined {

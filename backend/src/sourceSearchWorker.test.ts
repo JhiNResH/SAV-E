@@ -245,3 +245,52 @@ test("runSourceSearchRecovery keeps generic live search pages diagnostic-only", 
   assert.ok(output.receipt.missing.includes("Verified venue name"));
   assert.match(output.receipt.nextBestClue, /screenshot/);
 });
+
+
+test("runSourceSearchRecovery records bounded server media fetch and keyframe evidence", async () => {
+  const output = await runSourceSearchRecovery(
+    {
+      sourceUrl: "https://www.instagram.com/reel/DZM8vmZBuNM/",
+      maxQueries: 1,
+    },
+    async (url) => {
+      if (url.includes("instagram.com")) {
+        return `
+          <meta property="og:title" content="Food reel on Instagram">
+          <meta property="og:image" content="https://cdn.example.test/reel-cover.jpg">
+          <meta property="og:video" content="https://cdn.example.test/reel-video.mp4">
+        `;
+      }
+      return "";
+    },
+    async (metadata) => {
+      assert.equal(metadata.imageURL, "https://cdn.example.test/reel-cover.jpg");
+      assert.equal(metadata.videoURL, "https://cdn.example.test/reel-video.mp4");
+      return [
+        {
+          kind: "thumbnail",
+          url: metadata.imageURL ?? "",
+          contentType: "image/jpeg",
+          byteLength: 1234,
+          sha256: "thumbnail-hash",
+        },
+        {
+          kind: "video_keyframe",
+          url: metadata.videoURL ?? "",
+          contentType: "image/jpeg",
+          byteLength: 2345,
+          sha256: "frame-hash",
+          frameSecond: 1,
+        },
+      ];
+    },
+  );
+
+  assert.deepEqual(output.mediaEvidence.map((item) => item.kind), ["thumbnail", "video_keyframe"]);
+  assert.ok(output.receipt.found.includes("public_thumbnail_url"));
+  assert.ok(output.receipt.found.includes("public_video_url"));
+  assert.ok(output.receipt.found.includes("server_keyframe_extraction"));
+  assert.ok(output.receipt.tried.includes("public_media_fetch"));
+  assert.ok(output.receipt.tried.includes("server_keyframe_extraction"));
+  assert.equal(output.receipt.capabilityLevel, "media_evidence_recovery");
+});
