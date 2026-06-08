@@ -8,10 +8,11 @@ Railway-hosted API for SAV-E mobile persistence. It replaces the previous Supaba
 DATABASE_URL=postgresql://...
 PRIVY_APP_ID=...
 PRIVY_VERIFICATION_KEY='-----BEGIN PUBLIC KEY-----...'
+SAVE_GUEST_SESSION_SECRET=...
 PORT=3000
 ```
 
-Railway provides `DATABASE_URL` and `PORT`. Set the Privy values on the backend service.
+Railway provides `DATABASE_URL` and `PORT`. Set the Privy values and a stable `SAVE_GUEST_SESSION_SECRET` on the backend service. If the guest secret is omitted, the backend generates an ephemeral process-local secret, which is only suitable for local development because guest sessions will expire on restart.
 
 ## Local
 
@@ -29,8 +30,10 @@ psql "$DATABASE_URL" -f backend/sql/schema.sql
 
 ## Routes
 
-Persistence routes accept either `Authorization: Bearer <Privy access token>` or `x-save-guest-id: guest_<uuid>`.
+Persistence routes accept either `Authorization: Bearer <Privy access token>` or `x-save-guest-token: <server-issued guest token>`.
+Guest clients create a server-issued session with `POST /v0/guest-sessions`; the backend no longer trusts client-generated `guest_<uuid>` headers as authorization.
 
+- `POST /v0/guest-sessions` — returns `guest_id`, `guest_token`, and `expires_at` for low-friction guest persistence.
 - `GET /places`
 - `POST /places`
 - `PATCH /places/:id`
