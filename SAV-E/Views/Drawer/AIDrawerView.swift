@@ -214,12 +214,14 @@ struct AIDrawerView: View {
             },
             onPlanAroundPlace: { place in
                 closeMapDetail()
-                viewModel.showPlanAround(
-                    anchor: place,
-                    reviewCandidates: reviewCandidates,
-                    outputLanguage: languageSettings.language
-                )
                 withAnimation { drawerDetent = .large }
+                Task {
+                    await viewModel.showPlanAround(
+                        anchor: place,
+                        reviewCandidates: reviewCandidates,
+                        outputLanguage: languageSettings.language
+                    )
+                }
             },
             onAddMoreClueCandidate: { candidate in
                 addMoreClue(for: candidate)
@@ -547,12 +549,14 @@ struct AIDrawerView: View {
                             drawerDetent = .height(72)
                         }
                     } onPlanAround: {
-                        viewModel.showPlanAround(
-                            anchor: place,
-                            reviewCandidates: reviewCandidates,
-                            outputLanguage: languageSettings.language
-                        )
                         withAnimation { drawerDetent = .large }
+                        Task {
+                            await viewModel.showPlanAround(
+                                anchor: place,
+                                reviewCandidates: reviewCandidates,
+                                outputLanguage: languageSettings.language
+                            )
+                        }
                     }
 
                     AddToListPanel(

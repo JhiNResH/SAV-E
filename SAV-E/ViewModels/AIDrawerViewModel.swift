@@ -325,7 +325,7 @@ final class AIDrawerViewModel: ObservableObject {
         outputLanguage: AppLanguage = .english,
         duration: SavePlanDuration = .halfDay,
         intent: SavePlanIntent = .balanced
-    ) {
+    ) async {
         let response = saveSearchController.search(
             query: "",
             places: places,
@@ -346,6 +346,11 @@ final class AIDrawerViewModel: ObservableObject {
             return
         }
 
+        let requestID = UUID()
+        activeRequestID = requestID
+        drawerState = .loading
+        mapAction = nil
+
         let request = SavePlanAroundRequest(anchorResultID: anchor.id, duration: duration, intent: intent)
         let result = SavePlanAroundController().planAround(
             anchor: anchor,
@@ -355,10 +360,28 @@ final class AIDrawerViewModel: ObservableObject {
         )
         switch result {
         case .draft(let draft):
-            let response = SaveAIResponse.planAroundDraft(draft, outputLanguage: outputLanguage)
-            drawerState = .displaying(response)
-            mapAction = response.mapAction
+            let prompt = planAroundPrompt(for: draft, outputLanguage: outputLanguage)
+            let deterministicResponse = SaveAIResponse.planAroundDraft(draft, outputLanguage: outputLanguage)
+            let routePlaces = resolvePlaces(from: deterministicResponse.placeIds)
+            let polishedResponse = await aiService.polishItineraryDraft(
+                deterministicResponse,
+                userMessage: prompt,
+                places: routePlaces,
+                outputLanguage: outputLanguage
+            )
+            guard activeRequestID == requestID else { return }
+            activeRequestID = nil
+            drawerState = .displaying(polishedResponse)
+            mapAction = polishedResponse.mapAction
+
+            let responseJSON = aiService.encodeResponse(polishedResponse)
+            conversationTurns.append(ConversationTurn(userMessage: prompt, assistantResponse: responseJSON))
+            if conversationTurns.count > 5 {
+                conversationTurns.removeFirst()
+            }
         case .blocked(let state):
+            guard activeRequestID == requestID else { return }
+            activeRequestID = nil
             showMessage(title: state.title, message: state.message)
         }
     }
@@ -527,6 +550,27 @@ final class AIDrawerViewModel: ObservableObject {
             chatHistory.insert(ChatEntry(query: query, timestamp: Date()), at: 0)
             if chatHistory.count > 20 { chatHistory.removeLast() }
         }
+    }
+
+    private func planAroundPrompt(for draft: SavePlanAroundDraft, outputLanguage: AppLanguage) -> String {
+        let stops = draft.routeStops.enumerated().map { index, stop in
+            let marker = stop.savedPlaceUUIDString == nil ? "unsaved public candidate" : "saved Map Stamp"
+            let distance = stop.distanceLabel.map { ", \($0) from anchor" } ?? ""
+            return "\(index + 1). \(stop.title) (\(marker)\(distance))"
+        }.joined(separator: "\n")
+
+        return outputLanguage.localized(
+            english: """
+            Plan a \(draft.request.duration.displayName.lowercased()) \(draft.request.intent.displayName.lowercased()) route around \(draft.anchor.title).
+            Polish this deterministic route into a useful itinerary:
+            \(stops)
+            """,
+            traditionalChinese: """
+            請用「\(draft.anchor.title)」周邊規劃一個\(draft.request.duration.displayName.lowercased())、\(draft.request.intent.displayName.lowercased())行程。
+            把這個確定路線潤飾成實用行程：
+            \(stops)
+            """
+        )
     }
 
     private func recordRecommendationAnalysisReceiptIfNeeded(for response: SaveSearchResponse) async {

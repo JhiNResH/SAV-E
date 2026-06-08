@@ -174,7 +174,105 @@ final class SaveAIService {
         throw lastError ?? SaveAIError.apiError(0)
     }
 
+    func polishItineraryDraft(
+        _ fallback: SaveAIResponse,
+        userMessage: String,
+        places: [Place],
+        outputLanguage: AppLanguage = .english
+    ) async -> SaveAIResponse {
+        guard fallback.componentType == .tripItinerary,
+              !fallback.itineraryDays.isEmpty,
+              let apiKey, !apiKey.isEmpty else {
+            return fallback
+        }
+
+        let prompt = """
+        Polish this SAV-E plan-around draft for the detail page.
+        User intent: \(userMessage)
+
+        Keep the deterministic draft as the source of truth:
+        - Do not add new places.
+        - Keep saved Map Stamp IDs valid.
+        - Draft stops without a placeId are unsaved map candidates; keep placeId null and label them clearly as unsaved/public.
+        - Improve only the title, times, durations, stop notes, and aiMessage so it reads like a useful itinerary.
+        """
+
+        return await renderItineraryPolish(
+            prompt: prompt,
+            fallback: fallback,
+            places: places,
+            outputLanguage: outputLanguage
+        )
+    }
+
     // MARK: - Private
+
+    private func renderItineraryPolish(
+        prompt: String,
+        fallback: SaveAIResponse,
+        places: [Place],
+        outputLanguage: AppLanguage
+    ) async -> SaveAIResponse {
+        guard let apiKey, !apiKey.isEmpty else { return fallback }
+
+        let contents: [[String: Any]] = [
+            [
+                "role": "user",
+                "parts": [[
+                    "text": systemPrompt(
+                        places: places,
+                        deterministicDraftJSON: encodeResponse(fallback),
+                        outputLanguage: outputLanguage
+                    )
+                ]]
+            ],
+            ["role": "model", "parts": [["text": "Understood. I will respond only with valid JSON using the deterministic draft as the baseline."]]],
+            ["role": "user", "parts": [["text": prompt]]]
+        ]
+
+        let body: [String: Any] = [
+            "contents": contents,
+            "generationConfig": [
+                "temperature": 0.25,
+                "maxOutputTokens": 2048
+            ]
+        ]
+
+        guard let requestBody = try? JSONSerialization.data(withJSONObject: body) else {
+            return fallback
+        }
+
+        for model in modelFallbacks {
+            let endpoint = SAVEProductionConfig.geminiGenerateContentURL(apiKey: apiKey, model: model)
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = requestBody
+
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse else { continue }
+                guard http.statusCode == 200 else {
+                    if http.statusCode != 404 && http.statusCode != 429 { return fallback }
+                    continue
+                }
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let candidates = json["candidates"] as? [[String: Any]],
+                      let content = candidates.first?["content"] as? [String: Any],
+                      let parts = content["parts"] as? [[String: Any]],
+                      let text = parts.first?["text"] as? String else {
+                    return fallback
+                }
+
+                let parsed = try parseResponse(text)
+                return validatedItineraryPolish(parsed, fallback: fallback, places: places)
+            } catch {
+                continue
+            }
+        }
+
+        return fallback
+    }
 
     private func localIntentResponse(
         for message: String,
@@ -258,6 +356,7 @@ final class SaveAIService {
             Use this draft as a safe baseline built from Map Stamps and distance/time-slot rules.
             You may improve the day grouping, stop order, times, title, aiMessage, and notes when it makes the itinerary more useful.
             Keep every place ID valid and do not introduce unknown place IDs or claim live travel times.
+            If a draft stop has no placeId, it is an unsaved map candidate. You may keep it with a null placeId, but you must clearly label it as unsaved/public and never call it a Map Stamp.
             Preserve the requested day count when the user specified one.
             """
         } else {
@@ -309,7 +408,8 @@ final class SaveAIService {
         RULES:
         - Every user-visible string in title, itineraryDays.label, itineraryDays.stops.note, messageText, and aiMessage must use the OUTPUT LANGUAGE exactly.
         - For itinerary requests: use Map Stamps to build a realistic schedule with smart times, geographic order, and the user's requested destination/day count/style.
-        - If a DETERMINISTIC PLANNER DRAFT is provided, use it as a safe baseline. You may improve grouping, order, times, title, aiMessage, and stop notes, but every place ID must come from USER'S MAP STAMPS.
+        - If a DETERMINISTIC PLANNER DRAFT is provided, use it as a safe baseline. You may improve grouping, order, times, title, aiMessage, and stop notes, but every non-null place ID must come from USER'S MAP STAMPS.
+        - Stops from the deterministic draft with null or empty placeId are unsaved/public candidates. You may keep those stops only if they are already in the draft, still with null placeId, and clearly labeled as unsaved/public.
         - The itinerary should read like an assistant-planned draft, not a debug report. Explain the plan in aiMessage before the stop list.
         - If the user asks for trip planning without days or style, still return a usable draft from Map Stamps, then ask exactly one concise follow-up about days or vibe in aiMessage.
         - If the user's saved Map Stamps are mostly food/drink and the trip is missing attractions or activities, do not invent exact public places. Mention the gap and ask whether to search public discovery near the saved anchors.
@@ -319,7 +419,7 @@ final class SaveAIService {
         - navigationCard: set navigationPlaceId + transportMode + mapAction.focusRegion to that place's lat/lng
         - tripItinerary: set itineraryDays + placeIds (all stop ids) + mapAction.showRoute
         - message: set messageText only, no mapAction. Only use for greetings or when there are truly zero relevant places.
-        - Only reference places from USER'S MAP STAMPS above using their exact "id" values
+        - Only reference places from USER'S MAP STAMPS above using their exact "id" values, except unsaved/public draft stops that already have null placeId.
         """
     }
 
@@ -331,12 +431,26 @@ final class SaveAIService {
 
         let validIDs = Set(places.map { $0.id.uuidString })
         let stopIDs = response.itineraryDays.flatMap(\.stops).compactMap(\.placeId)
+        let topLevelIDs = response.placeIds
+        let navigationIDs = [response.navigationPlaceId].compactMap { $0 }
+        let mapActionIDs = response.mapAction?.placeIds ?? []
+        let referencedIDs = stopIDs + topLevelIDs + navigationIDs + mapActionIDs
         guard !stopIDs.isEmpty,
-              stopIDs.allSatisfy({ validIDs.contains($0) }) else {
+              referencedIDs.allSatisfy({ validIDs.contains($0) }) else {
             return fallback
         }
 
-        return response
+        return SaveAIResponse(
+            componentType: response.componentType,
+            title: response.title ?? fallback.title,
+            placeIds: response.placeIds.isEmpty ? fallback.placeIds : response.placeIds,
+            navigationPlaceId: response.navigationPlaceId ?? fallback.navigationPlaceId,
+            transportMode: response.transportMode,
+            itineraryDays: response.itineraryDays,
+            messageText: response.messageText,
+            mapAction: response.mapAction ?? fallback.mapAction,
+            aiMessage: response.aiMessage ?? fallback.aiMessage
+        )
     }
 
     private func parseResponse(_ text: String) throws -> SaveAIResponse {
