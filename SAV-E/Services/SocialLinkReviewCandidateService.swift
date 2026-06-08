@@ -1,4 +1,10 @@
 import Foundation
+#if canImport(ImageIO)
+import ImageIO
+#endif
+#if canImport(Vision)
+import Vision
+#endif
 
 enum SocialLinkReviewCandidateError: LocalizedError {
     case noUsableCandidates
@@ -205,18 +211,25 @@ final class SocialLinkReviewCandidateService {
         var resolvedURL: String?
         var title: String?
         var description: String?
+        var imageURL: URL?
     }
 
     func reviewCandidates(from url: URL) async throws -> [PendingReviewCandidate] {
         let metadata = await fetchMetadata(from: url)
-        let evidenceText = [metadata.title, metadata.description]
+        let ocrLines = await thumbnailOCRLines(from: metadata.imageURL)
+        let ocrEvidence = ocrLines.isEmpty ? nil : ocrLines.joined(separator: "\n")
+        let evidenceText = [metadata.title, metadata.description, ocrEvidence]
             .compactMap { $0 }
             .map(cleanHTMLText)
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
 
         let sourceURL = metadata.resolvedURL ?? url.absoluteString
-        return try await recoverReviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+        let candidates = try await recoverReviewCandidates(fromEvidenceText: evidenceText, sourceURL: sourceURL)
+        guard !ocrLines.isEmpty else { return candidates }
+        return candidates.map { candidate in
+            candidate.withThumbnailOCREvidence(ocrLines)
+        }
     }
 
     func recoverReviewCandidates(fromEvidenceText evidenceText: String, sourceURL: String) async throws -> [PendingReviewCandidate] {
@@ -805,15 +818,107 @@ final class SocialLinkReviewCandidateService {
             let html = String(data: data.prefix(300_000), encoding: .utf8) ?? ""
             let title = metadataValue(in: html, keys: ["og:title", "twitter:title", "title"])
             let description = metadataValue(in: html, keys: ["og:description", "twitter:description", "description"])
+            let imageURL = metadataImageURL(in: html, baseURL: response.url ?? url)
             return PublicMetadata(
                 resolvedURL: response.url?.absoluteString ?? url.absoluteString,
                 title: title,
-                description: description
+                description: description,
+                imageURL: imageURL
             )
         } catch {
-            return PublicMetadata(resolvedURL: url.absoluteString, title: nil, description: nil)
+            return PublicMetadata(resolvedURL: url.absoluteString, title: nil, description: nil, imageURL: nil)
         }
     }
+
+    private func metadataImageURL(in html: String, baseURL: URL) -> URL? {
+        guard let value = metadataValue(in: html, keys: ["og:image:secure_url", "og:image", "twitter:image"]) else {
+            return nil
+        }
+        guard let url = URL(string: value, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+        return isSafePublicHTTPURL(url) ? url : nil
+    }
+
+    private func thumbnailOCRLines(from imageURL: URL?) async -> [String] {
+        guard let imageURL, isSafePublicHTTPURL(imageURL) else { return [] }
+        do {
+            var request = URLRequest(url: imageURL)
+            request.timeoutInterval = 8
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+            request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  data.count <= 6_000_000 else {
+                return []
+            }
+            return await recognizedThumbnailTextLines(from: data)
+        } catch {
+            return []
+        }
+    }
+
+    private func isSafePublicHTTPURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            return false
+        }
+        guard let host = url.host?.lowercased(), !host.isEmpty else { return false }
+        if host == "localhost" || host.hasSuffix(".localhost") { return false }
+        if host == "0.0.0.0" || host == "::1" { return false }
+        let privateIPv4Patterns = [
+            #"^127\."#,
+            #"^10\."#,
+            #"^192\.168\."#,
+            #"^169\.254\."#,
+            #"^172\.(1[6-9]|2[0-9]|3[0-1])\."#
+        ]
+        return !privateIPv4Patterns.contains { pattern in
+            host.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    private func recognizedThumbnailTextLines(from imageData: Data) async -> [String] {
+        #if canImport(Vision) && canImport(ImageIO)
+        guard let cgImage = downsampledCGImage(from: imageData) else { return [] }
+
+        return await withCheckedContinuation { continuation in
+            let request = VNRecognizeTextRequest { request, _ in
+                let observations = request.results as? [VNRecognizedTextObservation] ?? []
+                let lines = observations
+                    .compactMap { $0.topCandidates(1).first?.string.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                continuation.resume(returning: lines)
+            }
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+            request.recognitionLanguages = ["zh-Hant", "zh-Hans", "en-US"]
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                continuation.resume(returning: [])
+            }
+        }
+        #else
+        return []
+        #endif
+    }
+
+    #if canImport(ImageIO)
+    private func downsampledCGImage(from imageData: Data, maxPixelSize: CGFloat = 1_024) -> CGImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, sourceOptions) else { return nil }
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: false,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions)
+    }
+    #endif
 
     private func numberedCandidates(from evidenceText: String, sourceURL: String) -> [PendingReviewCandidate] {
         let lines = evidenceText
@@ -2314,5 +2419,41 @@ final class SocialLinkReviewCandidateService {
 private extension String {
     func matchesSocialDomain(_ domain: String) -> Bool {
         self == domain || hasSuffix(".\(domain)")
+    }
+}
+
+private extension PendingReviewCandidate {
+    func withThumbnailOCREvidence(_ lines: [String]) -> PendingReviewCandidate {
+        guard !lines.isEmpty else { return self }
+        var copy = self
+        let ocrText = lines.joined(separator: "\n")
+        copy.sourceText = [copy.sourceText, ocrText]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        copy.evidence = uniqueStrings(
+            copy.evidence + [
+                "Thumbnail OCR text: \(String(ocrText.prefix(300)))",
+                "Analysis pipeline: included public metadata image OCR before source recovery"
+            ]
+        )
+        if var diagnostic = copy.evidenceDiagnostic {
+            diagnostic.found = uniqueStrings(diagnostic.found + ["Thumbnail OCR text: \(String(ocrText.prefix(300)))"])
+            diagnostic.attempts = uniqueStrings(diagnostic.attempts + ["Ran OCR on public metadata image/thumbnail"])
+            copy.evidenceDiagnostic = diagnostic
+        }
+        return copy
+    }
+
+    private func uniqueStrings(_ values: [String]) -> [String] {
+        var result: [String] = []
+        var seen = Set<String>()
+        for value in values {
+            let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty, !seen.contains(cleaned) else { continue }
+            seen.insert(cleaned)
+            result.append(cleaned)
+        }
+        return result
     }
 }

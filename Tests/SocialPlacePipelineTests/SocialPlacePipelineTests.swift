@@ -35,6 +35,15 @@ private final class StubPublicSourceSearchService: PublicSourceSearchServiceProt
                 )
             ]
         }
+        if query.contains("DHiddenOCR") || query.contains("推薦４間冰店") || query.contains("台北 冰店") {
+            return [
+                PublicSourceSearchResult(
+                    title: "清水茶香｜台北冰店推薦",
+                    url: "https://example.com/taipei-shaved-ice/qingshui",
+                    snippet: "清水茶香 台北冰店，地址 台北市大安區復興南路一段100號。推薦黑糖剉冰與手搖茶。"
+                )
+            ]
+        }
         return []
     }
 }
@@ -128,6 +137,19 @@ private final class StubGooglePlacesService: GooglePlacesServiceProtocol {
                     longitude: 121.5301,
                     rating: 4.3,
                     priceLevel: 2
+                )
+            ]
+        }
+        if query.contains("清水茶香") {
+            return [
+                GooglePlaceMatch(
+                    id: "qingshui-tea-taipei",
+                    name: "清水茶香 台北復興店",
+                    address: "台北市大安區復興南路一段100號",
+                    latitude: 25.043,
+                    longitude: 121.544,
+                    rating: 4.4,
+                    priceLevel: 1
                 )
             ]
         }
@@ -577,6 +599,39 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(result.missingFields.contains("Verified place name"))
         XCTAssertTrue(result.evidence.contains { $0.contains("Raw source saved") })
         XCTAssertTrue(result.confidenceReason.contains("no verified place identity"))
+    }
+
+    func testInstagramReelThumbnailOCRFeedsPublicRecoveryAndPlacesResolver() async throws {
+        let places = StubGooglePlacesService()
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: places,
+            publicSourceSearchService: search
+        )
+
+        let result = await service.resolveEvidence(SocialPlaceEvidenceResolverInput(
+            sourceURL: "https://www.instagram.com/reel/DHiddenOCR/",
+            caption: "Foodie on Instagram: \"save this for later\"",
+            authorHandle: "taipei_foodie",
+            cityClues: ["台北"],
+            categoryClues: ["冰店", "dessert"],
+            ocrLines: [
+                "推薦４間冰店",
+                "台北夏天必吃",
+                "清水茶香"
+            ]
+        ))
+
+        XCTAssertEqual(result.outcome, .mapStamp)
+        XCTAssertEqual(result.rawSource.ocrLines, ["推薦４間冰店", "台北夏天必吃", "清水茶香"])
+        XCTAssertEqual(result.candidate.candidateName, "清水茶香 台北復興店")
+        XCTAssertEqual(result.candidate.address, "台北市大安區復興南路一段100號")
+        XCTAssertEqual(result.candidate.reviewState, "map_match_ready")
+        XCTAssertTrue(result.searchQueries.contains { $0.contains("DHiddenOCR") })
+        XCTAssertTrue(search.queries.contains { $0.contains("推薦４間冰店") || $0.contains("台北") })
+        XCTAssertTrue(places.queries.contains { $0.contains("清水茶香") })
+        XCTAssertTrue(result.evidence.contains { $0.contains("清水茶香") })
+        XCTAssertTrue(result.candidate.evidenceDiagnostic?.attempts.contains { $0.contains("public metadata/caption/OCR") } == true)
     }
 
     func testInstagramShilinSukiyakiCaptionStaysRecoveryScopedInsteadOfCreatorOnly() {
