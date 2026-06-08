@@ -387,10 +387,11 @@ final class SaveAIService {
 private extension SaveAIResponse {
     func copyingItineraryCopy(from response: SaveAIResponse) -> SaveAIResponse {
         let responseStops = response.itineraryDays.flatMap(\.stops)
-        let responseNotesByPlaceID = Dictionary(uniqueKeysWithValues: responseStops.compactMap { stop -> (String, String)? in
-            guard let placeId = stop.placeId, let note = stop.note, !note.isEmpty else { return nil }
-            return (placeId, note)
-        })
+        var responseNotesByPlaceID: [String: [String]] = [:]
+        responseStops.forEach { stop in
+            guard let placeId = stop.placeId, let note = stop.note, !note.isEmpty else { return }
+            responseNotesByPlaceID[placeId, default: []].append(note)
+        }
 
         var fallbackIndex = 0
         let copiedDays = itineraryDays.map { day in
@@ -399,7 +400,12 @@ private extension SaveAIResponse {
                 label: day.label,
                 stops: day.stops.map { stop in
                     defer { fallbackIndex += 1 }
-                    let responseNote = stop.placeId.flatMap { responseNotesByPlaceID[$0] } ?? {
+                    let responseNote = stop.placeId.flatMap { placeId -> String? in
+                        guard var notes = responseNotesByPlaceID[placeId], !notes.isEmpty else { return nil }
+                        let note = notes.removeFirst()
+                        responseNotesByPlaceID[placeId] = notes
+                        return note
+                    } ?? {
                         guard responseStops.indices.contains(fallbackIndex) else { return nil }
                         return responseStops[fallbackIndex].note
                     }()
