@@ -36,12 +36,6 @@ struct PlaceDetailView: View {
                 PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
                     .padding(.horizontal)
 
-                PlaceVisibilityControl(
-                    visibility: detailPlace.effectiveVisibility,
-                    onChange: onUpdateVisibility == nil ? nil : updateVisibility
-                )
-                .padding(.horizontal)
-
                 // Mini map
                 Map(position: .constant(.region(MKCoordinateRegion(
                     center: detailPlace.coordinate,

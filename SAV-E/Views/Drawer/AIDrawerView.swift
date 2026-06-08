@@ -2311,19 +2311,11 @@ private struct SavedMapDetailDrawerContent: View {
 
             PlaceBasicInfoPanel(place: detailPlace)
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
-            PlaceVisibilityControl(
-                visibility: detailPlace.effectiveVisibility,
-                onChange: onUpdateVisibility
-            )
             if isEditingPlace {
                 placeEditor
             }
 
             HStack(spacing: 8) {
-                Button(action: onRecommendOrder) {
-                    PlaceDetailActionLabel(title: languageSettings.localized(english: "Order?", traditionalChinese: "點餐？"), systemImage: "fork.knife", fill: .saveHoney.opacity(0.78))
-                }
-
                 Button(action: onPlanAroundPlace) {
                     PlaceDetailActionLabel(title: languageSettings.localized(english: "Plan", traditionalChinese: "規劃"), systemImage: "point.topleft.down.curvedto.point.bottomright.up", fill: Color.saveSignal.opacity(0.56))
                 }

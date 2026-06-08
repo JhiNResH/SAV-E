@@ -75,10 +75,6 @@ struct PlaceBottomSheet: View {
 
             PlaceBasicInfoPanel(place: place)
             PlaceInsightSummaryPanel(place: place, fallbackSummary: memorySummary)
-            PlaceVisibilityControl(
-                visibility: place.effectiveVisibility,
-                onChange: onUpdateVisibility
-            )
             PlaceProofPlaceholderCard()
 
             FlowLayout(spacing: 8) {
@@ -121,9 +117,9 @@ struct PlaceBottomSheet: View {
                     onPlanAround?()
                 } label: {
                     PlaceDetailActionLabel(
-                        title: languageSettings.localized(english: "Order?", traditionalChinese: "點餐？"),
-                        systemImage: "fork.knife",
-                        fill: .saveHoney
+                        title: languageSettings.localized(english: "Plan", traditionalChinese: "規劃"),
+                        systemImage: "point.topleft.down.curvedto.point.bottomright.up",
+                        fill: Color.saveSignal.opacity(0.56)
                     )
                 }
                 .disabled(onPlanAround == nil)
