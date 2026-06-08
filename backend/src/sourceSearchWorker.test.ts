@@ -194,6 +194,25 @@ test("runSourceSearchRecovery creates review candidate from explicit source meta
   assert.ok(output.receipt.found.includes("explicit_address"));
 });
 
+test("runSourceSearchRecovery blocks private source metadata URLs before fetch", async () => {
+  const fetchedURLs: string[] = [];
+  const output = await runSourceSearchRecovery(
+    {
+      sourceUrl: "http://127.0.0.1:5432/internal",
+      maxQueries: 0,
+    },
+    async (url) => {
+      fetchedURLs.push(url);
+      return "";
+    },
+  );
+
+  assert.deepEqual(fetchedURLs, []);
+  assert.equal(output.searchResults.length, 0);
+  assert.equal(output.candidates.length, 0);
+  assert.ok(!output.receipt.found.includes("public_metadata"));
+});
+
 test("runSourceSearchRecovery skips hours and uses venue line before non-US address", async () => {
   const output = await runSourceSearchRecovery(
     {
