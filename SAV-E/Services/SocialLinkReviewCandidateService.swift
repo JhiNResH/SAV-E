@@ -229,7 +229,8 @@ final class SocialLinkReviewCandidateService {
         }
 
         let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
-        guard analysis.isPlaceBearing || analysis.resolverDecision.shouldRunPublicSearch else { return initial }
+        let hasUnresolvedInitialCandidate = initial.contains { $0.reviewState == "unresolved_place_candidate" }
+        guard analysis.isPlaceBearing || analysis.resolverDecision.shouldRunPublicSearch || hasUnresolvedInitialCandidate else { return initial }
 
         let queries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
         let searchResults = await publicSearchResults(for: queries)
@@ -1589,7 +1590,7 @@ final class SocialLinkReviewCandidateService {
             .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\"'“”"))
 
         if candidate.range(of: #"[\u4e00-\u9fff]"#, options: .regularExpression) != nil {
-            if candidate.range(of: #"^(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的"#, options: .regularExpression) != nil {
+            if candidate.range(of: #"^(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))"#, options: .regularExpression) != nil {
                 guard let cityScopedName = venueNameFromCityQualifiedPhrase(candidate) else { return nil }
                 candidate = cityScopedName
             }
@@ -1723,7 +1724,7 @@ final class SocialLinkReviewCandidateService {
             #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
             #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"((?:士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)[^\n\r]{0,60}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食))"#,
-            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的[^\n\r，,。！!？?@#]{2,24})"#
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?@#]{2,24})"#
         ]
         for pattern in patterns {
             guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
@@ -1751,12 +1752,12 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func cityQualifiedVenuePhrase(in text: String) -> String? {
-        firstCapture(in: text, pattern: #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的[^\n\r，,。！!？?@#]{2,24})"#)
+        firstCapture(in: text, pattern: #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?@#]{2,24})"#)
             .map(cleanHTMLText)
     }
 
     private func venueNameFromCityQualifiedPhrase(_ value: String) -> String? {
-        guard let rawName = firstCapture(in: value, pattern: #"^(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)的([^\n\r，,。！!？?@#]{2,24})"#) else {
+        guard let rawName = firstCapture(in: value, pattern: #"^(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))([^\n\r，,。！!？?@#]{2,24})"#) else {
             return nil
         }
         let name = cleanRecoveredVenueName(rawName)

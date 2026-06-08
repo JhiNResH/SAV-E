@@ -351,7 +351,6 @@ function isReviewableSearchResult(result: SourceSearchResult): boolean {
 function candidateNameFromResult(result: SourceSearchResult): string | undefined {
   let title = cleanText(result.title)
     .replace(/\s+[@#][A-Za-z0-9._-]{3,30}\b/g, "")
-    .replace(/\s*[|｜]\s+.*$/g, "")
     .replace(/\s*[|｜]\s*.*$/g, "")
     .replace(/\s+[–-]\s+(?:Google Maps|Yelp|Tripadvisor|OpenTable|Instagram|Facebook|TikTok).*$/gi, "")
     .replace(/\s+[–-]\s+Official(?:\s+Site)?$/gi, "")

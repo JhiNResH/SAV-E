@@ -34,10 +34,8 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertEqual(response.componentType, .tripItinerary)
         XCTAssertTrue(response.placeIds.contains(anchor.id.uuidString))
         XCTAssertTrue(response.placeIds.contains(dessert.id.uuidString))
-        XCTAssertLessThan(
-            response.placeIds.firstIndex(of: dessert.id.uuidString) ?? Int.max,
-            response.placeIds.firstIndex(of: farAway.id.uuidString) ?? Int.max
-        )
+        XCTAssertFalse(response.placeIds.contains(farAway.id.uuidString), "Far-away place should be excluded by 25km threshold")
+        XCTAssertEqual(response.placeIds.count, 2, "Should only include anchor and nearby dessert")
     }
 
     func testPlannerGroupsRequestedDaysAndOrdersStopsByDistance() throws {

@@ -193,6 +193,8 @@ struct ItineraryConstraintPlanner {
 }
 
 struct DeterministicTripPlanner {
+    private static let nearbyAnchorDistanceThresholdMeters: CLLocationDistance = 25_000
+
     private struct Candidate {
         let place: Place
         let score: Int
@@ -358,7 +360,7 @@ struct DeterministicTripPlanner {
         let anchorIDs = Set(anchors.map(\.place.id))
         let nearbySaved = allCandidates
             .filter { !anchorIDs.contains($0.place.id) }
-            .filter { distance(from: primaryAnchor, to: $0.place) <= 25_000 }
+            .filter { distance(from: primaryAnchor, to: $0.place) <= Self.nearbyAnchorDistanceThresholdMeters }
             .sorted { lhs, rhs in
                 let leftDistance = distance(from: primaryAnchor, to: lhs.place)
                 let rightDistance = distance(from: primaryAnchor, to: rhs.place)

@@ -553,8 +553,6 @@ struct AIDrawerView: View {
                             outputLanguage: languageSettings.language
                         )
                         withAnimation { drawerDetent = .large }
-                    } onUpdateVisibility: { visibility in
-                        try await onUpdatePlaceVisibility(place, visibility)
                     }
 
                     AddToListPanel(
