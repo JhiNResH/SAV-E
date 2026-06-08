@@ -64,6 +64,10 @@ extension Color {
     static let saveSuccess = Color(light: "C8EBCF", dark: "4F7D5D")
     static let saveCoral = Color(light: "EE9C78", dark: "9F523F")
     static let savePink = Color(light: "F6C1CB", dark: "96586B")
+    static let saveBlush = Color(light: "FFF6F8", dark: "281A20")
+    static let saveLavender = Color(light: "DCC8FF", dark: "44345F")
+    static let saveLeaf = Color(light: "D9F2C7", dark: "435F3D")
+    static let saveBlueInk = Color(light: "315D76", dark: "BEE7F8")
     static let saveNotebookBackground = Color(light: "FFF5E7", dark: "101419")
     static let saveNotebookPage = Color(light: "FFF0DC", dark: "1B2027")
     static let saveNotebookSpine = Color(light: "F6C181", dark: "7A5533")
@@ -192,6 +196,31 @@ struct SaveIconTile: View {
 struct SaveDottedBackground: View {
     var body: some View {
         Color.saveNotebookBackground
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        Color.saveBlush.opacity(0.38),
+                        Color.clear,
+                        Color.saveSky.opacity(0.18),
+                        Color.saveLeaf.opacity(0.20)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.26),
+                        Color.clear,
+                        Color.saveNotebookSpine.opacity(0.10)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+            }
             .overlay {
                 Canvas { context, size in
                     let spacing: CGFloat = 18

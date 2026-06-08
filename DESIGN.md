@@ -179,6 +179,10 @@ Use current SwiftUI tokens from `Wanderly/Extensions/Color+Theme.swift`.
 | Mint | `saveMint` | `#C8EBCF` | `#4F7D5D` | Confirmed, saved, success |
 | Signal/coral | `saveSignal` / `saveCoral` | `#EE9C78` | `#9F523F` | Waiting, attention, review |
 | Pink | `savePink` | `#F6C1CB` | `#96586B` | Friendly accent, trip support |
+| Blush | `saveBlush` | `#FFF6F8` | `#281A20` | Mascot-led onboarding, soft brand warmth |
+| Lavender | `saveLavender` | `#DCC8FF` | `#44345F` | Pro/upgrade preview, premium support accent |
+| Leaf | `saveLeaf` | `#D9F2C7` | `#435F3D` | Gentle saved-memory support distinct from success mint |
+| Blue ink | `saveBlueInk` | `#315D76` | `#BEE7F8` | Cool contrast for review/search copy or icons |
 | Disabled | `saveDisabled` | `#D7C0A6` | `#4E4842` | Disabled controls |
 | Notebook line | `saveNotebookLine` | `#3A2415` | `#6E6257` | Strokes, dividers, notebook grid |
 | Notebook spine | `saveNotebookSpine` | `#F6C181` | `#7A5533` | Passport and notebook binding |
@@ -190,6 +194,9 @@ Palette rules:
 - Mint means saved or successful.
 - Sky means review/search/investigation context.
 - Signal means attention, waiting, or risk.
+- Blush, lavender, leaf, and blue ink should break up the one-note cream/honey
+  palette in brand moments, onboarding, and upgrade previews. Do not use them
+  to recolor every operational surface.
 - Ink outlines should stay visible. If a surface cannot handle a 1.4 to 2 pt ink
   stroke, the surface is probably too small or too decorative.
 - Dark mode keeps the same nouns, but uses charcoal surfaces and muted accents.

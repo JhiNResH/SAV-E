@@ -132,7 +132,7 @@ struct OnboardingView: View {
             .opacity(stage == .clue && trimmedClue.isEmpty ? 0.58 : 1)
             .padding(.horizontal, 24)
 
-            if !isCompactHeight || stage != .language {
+            if (!isCompactHeight || stage != .language) && stage != .tag {
                 Button(secondaryActionTitle) {
                     skipCurrentStep()
                 }
@@ -160,7 +160,7 @@ struct OnboardingView: View {
         case .ask:
             return localized(english: "Add why I saved it", traditionalChinese: "標記我為什麼想存")
         case .tag:
-            return localized(english: "Open SAV-E", traditionalChinese: "打開 SAV-E")
+            return localized(english: "Start free with Memo", traditionalChinese: "和 Memo 免費開始")
         }
     }
 
@@ -169,7 +169,8 @@ struct OnboardingView: View {
         case .language: return .saveHoney
         case .clue, .candidate: return .saveHoney
         case .mapStamp: return .saveMint
-        case .ask, .tag: return .saveSky
+        case .ask: return .saveSky
+        case .tag: return .saveMint
         }
     }
 
@@ -315,15 +316,27 @@ private struct BrandEntryHero: View {
                 entryBadge
             }
 
-            ZStack {
-                Circle()
-                    .fill(Color.saveHoney.opacity(0.18))
-                    .frame(width: isCompactHeight ? 82 : 138, height: isCompactHeight ? 82 : 138)
-                    .scaleEffect(isBreathing ? 1.06 : 0.96)
+            ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: isCompactHeight ? 30 : 42, style: .continuous)
+                    .fill(Color.saveBlush.opacity(0.72))
+                    .frame(width: isCompactHeight ? 104 : 168, height: isCompactHeight ? 86 : 140)
+                    .rotationEffect(.degrees(-5))
+
+                RoundedRectangle(cornerRadius: isCompactHeight ? 28 : 38, style: .continuous)
+                    .fill(Color.saveSky.opacity(0.22))
+                    .frame(width: isCompactHeight ? 92 : 146, height: isCompactHeight ? 78 : 122)
+                    .offset(x: isCompactHeight ? 12 : 18, y: isCompactHeight ? 8 : 12)
+                    .scaleEffect(isBreathing ? 1.04 : 0.97)
                     .animation(SaveTheme.Motion.breathing, value: isBreathing)
 
-                MemoMascotMark(size: isCompactHeight ? 58 : 96, framed: true)
-                    .shadow(color: Color.saveInk.opacity(0.10), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
+                MemoMascotMark(size: isCompactHeight ? 66 : 108, framed: true)
+                    .shadow(color: Color.saveInk.opacity(0.12), radius: isCompactHeight ? 18 : 26, x: 0, y: isCompactHeight ? 9 : 14)
+
+                MascotTrustBubble(
+                    text: localized(english: "I keep the proof.", traditionalChinese: "我會保留證據。"),
+                    isCompactHeight: isCompactHeight
+                )
+                .offset(x: isCompactHeight ? 22 : 36, y: isCompactHeight ? 16 : 18)
             }
 
             VStack(spacing: isCompactHeight ? 4 : 10) {
@@ -334,8 +347,8 @@ private struct BrandEntryHero: View {
                     .minimumScaleFactor(0.72)
 
                 Text(localized(
-                    english: "Your private place memory.",
-                    traditionalChinese: "你的私人地點記憶。"
+                    english: "Turn messy place links into private Map Stamps.",
+                    traditionalChinese: "把混亂地點連結變成私人地圖章。"
                 ))
                 .font(isCompactHeight ? .subheadline.weight(.black) : SaveTheme.Typography.entryTitle)
                 .foregroundColor(.saveInk)
@@ -343,8 +356,8 @@ private struct BrandEntryHero: View {
                 .fixedSize(horizontal: false, vertical: true)
 
                 Text(localized(
-                    english: "Keep the source, review the match, then ask your saved places when it is time to decide.",
-                    traditionalChinese: "保留來源、先確認地點，之後要決定去哪時就能直接問 SAV-E。"
+                    english: "Memo keeps the source, shows what is missing, and waits for you before saving anything.",
+                    traditionalChinese: "Memo 會保留來源、顯示還缺什麼，確認前不會亂存。"
                 ))
                 .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                 .lineSpacing(2)
@@ -355,16 +368,7 @@ private struct BrandEntryHero: View {
                 .fixedSize(horizontal: false, vertical: !isCompactHeight)
             }
 
-            if !isCompactHeight {
-                HStack(spacing: 10) {
-                    Label(localized(english: "Review first", traditionalChinese: "先確認"), systemImage: "checklist.unchecked")
-                    Label(localized(english: "Ask saved", traditionalChinese: "問已保存"), systemImage: "sparkles")
-                }
-                .font(.caption.weight(.black))
-                .foregroundColor(.saveInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-            }
+            OnboardingProofPromiseStrip(language: language, isCompactHeight: isCompactHeight)
         }
         .padding(.top, isCompactHeight ? 3 : 18)
         .padding(.bottom, 6)
@@ -387,6 +391,78 @@ private struct BrandEntryHero: View {
             .background(Color.saveHoney.opacity(0.48))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.46), lineWidth: 1))
+    }
+}
+
+private struct MascotTrustBubble: View {
+    let text: String
+    let isCompactHeight: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.black))
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.74)
+            .padding(.horizontal, isCompactHeight ? 8 : 10)
+            .padding(.vertical, isCompactHeight ? 5 : 7)
+            .background(Color.saveNotebookPage.opacity(0.94))
+            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.50), lineWidth: 1))
+            .clipShape(Capsule())
+            .shadow(color: Color.saveInk.opacity(0.08), radius: 8, x: 0, y: 4)
+    }
+}
+
+private struct OnboardingProofPromiseStrip: View {
+    let language: AppLanguage
+    let isCompactHeight: Bool
+
+    var body: some View {
+        HStack(spacing: isCompactHeight ? 7 : 10) {
+            promiseChip(
+                title: localized(english: "Paste clue", traditionalChinese: "貼上線索"),
+                systemImage: "link",
+                tint: .saveBlush
+            )
+            promiseChip(
+                title: localized(english: "Review proof", traditionalChinese: "檢查證據"),
+                systemImage: "checklist.unchecked",
+                tint: .saveSky
+            )
+            promiseChip(
+                title: localized(english: "Ask saved", traditionalChinese: "問已保存"),
+                systemImage: "sparkles",
+                tint: .saveLeaf
+            )
+        }
+        .padding(.horizontal, isCompactHeight ? 8 : 10)
+        .padding(.vertical, isCompactHeight ? 7 : 9)
+        .background(Color.saveNotebookPage.opacity(0.58))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.28), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func promiseChip(title: String, systemImage: String, tint: Color) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.black))
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.64)
+            .padding(.horizontal, isCompactHeight ? 7 : 9)
+            .padding(.vertical, isCompactHeight ? 6 : 7)
+            .frame(maxWidth: .infinity)
+            .background(tint.opacity(0.66))
+            .clipShape(Capsule())
+    }
+
+    private func localized(english: String, traditionalChinese: String) -> String {
+        switch language {
+        case .english: return english
+        case .traditionalChinese: return traditionalChinese
+        }
     }
 }
 
@@ -1161,6 +1237,8 @@ private struct ProofStageCard: View {
                     }
                 }
             }
+
+            UpgradePreviewCard(language: language, isCompactHeight: isCompactHeight)
         }
     }
 
@@ -1271,6 +1349,109 @@ private struct ProofStageCard: View {
             return localized(english: "Friend message", traditionalChinese: "朋友訊息")
         }
         return String(trimmed.prefix(72))
+    }
+
+    private func localized(english: String, traditionalChinese: String) -> String {
+        switch language {
+        case .english: return english
+        case .traditionalChinese: return traditionalChinese
+        }
+    }
+}
+
+private struct UpgradePreviewCard: View {
+    let language: AppLanguage
+    let isCompactHeight: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 10 : 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.headline.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 36, height: 36)
+                    .background(Color.saveLavender.opacity(0.58))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localized(english: "Upgrade after the first useful memory", traditionalChinese: "先有第一個有用記憶，再升級"))
+                        .font(.caption.weight(.black))
+                        .foregroundColor(.saveInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.84)
+
+                    Text(localized(english: "Start free. Pro is for heavier recovery and planning.", traditionalChinese: "先免費開始。Pro 留給更重的找地點與規劃。"))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.saveMutedText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                }
+            }
+
+            HStack(spacing: 10) {
+                planColumn(
+                    title: localized(english: "Free", traditionalChinese: "免費"),
+                    subtitle: localized(english: "Save, review, ask", traditionalChinese: "保存、確認、提問"),
+                    systemImage: "checkmark.seal.fill",
+                    tint: .saveMint
+                )
+
+                planColumn(
+                    title: "SAV-E Pro",
+                    subtitle: localized(english: "OCR, recovery, planning", traditionalChinese: "OCR、找回地點、規劃"),
+                    systemImage: "lock.open.fill",
+                    tint: .saveHoney
+                )
+            }
+        }
+        .padding(isCompactHeight ? 12 : 14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.saveLavender.opacity(0.18),
+                    Color.saveBlush.opacity(0.44),
+                    Color.saveNotebookPage.opacity(0.68)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.38), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func planColumn(title: String, subtitle: String, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.62))
+                .clipShape(Circle())
+
+            Text(title)
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(subtitle)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.saveMutedText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.76)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.saveNotebookPage.opacity(0.58))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.24), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func localized(english: String, traditionalChinese: String) -> String {
