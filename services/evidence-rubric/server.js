@@ -2,29 +2,30 @@ import { createServer } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 
 const maxBodyBytes = 64_000;
-const defaultModel = "gpt-4.1-mini";
+const defaultModel = "gemini-3.5-flash";
 const allowedTiers = new Set(["source_only", "weak", "likely", "corroborated"]);
 
 export function createEvidenceRubricServer(env = process.env, fetchImpl = fetch) {
   const token = env.SAVE_EVIDENCE_RUBRIC_TOKEN?.trim();
-  const openAIKey = env.OPENAI_API_KEY?.trim();
-  const model = env.OPENAI_MODEL?.trim() || defaultModel;
+  const geminiKey = env.GEMINI_API_KEY?.trim();
+  const model = env.GEMINI_MODEL?.trim() || defaultModel;
 
   return createServer(async (request, response) => {
     try {
       if (request.method === "GET" && request.url === "/health") {
         return sendJson(response, {
-          ready: Boolean(token && openAIKey),
+          ready: Boolean(token && geminiKey),
           tokenConfigured: Boolean(token),
-          openAIConfigured: Boolean(openAIKey),
+          geminiConfigured: Boolean(geminiKey),
           model,
-        }, token && openAIKey ? 200 : 503);
+        }, token && geminiKey ? 200 : 503);
       }
 
-      if (request.method !== "POST" || request.url !== "/rubric") {
+      const requestURL = new URL(request.url ?? "/", "http://localhost");
+      if (request.method !== "POST" || requestURL.pathname !== "/rubric") {
         return sendJson(response, { error: "Not found" }, 404);
       }
-      if (!token || !openAIKey) {
+      if (!token || !geminiKey) {
         return sendJson(response, { error: "Rubric service is not configured" }, 503);
       }
       if (!validBearer(request.headers.authorization, token)) {
@@ -32,7 +33,7 @@ export function createEvidenceRubricServer(env = process.env, fetchImpl = fetch)
       }
 
       const input = await readJson(request, maxBodyBytes);
-      const verdict = await evaluateRubric(input, { openAIKey, model, fetchImpl });
+      const verdict = await evaluateRubric(input, { geminiKey, model, fetchImpl });
       return sendJson(response, verdict);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -42,74 +43,80 @@ export function createEvidenceRubricServer(env = process.env, fetchImpl = fetch)
   });
 }
 
-export async function evaluateRubric(input, { openAIKey, model = defaultModel, fetchImpl = fetch }) {
-  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+export async function evaluateRubric(input, { geminiKey, model = defaultModel, fetchImpl = fetch }) {
+  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
+  url.searchParams.set("key", geminiKey);
+  const response = await fetchImpl(url.toString(), {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${openAIKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
-      temperature: 0,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "You are SAV-E's evidence rubric evaluator for place source recovery.",
-            "Return only a conservative JSON verdict.",
-            "Do not invent addresses, coordinates, place IDs, or facts not present in the supplied evidence.",
-            "Use corroborated only when cited evidence already includes verified address and coordinates.",
-            "Use likely when source/search/media evidence supports a venue and address but coordinates still need verification.",
-            "Use weak when there are place-bearing clues but insufficient proof for map-ready saving.",
-            "Use source_only when no reliable place evidence is present.",
-          ].join(" "),
-        },
+      contents: [
         {
           role: "user",
-          content: JSON.stringify(input).slice(0, maxBodyBytes),
+          parts: [{
+            text: [
+              "You are SAV-E's evidence rubric evaluator for place source recovery.",
+              "Return only a conservative JSON verdict.",
+              "Do not invent addresses, coordinates, place IDs, or facts not present in the supplied evidence.",
+              "Use corroborated only when cited evidence already includes verified address and coordinates.",
+              "Use likely when source/search/media evidence supports a venue and address but coordinates still need verification.",
+              "Use weak when there are place-bearing clues but insufficient proof for map-ready saving.",
+              "Use source_only when no reliable place evidence is present.",
+              "",
+              "Input projection:",
+              JSON.stringify(input).slice(0, maxBodyBytes),
+            ].join(" "),
+          }],
         },
       ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "save_evidence_rubric_verdict",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["evidence_tier", "confidence_reason", "missing_info"],
-            properties: {
-              evidence_tier: {
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["evidence_tier", "confidence_reason", "missing_info"],
+          properties: {
+            evidence_tier: {
+              type: "string",
+              enum: ["source_only", "weak", "likely", "corroborated"],
+            },
+            confidence_reason: {
+              type: "string",
+              maxLength: 500,
+            },
+            missing_info: {
+              type: "array",
+              maxItems: 12,
+              items: {
                 type: "string",
-                enum: ["source_only", "weak", "likely", "corroborated"],
-              },
-              confidence_reason: {
-                type: "string",
-                maxLength: 500,
-              },
-              missing_info: {
-                type: "array",
-                maxItems: 12,
-                items: {
-                  type: "string",
-                  maxLength: 120,
-                },
+                maxLength: 120,
               },
             },
           },
         },
       },
+      systemInstruction: {
+        parts: [{
+          text: [
+            "You are SAV-E's evidence rubric evaluator for place source recovery.",
+            "Return strict JSON matching the requested schema.",
+            "Never invent facts beyond supplied evidence.",
+          ].join(" "),
+        }],
+      },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI rubric request failed: ${response.status}`);
+    throw new Error(`Gemini rubric request failed: ${response.status}`);
   }
   const body = await response.json();
-  const rawContent = body?.choices?.[0]?.message?.content;
+  const rawContent = body?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof rawContent !== "string") {
-    throw new Error("OpenAI rubric response was missing content");
+    throw new Error("Gemini rubric response was missing content");
   }
   const parsed = JSON.parse(rawContent);
   return normalizeVerdict(parsed);

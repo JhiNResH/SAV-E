@@ -6,8 +6,8 @@ Small Railway service used by `wanderly-api` as `SAVE_EVIDENCE_RUBRIC_URL`.
 
 ```bash
 SAVE_EVIDENCE_RUBRIC_TOKEN=shared_backend_bearer_token
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4.1-mini
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.5-flash
 PORT=3000
 ```
 
