@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes, createHash } from "node:crypto";
 import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg, { type PoolClient } from "pg";
+import { createGuestSession, userIdFromGuestSessionToken } from "./guestSessions.js";
 import {
   buildPublicPlaceCard,
   buildTrustSummary,
@@ -48,6 +49,7 @@ const { Pool } = pg;
 const databaseUrl = requireEnv("DATABASE_URL");
 const privyAppId = requireEnv("PRIVY_APP_ID");
 const privyVerificationKey = requireEnv("PRIVY_VERIFICATION_KEY");
+const guestSessionSecret = process.env.SAVE_GUEST_SESSION_SECRET?.trim() || randomBytes(32).toString("hex");
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -371,6 +373,9 @@ createServer(async (request, response) => {
     }
     if (isV0 && request.method === "GET" && resource === "shared-place-links" && id) {
       return await handleSharedPlaceLinkPublic(response, id);
+    }
+    if (isV0 && request.method === "POST" && resource === "guest-sessions" && !id) {
+      return sendJson(response, createGuestSession(guestSessionSecret), 201);
     }
 
     const userId = await resolveUserId(request);
@@ -2258,13 +2263,14 @@ async function resolveUserId(request: IncomingMessage): Promise<string> {
   const token = header.match(/^Bearer\s+(.+)$/i)?.[1];
   if (token) return verifiedPrivySubject(token);
 
-  const guestId = request.headers["x-save-guest-id"] ?? request.headers["x-wanderly-guest-id"];
-  const normalizedGuestId = Array.isArray(guestId) ? guestId[0] : guestId;
-  if (typeof normalizedGuestId === "string" && /^guest_[0-9a-fA-F-]{36}$/.test(normalizedGuestId)) {
-    return normalizedGuestId;
+  const guestToken = request.headers["x-save-guest-token"] ?? request.headers["x-wanderly-guest-token"];
+  const normalizedGuestToken = Array.isArray(guestToken) ? guestToken[0] : guestToken;
+  if (typeof normalizedGuestToken === "string") {
+    const guestUserId = userIdFromGuestSessionToken(normalizedGuestToken, guestSessionSecret);
+    if (guestUserId) return guestUserId;
   }
 
-  throw new ApiError(401, "Missing bearer token or guest id");
+  throw new ApiError(401, "Missing bearer token or guest session");
 }
 
 async function verifiedPrivySubject(token: string): Promise<string> {
@@ -2430,7 +2436,7 @@ function assembleRecommendationSets(setRows: JsonBody[], itemRows: JsonBody[]): 
 function sendJson(response: ServerResponse, body: unknown, status = 200): void {
   response.writeHead(status, {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, content-type, x-save-guest-id, x-wanderly-guest-id",
+    "Access-Control-Allow-Headers": "authorization, content-type, x-save-guest-token, x-wanderly-guest-token",
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Content-Type": "application/json",
   });

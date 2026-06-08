@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { createPlace, createTrip, fetchPlaces, fetchTrips, hasApiConfig, SaveAuth } from "./src/api";
+import { createGuestSession, createPlace, createTrip, fetchPlaces, fetchTrips, GuestSession, hasApiConfig, SaveAuth } from "./src/api";
 import { parseSharedLink } from "./src/importLink";
 import {
   categoryLabel,
@@ -52,8 +52,7 @@ const allCategories: Array<PlaceCategory | "all"> = [
 
 const storageKey = "@save-rn/bookmarks";
 const legacyStorageKey = "@wanderly-rn/bookmarks";
-const guestIdStorageKey = "@save-rn/guest-id";
-const legacyGuestIdStorageKey = "@wanderly-rn/guest-id";
+const guestSessionStorageKey = "@save-rn/guest-session";
 const seededSamplePlaceIds = new Set(["tartine", "ramen-nagi", "the-interval", "palace-of-fine-arts"]);
 
 export default function App() {
@@ -83,7 +82,7 @@ function SaveApp() {
   const [pendingImport, setPendingImport] = useState<Place | null>(null);
   const [incomingPlace, setIncomingPlace] = useState<SharedPlaceData | null>(null);
   const [incomingTrip, setIncomingTrip] = useState<SharedTripData | null>(null);
-  const [guestId, setGuestId] = useState<string | null>(null);
+  const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -236,20 +235,24 @@ function SaveApp() {
       return { accessToken };
     }
 
-    const resolvedGuestId = await ensureGuestId();
-    return { guestId: resolvedGuestId };
+    const resolvedGuestSession = await ensureGuestSession();
+    return { guestToken: resolvedGuestSession.guestToken };
   }
 
-  async function ensureGuestId(): Promise<string> {
-    if (guestId) return guestId;
+  async function ensureGuestSession(): Promise<GuestSession> {
+    if (guestSession) return guestSession;
 
-    const stored = await readMigratedStorageValue(guestIdStorageKey, legacyGuestIdStorageKey);
-    const nextGuestId = stored && stored.startsWith("guest_") ? stored : createGuestId();
-    if (nextGuestId !== stored) {
-      await AsyncStorage.setItem(guestIdStorageKey, nextGuestId);
+    const stored = await AsyncStorage.getItem(guestSessionStorageKey);
+    const parsed = stored ? parseGuestSession(stored) : null;
+    if (parsed) {
+      setGuestSession(parsed);
+      return parsed;
     }
-    setGuestId(nextGuestId);
-    return nextGuestId;
+
+    const nextGuestSession = await createGuestSession();
+    await AsyncStorage.setItem(guestSessionStorageKey, JSON.stringify(nextGuestSession));
+    setGuestSession(nextGuestSession);
+    return nextGuestSession;
   }
 
   function togglePlace(placeId: string) {
@@ -720,14 +723,25 @@ function removeSeededSamplePlaces(places: Place[]) {
   return places.filter((place) => !seededSamplePlaceIds.has(place.id));
 }
 
-function createGuestId() {
-  const fallback = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === "x" ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-  const uuid = globalThis.crypto?.randomUUID?.() ?? fallback;
-  return `guest_${uuid}`;
+function parseGuestSession(raw: string): GuestSession | null {
+  try {
+    const value = JSON.parse(raw) as Partial<GuestSession>;
+    if (
+      typeof value.guestId === "string" &&
+      typeof value.guestToken === "string" &&
+      typeof value.expiresAt === "string" &&
+      Date.parse(value.expiresAt) > Date.now()
+    ) {
+      return {
+        guestId: value.guestId,
+        guestToken: value.guestToken,
+        expiresAt: value.expiresAt,
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function TabButton({

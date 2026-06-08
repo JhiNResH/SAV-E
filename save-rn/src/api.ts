@@ -6,7 +6,13 @@ const apiBaseUrl =
 
 export type SaveAuth = {
   accessToken?: string;
-  guestId?: string;
+  guestToken?: string;
+};
+
+export type GuestSession = {
+  guestId: string;
+  guestToken: string;
+  expiresAt: string;
 };
 
 type BackendTripStop = {
@@ -69,19 +75,19 @@ function normalizedEnvValue(value?: string): string | undefined {
   return trimmed.replace(/\/+$/, "");
 }
 
-function requestHeaders({ accessToken, guestId }: SaveAuth): HeadersInit {
+function requestHeaders({ accessToken, guestToken }: SaveAuth): HeadersInit {
   const baseHeaders = {
     "Content-Type": "application/json",
   };
 
   if (!accessToken) {
-    if (!guestId) {
+    if (!guestToken) {
       throw new Error("Missing SAV-E auth context");
     }
 
     return {
       ...baseHeaders,
-      "x-save-guest-id": guestId,
+      "x-save-guest-token": guestToken,
     };
   }
 
@@ -114,6 +120,31 @@ async function apiRequest<T>(
   }
 
   return (await response.json()) as T;
+}
+
+export async function createGuestSession(): Promise<GuestSession> {
+  const response = await fetch(`${requireApiBaseUrl()}/v0/guest-sessions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Guest session request failed: ${response.status}`);
+  }
+
+  const body = await response.json() as { guest_id?: unknown; guest_token?: unknown; expires_at?: unknown };
+  if (typeof body.guest_id !== "string" || typeof body.guest_token !== "string" || typeof body.expires_at !== "string") {
+    throw new Error("Guest session response is invalid");
+  }
+
+  return {
+    guestId: body.guest_id,
+    guestToken: body.guest_token,
+    expiresAt: body.expires_at,
+  };
 }
 
 export async function fetchPlaces(auth: SaveAuth): Promise<Place[]> {
