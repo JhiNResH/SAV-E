@@ -243,6 +243,7 @@ final class SupabaseService: SupabaseServiceProtocol {
 
         let body = try Self.jsonBody([
             "workflow_run_id": workflowRunId?.uuidString,
+            "include_media_evidence": true,
         ])
         let data = try await request(
             path: "/memory/captures/\(captureId.uuidString)/search-recovery",
