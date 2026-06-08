@@ -214,12 +214,14 @@ struct AIDrawerView: View {
             },
             onPlanAroundPlace: { place in
                 closeMapDetail()
-                viewModel.showPlanAround(
-                    anchor: place,
-                    reviewCandidates: reviewCandidates,
-                    outputLanguage: languageSettings.language
-                )
                 withAnimation { drawerDetent = .large }
+                Task {
+                    await viewModel.showPlanAround(
+                        anchor: place,
+                        reviewCandidates: reviewCandidates,
+                        outputLanguage: languageSettings.language
+                    )
+                }
             },
             onAddMoreClueCandidate: { candidate in
                 addMoreClue(for: candidate)
@@ -547,14 +549,14 @@ struct AIDrawerView: View {
                             drawerDetent = .height(72)
                         }
                     } onPlanAround: {
-                        viewModel.showPlanAround(
-                            anchor: place,
-                            reviewCandidates: reviewCandidates,
-                            outputLanguage: languageSettings.language
-                        )
                         withAnimation { drawerDetent = .large }
-                    } onUpdateVisibility: { visibility in
-                        try await onUpdatePlaceVisibility(place, visibility)
+                        Task {
+                            await viewModel.showPlanAround(
+                                anchor: place,
+                                reviewCandidates: reviewCandidates,
+                                outputLanguage: languageSettings.language
+                            )
+                        }
                     }
 
                     AddToListPanel(
@@ -2311,19 +2313,11 @@ private struct SavedMapDetailDrawerContent: View {
 
             PlaceBasicInfoPanel(place: detailPlace)
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
-            PlaceVisibilityControl(
-                visibility: detailPlace.effectiveVisibility,
-                onChange: onUpdateVisibility
-            )
             if isEditingPlace {
                 placeEditor
             }
 
             HStack(spacing: 8) {
-                Button(action: onRecommendOrder) {
-                    PlaceDetailActionLabel(title: languageSettings.localized(english: "Order?", traditionalChinese: "點餐？"), systemImage: "fork.knife", fill: .saveHoney.opacity(0.78))
-                }
-
                 Button(action: onPlanAroundPlace) {
                     PlaceDetailActionLabel(title: languageSettings.localized(english: "Plan", traditionalChinese: "規劃"), systemImage: "point.topleft.down.curvedto.point.bottomright.up", fill: Color.saveSignal.opacity(0.56))
                 }

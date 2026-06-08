@@ -2,6 +2,42 @@ import XCTest
 @testable import SAVE
 
 final class DeterministicTripPlannerTests: XCTestCase {
+    func testSpecificAnchorPlanningStillPullsNearbySavedMapStamps() throws {
+        let anchor = makePlace(
+            "一號地鍋雞",
+            address: "台北市大安區忠孝東路四段",
+            latitude: 25.0419,
+            longitude: 121.5452,
+            category: .food
+        )
+        let dessert = makePlace(
+            "附近甜點店",
+            address: "台北市大安區延吉街",
+            latitude: 25.0423,
+            longitude: 121.5460,
+            category: .cafe
+        )
+        let farAway = makePlace(
+            "高雄咖啡",
+            address: "高雄市前鎮區",
+            latitude: 22.6040,
+            longitude: 120.3020,
+            category: .cafe
+        )
+
+        let response = try XCTUnwrap(DeterministicTripPlanner().plan(
+            for: "幫我用一號地鍋雞附近的已存地點規劃半日行程",
+            places: [farAway, dessert, anchor],
+            outputLanguage: .traditionalChinese
+        ))
+
+        XCTAssertEqual(response.componentType, .tripItinerary)
+        XCTAssertTrue(response.placeIds.contains(anchor.id.uuidString))
+        XCTAssertTrue(response.placeIds.contains(dessert.id.uuidString))
+        XCTAssertFalse(response.placeIds.contains(farAway.id.uuidString), "Far-away place should be excluded by 25km threshold")
+        XCTAssertEqual(response.placeIds.count, 2, "Should only include anchor and nearby dessert")
+    }
+
     func testPlannerGroupsRequestedDaysAndOrdersStopsByDistance() throws {
         let places = [
             makePlace("Santa Monica Pier", address: "Santa Monica, Los Angeles, CA", latitude: 34.0100, longitude: -118.4960, category: .attraction),

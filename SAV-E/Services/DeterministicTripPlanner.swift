@@ -193,6 +193,8 @@ struct ItineraryConstraintPlanner {
 }
 
 struct DeterministicTripPlanner {
+    private static let nearbyAnchorDistanceThresholdMeters: CLLocationDistance = 25_000
+
     private struct Candidate {
         let place: Place
         let score: Int
@@ -256,7 +258,7 @@ struct DeterministicTripPlanner {
         let keywords = [
             "plan", "itinerary", "trip", "route", "schedule", "organize",
             "weekend", "行程", "規劃", "规划", "旅程", "路線", "路线", "安排",
-            "怎麼排", "怎么排"
+            "怎麼排", "怎么排", "half day", "half-day", "半日", "半天"
         ]
         return keywords.contains { normalized.contains($0) }
     }
@@ -322,8 +324,17 @@ struct DeterministicTripPlanner {
         if positive.isEmpty, hasSpecificPlanningConstraint(message) {
             return []
         }
-        let source = positive.isEmpty ? candidates : positive
         let maxStops = max(3, days * maxStopsPerDay)
+
+        if !positive.isEmpty {
+            return savedMemoryPlanAnchoredByPositiveMatches(
+                positive: positive,
+                allCandidates: candidates,
+                maxStops: maxStops
+            )
+        }
+
+        let source = candidates
 
         return source
             .sorted { lhs, rhs in
@@ -332,6 +343,32 @@ struct DeterministicTripPlanner {
             }
             .prefix(maxStops)
             .map(\.place)
+    }
+
+    private func savedMemoryPlanAnchoredByPositiveMatches(
+        positive: [Candidate],
+        allCandidates: [Candidate],
+        maxStops: Int
+    ) -> [Place] {
+        let anchors = positive
+            .sorted { lhs, rhs in
+                if lhs.score != rhs.score { return lhs.score > rhs.score }
+                return lhs.place.createdAt > rhs.place.createdAt
+            }
+        guard let primaryAnchor = anchors.first?.place else { return [] }
+
+        let anchorIDs = Set(anchors.map(\.place.id))
+        let nearbySaved = allCandidates
+            .filter { !anchorIDs.contains($0.place.id) }
+            .filter { distance(from: primaryAnchor, to: $0.place) <= Self.nearbyAnchorDistanceThresholdMeters }
+            .sorted { lhs, rhs in
+                let leftDistance = distance(from: primaryAnchor, to: lhs.place)
+                let rightDistance = distance(from: primaryAnchor, to: rhs.place)
+                if leftDistance != rightDistance { return leftDistance < rightDistance }
+                return lhs.place.createdAt > rhs.place.createdAt
+            }
+
+        return Array((anchors + nearbySaved).prefix(maxStops).map(\.place))
     }
 
     private func hasSpecificPlanningConstraint(_ message: String) -> Bool {
@@ -343,6 +380,11 @@ struct DeterministicTripPlanner {
         let searchable = normalize("\(place.name) \(place.address) \(place.category.rawValue) \(place.category.displayName)")
         let tokens = tokens(from: normalized)
         var score = 0
+
+        let normalizedName = normalize(place.name)
+        if !normalizedName.isEmpty, normalized.contains(normalizedName) {
+            score += 8
+        }
 
         for token in tokens where searchable.contains(token) {
             score += place.name.lowercased().contains(token) ? 5 : 3

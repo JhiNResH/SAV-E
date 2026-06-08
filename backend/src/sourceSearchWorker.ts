@@ -92,6 +92,14 @@ export function buildSourceRecoveryQueries(input: SourceSearchInput): string[] {
   const url = sourceUrl ? safeURL(sourceUrl) : undefined;
   const reelId = instagramReelID(url);
   const rawText = cleanText([input.title, input.rawText].filter(Boolean).join(" "));
+  const handle = firstSocialHandle(rawText);
+  const cityVenue = cityQualifiedVenueClue(rawText);
+
+  if (cityVenue) {
+    queries.push(`${cityVenue.name} ${cityVenue.city} 地址`);
+    if (handle) queries.push(`${handle} ${cityVenue.name}`);
+    queries.push(`${cityVenue.name} 官方 餐廳 訂位`);
+  }
 
   if (reelId) {
     queries.push(`instagram reel ${reelId} place`);
@@ -100,7 +108,6 @@ export function buildSourceRecoveryQueries(input: SourceSearchInput): string[] {
     queries.push(`${url.host} ${url.pathname.split("/").filter(Boolean).at(-1) ?? ""} place`.trim());
   }
 
-  const handle = firstSocialHandle(rawText);
   if (handle) queries.push(`@${handle} address`);
 
   if (rawText) queries.push(`"${rawText.slice(0, 80)}" place`);
@@ -344,9 +351,10 @@ function isReviewableSearchResult(result: SourceSearchResult): boolean {
 function candidateNameFromResult(result: SourceSearchResult): string | undefined {
   let title = cleanText(result.title)
     .replace(/\s+[@#][A-Za-z0-9._-]{3,30}\b/g, "")
-    .replace(/\s+\|\s+.*$/g, "")
+    .replace(/\s*[|｜]\s*.*$/g, "")
     .replace(/\s+[–-]\s+(?:Google Maps|Yelp|Tripadvisor|OpenTable|Instagram|Facebook|TikTok).*$/gi, "")
     .replace(/\s+[–-]\s+Official(?:\s+Site)?$/gi, "")
+    .replace(/[–—-][^-–—|｜]{2,40}$/g, "")
     .replace(/\s*•\s*Instagram.*$/gi, "")
     .replace(/\s+on Instagram.*$/gi, "")
     .trim();
@@ -419,7 +427,7 @@ const blockedOfficialHosts = new Set([
 function addressFromText(text: string): string | undefined {
   const patterns = [
     /\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy)\b(?:,\s*[A-Za-z .'-]{2,40})?/i,
-    /[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?/,
+    /[\u4e00-\u9fff]{2,}(?:市|区|區|路|街|道)[\u4e00-\u9fffA-Za-z0-9\-－\s]{0,40}\d{1,6}\s*(?:号|號)?(?:B\d|[0-9一二三四五六七八九十]+樓)?/,
   ];
   return patterns.map((pattern) => text.match(pattern)?.[0]?.trim()).find(Boolean);
 }
@@ -446,6 +454,24 @@ function firstSocialHandle(text: string): string | undefined {
     if (!ignored.has(handle) && !handle.includes("instagram") && !/\d{5,}/.test(handle)) return handle;
   }
   return undefined;
+}
+
+function cityQualifiedVenueClue(text: string): { city: string; name: string } | undefined {
+  const genericNames = new Set(["那間店", "那家店", "這間店", "这间店", "這家店", "这家店", "那個地方", "那个地方"]);
+  const match = text.match(/(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的([^\n\r，,。！!？?@#]{2,24})/);
+  if (!match) return undefined;
+  const city = normalizeTaiwanCity(match[1]);
+  const name = cleanText(match[2]).replace(/[「」『』"']/g, "").trim();
+  if (!name || genericNames.has(name) || looksLikeAddress(name)) return undefined;
+  if (!isUsableCandidateName(name)) return undefined;
+  return { city, name };
+}
+
+function normalizeTaiwanCity(city: string): string {
+  if (city === "臺南") return "台南";
+  if (city === "臺北") return "台北";
+  if (city === "臺中") return "台中";
+  return city;
 }
 
 function duckDuckGoHTMLURL(query: string): string {

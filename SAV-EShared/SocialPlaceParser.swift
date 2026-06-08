@@ -2086,7 +2086,8 @@ struct SocialPlaceParser {
             #"\b(?:favorite|favourite|best|top|must try|must-try|iconic|hidden gem|hidden gems)[^.\n]{0,80}\b(?:restaurants?|food spots?|dinner spots?|brunch spots?|places to eat)\b"#,
             #"\b(?:where to eat|wheretoeat|places to eat|food spots?|dinner spots?|brunch spots?)\b"#,
             #"\b(?:restaurants?|food spots?|places to eat)\s+in\s+(?:la|los angeles|oc|orange county|tokyo|taipei|seoul|paris|london|new york|[a-z][a-z .'-]{2,60})\b"#,
-            #"(?:台南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)?[^\n\r]{0,20}(?:推薦|必吃|想衝去吃|吃什麼)[^\n\r]{0,40}(?:刨冰|剉冰|冰品|冰店|芒果冰|粉粿冰|八寶冰|布丁冰|小吃|美食|餐廳|餐厅)"#,
+            #"(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)?[^\n\r]{0,20}(?:推薦|必吃|想衝去吃|吃什麼)[^\n\r]{0,40}(?:刨冰|剉冰|冰品|冰店|芒果冰|粉粿冰|八寶冰|布丁冰|小吃|美食|餐廳|餐厅)"#,
+            #"(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?]{2,24}[\s\S]{0,80}(?:鴨|鸭|烤鴨|烤鸭|餐廳|餐厅|美食|小吃|聚餐|吃|訂位|订位)"#,
             #"(?:士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲|台北|臺北)[📍\s·・:：-]{0,4}[^\n\r]{0,50}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食)"#,
             #"(?:刨冰|剉冰|冰品|冰店|芒果冰|粉粿冰|八寶冰|布丁冰|小吃|美食)[^\n\r]{0,30}(?:推薦|必吃|店)"#
         ]
@@ -2162,7 +2163,8 @@ struct SocialPlaceParser {
             #"(?i)\b((?:favorite|favourite|best|top|must-try|must try|iconic|hidden gems?|where to eat)[^.\n\r]{0,90})"#,
             #"(?i)\b((?:restaurants?|cafes?|coffee shops?|hotels?|resorts?|things to do|places to visit)\s+in\s+(?:LA|Los Angeles|OC|Orange County|Tokyo|Taipei|Seoul|Paris|London|New York|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"((?:士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)[^\n\r]{0,60}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食))"#,
-            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)[^\n\r]{0,30}(?:推薦|必吃|吃什麼|冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅))"#,
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?@#]{2,24})"#,
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園|東京|大阪|首爾|서울)[^\n\r]{0,30}(?:推薦|必吃|吃什麼|冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅))"#,
             #"((?:推薦|精選|必吃|必去|收藏)\s*(?:\d{1,2}|[０-９]{1,2}|[一二三四五六七八九十]{1,3})\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店))"#
         ]
         for pattern in patterns {
@@ -2185,7 +2187,8 @@ struct SocialPlaceParser {
             #"(洛杉[矶磯]美食)"#,
             #"(?i)\b(?:the\s+)?(coffee shops?\s+in\s+Los Angeles County)\b"#,
             #"((?:推薦|精選|必吃|必去|收藏)\s*(?:\d{1,2}|[０-９]{1,2}|[一二三四五六七八九十]{1,3})\s*(?:間|家|個)?\s*(?:冰店|冰品|剉冰|刨冰|甜點|甜品|咖啡|咖啡廳|餐廳|餐厅|小吃|美食|店))"#,
-            #"((?:台南|台北|臺北|台中|臺中|高雄|新北|桃園)[^\n\r]{0,20}(?:冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅|甜點|甜品|咖啡廳))"#,
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?@#]{2,24})"#,
+            #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)[^\n\r]{0,20}(?:冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅|甜點|甜品|咖啡廳))"#,
             #"(?i)\b(?:favorite|favourite|best|top|must-try|must try|hidden gems?)?[^\n\r]{0,30}\b((?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?)\s+in\s+(?:LA|OC|[A-Z][A-Za-z .'-]{2,60}))\b"#,
             #"(?i)\b((?:LA|Los Angeles|Orange County|OC|Tokyo|Taipei|Seoul|Paris|London|New York)\s+(?:coffee shops?|restaurants?|cafes?|bars?|bakeries|dessert shops?))\b"#
         ]
@@ -2213,6 +2216,7 @@ struct SocialPlaceParser {
             #"(?i)\bOC\b"#,
             #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#,
             #"(士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)(?=[📍\s·・:：-]{0,4}[^\n\r]{0,40}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食|咖啡|甜點|甜品|小吃))"#,
+            #"(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)(?=的(?!(?:那間店|那家店|這間店|这间店|這家店|这家店|那個地方|那个地方))[^\n\r，,。！!？?@#]{2,24})"#,
             #"(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)(?=[^\n\r]{0,12}(?:冰店|冰品|剉冰|刨冰|小吃|美食|餐廳|餐厅|甜點|甜品|咖啡廳|推薦|必吃|吃什麼))"#,
             #"#(台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)(?:小吃|美食|冰品|冰店|甜點|甜品)?"#
         ]
