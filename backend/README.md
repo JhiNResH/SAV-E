@@ -13,6 +13,7 @@ PORT=3000
 GOOGLE_PLACES_API_KEY=...
 SAVE_ENABLE_SERVER_KEYFRAME_EXTRACTION=false
 SAVE_ENABLE_SERVER_OCR=false
+SAVE_SERVER_OCR_COMMAND=tesseract
 SAVE_ENABLE_SERVER_ASR=false
 SAVE_SERVER_ASR_COMMAND=whisper
 SAVE_SERVER_ASR_MODEL=base
@@ -29,6 +30,7 @@ Source recovery can run with metadata and public search only. Set `GOOGLE_PLACES
 ```bash
 npm install
 npm run build
+npm run check:source-recovery
 npm run start
 ```
 
@@ -37,6 +39,17 @@ Apply schema:
 ```bash
 psql "$DATABASE_URL" -f backend/sql/schema.sql
 ```
+
+Production source recovery readiness:
+
+```bash
+cd backend
+npm run build
+npm run check:source-recovery
+curl "$RAILWAY_PUBLIC_DOMAIN/health/source-recovery"
+```
+
+`npm start` runs `check:source-recovery` before boot. The check stays green when OCR, ASR, and external rubric are disabled. It fails when an enabled OCR/ASR adapter is missing its executable or when `SAVE_EVIDENCE_RUBRIC_URL` is not an HTTPS public URL. Railway also uses `/health/source-recovery` as the deployment healthcheck, so source-recovery adapter misconfiguration blocks rollout instead of silently falling back in production.
 
 ## Routes
 
