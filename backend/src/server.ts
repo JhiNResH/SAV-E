@@ -3,6 +3,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import pg, { type PoolClient } from "pg";
 import {
+  buildMaatPlaceAnalysis,
   buildPublicPlaceCard,
   buildTrustSummary,
   formatPlaceClaim,
@@ -388,6 +389,9 @@ createServer(async (request, response) => {
     if (isV0 && resource === "places" && id && segments[2] === "verified-claims") {
       return await handlePlaceVerifiedClaims(request, response, id, url, userId);
     }
+    if (isV0 && resource === "places" && id && segments[2] === "maat-analysis") {
+      return await handlePlaceMaatAnalysis(request, response, id, url, userId);
+    }
     if (isV0 && resource === "places" && id && segments[2] === "trust-summary") {
       return await handlePlaceTrustSummary(request, response, id, userId);
     }
@@ -636,6 +640,26 @@ async function handlePlaceVerifiedClaims(
   }
 
   return sendJson(response, { error: "Unsupported verified claims route" }, 405);
+}
+
+async function handlePlaceMaatAnalysis(
+  request: IncomingMessage,
+  response: ServerResponse,
+  placeId: string,
+  url: URL,
+  userId: string,
+): Promise<void> {
+  if (request.method !== "GET") return sendJson(response, { error: "Unsupported maat analysis route" }, 405);
+
+  const place = await ownedPlaceForAnalysis(placeId, userId);
+  const claims = await placeClaimsForPlace(placeId, userId);
+  const includePrivateEvidence = url.searchParams.get("includePrivateEvidence") === "true" ||
+    url.searchParams.get("include_private_evidence") === "true";
+  const maxCitedClaims = Number(url.searchParams.get("maxCitedClaims") ?? url.searchParams.get("max_cited_claims") ?? 3);
+  return sendJson(response, buildMaatPlaceAnalysis(place, claims.map((claim) => formatDates(claim)), {
+    includePrivateEvidence,
+    maxCitedClaims,
+  }));
 }
 
 async function handlePlaceTrustSummary(
@@ -2014,6 +2038,17 @@ async function ensureCandidateOwner(candidateId: string, userId: string): Promis
     [candidateId, userId],
   );
   if (!rows[0]) throw new ApiError(404, "Candidate not found");
+}
+
+async function ownedPlaceForAnalysis(placeId: unknown, userId: string): Promise<JsonBody> {
+  if (typeof placeId !== "string") throw new ApiError(400, "place_id must be a string");
+
+  const { rows } = await pool.query(
+    "select * from places where id = $1 and user_id = $2 limit 1",
+    [placeId, userId],
+  );
+  if (!rows[0]) throw new ApiError(404, "Place not found");
+  return asObject(rows[0]);
 }
 
 async function ensureOwnedPlaceReference(placeId: unknown, userId: string): Promise<void> {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildMaatPlaceAnalysis,
   buildPublicPlaceCard,
   buildTrustSummary,
   formatPlaceClaim,
@@ -217,6 +218,63 @@ test("normalizeUsageReceiptCreate bounds action and outcome", () => {
       outcome: "unknown",
     },
   );
+});
+
+test("buildMaatPlaceAnalysis scopes analysis to selected place evidence and excludes private claims by default", () => {
+  const output = buildMaatPlaceAnalysis(
+    {
+      id: "place_1",
+      name: "Spicy Date Noodles",
+      address: "100 Taipei Rd",
+      note: "Saved for casual dates; try the spicy noodles.",
+      source_url: "https://www.instagram.com/reel/example/",
+      google_rating: 4.6,
+    },
+    [
+      {
+        id: "claim_public",
+        claim_type: "good_for_date",
+        claim: "Great casual date dinner with spicy noodles.",
+        agent_usable_summary: "date dinner spicy noodles",
+        proof_level: "visited_self_reported",
+        confidence: 0.82,
+        visibility: "public",
+        evidence_refs: ["source_123"],
+      },
+      {
+        id: "claim_private",
+        claim_type: "private_note",
+        claim: "Private exact companion note.",
+        agent_usable_summary: "private companion detail",
+        proof_level: "receipt_backed",
+        confidence: 0.95,
+        visibility: "private",
+        evidence_refs: ["receipt_private"],
+      },
+    ],
+  );
+
+  assert.equal(output.capability, "maat_place_analysis_v0");
+  assert.equal(output.status, "ready");
+  assert.equal(output.verdict, "usable_with_caveats");
+  assert.deepEqual(output.cited_claim_ids, ["claim_public"]);
+  assert.match(String(output.summary), /date dinner spicy noodles/);
+  assert.deepEqual(output.warnings, ["private_claims_excluded"]);
+  const receipt = output.analysis_receipt as Record<string, unknown>;
+  assert.equal(receipt.input_scope, "selected_place_only");
+  assert.equal(receipt.whole_map_used, false);
+  assert.equal(receipt.raw_private_evidence_included, false);
+  assert.equal(receipt.model_used, false);
+});
+
+test("buildMaatPlaceAnalysis refuses to invent analysis for thin source-only places", () => {
+  const output = buildMaatPlaceAnalysis({ id: "place_thin", name: "Mystery Reel Spot" }, []);
+
+  assert.equal(output.status, "not_enough_evidence");
+  assert.equal(output.verdict, "insufficient_evidence");
+  assert.deepEqual(output.cited_claim_ids, []);
+  assert.deepEqual(output.next_actions, ["add_note", "confirm_place", "attach_source_or_receipt"]);
+  assert.deepEqual(output.warnings, ["thin_place_evidence", "no_verified_claims_cited"]);
 });
 
 test("recommendPlacesByClaims uses usage receipts as a small reputation boost", () => {
