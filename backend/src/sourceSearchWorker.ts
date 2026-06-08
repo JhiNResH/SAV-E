@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -71,6 +73,7 @@ type FetchMediaEvidence = (metadata: SourceMetadata) => Promise<SourceMediaEvide
 
 const defaultMaxQueries = 4;
 const maxResultsPerQuery = 5;
+const maxTextFetchBytes = 1_000_000;
 
 export async function runSourceSearchRecovery(
   input: SourceSearchInput,
@@ -514,18 +517,23 @@ function duckDuckGoHTMLURL(query: string): string {
 }
 
 async function defaultFetchText(url: string): Promise<string> {
+  const parsed = safeURL(url);
+  if (!parsed || !(await isSafePublicHTTPURL(parsed))) throw new Error("Blocked non-public URL");
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
-    const response = await fetch(url, {
+    const response = await fetch(parsed.toString(), {
       headers: {
         "User-Agent": "SAV-E source recovery worker/1.0",
         "Accept": "text/html,application/xhtml+xml",
       },
+      redirect: "manual",
       signal: controller.signal,
     });
+    if (isRedirectResponse(response)) throw new Error("Blocked redirect response");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.text();
+    return await boundedResponseText(response, maxTextFetchBytes);
   } finally {
     clearTimeout(timeout);
   }
@@ -538,7 +546,7 @@ async function fetchSourceMetadata(
 ): Promise<SourceMetadata | undefined> {
   const source = sourceUrl?.trim();
   const url = source ? safeURL(source) : undefined;
-  if (!url || !["http:", "https:"].includes(url.protocol)) return undefined;
+  if (!url || !isSafePublicHTTPURLByHostname(url)) return undefined;
 
   try {
     const html = await fetchText(url.toString());
@@ -643,7 +651,7 @@ async function defaultFetchMediaEvidence(metadata: SourceMetadata): Promise<Sour
 
 async function fetchBoundedMedia(url: string, maxBytes: number): Promise<{ data: Uint8Array; contentType?: string } | undefined> {
   const parsed = safeURL(url);
-  if (!parsed || !isSafePublicHTTPURL(parsed)) return undefined;
+  if (!parsed || !(await isSafePublicHTTPURL(parsed))) return undefined;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -653,8 +661,10 @@ async function fetchBoundedMedia(url: string, maxBytes: number): Promise<{ data:
         "User-Agent": "SAV-E source recovery media fetcher/1.0",
         "Accept": "image/avif,image/webp,image/apng,image/*,video/*,*/*;q=0.8",
       },
+      redirect: "manual",
       signal: controller.signal,
     });
+    if (isRedirectResponse(response)) return undefined;
     if (!response.ok) return undefined;
     const length = Number(response.headers.get("content-length") ?? "0");
     if (length > maxBytes) return undefined;
@@ -707,14 +717,80 @@ async function extractFirstKeyframe(videoData: Uint8Array, sourceUrl: string): P
 function safePublicMediaURL(value: string | undefined, baseURL: URL | undefined): string | undefined {
   if (!value) return undefined;
   const url = safeURL(baseURL ? new URL(value, baseURL).toString() : value);
-  return url && isSafePublicHTTPURL(url) ? url.toString() : undefined;
+  return url && isSafePublicHTTPURLByHostname(url) ? url.toString() : undefined;
 }
 
-function isSafePublicHTTPURL(url: URL): boolean {
+async function isSafePublicHTTPURL(url: URL): Promise<boolean> {
+  if (!isSafePublicHTTPURLByHostname(url)) return false;
+  const host = normalizedHostname(url);
+  if (isIP(host)) return !isPrivateIPAddress(host);
+  try {
+    const addresses = await lookup(host, { all: true, verbatim: true });
+    return addresses.length > 0 && addresses.every((address) => !isPrivateIPAddress(address.address));
+  } catch {
+    return false;
+  }
+}
+
+function isSafePublicHTTPURLByHostname(url: URL): boolean {
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  const host = url.hostname.toLowerCase();
-  if (!host || host === "localhost" || host.endsWith(".localhost") || host === "0.0.0.0" || host === "::1") return false;
-  return ![/^127\./, /^10\./, /^192\.168\./, /^169\.254\./, /^172\.(1[6-9]|2[0-9]|3[0-1])\./].some((pattern) => pattern.test(host));
+  const host = normalizedHostname(url);
+  if (!host || host === "localhost" || host.endsWith(".localhost")) return false;
+  if (isIP(host)) return !isPrivateIPAddress(host);
+  return true;
+}
+
+function normalizedHostname(url: URL): string {
+  return url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+}
+
+function isPrivateIPAddress(host: string): boolean {
+  if (host === "0.0.0.0" || host === "::" || host === "::1") return true;
+  if (host.includes(":")) {
+    const value = host.toLowerCase();
+    return value === "::1" || value.startsWith("fc") || value.startsWith("fd") || value.startsWith("fe80:");
+  }
+  return [
+    /^127\./,
+    /^10\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./,
+    /^198\.(1[8-9])\./,
+  ].some((pattern) => pattern.test(host));
+}
+
+function isRedirectResponse(response: Response): boolean {
+  return response.status >= 300 && response.status < 400;
+}
+
+async function boundedResponseText(response: Response, maxBytes: number): Promise<string> {
+  const length = Number(response.headers.get("content-length") ?? "0");
+  if (length > maxBytes) throw new Error("Response too large");
+  if (!response.body) return "";
+
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  const reader = response.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > maxBytes) {
+      await reader.cancel();
+      throw new Error("Response too large");
+    }
+    chunks.push(value);
+  }
+
+  const data = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(data);
 }
 
 function sha256(data: Uint8Array): string {
