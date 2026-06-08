@@ -41,6 +41,7 @@ import {
   RecommendationAnalysisReceiptPayloadError,
   recommendationAnalysisReceiptPayloadMaxBytes,
 } from "./receiptEnvelope.js";
+import { readSourceRecoveryConfigStatus } from "./sourceRecoveryConfig.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -357,6 +358,10 @@ createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     if (request.method === "GET" && url.pathname === "/") {
       return sendJson(response, { ok: true, service: "save-backend" });
+    }
+    if (request.method === "GET" && url.pathname === "/health/source-recovery") {
+      const status = await readSourceRecoveryConfigStatus();
+      return sendJson(response, status, status.ready ? 200 : 503);
     }
 
     const rawSegments = url.pathname.split("/").filter(Boolean);

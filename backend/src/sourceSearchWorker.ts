@@ -1092,7 +1092,8 @@ async function extractFirstKeyframe(videoData: Uint8Array, sourceUrl: string): P
 async function extractOCRText(imagePath: string): Promise<string | undefined> {
   if (process.env.SAVE_ENABLE_SERVER_OCR !== "true") return undefined;
   try {
-    const { stdout } = await execFileAsync("tesseract", [imagePath, "stdout"], {
+    const command = process.env.SAVE_SERVER_OCR_COMMAND?.trim() || "tesseract";
+    const { stdout } = await execFileAsync(command, [imagePath, "stdout"], {
       timeout: 10_000,
       maxBuffer: 500_000,
     });

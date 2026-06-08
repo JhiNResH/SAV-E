@@ -5,7 +5,7 @@
   },
   "deploy": {
     "startCommand": "npm run start",
-    "healthcheckPath": "/",
+    "healthcheckPath": "/health/source-recovery",
     "healthcheckTimeout": 300
   }
 }
