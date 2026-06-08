@@ -35,7 +35,7 @@ private final class StubPublicSourceSearchService: PublicSourceSearchServiceProt
                 )
             ]
         }
-        if query.contains("DHiddenOCR") || query.contains("推薦４間冰店") || query.contains("台北 冰店") {
+        if query.contains("推薦４間冰店") || query.contains("清水茶香") {
             return [
                 PublicSourceSearchResult(
                     title: "清水茶香｜台北冰店推薦",
@@ -627,8 +627,8 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(result.candidate.candidateName, "清水茶香 台北復興店")
         XCTAssertEqual(result.candidate.address, "台北市大安區復興南路一段100號")
         XCTAssertEqual(result.candidate.reviewState, "map_match_ready")
-        XCTAssertTrue(result.searchQueries.contains { $0.contains("DHiddenOCR") })
-        XCTAssertTrue(search.queries.contains { $0.contains("推薦４間冰店") || $0.contains("台北") })
+        XCTAssertTrue(result.searchQueries.contains { $0.contains("推薦４間冰店") || $0.contains("清水茶香") })
+        XCTAssertTrue(search.queries.contains { $0.contains("推薦４間冰店") || $0.contains("清水茶香") })
         XCTAssertTrue(places.queries.contains { $0.contains("清水茶香") })
         XCTAssertTrue(result.evidence.contains { $0.contains("清水茶香") })
         XCTAssertTrue(result.candidate.evidenceDiagnostic?.attempts.contains { $0.contains("public metadata/caption/OCR") } == true)

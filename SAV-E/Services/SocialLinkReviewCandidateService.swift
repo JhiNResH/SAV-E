@@ -158,6 +158,7 @@ final class SocialLinkReviewCandidateService {
 
     private let placeResolverService: PlaceResolverServiceProtocol
     private let publicSourceSearchService: PublicSourceSearchServiceProtocol
+    private let thumbnailImageByteLimit = 6_000_000
 
     init(
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
@@ -847,12 +848,8 @@ final class SocialLinkReviewCandidateService {
             request.timeoutInterval = 8
             request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
             request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  data.count <= 6_000_000 else {
-                return []
-            }
+            let fetcher = SafeThumbnailDataFetcher(maxBytes: thumbnailImageByteLimit, isSafeURL: isSafePublicHTTPURL)
+            let (data, _) = try await fetcher.fetch(request)
             return await recognizedThumbnailTextLines(from: data)
         } catch {
             return []
@@ -875,6 +872,126 @@ final class SocialLinkReviewCandidateService {
         ]
         return !privateIPv4Patterns.contains { pattern in
             host.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    private final class SafeThumbnailDataFetcher: NSObject, URLSessionDataDelegate {
+        private enum FetchError: Error {
+            case invalidResponse
+            case unsafeRedirect
+            case tooLarge
+        }
+
+        private let maxBytes: Int
+        private let isSafeURL: (URL) -> Bool
+        private let lock = NSLock()
+        private var data = Data()
+        private var response: HTTPURLResponse?
+        private var continuation: CheckedContinuation<(Data, HTTPURLResponse), Error>?
+        private var didFinish = false
+        private lazy var session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+
+        init(maxBytes: Int, isSafeURL: @escaping (URL) -> Bool) {
+            self.maxBytes = maxBytes
+            self.isSafeURL = isSafeURL
+        }
+
+        func fetch(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                self.continuation = continuation
+                lock.unlock()
+
+                session.dataTask(with: request).resume()
+            }
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            willPerformHTTPRedirection response: HTTPURLResponse,
+            newRequest request: URLRequest,
+            completionHandler: @escaping (URLRequest?) -> Void
+        ) {
+            guard let url = request.url, isSafeURL(url) else {
+                completionHandler(nil)
+                task.cancel()
+                finish(.failure(FetchError.unsafeRedirect))
+                return
+            }
+            completionHandler(request)
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            dataTask: URLSessionDataTask,
+            didReceive response: URLResponse,
+            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+        ) {
+            guard let http = response as? HTTPURLResponse,
+                  let finalURL = http.url,
+                  isSafeURL(finalURL),
+                  (200..<300).contains(http.statusCode) else {
+                completionHandler(.cancel)
+                finish(.failure(FetchError.invalidResponse))
+                return
+            }
+
+            if response.expectedContentLength > Int64(maxBytes) {
+                completionHandler(.cancel)
+                finish(.failure(FetchError.tooLarge))
+                return
+            }
+
+            lock.lock()
+            self.response = http
+            lock.unlock()
+            completionHandler(.allow)
+        }
+
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            lock.lock()
+            self.data.append(data)
+            let isTooLarge = self.data.count > maxBytes
+            lock.unlock()
+
+            if isTooLarge {
+                dataTask.cancel()
+                finish(.failure(FetchError.tooLarge))
+            }
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+            if let error {
+                finish(.failure(error))
+                return
+            }
+
+            lock.lock()
+            let data = self.data
+            let response = self.response
+            lock.unlock()
+
+            guard let response else {
+                finish(.failure(FetchError.invalidResponse))
+                return
+            }
+            finish(.success((data, response)))
+        }
+
+        private func finish(_ result: Result<(Data, HTTPURLResponse), Error>) {
+            lock.lock()
+            guard !didFinish else {
+                lock.unlock()
+                return
+            }
+            didFinish = true
+            let continuation = self.continuation
+            self.continuation = nil
+            lock.unlock()
+
+            session.invalidateAndCancel()
+            continuation?.resume(with: result)
         }
     }
 
