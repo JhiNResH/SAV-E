@@ -144,6 +144,45 @@ final class SavePlanAroundControllerTests: XCTestCase {
         XCTAssertTrue(draft.newSuggestions.first?.reason.contains("Public filler") == true)
     }
 
+    func testBalancedPlanReservesPublicActivityWhenSavedPlacesAreAllFood() throws {
+        let searchController = SaveSearchController()
+        let planController = SavePlanAroundController()
+        let anchor = place(name: "永樂牛肉湯", address: "台灣臺南市中西區民族路三段", category: .food, latitude: 22.9972, longitude: 120.2019)
+        let savedPlaces = [
+            anchor,
+            place(name: "井賀鍋物", address: "台灣臺南市北區海安路三段", category: .food, latitude: 23.0020, longitude: 120.2050),
+            place(name: "丹丹漢堡", address: "台灣臺南市中西區成功路", category: .food, latitude: 22.9990, longitude: 120.2040),
+            place(name: "邱家小卷米粉", address: "台灣臺南市中西區國華街", category: .food, latitude: 22.9955, longitude: 120.1975),
+            place(name: "夏慕尼", address: "台灣臺南市北區西門路", category: .food, latitude: 23.0060, longitude: 120.2030)
+        ]
+        let response = searchController.search(query: "", places: savedPlaces, localRecords: [])
+        let anchorResult = try XCTUnwrap(response.fromYourSave.results.first { $0.title == "永樂牛肉湯" })
+
+        let result = planController.planAround(
+            anchor: anchorResult,
+            savedResults: response.fromYourSave.results,
+            mapCandidates: [
+                SaveMapCandidate(
+                    title: "赤崁樓",
+                    subtitle: "台南 · 古蹟",
+                    latitude: 22.9975,
+                    longitude: 120.2025,
+                    category: .attraction,
+                    evidence: ["Public map candidate"]
+                )
+            ],
+            request: SavePlanAroundRequest(anchorResultID: anchorResult.id, duration: .halfDay, intent: .balanced)
+        )
+
+        guard case .draft(let draft) = result else {
+            return XCTFail("Expected balanced routeable draft")
+        }
+
+        XCTAssertEqual(draft.routeStops.count, SavePlanDuration.halfDay.maxStops)
+        XCTAssertTrue(draft.routeStops.map(\.title).contains("赤崁樓"))
+        XCTAssertTrue(draft.routeStops.contains { $0.category == .attraction })
+    }
+
 
     func testPlanAroundKeepsSavedFirstAndUnsavedSuggestionsSeparate() throws {
         let searchController = SaveSearchController()

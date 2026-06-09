@@ -191,10 +191,17 @@ struct SavePlanAroundController {
         selected.append(contentsOf: mustInclude.prefix(max(0, request.duration.maxStops - selected.count)))
 
         if selected.count < request.duration.maxStops {
+            let savedCapacity = savedCapacity(
+                selected: selected,
+                nearbySaved: nearbySaved,
+                newSuggestions: newSuggestions,
+                desiredGaps: desiredGaps,
+                request: request
+            )
             selected.append(
                 contentsOf: nearbySaved
                     .filter { stop in !selected.contains(where: { $0.id == stop.id }) }
-                    .prefix(max(0, request.duration.maxStops - selected.count))
+                    .prefix(savedCapacity)
             )
         }
 
@@ -219,6 +226,30 @@ struct SavePlanAroundController {
             skippedReasons.append("Public recommendation fetch failed or returned no routeable candidates; gaps left unfilled: \(unfilledGaps.map(\.displayName).joined(separator: ", ")).")
         }
         return RouteResult(stops: selected, unfilledGaps: unfilledGaps, skippedReasons: skippedReasons)
+    }
+
+    private func savedCapacity(
+        selected: [SavePlanStop],
+        nearbySaved: [SavePlanStop],
+        newSuggestions: [SavePlanStop],
+        desiredGaps: [SavePlanFillerSlot],
+        request: SavePlanAroundRequest
+    ) -> Int {
+        let remaining = max(0, request.duration.maxStops - selected.count)
+        guard request.intent == .balanced, remaining > 1, !newSuggestions.isEmpty else {
+            return remaining
+        }
+
+        let candidateSaved = Array(nearbySaved
+            .filter { stop in !selected.contains(where: { $0.id == stop.id }) }
+            .prefix(remaining))
+        let unfilledIfSavedFillsRoute = unfilledGaps(for: selected + candidateSaved, desiredGaps: desiredGaps)
+        let publicCanFillMissingGap = newSuggestions.contains { suggestion in
+            guard let fillerSlot = suggestion.fillerSlot else { return false }
+            return unfilledIfSavedFillsRoute.contains(fillerSlot)
+        }
+
+        return publicCanFillMissingGap ? max(0, remaining - 1) : remaining
     }
 
     private func routeNotes(for stops: [SavePlanStop]) -> [String] {

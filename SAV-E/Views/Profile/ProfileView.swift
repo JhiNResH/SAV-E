@@ -624,8 +624,8 @@ private struct PassportStampSection: View {
 
     private var citiesDetail: String {
         switch languageSettings.language {
-        case .english: return stats.usesSavedPlaces ? "Unique areas parsed from saved place addresses." : "Appears after SAV-E has saved place addresses."
-        case .traditionalChinese: return stats.usesSavedPlaces ? "從已存地點地址整理出的城市或區域。" : "存下帶地址的地點後就會出現。"
+        case .english: return stats.usesSavedPlaces ? "City-level stamps parsed from saved place addresses." : "Appears after SAV-E has saved place addresses."
+        case .traditionalChinese: return stats.usesSavedPlaces ? "從已存地點地址整理出的城市級地區。" : "存下帶地址的地點後就會出現。"
         }
     }
 
@@ -771,7 +771,7 @@ private struct PassportVisibilityPanel: View {
                 Image(systemName: "person.2.wave.2.fill")
                     .font(.caption.weight(.black))
                     .foregroundColor(.saveCocoa)
-                Text(languageSettings.localized(english: "Social visibility", traditionalChinese: "社交可見度"))
+                Text(languageSettings.localized(english: "Sharing controls", traditionalChinese: "分享設定"))
                     .font(.caption.weight(.black))
                     .foregroundColor(.saveCocoa)
                 Spacer()
@@ -788,12 +788,19 @@ private struct PassportVisibilityPanel: View {
 
             if places.isEmpty {
                 Text(languageSettings.localized(
-                    english: "Save places first, then choose what can become friend or public guide signals.",
-                    traditionalChinese: "先保存地點，再選哪些可以成為朋友或公開指南訊號。"
+                    english: "Save places first, then choose which memories stay private or become shareable links.",
+                    traditionalChinese: "先保存地點，再選哪些記憶保持私密、哪些可以用公開連結分享。"
                 ))
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveCocoa.opacity(0.72))
             } else {
+                Text(languageSettings.localized(
+                    english: "These are sharing permissions, not popularity scores.",
+                    traditionalChinese: "這是每個地點的分享權限，不是熱門度或排行榜。"
+                ))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.70))
+
                 VStack(spacing: 8) {
                     ForEach(places.prefix(4)) { place in
                         PassportVisibilityRow(place: place, onUpdate: onUpdate)

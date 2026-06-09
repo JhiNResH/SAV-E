@@ -408,9 +408,6 @@ final class MapViewModel: ObservableObject {
         if !selectedCategories.isEmpty {
             result = result.filter { selectedCategories.contains($0.category) }
         }
-        if let filter = activeFilter {
-            result = result.filter { filter.contains($0.id) }
-        }
         return result
     }
 
