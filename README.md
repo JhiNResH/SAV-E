@@ -83,6 +83,18 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
 
 6. Build and run on simulator or device. Simulator builds do not need signing; device builds and archives require either passing `APPLE_TEAM_ID` through the CLI or selecting your Apple Developer Team in Xcode locally.
 
+For local simulator verification, use the wrapper so Xcode's benign locked-device discovery warnings do not bury the real build output:
+
+```bash
+scripts/xcodebuild-clean.sh \
+  -project SAV-E.xcodeproj \
+  -scheme SAV-E \
+  -configuration Debug \
+  -destination 'platform=iOS Simulator,id=53A8DA29-D4F6-43AF-A81E-47929D1DF97D' \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
 ## TestFlight Archive
 
 Set `APPLE_TEAM_ID` to the 10-character Apple Developer Team ID for the account that owns the App IDs. XcodeGen passes it into all iOS targets as `DEVELOPMENT_TEAM`.
