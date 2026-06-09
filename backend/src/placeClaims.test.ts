@@ -13,6 +13,7 @@ import {
 import {
   enrichMaatPlaceAnalysisWithPublicWeb,
   mergePublicWebDetails,
+  publicWebConfigFromEnv,
 } from "./maatPublicWebAnalysis.js";
 
 test("normalizePlaceClaimCreate keeps raw evidence refs private by default", () => {
@@ -354,6 +355,11 @@ test("enrichMaatPlaceAnalysisWithPublicWeb is env-gated and keeps deterministic 
   assert.equal(receipt.public_web_used, false);
   assert.equal(receipt.model_used, false);
   assert.equal(receipt.public_web_status, "disabled");
+});
+
+test("publicWebConfigFromEnv enables requested Ma'at web analysis unless explicitly disabled", () => {
+  assert.equal(publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key" }).enabled, true);
+  assert.equal(publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key", SAVE_ENABLE_MAAT_PUBLIC_WEB: "false" }).enabled, false);
 });
 
 test("enrichMaatPlaceAnalysisWithPublicWeb sends public claim summaries only", async () => {
