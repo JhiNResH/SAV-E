@@ -2299,14 +2299,29 @@ private struct SavedMapDetailDrawerContent: View {
     @State private var editAddress = ""
     @State private var editError: String?
     @State private var maatAnalysis: MaatPlaceAnalysisResponse?
+    @State private var maatAnalysisPlaceId: UUID?
     @State private var maatAnalysisError: String?
-    @State private var isLoadingMaatAnalysis = false
+    @State private var loadingMaatAnalysisPlaceId: UUID?
 
     private var detailPlace: Place {
         if let enrichedPlace, enrichedPlace.id == place.id {
             return enrichedPlace
         }
         return place
+    }
+
+    private var currentMaatAnalysis: MaatPlaceAnalysisResponse? {
+        guard maatAnalysis?.placeId == detailPlace.id else { return nil }
+        return maatAnalysis
+    }
+
+    private var currentMaatAnalysisError: String? {
+        guard maatAnalysisPlaceId == detailPlace.id else { return nil }
+        return maatAnalysisError
+    }
+
+    private var isLoadingMaatAnalysis: Bool {
+        loadingMaatAnalysisPlaceId == detailPlace.id
     }
 
     var body: some View {
@@ -2330,9 +2345,9 @@ private struct SavedMapDetailDrawerContent: View {
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
             SavePlaceInsightsPanel(
                 place: detailPlace,
-                analysis: maatAnalysis,
+                analysis: currentMaatAnalysis,
                 isLoading: isLoadingMaatAnalysis,
-                error: maatAnalysisError,
+                error: currentMaatAnalysisError,
                 languageSettings: languageSettings
             ) {
                 Task { await loadMaatAnalysis(force: true) }
@@ -2417,6 +2432,7 @@ private struct SavedMapDetailDrawerContent: View {
             Text(languageSettings.localized(english: "This removes the Map Stamp from SAV-E.", traditionalChinese: "這會從 SAV-E 移除這個地圖章。"))
         }
         .task(id: place.id) {
+            resetMaatAnalysis(for: place.id)
             await enrichBusinessDetails()
             await loadMaatAnalysis()
         }
@@ -2426,21 +2442,39 @@ private struct SavedMapDetailDrawerContent: View {
         detailPlace.memorySummary(language: languageSettings.language)
     }
 
-    private func loadMaatAnalysis(force: Bool = false) async {
-        guard force || maatAnalysis == nil else { return }
-        isLoadingMaatAnalysis = true
+    private func resetMaatAnalysis(for placeId: UUID) {
+        guard maatAnalysisPlaceId != placeId else { return }
+        maatAnalysis = nil
         maatAnalysisError = nil
-        defer { isLoadingMaatAnalysis = false }
+        maatAnalysisPlaceId = placeId
+        loadingMaatAnalysisPlaceId = nil
+    }
+
+    private func loadMaatAnalysis(force: Bool = false) async {
+        let placeId = detailPlace.id
+        resetMaatAnalysis(for: placeId)
+        guard force || maatAnalysis?.placeId != placeId else { return }
+        loadingMaatAnalysisPlaceId = placeId
+        maatAnalysisError = nil
+        defer {
+            if loadingMaatAnalysisPlaceId == placeId {
+                loadingMaatAnalysisPlaceId = nil
+            }
+        }
 
         do {
-            maatAnalysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
-                for: detailPlace.id,
+            let analysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
+                for: placeId,
                 includePrivateEvidence: false,
                 includePublicWeb: true
             )
+            guard maatAnalysisPlaceId == placeId, analysis.placeId == placeId else { return }
+            maatAnalysis = analysis
         } catch SupabaseError.notConfigured {
+            guard maatAnalysisPlaceId == placeId else { return }
             maatAnalysis = nil
         } catch {
+            guard maatAnalysisPlaceId == placeId else { return }
             maatAnalysisError = error.localizedDescription
         }
     }
