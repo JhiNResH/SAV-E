@@ -2298,6 +2298,9 @@ private struct SavedMapDetailDrawerContent: View {
     @State private var editName = ""
     @State private var editAddress = ""
     @State private var editError: String?
+    @State private var maatAnalysis: MaatPlaceAnalysisResponse?
+    @State private var maatAnalysisError: String?
+    @State private var isLoadingMaatAnalysis = false
 
     private var detailPlace: Place {
         if let enrichedPlace, enrichedPlace.id == place.id {
@@ -2325,6 +2328,15 @@ private struct SavedMapDetailDrawerContent: View {
 
             PlaceBasicInfoPanel(place: detailPlace)
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
+            SavePlaceInsightsPanel(
+                place: detailPlace,
+                analysis: maatAnalysis,
+                isLoading: isLoadingMaatAnalysis,
+                error: maatAnalysisError,
+                languageSettings: languageSettings
+            ) {
+                Task { await loadMaatAnalysis(force: true) }
+            }
             PlaceSourceEvidencePanel(place: detailPlace)
             if isEditingPlace {
                 placeEditor
@@ -2406,11 +2418,31 @@ private struct SavedMapDetailDrawerContent: View {
         }
         .task(id: place.id) {
             await enrichBusinessDetails()
+            await loadMaatAnalysis()
         }
     }
 
     private var memorySummary: String {
         detailPlace.memorySummary(language: languageSettings.language)
+    }
+
+    private func loadMaatAnalysis(force: Bool = false) async {
+        guard force || maatAnalysis == nil else { return }
+        isLoadingMaatAnalysis = true
+        maatAnalysisError = nil
+        defer { isLoadingMaatAnalysis = false }
+
+        do {
+            maatAnalysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
+                for: detailPlace.id,
+                includePrivateEvidence: false,
+                includePublicWeb: true
+            )
+        } catch SupabaseError.notConfigured {
+            maatAnalysis = nil
+        } catch {
+            maatAnalysisError = error.localizedDescription
+        }
     }
 
     private func enrichBusinessDetails() async {
