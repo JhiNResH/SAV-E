@@ -39,7 +39,8 @@ struct PlaceDetailView: View {
                 PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
                     .padding(.horizontal)
 
-                PlaceMaatAnalysisPanel(
+                SavePlaceInsightsPanel(
+                    place: detailPlace,
                     analysis: maatAnalysis,
                     isLoading: isLoadingMaatAnalysis,
                     error: maatAnalysisError,
@@ -319,9 +320,10 @@ struct PlaceDetailView: View {
     }
 }
 
-// MARK: - Ma'at Analysis
+// MARK: - SAV-E Place Insights
 
-private struct PlaceMaatAnalysisPanel: View {
+struct SavePlaceInsightsPanel: View {
+    let place: Place
     let analysis: MaatPlaceAnalysisResponse?
     let isLoading: Bool
     let error: String?
@@ -331,10 +333,10 @@ private struct PlaceMaatAnalysisPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "scalemass.fill")
+                Image(systemName: "sparkles")
                     .foregroundColor(.saveCocoa)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(languageSettings.localized(english: "Ma'at analysis", traditionalChinese: "Ma'at 分析"))
+                    Text(languageSettings.localized(english: "SAV-E place details", traditionalChinese: "SAV-E 地點詳情"))
                         .font(.headline.weight(.bold))
                         .foregroundColor(.saveInk)
                     Text(scopeSubtitle)
@@ -348,38 +350,34 @@ private struct PlaceMaatAnalysisPanel: View {
                 .disabled(isLoading)
             }
 
-            if let analysis {
-                Text(analysis.summary)
-                    .font(.subheadline)
-                    .foregroundColor(.saveInk)
-                    .fixedSize(horizontal: false, vertical: true)
+            Text(summaryText)
+                .font(.subheadline)
+                .foregroundColor(.saveInk)
+                .fixedSize(horizontal: false, vertical: true)
 
+            if let analysis {
                 FlowLayout(spacing: 8) {
                     InfoChip(icon: "checkmark.seal", text: analysis.verdict.replacingOccurrences(of: "_", with: " "), color: .saveCocoa)
                     InfoChip(icon: "scope", text: analysis.analysisReceipt.inputScope.replacingOccurrences(of: "_", with: " "), color: .saveCocoa)
                     InfoChip(icon: "quote.bubble", text: "\(analysis.analysisReceipt.citedClaimCount) cited", color: .saveCocoa)
                 }
+            }
 
-                if let details = analysis.restaurantDetails {
-                    MaatRestaurantDetailsView(details: details, languageSettings: languageSettings)
-                }
+            SaveRestaurantDetailsView(
+                place: place,
+                details: analysis?.restaurantDetails,
+                citedEvidence: analysis?.citedEvidence ?? [],
+                languageSettings: languageSettings
+            )
 
-                if !analysis.warnings.isEmpty {
-                    Text(analysis.warnings.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · "))
-                        .font(.caption)
-                        .foregroundColor(.saveMutedText)
-                }
-            } else if let error {
+            if let error {
                 Text(error)
                     .font(.caption)
                     .foregroundColor(.red)
-            } else {
-                Text(languageSettings.localized(
-                    english: "No server analysis loaded yet. Refresh after this place has notes, claims, source evidence, or receipts.",
-                    traditionalChinese: "尚未載入伺服器分析。此地點有筆記、claims、來源或收據後可重新整理。"
-                ))
-                .font(.caption)
-                .foregroundColor(.saveMutedText)
+            } else if let analysis, !analysis.warnings.isEmpty {
+                Text(analysis.warnings.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundColor(.saveMutedText)
             }
         }
         .padding(16)
@@ -392,39 +390,50 @@ private struct PlaceMaatAnalysisPanel: View {
         )
     }
 
+    private var summaryText: String {
+        if let analysis {
+            return analysis.summary
+        }
+        if isLoading {
+            return languageSettings.localized(
+                english: "SAV-E is checking saved evidence and public place context. Showing what is already known.",
+                traditionalChinese: "SAV-E 正在檢查已保存證據與公開地點資訊。先顯示目前已知內容。"
+            )
+        }
+        return languageSettings.localized(
+            english: "SAV-E can still show saved place details here, and will mark missing fields as evidence gaps.",
+            traditionalChinese: "SAV-E 會先顯示已保存的地點詳情，缺少的欄位會標成證據缺口。"
+        )
+    }
+
     private var scopeSubtitle: String {
         if analysis?.analysisReceipt.publicWebUsed == true {
             return languageSettings.localized(
-                english: "Selected place + public web citations",
-                traditionalChinese: "此地點證據 + 公開網路引用"
+                english: "Saved place + public web evidence",
+                traditionalChinese: "保存地點 + 公開網路證據"
             )
         }
 
         return languageSettings.localized(
-            english: "Selected-place evidence only",
-            traditionalChinese: "只使用此地點的可引用證據"
+            english: "Saved place evidence first",
+            traditionalChinese: "優先使用此地點保存證據"
         )
     }
 }
 
-private struct MaatRestaurantDetailsView: View {
-    let details: MaatRestaurantDetails
+private struct SaveRestaurantDetailsView: View {
+    let place: Place
+    let details: MaatRestaurantDetails?
+    let citedEvidence: [String]
     let languageSettings: AppLanguageSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if !details.mustTry.isEmpty {
-                detailSection(
-                    title: languageSettings.localized(english: "What to order", traditionalChinese: "推薦餐點"),
-                    icon: "fork.knife",
-                    rows: details.mustTry.prefix(4).map { item in
-                        MaatDetailRow(
-                            title: item.name,
-                            value: [item.price, item.description].compactMap(cleaned).joined(separator: " · ")
-                        )
-                    }
-                )
-            }
+            detailSection(
+                title: languageSettings.localized(english: "What to order", traditionalChinese: "推薦餐點"),
+                icon: "fork.knife",
+                rows: recommendationRows
+            )
 
             detailSection(
                 title: languageSettings.localized(english: "Cost and score", traditionalChinese: "消費與評分"),
@@ -438,11 +447,11 @@ private struct MaatRestaurantDetailsView: View {
                 rows: [
                     MaatDetailRow(
                         title: languageSettings.localized(english: "Parking", traditionalChinese: "停車"),
-                        value: details.parking
+                        value: cleaned(details?.parking) ?? missingEvidenceText
                     ),
                     MaatDetailRow(
                         title: languageSettings.localized(english: "Reservation", traditionalChinese: "訂位"),
-                        value: details.reservationTips
+                        value: cleaned(details?.reservationTips) ?? missingEvidenceText
                     )
                 ]
             )
@@ -453,60 +462,208 @@ private struct MaatRestaurantDetailsView: View {
                 rows: experienceRows
             )
 
-            if !details.criticalReviews.isEmpty {
-                detailSection(
-                    title: languageSettings.localized(english: "Watch-outs", traditionalChinese: "注意事項"),
-                    icon: "exclamationmark.triangle.fill",
-                    rows: details.criticalReviews.prefix(3).map { review in
-                        MaatDetailRow(
-                            title: review.source ?? languageSettings.localized(english: "Saved evidence", traditionalChinese: "保存證據"),
-                            value: review.issue
-                        )
-                    }
-                )
-            }
+            detailSection(
+                title: languageSettings.localized(english: "Watch-outs", traditionalChinese: "注意事項"),
+                icon: "exclamationmark.triangle.fill",
+                rows: watchOutRows
+            )
 
-            if !details.evidenceGaps.isEmpty {
-                Text(languageSettings.localized(
-                    english: "Needs more evidence: \(details.evidenceGaps.map(gapLabel).joined(separator: ", "))",
-                    traditionalChinese: "還需要更多證據：\(details.evidenceGaps.map(gapLabel).joined(separator: "、"))"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.saveMutedText)
-                .fixedSize(horizontal: false, vertical: true)
-            }
+            detailSection(
+                title: languageSettings.localized(english: "Evidence gaps", traditionalChinese: "證據缺口"),
+                icon: "questionmark.circle.fill",
+                rows: evidenceGapRows
+            )
+
+            relatedReelsSection
         }
     }
 
-    private var costRows: [MaatDetailRow] {
-        var rows: [MaatDetailRow] = []
-        if let priceRange = cleaned(details.priceRange) {
-            rows.append(MaatDetailRow(title: languageSettings.localized(english: "Price", traditionalChinese: "價格"), value: priceRange))
+    private var recommendationRows: [MaatDetailRow] {
+        if let mustTry = details?.mustTry, !mustTry.isEmpty {
+            return mustTry.prefix(4).map { item in
+                MaatDetailRow(
+                    title: item.name,
+                    value: [item.price, item.description].compactMap(cleaned).joined(separator: " · ")
+                )
+            }
         }
-        if let avgCost = cleaned(details.avgCost) {
+
+        let savedItems = place.savedRecommendedItems
+        if !savedItems.isEmpty {
+            return savedItems.prefix(4).map { item in
+                MaatDetailRow(title: item.name, value: cleaned(item.price))
+            }
+        }
+
+        return [MaatDetailRow(
+            title: languageSettings.localized(english: "Needs evidence", traditionalChinese: "需要證據"),
+            value: missingEvidenceText
+        )]
+    }
+
+    private var costRows: [MaatDetailRow] {
+        var rows: [MaatDetailRow] = [
+            MaatDetailRow(
+                title: languageSettings.localized(english: "Price", traditionalChinese: "價格"),
+                value: cleaned(details?.priceRange) ?? cleaned(place.priceRange) ?? missingEvidenceText
+            )
+        ]
+
+        if let avgCost = cleaned(details?.avgCost) {
             rows.append(MaatDetailRow(title: languageSettings.localized(english: "Average", traditionalChinese: "人均"), value: avgCost))
         }
-        rows += details.platformScores.prefix(2).map { score in
+
+        rows += (details?.platformScores ?? []).prefix(2).map { score in
             MaatDetailRow(title: score.platform, value: String(format: "%.1f", score.score))
         }
+
+        if let rating = place.googleRating ?? place.rating,
+           !(details?.platformScores.contains(where: { $0.platform.localizedCaseInsensitiveContains("google") }) ?? false) {
+            rows.append(MaatDetailRow(title: "Google", value: String(format: "%.1f", rating)))
+        }
+
         return rows
     }
 
     private var experienceRows: [MaatDetailRow] {
         var rows: [MaatDetailRow] = []
-        if let ambiance = cleaned(details.ambiance) {
+        if let ambiance = cleaned(details?.ambiance) {
             rows.append(MaatDetailRow(title: languageSettings.localized(english: "Ambiance", traditionalChinese: "氛圍"), value: ambiance))
         }
-        if let service = cleaned(details.serviceRating) {
+        if let service = cleaned(details?.serviceRating) {
             rows.append(MaatDetailRow(title: languageSettings.localized(english: "Service", traditionalChinese: "服務"), value: service))
         }
-        if !details.bestFor.isEmpty {
+        let bestFor = details?.bestFor ?? []
+        if !bestFor.isEmpty {
             rows.append(MaatDetailRow(
                 title: languageSettings.localized(english: "Best for", traditionalChinese: "適合"),
-                value: details.bestFor.joined(separator: " · ")
+                value: bestFor.joined(separator: " · ")
+            ))
+        }
+        if rows.isEmpty {
+            rows.append(MaatDetailRow(
+                title: languageSettings.localized(english: "Needs evidence", traditionalChinese: "需要證據"),
+                value: missingEvidenceText
             ))
         }
         return rows
+    }
+
+    private var watchOutRows: [MaatDetailRow] {
+        if let reviews = details?.criticalReviews, !reviews.isEmpty {
+            return reviews.prefix(3).map { review in
+                MaatDetailRow(
+                    title: review.source ?? languageSettings.localized(english: "Saved evidence", traditionalChinese: "保存證據"),
+                    value: review.issue
+                )
+            }
+        }
+
+        let warnings = details?.warnings ?? []
+        if !warnings.isEmpty {
+            return warnings.prefix(3).map { warning in
+                MaatDetailRow(
+                    title: languageSettings.localized(english: "Warning", traditionalChinese: "提醒"),
+                    value: warning.replacingOccurrences(of: "_", with: " ")
+                )
+            }
+        }
+
+        return [MaatDetailRow(
+            title: languageSettings.localized(english: "Needs evidence", traditionalChinese: "需要證據"),
+            value: languageSettings.localized(english: "No wait, service, closure, or crowd warning evidence yet.", traditionalChinese: "尚未有等待、服務、停業或人潮注意事項證據。")
+        )]
+    }
+
+    private var evidenceGapRows: [MaatDetailRow] {
+        let gaps = computedEvidenceGaps
+        guard !gaps.isEmpty else {
+            return [MaatDetailRow(
+                title: languageSettings.localized(english: "Ready", traditionalChinese: "已補齊"),
+                value: languageSettings.localized(english: "SAV-E has enough detail evidence for this view.", traditionalChinese: "SAV-E 已有足夠地點詳情證據。")
+            )]
+        }
+        return gaps.map { gap in
+            MaatDetailRow(
+                title: gapLabel(gap),
+                value: languageSettings.localized(english: "Needs one more reliable source.", traditionalChinese: "需要再補一個可靠來源。")
+            )
+        }
+    }
+
+    private var computedEvidenceGaps: [String] {
+        var gaps = details?.evidenceGaps ?? []
+        if details?.mustTry.isEmpty != false && place.savedRecommendedItems.isEmpty {
+            gaps.append("recommended_dishes")
+        }
+        if cleaned(details?.priceRange) == nil && cleaned(details?.avgCost) == nil && cleaned(place.priceRange) == nil {
+            gaps.append("cost")
+        }
+        if cleaned(details?.parking) == nil {
+            gaps.append("parking")
+        }
+        if cleaned(details?.reservationTips) == nil {
+            gaps.append("reservation_tips")
+        }
+        if relatedReelLinks.isEmpty {
+            gaps.append("related_reels")
+        }
+        var seen = Set<String>()
+        return gaps.filter { seen.insert($0).inserted }
+    }
+
+    @ViewBuilder
+    private var relatedReelsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(languageSettings.localized(english: "Related reels", traditionalChinese: "相關 Reels"), systemImage: "play.rectangle.fill")
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveCocoa)
+
+            if relatedReelLinks.isEmpty {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(languageSettings.localized(english: "Needs evidence", traditionalChinese: "需要證據"))
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.saveInk)
+                        .frame(width: 86, alignment: .leading)
+                    Text(languageSettings.localized(english: "No Instagram Reel source is linked to this place yet.", traditionalChinese: "這個地點尚未連到 Instagram Reel 來源。"))
+                        .font(.caption)
+                        .foregroundColor(.saveMutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(relatedReelLinks) { link in
+                        Link(destination: link.url) {
+                            Label(link.title, systemImage: "play.rectangle.fill")
+                                .font(.caption.weight(.bold))
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.saveHoney.opacity(0.34))
+                                .foregroundColor(.saveInk)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.56), lineWidth: 1))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.saveNotebookPage.opacity(0.56))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+        )
+    }
+
+    private var relatedReelLinks: [SaveRelatedReelLink] {
+        SaveRelatedReelLink.extract(from: place.sourceEvidence + citedEvidence)
+    }
+
+    private var missingEvidenceText: String {
+        languageSettings.localized(english: "Not enough saved or public evidence yet.", traditionalChinese: "目前保存或公開證據還不夠。")
     }
 
     private func detailSection(title: String, icon: String, rows: [MaatDetailRow]) -> some View {
@@ -553,6 +710,8 @@ private struct MaatRestaurantDetailsView: View {
             return languageSettings.localized(english: "reservation tips", traditionalChinese: "訂位建議")
         case "cost":
             return languageSettings.localized(english: "cost", traditionalChinese: "消費")
+        case "related_reels":
+            return languageSettings.localized(english: "related reels", traditionalChinese: "相關 Reels")
         default:
             return value.replacingOccurrences(of: "_", with: " ")
         }
@@ -568,6 +727,62 @@ private struct MaatDetailRow: Identifiable {
     let id = UUID()
     let title: String
     let value: String?
+}
+
+private struct SaveRelatedReelLink: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let url: URL
+
+    static func extract(from evidence: [String]) -> [SaveRelatedReelLink] {
+        var links: [SaveRelatedReelLink] = []
+        var seen = Set<String>()
+
+        for text in evidence {
+            for url in urls(in: text) where isInstagramReel(url) {
+                let key = normalizedKey(url)
+                guard seen.insert(key).inserted else { continue }
+                links.append(SaveRelatedReelLink(
+                    id: key,
+                    title: "Instagram Reel",
+                    url: url
+                ))
+            }
+        }
+
+        return Array(links.prefix(4))
+    }
+
+    private static func urls(in text: String) -> [URL] {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return []
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector
+            .matches(in: text, options: [], range: range)
+            .compactMap(\.url)
+            .filter { url in
+                guard let scheme = url.scheme?.lowercased() else { return false }
+                return scheme == "http" || scheme == "https"
+            }
+    }
+
+    private static func isInstagramReel(_ url: URL) -> Bool {
+        guard let host = url.host(percentEncoded: false)?.lowercased(),
+              host.hasSuffix("instagram.com")
+        else { return false }
+        let path = url.path(percentEncoded: false).lowercased()
+        return path.contains("/reel/") || path.contains("/reels/")
+    }
+
+    private static func normalizedKey(_ url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url.absoluteString
+        }
+        components.query = nil
+        components.fragment = nil
+        return components.string ?? url.absoluteString
+    }
 }
 
 // MARK: - Info Chip
