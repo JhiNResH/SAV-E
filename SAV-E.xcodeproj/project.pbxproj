@@ -51,6 +51,7 @@
 		6BC478C8D4778B2BE248D315 /* SharedTripData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85338A305203F41DF18FAE27 /* SharedTripData.swift */; };
 		6F07949E22AA506EE5A64CD7 /* SaveLocalVaultService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5A7F09B9AE3F2129C605FE /* SaveLocalVaultService.swift */; };
 		6F9A7F7D67162AAFC701986F /* SAVEProductionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82EECB77D78AB65A9D806D73 /* SAVEProductionConfig.swift */; };
+		733CFCEB6A88F61540EBD1A4 /* SAVEOnboardingCarouselTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7966C389379C2C27D0974740 /* SAVEOnboardingCarouselTests.swift */; };
 		76FC5BA1F7C59B7D0436B3B5 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54876D21CED56B8E43591F6E /* StatsView.swift */; };
 		77E9B588DF847D51CD055C59 /* SocialPlacePipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6383E88214348C9728A5C35B /* SocialPlacePipelineTests.swift */; };
 		78BCAADC36E4F2A6E45F076E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8EBE852DE7618089938F9421 /* Assets.xcassets */; };
@@ -222,6 +223,7 @@
 		75980C64772B9E80FBEA8DF6 /* SAVEUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SAVEUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		76EE79719B259620EE6212C7 /* Place.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Place.swift; sourceTree = "<group>"; };
 		78E45623E52CFE065303EC21 /* PlatformIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformIcon.swift; sourceTree = "<group>"; };
+		7966C389379C2C27D0974740 /* SAVEOnboardingCarouselTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SAVEOnboardingCarouselTests.swift; sourceTree = "<group>"; };
 		7AA6CC1931A9C727DB73665F /* SavePlanAroundControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavePlanAroundControllerTests.swift; sourceTree = "<group>"; };
 		7D404A68838FF556ADEBC2D7 /* SaveLocationIntentRecommendationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveLocationIntentRecommendationServiceTests.swift; sourceTree = "<group>"; };
 		8165C7FCD4C17E50EFFC6532 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -543,6 +545,7 @@
 		ABC8567013403AA25EA4E4F0 /* SAVEUITests */ = {
 			isa = PBXGroup;
 			children = (
+				7966C389379C2C27D0974740 /* SAVEOnboardingCarouselTests.swift */,
 				33940014B7E9BB8072DC45FE /* SAVEUISmokeHarnessTests.swift */,
 			);
 			name = SAVEUITests;
@@ -1014,6 +1017,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				733CFCEB6A88F61540EBD1A4 /* SAVEOnboardingCarouselTests.swift in Sources */,
 				B214EF983BE6DB35168A6EF2 /* SAVEUISmokeHarnessTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
