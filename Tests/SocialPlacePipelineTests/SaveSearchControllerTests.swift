@@ -2304,6 +2304,32 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(stats.usesSavedPlaces)
     }
 
+    func testPassportStatsCollapseTaiwanAddressesToCityStamp() {
+        let profile = UserProfile.empty
+        let places = [
+            place(name: "台北咖啡", address: "10491 台灣臺北市中山區中山北路二段 59 巷 67 號", category: .cafe),
+            place(name: "台北晚餐", address: "106 台灣臺北市大安區復興南路一段 308 巷 42 號", category: .food),
+            place(name: "台南牛肉湯", address: "700 台灣臺南市中西區民族路三段 222 號", category: .food)
+        ]
+
+        let stats = PassportStats(profile: profile, savedPlaces: places, waitingClues: 0)
+
+        XCTAssertEqual(stats.citiesCount, 2)
+        XCTAssertEqual(stats.cityNames, ["臺北市", "臺南市"])
+    }
+
+    @MainActor
+    func testMapFilterActionDoesNotHideSavedPins() {
+        let focusedPlace = place(name: "Focused Stop", address: "Irvine, CA", category: .cafe)
+        let otherSavedPlace = place(name: "Other Saved", address: "Irvine, CA", category: .food)
+        let map = MapViewModel()
+        map.places = [focusedPlace, otherSavedPlace]
+
+        map.apply(MapActionData(type: .filterPins, placeIds: [focusedPlace.id.uuidString], lat: nil, lng: nil, span: nil))
+
+        XCTAssertEqual(Set(map.filteredPlaces.map(\.id)), Set([focusedPlace.id, otherSavedPlace.id]))
+    }
+
     private func place(
         name: String,
         address: String,

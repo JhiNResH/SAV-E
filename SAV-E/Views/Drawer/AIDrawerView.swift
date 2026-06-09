@@ -622,7 +622,7 @@ struct AIDrawerView: View {
             VStack(spacing: 10) {
                 Spacer()
                 Image(systemName: "exclamationmark.triangle").foregroundColor(.saveCocoa)
-                Text(msg)
+                Text(localizedErrorMessage(msg))
                     .font(.caption).foregroundColor(.saveCocoa.opacity(0.74))
                     .multilineTextAlignment(.center).padding(.horizontal)
                 HStack(spacing: 12) {
@@ -787,6 +787,20 @@ struct AIDrawerView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func localizedErrorMessage(_ message: String) -> String {
+        let normalized = message.lowercased()
+        if normalized.contains("ai returned something unexpected") ||
+            normalized.contains("ai request failed") ||
+            normalized.contains("ai didn't return") ||
+            normalized.contains("ai is busy") {
+            return languageSettings.localized(
+                english: "SAV-E could not finish that request. Try again in a moment.",
+                traditionalChinese: "SAV-E 剛剛沒完成這個請求，請稍後再試一次。"
+            )
+        }
+        return message
     }
 
     private var isLoading: Bool {
@@ -2311,6 +2325,7 @@ private struct SavedMapDetailDrawerContent: View {
 
             PlaceBasicInfoPanel(place: detailPlace)
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
+            PlaceSourceEvidencePanel(place: detailPlace)
             if isEditingPlace {
                 placeEditor
             }
@@ -2572,6 +2587,83 @@ private struct SavedMapDetailDrawerContent: View {
             try await onDeletePlace()
         } catch {
             deleteError = error.localizedDescription
+        }
+    }
+}
+
+private struct PlaceSourceEvidencePanel: View {
+    @Environment(\.appLanguageSettings) private var languageSettings
+    @Environment(\.openURL) private var openURL
+    let place: Place
+
+    private var sourceURL: URL? {
+        place.primarySourceURL
+    }
+
+    private var sourcePlatform: SourcePlatform {
+        SourcePlatform.from(urlString: sourceURL?.absoluteString)
+    }
+
+    private var sourceTitle: String {
+        switch sourcePlatform {
+        case .instagram:
+            return languageSettings.localized(english: "Instagram Reel or post", traditionalChinese: "Instagram Reel 或貼文")
+        case .googleMaps:
+            return languageSettings.localized(english: "Google Maps source", traditionalChinese: "Google Maps 來源")
+        case .threads:
+            return "Threads"
+        case .xiaohongshu:
+            return "Xiaohongshu"
+        case .douyin:
+            return "Douyin"
+        case .amap:
+            return "Amap"
+        case .baidu:
+            return "Baidu Maps"
+        case .other:
+            return languageSettings.localized(english: "Original source", traditionalChinese: "原始來源")
+        }
+    }
+
+    private var sourceSubtitle: String {
+        if let handle = place.savedSourceHandle?.trimmingCharacters(in: .whitespacesAndNewlines), !handle.isEmpty {
+            return handle.hasPrefix("@") ? handle : "@\(handle)"
+        }
+        return languageSettings.localized(
+            english: "Open the public source attached to this Map Stamp.",
+            traditionalChinese: "打開這個地圖章附上的公開來源。"
+        )
+    }
+
+    var body: some View {
+        if let sourceURL {
+            Button {
+                openURL(sourceURL)
+            } label: {
+                HStack(spacing: 10) {
+                    SaveMemoryBadge(state: .clue, size: 36)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(sourceTitle)
+                            .font(.subheadline.weight(.black))
+                            .foregroundColor(.saveInk)
+                        Text(sourceSubtitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.saveCocoa.opacity(0.72))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: sourcePlatform == .instagram ? "play.rectangle.fill" : "arrow.up.right")
+                        .font(.subheadline.weight(.black))
+                        .foregroundColor(.saveCocoa)
+                }
+                .padding(10)
+                .background(Color.saveSky.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 }

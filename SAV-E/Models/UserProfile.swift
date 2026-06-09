@@ -51,9 +51,24 @@ struct PassportStats: Hashable {
     }
 
     private static func cityName(for place: Place) -> String? {
+        if let value = cityLevelName(in: place.address) {
+            return value
+        }
         let value = place.shareAreaLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
         return value
+    }
+
+    private static func cityLevelName(in address: String) -> String? {
+        let value = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+
+        let taiwanCities = [
+            "臺北市", "台北市", "新北市", "桃園市", "臺中市", "台中市", "臺南市", "台南市", "高雄市",
+            "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣", "南投縣", "雲林縣", "嘉義縣",
+            "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "台東縣", "澎湖縣", "金門縣", "連江縣"
+        ]
+        return taiwanCities.first { value.contains($0) }
     }
 }
 
