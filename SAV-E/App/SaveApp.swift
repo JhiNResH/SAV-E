@@ -15,6 +15,7 @@ struct SaveApp: App {
 #endif
 
     private let supabaseService = SupabaseService.shared
+    private let pendingImportService = PendingPlaceImportService.shared
     private let minimumOpeningAnimationDuration: UInt64 = 1_800_000_000
 
     var body: some Scene {
@@ -79,7 +80,8 @@ struct SaveApp: App {
     @ViewBuilder
     private var standardRootContent: some View {
         if !hasCompletedOnboarding {
-            OnboardingView {
+            OnboardingView { firstClue in
+                captureOnboardingFirstClue(firstClue)
                 hasCompletedOnboarding = true
                 minimumOpeningAnimationCompleted = false
             }
@@ -93,7 +95,7 @@ struct SaveApp: App {
             case .unknown:
                 AuthLoadingView()
             case .unauthenticated:
-                SignInView()
+                SignInView(onFirstClueCaptured: captureOnboardingFirstClue)
                     .environmentObject(authService)
             case .authenticated:
                 ContentView()
@@ -104,6 +106,11 @@ struct SaveApp: App {
 
     private var shouldShowOpeningAnimation: Bool {
         !minimumOpeningAnimationCompleted || authService.authState == .unknown
+    }
+
+    private func captureOnboardingFirstClue(_ firstClue: String?) {
+        guard let firstClue else { return }
+        pendingImportService.queueOnboardingFirstClue(firstClue)
     }
 
     @MainActor
@@ -450,6 +457,7 @@ private struct SaveOpeningHintPill: View {
 struct SignInView: View {
     @EnvironmentObject var authService: PrivyAuthService
     @Environment(\.appLanguageSettings) private var languageSettings
+    var onFirstClueCaptured: (String) -> Void = { _ in }
     @State private var email = ""
     @State private var showEmailCode = false
     @State private var verificationCode = ""
@@ -506,7 +514,10 @@ struct SignInView: View {
             Text(errorMessage ?? "")
         }
         .sheet(isPresented: $showsSampleProof) {
-            OnboardingView(startWithSampleProof: true) {
+            OnboardingView(startWithSampleProof: true) { firstClue in
+                if let firstClue {
+                    onFirstClueCaptured(firstClue)
+                }
                 showsSampleProof = false
             }
         }
