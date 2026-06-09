@@ -47,7 +47,7 @@ const geminiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/mod
 
 export function publicWebConfigFromEnv(env: NodeJS.ProcessEnv = process.env): MaatPublicWebConfig {
   return {
-    enabled: env.SAVE_ENABLE_MAAT_PUBLIC_WEB === "true",
+    enabled: env.SAVE_ENABLE_MAAT_PUBLIC_WEB !== "false",
     apiKey: env.GEMINI_API_KEY ?? env.GOOGLE_GEMINI_API_KEY,
     model: env.SAVE_MAAT_GEMINI_MODEL ?? defaultModel,
   };
