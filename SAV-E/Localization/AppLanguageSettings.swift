@@ -248,7 +248,7 @@ enum SaveText {
         case .signInTagline:
             return localized(english: "Your private place memory.", traditionalChinese: "你的私人地點記憶。", language: language)
         case .signInDescription:
-            return localized(english: "Add links, posts, screenshots, notes, or maps. SAV-E captures why you saved them, keeps uncertain places in Review, and wakes them up when you need a decision.", traditionalChinese: "把連結、貼文、截圖、筆記或地圖分享丟進來。SAV-E 會記住你為什麼想存，不確定的地點先放到待確認，等你要做決定時再拿出來。", language: language)
+            return localized(english: "Drop in a place clue. SAV-E keeps the source, asks before saving, then helps you decide later.", traditionalChinese: "丟進一個地點線索。SAV-E 會保留來源、先讓你確認，之後再幫你做決定。", language: language)
         case .capture:
             return localized(english: "Capture", traditionalChinese: "收進來", language: language)
         case .captureSubtitle:

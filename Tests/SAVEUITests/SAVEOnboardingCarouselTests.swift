@@ -9,13 +9,13 @@ final class SAVEOnboardingCarouselTests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Stop losing places friends send you."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Keep the clue before it disappears."].waitForExistence(timeout: 10))
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Memo finds the real place."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["SAV-E shows why it guessed."].waitForExistence(timeout: 3))
 
         app.buttons["Next"].tap()
-        XCTAssertTrue(app.staticTexts["Save only what you confirm."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Confirm before it becomes memory."].waitForExistence(timeout: 3))
 
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["Rescue one place now"].waitForExistence(timeout: 3))

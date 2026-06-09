@@ -459,34 +459,38 @@ struct SignInView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ZStack {
-            SaveDottedBackground()
-                .ignoresSafeArea()
+        GeometryReader { proxy in
+            let isCompactHeight = proxy.size.height < 760
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 24)
+            ZStack {
+                SaveDottedBackground()
+                    .ignoresSafeArea()
 
-                SignInHero()
-                    .padding(.horizontal, 24)
+                VStack(spacing: 0) {
+                    Spacer(minLength: isCompactHeight ? 10 : 22)
 
-                Spacer(minLength: 22)
+                    SignInHero(isCompactHeight: isCompactHeight)
+                        .padding(.horizontal, 24)
 
-                SignInWorkflowStrip()
+                    Spacer(minLength: isCompactHeight ? 12 : 20)
+
+                    SignInWorkflowStrip(isCompactHeight: isCompactHeight)
+                        .padding(.horizontal, 22)
+
+                    sampleProofButton
+                        .padding(.horizontal, 22)
+                        .padding(.top, isCompactHeight ? 10 : 14)
+
+                    Spacer(minLength: isCompactHeight ? 12 : 18)
+
+                    VStack(spacing: isCompactHeight ? 10 : 12) {
+                        appleSignInButton
+                        googleSignInButton
+                        emailSignInSection
+                    }
                     .padding(.horizontal, 22)
-
-                sampleProofButton
-                    .padding(.horizontal, 22)
-                    .padding(.top, 14)
-
-                Spacer(minLength: 18)
-
-                VStack(spacing: 12) {
-                    appleSignInButton
-                    googleSignInButton
-                    emailSignInSection
+                    .padding(.bottom, isCompactHeight ? 16 : 28)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 28)
             }
         }
         .overlay(alignment: .bottom) {
@@ -584,13 +588,13 @@ struct SignInView: View {
                     .font(.headline.weight(.black))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(languageSettings.localized(
-                        english: "Try a sample coffee clue",
-                        traditionalChinese: "先看咖啡店範例"
+                        english: "Try a sample place clue",
+                        traditionalChinese: "用範例線索試一次"
                     ))
                     .font(.subheadline.weight(.black))
                     Text(languageSettings.localized(
-                        english: "See clue, review, Map Stamp, then ask SAV-E.",
-                        traditionalChinese: "先看線索、確認、地圖章，再問 SAV-E。"
+                        english: "See evidence, Review Candidate, then Map Stamp.",
+                        traditionalChinese: "看證據、待確認地點，再確認成地圖章。"
                     ))
                     .font(.caption.weight(.semibold))
                     .foregroundColor(.saveMutedText)
@@ -666,33 +670,75 @@ struct SignInView: View {
 
 private struct SignInHero: View {
     @Environment(\.appLanguageSettings) private var languageSettings
+    let isCompactHeight: Bool
 
     var body: some View {
-        VStack(spacing: 18) {
-            MemoMascotMark(size: 132)
+        VStack(spacing: isCompactHeight ? 12 : 16) {
+            SignInProofMark(
+                label: languageSettings.localized(english: "Proof kept", traditionalChinese: "保留證據"),
+                isCompactHeight: isCompactHeight
+            )
 
-            VStack(spacing: 8) {
+            VStack(spacing: isCompactHeight ? 5 : 8) {
                 Text(languageSettings.text(.appName))
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .font(.system(size: isCompactHeight ? 34 : 38, weight: .black, design: .rounded))
                     .foregroundColor(.saveInk)
 
                 Text(languageSettings.text(.signInTagline))
-                    .font(.title3.weight(.semibold))
+                    .font(isCompactHeight ? .headline.weight(.black) : .title3.weight(.semibold))
                     .foregroundColor(.saveInk)
+                    .multilineTextAlignment(.center)
 
                 Text(languageSettings.text(.signInDescription))
-                    .font(.subheadline)
-                    .lineSpacing(3)
+                    .font(isCompactHeight ? .caption.weight(.semibold) : .subheadline)
+                    .lineSpacing(2)
                     .foregroundColor(.saveInk.opacity(0.66))
                     .multilineTextAlignment(.center)
+                    .lineLimit(isCompactHeight ? 3 : nil)
+                    .minimumScaleFactor(0.84)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 }
 
+private struct SignInProofMark: View {
+    let label: String
+    let isCompactHeight: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(Color.saveNotebookPage.opacity(0.82))
+                .frame(width: isCompactHeight ? 116 : 136, height: isCompactHeight ? 88 : 104)
+                .rotationEffect(.degrees(-4))
+
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.saveSky.opacity(0.22))
+                .frame(width: isCompactHeight ? 94 : 112, height: isCompactHeight ? 70 : 82)
+                .offset(x: 18, y: 10)
+
+            MemoMascotMark(size: isCompactHeight ? 78 : 92, framed: false)
+                .offset(y: isCompactHeight ? -2 : -4)
+
+            Label(label, systemImage: "link")
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.saveHoney.opacity(0.92))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.52), lineWidth: 1))
+                .offset(x: 48, y: 38)
+        }
+        .frame(height: isCompactHeight ? 104 : 122)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct SignInWorkflowStrip: View {
     @Environment(\.appLanguageSettings) private var languageSettings
+    let isCompactHeight: Bool
 
     private var steps: [(String, String, Color)] {
         [
@@ -708,7 +754,8 @@ private struct SignInWorkflowStrip: View {
                 WorkflowStepCard(
                     title: steps[index].0,
                     subtitle: steps[index].1,
-                    tint: steps[index].2
+                    tint: steps[index].2,
+                    isCompactHeight: isCompactHeight
                 )
             }
         }
@@ -724,12 +771,13 @@ private struct WorkflowStepCard: View {
     let title: String
     let subtitle: String
     let tint: Color
+    let isCompactHeight: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 4 : 5) {
             Circle()
                 .fill(tint)
-                .frame(width: 10, height: 10)
+                .frame(width: isCompactHeight ? 8 : 10, height: isCompactHeight ? 8 : 10)
                 .overlay(
                     Circle()
                         .stroke(Color.saveNotebookLine, lineWidth: 1.2)
@@ -744,11 +792,11 @@ private struct WorkflowStepCard: View {
             Text(subtitle)
                 .font(.caption2)
                 .foregroundColor(.saveCocoa.opacity(0.68))
-                .lineLimit(2)
+                .lineLimit(isCompactHeight ? 1 : 2)
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(isCompactHeight ? 10 : 12)
         .background(Color.saveNotebookPage.opacity(0.96))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

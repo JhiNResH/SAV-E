@@ -279,8 +279,8 @@ struct OnboardingView: View {
 
     private func useSampleClue() {
         clueText = localized(
-            english: "Friend sent: try Utopia Euro Caffe near Irvine for a quiet coffee date",
-            traditionalChinese: "朋友傳：Irvine 附近的 Utopia Euro Caffe 很適合安靜咖啡約會"
+            english: "Sample IG Reel: quiet cafe with a tiny patio near the station, tagged @hidden.moon.cafe",
+            traditionalChinese: "範例 IG Reels：捷運站旁有小庭院的安靜咖啡店，標記 @hidden.moon.cafe"
         )
     }
 
@@ -436,7 +436,7 @@ private struct CarouselPromisePage: View {
             OnboardingCarouselVisual(
                 stage: stage,
                 language: language,
-                height: isCompactHeight ? 280 : 336
+                height: isCompactHeight ? 228 : 300
             )
 
             VStack(spacing: isCompactHeight ? 8 : 12) {
@@ -465,11 +465,11 @@ private struct CarouselPromisePage: View {
     private var headline: String {
         switch stage {
         case .lost:
-            return localized(english: "Stop losing places friends send you.", traditionalChinese: "別再弄丟朋友傳來的地點。")
+            return localized(english: "Keep the clue before it disappears.", traditionalChinese: "先把快消失的線索接住。")
         case .find:
-            return localized(english: "Memo finds the real place.", traditionalChinese: "Memo 幫你找出真正地點。")
+            return localized(english: "SAV-E shows why it guessed.", traditionalChinese: "SAV-E 會說清楚為什麼這樣猜。")
         case .privateMap:
-            return localized(english: "Save only what you confirm.", traditionalChinese: "確認後才存到私人地圖。")
+            return localized(english: "Confirm before it becomes memory.", traditionalChinese: "你確認後才變成記憶。")
         default:
             return ""
         }
@@ -478,11 +478,11 @@ private struct CarouselPromisePage: View {
     private var subtitle: String {
         switch stage {
         case .lost:
-            return localized(english: "Drop in a message, social post, map link, or screenshot before it disappears.", traditionalChinese: "訊息、短影音文案、地圖連結或截圖，都先丟給 Memo 接住。")
+            return localized(english: "Share a Reel, map link, caption, screenshot, or note. The raw source stays attached.", traditionalChinese: "Reel、地圖連結、文案、截圖或筆記都可以；原始來源會一起保留。")
         case .find:
-            return localized(english: "Messy clues become one likely place with the source still attached.", traditionalChinese: "混亂線索會變成一個可能地點，來源也會一起保留。")
+            return localized(english: "Caption, handle, location words, and map evidence become a Review Candidate, not a fake pin.", traditionalChinese: "文案、帳號、地點字眼和地圖證據會變成待確認地點，不會直接假裝成地圖點。")
         case .privateMap:
-            return localized(english: "Uncertain matches wait in Review. Confirmed places become private Map Stamps.", traditionalChinese: "不確定的先待確認。確認過的地點，才會變成私人地圖章。")
+            return localized(english: "Only confirmed places become private Map Stamps you can ask about later.", traditionalChinese: "只有你確認過的地點，才會成為之後能詢問的私人地圖章。")
         default:
             return ""
         }
@@ -530,15 +530,15 @@ private struct OnboardingCarouselVisual: View {
     private var lostVisual: some View {
         ZStack {
             floatingSource(label: "CHAT", icon: "bubble.left.and.bubble.right.fill", tint: .saveSky)
-                .offset(x: -92, y: -74)
+                .offset(x: -height * 0.28, y: -height * 0.22)
                 .rotationEffect(.degrees(-8))
 
             floatingSource(label: "IG", icon: "camera.fill", tint: .saveBlush)
-                .offset(x: 92, y: -62)
+                .offset(x: height * 0.27, y: -height * 0.20)
                 .rotationEffect(.degrees(9))
 
             floatingSource(label: "MAP", icon: "map.fill", tint: .saveMint)
-                .offset(x: -78, y: 78)
+                .offset(x: -height * 0.24, y: height * 0.23)
                 .rotationEffect(.degrees(7))
 
             Image(systemName: "arrow.down")
@@ -547,27 +547,27 @@ private struct OnboardingCarouselVisual: View {
                 .offset(y: -6)
 
             MemoMascotMark(size: height * 0.32, framed: true)
-                .offset(x: 52, y: 54)
+                .offset(x: height * 0.18, y: height * 0.18)
         }
     }
 
     private var findVisual: some View {
         ZStack {
             clueCard
-                .offset(x: -48, y: -54)
+                .offset(x: -height * 0.14, y: -height * 0.16)
                 .rotationEffect(.degrees(-7))
 
             Image(systemName: "sparkles")
                 .font(.largeTitle.weight(.black))
                 .foregroundColor(.saveHoney)
-                .offset(x: 36, y: -8)
+                .offset(x: height * 0.11, y: -height * 0.03)
 
             candidateCard
-                .offset(x: 26, y: 56)
+                .offset(x: height * 0.08, y: height * 0.17)
                 .rotationEffect(.degrees(5))
 
             MemoMascotMark(size: height * 0.22, framed: true)
-                .offset(x: 84, y: -74)
+                .offset(x: height * 0.24, y: -height * 0.22)
         }
     }
 
@@ -589,10 +589,10 @@ private struct OnboardingCarouselVisual: View {
             .padding(.vertical, 10)
             .background(Color.saveHoney.opacity(0.88))
             .clipShape(Capsule())
-            .offset(x: 74, y: -78)
+            .offset(x: height * 0.22, y: -height * 0.23)
 
             MemoMascotMark(size: height * 0.22, framed: true)
-                .offset(x: -88, y: 76)
+                .offset(x: -height * 0.26, y: height * 0.22)
         }
     }
 
@@ -605,7 +605,7 @@ private struct OnboardingCarouselVisual: View {
             .font(.caption.weight(.black))
             .foregroundColor(.saveMutedText)
 
-            Text(localized(english: "quiet coffee near Irvine", traditionalChinese: "Irvine 附近安靜咖啡"))
+            Text(localized(english: "quiet cafe near the station", traditionalChinese: "捷運站旁安靜咖啡"))
                 .font(.headline.weight(.black))
                 .foregroundColor(.saveInk)
         }
@@ -629,7 +629,7 @@ private struct OnboardingCarouselVisual: View {
             }
             .font(.caption.weight(.black))
 
-            Text("Utopia Euro Caffe")
+            Text(localized(english: "Hidden Moon Cafe?", traditionalChinese: "Hidden Moon Cafe？"))
                 .font(.headline.weight(.black))
                 .foregroundColor(.saveInk)
 
@@ -687,7 +687,7 @@ private struct FirstPlaceInputPage: View {
         VStack(spacing: isCompactHeight ? 14 : 20) {
             Spacer(minLength: 0)
 
-            MemoMascotMark(size: isCompactHeight ? 82 : 104, framed: true)
+            MemoMascotMark(size: isCompactHeight ? 74 : 94, framed: false)
                 .shadow(color: Color.saveInk.opacity(0.10), radius: 18, x: 0, y: 10)
 
             VStack(spacing: isCompactHeight ? 7 : 10) {
@@ -728,8 +728,8 @@ private struct FirstPlaceInputPage: View {
 
                     if clueText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text(localized(
-                            english: "Example: friend said this cafe is good for a quiet date near Irvine...",
-                            traditionalChinese: "例如：朋友說 Irvine 附近這間咖啡很適合安靜約會..."
+                            english: "Example: IG Reel caption says quiet cafe near the station, tagged @hidden.moon.cafe...",
+                            traditionalChinese: "例如：IG Reels 文案寫捷運站旁安靜咖啡，標記 @hidden.moon.cafe..."
                         ))
                         .font(.body.weight(.semibold))
                         .foregroundColor(.saveMutedText.opacity(0.72))
@@ -900,14 +900,14 @@ private struct AnimatedProofHero: View {
                     .textCase(.uppercase)
                     .foregroundColor(.saveMutedText)
 
-                Text("Utopia Euro Caffe")
+                Text(localized(english: "Hidden Moon Cafe?", traditionalChinese: "Hidden Moon Cafe？"))
                     .font(.title3)
                     .fontWeight(.black)
                     .foregroundColor(.saveInk)
 
-                ProofHeroLine(icon: "checkmark.seal.fill", text: localized(english: "Name found", traditionalChinese: "找到名稱"), tint: .saveMint)
+                ProofHeroLine(icon: "checkmark.seal.fill", text: localized(english: "Name clue found", traditionalChinese: "找到名稱線索"), tint: .saveMint)
                 ProofHeroLine(icon: "link", text: localized(english: "Source kept", traditionalChinese: "保留來源"), tint: .saveSky)
-                ProofHeroLine(icon: "exclamationmark.triangle.fill", text: localized(english: "Missing coordinates", traditionalChinese: "還缺座標"), tint: .saveHoney)
+                ProofHeroLine(icon: "exclamationmark.triangle.fill", text: localized(english: "Needs exact address", traditionalChinese: "還缺精確地址"), tint: .saveHoney)
             }
         }
         .padding(16)
@@ -935,12 +935,12 @@ private struct AnimatedProofHero: View {
                         .textCase(.uppercase)
                         .foregroundColor(.saveMutedText)
 
-                    Text("Utopia Euro Caffe")
+                    Text(localized(english: "Hidden Moon Cafe", traditionalChinese: "Hidden Moon Cafe"))
                         .font(.headline)
                         .fontWeight(.black)
                         .foregroundColor(.saveInk)
 
-                    Text(localized(english: "Coffee · friend sent · private", traditionalChinese: "咖啡 · 朋友推薦 · 私人"))
+                    Text(localized(english: "Coffee · source kept · private", traditionalChinese: "咖啡 · 保留來源 · 私人"))
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundColor(.saveMutedText)
@@ -984,8 +984,8 @@ private struct AnimatedProofHero: View {
                     .clipShape(Capsule())
 
                 Text(localized(
-                    english: "Start with Utopia. It matches your saved coffee clue. Public options stay separate.",
-                    traditionalChinese: "先從 Utopia 開始。它符合你存下的咖啡線索；公開搜尋會分開。"
+                    english: "Start with the place you confirmed. It matches your saved coffee clue; public nearby options stay separate.",
+                    traditionalChinese: "先從你確認過的地點開始。它符合你存下的咖啡線索；附近公開選項會分開。"
                 ))
                 .font(.subheadline)
                 .fontWeight(.bold)
@@ -1032,8 +1032,8 @@ private struct AnimatedProofHero: View {
         let trimmed = clueText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             return localized(
-                english: "Friend sent: quiet coffee date near Irvine",
-                traditionalChinese: "朋友傳：Irvine 附近安靜咖啡約會"
+                english: "Sample Reel: quiet cafe near the station",
+                traditionalChinese: "範例 Reels：捷運站旁安靜咖啡"
             )
         }
         return String(trimmed.prefix(74))
@@ -1383,7 +1383,7 @@ private struct ProofStageCard: View {
         VStack(alignment: .leading, spacing: 12) {
             ProofLine(
                 label: localized(english: "Found", traditionalChinese: "找到"),
-                value: localized(english: "Utopia Euro Caffe", traditionalChinese: "Utopia Euro Caffe"),
+                value: localized(english: "Hidden Moon Cafe? from the sample handle", traditionalChinese: "從範例帳號猜到 Hidden Moon Cafe？"),
                 icon: "checkmark.seal.fill",
                 tint: .saveMint
             )
@@ -1395,7 +1395,7 @@ private struct ProofStageCard: View {
             )
             ProofLine(
                 label: localized(english: "Missing", traditionalChinese: "還缺"),
-                value: localized(english: "Exact address and coordinates before it becomes a Map Stamp", traditionalChinese: "變成地圖章前，要確認地址與座標"),
+                value: localized(english: "Exact address and coordinates before saving", traditionalChinese: "保存前要確認精確地址與座標"),
                 icon: "exclamationmark.triangle.fill",
                 tint: .saveHoney
             )
@@ -1422,12 +1422,12 @@ private struct ProofStageCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Utopia Euro Caffe")
+                    Text("Hidden Moon Cafe")
                         .font(.headline)
                         .fontWeight(.black)
                         .foregroundColor(.saveInk)
 
-                    Text(localized(english: "Map Stamp · Coffee · Friend sent", traditionalChinese: "地圖章 · 咖啡 · 朋友推薦"))
+                    Text(localized(english: "Map Stamp · Coffee · Source kept", traditionalChinese: "地圖章 · 咖啡 · 保留來源"))
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.saveMutedText)
@@ -1450,8 +1450,8 @@ private struct ProofStageCard: View {
             )
             chatBubble(
                 localized(
-                    english: "I’d start with Utopia Euro Caffe because it matches your saved coffee clue and looks quiet enough for a date. Public discovery stays separate.",
-                    traditionalChinese: "我會先推薦 Utopia Euro Caffe，因為它符合你剛存的咖啡線索，也偏安靜適合約會。公開搜尋會另外標示。"
+                    english: "I’d start with Hidden Moon Cafe because you confirmed it from the sample clue. Public discovery stays separate.",
+                    traditionalChinese: "我會先推薦 Hidden Moon Cafe，因為你剛用範例線索確認過它。公開搜尋會另外標示。"
                 ),
                 isUser: false
             )
@@ -1583,8 +1583,8 @@ private struct ProofStageCard: View {
 
     private var placeholder: String {
         localized(
-            english: "Example: friend said this cafe is good for a quiet date near Irvine...",
-            traditionalChinese: "例如：朋友說 Irvine 附近這間咖啡很適合安靜約會..."
+            english: "Example: IG Reel caption says quiet cafe near the station, tagged @hidden.moon.cafe...",
+            traditionalChinese: "例如：IG Reels 文案寫捷運站旁安靜咖啡，標記 @hidden.moon.cafe..."
         )
     }
 
