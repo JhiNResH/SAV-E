@@ -274,6 +274,7 @@ struct OnboardingView: View {
     private func shouldShowSecondaryAction(isCompactHeight: Bool) -> Bool {
         if stage == .tag { return false }
         if stage == .lost { return false }
+        if stage == .clue { return true }
         return !isCompactHeight || stage.isIntroStage
     }
 
