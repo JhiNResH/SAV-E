@@ -10,6 +10,10 @@ struct PlaceBottomSheet: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
+    @State private var maatAnalysis: MaatPlaceAnalysisResponse?
+    @State private var maatAnalysisPlaceId: UUID?
+    @State private var maatAnalysisError: String?
+    @State private var isLoadingMaatAnalysis = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -74,6 +78,15 @@ struct PlaceBottomSheet: View {
 
             PlaceBasicInfoPanel(place: place)
             PlaceInsightSummaryPanel(place: place, fallbackSummary: memorySummary)
+            SavePlaceInsightsPanel(
+                place: place,
+                analysis: maatAnalysis,
+                isLoading: isLoadingMaatAnalysis,
+                error: maatAnalysisError,
+                languageSettings: languageSettings
+            ) {
+                Task { await loadMaatAnalysis(force: true) }
+            }
             PlaceProofPlaceholderCard()
 
             FlowLayout(spacing: 8) {
@@ -86,28 +99,6 @@ struct PlaceBottomSheet: View {
                 }
                 ForEach(verificationChips, id: \.text) { chip in
                     PlaceMemoryChip(icon: chip.icon, text: chip.text)
-                }
-            }
-
-            // Dishes
-            if let dishes = place.extractedDishes, !dishes.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(languageSettings.localized(english: "Recommended", traditionalChinese: "推薦"))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.saveMutedText)
-
-                    FlowLayout(spacing: 6) {
-                        ForEach(dishes, id: \.self) { dish in
-                            Text(dish)
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .foregroundColor(.saveInk)
-                                .background(Color.saveHoney.opacity(0.30))
-                                .cornerRadius(12)
-                        }
-                    }
                 }
             }
 
@@ -163,6 +154,9 @@ struct PlaceBottomSheet: View {
         }
         .padding()
         .background(PlaceDetailGlassBackground(colorScheme: colorScheme))
+        .task(id: place.id) {
+            await loadMaatAnalysis()
+        }
         .confirmationDialog(
             languageSettings.localized(english: "Delete \(place.name)?", traditionalChinese: "刪除「\(place.name)」？"),
             isPresented: $showDeleteConfirmation,
@@ -174,6 +168,35 @@ struct PlaceBottomSheet: View {
             Button(languageSettings.text(.cancel), role: .cancel) {}
         } message: {
             Text(languageSettings.localized(english: "This removes the Map Stamp from SAV-E.", traditionalChinese: "這會從 SAV-E 移除這個地圖章。"))
+        }
+    }
+
+    private func loadMaatAnalysis(force: Bool = false) async {
+        let placeId = place.id
+
+        if maatAnalysisPlaceId != placeId {
+            maatAnalysis = nil
+            maatAnalysisError = nil
+        }
+
+        guard force || maatAnalysisPlaceId != placeId || maatAnalysis == nil else { return }
+        isLoadingMaatAnalysis = true
+        maatAnalysisError = nil
+        defer { isLoadingMaatAnalysis = false }
+
+        do {
+            maatAnalysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
+                for: placeId,
+                includePrivateEvidence: false,
+                includePublicWeb: true
+            )
+            maatAnalysisPlaceId = placeId
+        } catch SupabaseError.notConfigured {
+            maatAnalysis = nil
+            maatAnalysisPlaceId = placeId
+        } catch {
+            maatAnalysisError = error.localizedDescription
+            maatAnalysisPlaceId = placeId
         }
     }
 
