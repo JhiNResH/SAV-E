@@ -2496,4 +2496,17 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(place.memorySummary(language: .traditionalChinese), "已存成想找時間去的地點。")
     }
 
+    func testOnboardingFirstClueQueuesReviewCandidateWithoutSyntheticSourceURL() throws {
+        let candidates = PendingPlaceImportService.onboardingFirstClueCandidates(
+            from: "Hidden Moon Cafe near the station, tiny patio, tagged @hidden.moon.cafe"
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+        XCTAssertNil(candidate.sourceURL)
+        XCTAssertEqual(candidate.sourceText, "Hidden Moon Cafe near the station, tiny patio, tagged @hidden.moon.cafe")
+        XCTAssertFalse(candidate.evidence.contains { $0.contains("save://onboarding") })
+        XCTAssertTrue(candidate.evidence.contains { $0.contains("Onboarding clue: Hidden Moon Cafe") })
+        XCTAssertFalse(candidate.candidateName.isEmpty)
+    }
+
 }

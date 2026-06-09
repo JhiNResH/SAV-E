@@ -7,12 +7,12 @@ struct OnboardingView: View {
     @State private var clueText = ""
     @State private var selectedTags: Set<ProofIntentTag> = []
     private let autoUseSampleClue: Bool
-    var onComplete: () -> Void
+    var onComplete: (String?) -> Void
 
     private var language: AppLanguage { languageSettings.language }
     private var isIntroStage: Bool { stage.introIndex != nil }
 
-    init(startWithSampleProof: Bool = false, onComplete: @escaping () -> Void) {
+    init(startWithSampleProof: Bool = false, onComplete: @escaping (String?) -> Void) {
         _stage = State(initialValue: startWithSampleProof ? .clue : .lost)
         self.autoUseSampleClue = startWithSampleProof
         self.onComplete = onComplete
@@ -221,7 +221,7 @@ struct OnboardingView: View {
             stage = .clue
         case .clue:
             guard !trimmedClue.isEmpty else { return }
-            onComplete()
+            onComplete(trimmedClue)
         case .candidate:
             stage = .mapStamp
         case .mapStamp:
@@ -229,7 +229,7 @@ struct OnboardingView: View {
         case .ask:
             stage = .tag
         case .tag:
-            onComplete()
+            onComplete(nil)
         }
     }
 
@@ -238,7 +238,7 @@ struct OnboardingView: View {
         case .lost, .find, .privateMap:
             stage = .clue
         case .clue:
-            onComplete()
+            onComplete(nil)
         case .candidate:
             stage = .mapStamp
         case .mapStamp:
@@ -246,7 +246,7 @@ struct OnboardingView: View {
         case .ask:
             stage = .tag
         case .tag:
-            onComplete()
+            onComplete(nil)
         }
     }
 
@@ -1778,6 +1778,6 @@ private struct FirstRunTrustNote: View {
 }
 
 #Preview {
-    OnboardingView(onComplete: {})
+    OnboardingView { _ in }
         .environment(\.appLanguageSettings, AppLanguageSettings())
 }
