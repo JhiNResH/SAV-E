@@ -12,6 +12,7 @@ import {
 } from "./placeClaims.js";
 import {
   enrichMaatPlaceAnalysisWithPublicWeb,
+  enrichMaatPlaceAnalysisWithStructuredSources,
   mergePublicWebDetails,
   publicWebConfigFromEnv,
 } from "./maatPublicWebAnalysis.js";
@@ -358,10 +359,152 @@ test("enrichMaatPlaceAnalysisWithPublicWeb is env-gated and keeps deterministic 
 });
 
 test("publicWebConfigFromEnv enables requested Ma'at web analysis unless explicitly disabled", () => {
-  const config = publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key" });
+  const config = publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key", GOOGLE_PLACES_API_KEY: "places-key", YELP_API_KEY: "yelp-key" });
   assert.equal(config.enabled, true);
   assert.equal(config.model, "gemini-3.5-flash");
+  assert.equal(config.googlePlacesApiKey, "places-key");
+  assert.equal(config.yelpApiKey, "yelp-key");
   assert.equal(publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key", SAVE_ENABLE_MAAT_PUBLIC_WEB: "false" }).enabled, false);
+});
+
+test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Places", async () => {
+  const base = buildMaatPlaceAnalysis({ id: "place_1", name: "一號地鍋雞", address: "Irvine, CA" }, []);
+  const output = await enrichMaatPlaceAnalysisWithStructuredSources({
+    place: { id: "place_1", name: "一號地鍋雞", address: "Irvine, CA" },
+    claims: [],
+    analysis: base,
+  }, {
+    enabled: true,
+    model: "gemini-test",
+    googlePlacesApiKey: "places-key",
+    fetcher: async (url, init) => {
+      assert.equal(url, "https://places.googleapis.com/v1/places:searchText");
+      assert.match(init.body ?? "", /一號地鍋雞/);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          places: [{
+            id: "google_1",
+            displayName: { text: "一號地鍋雞" },
+            formattedAddress: "1 Test Rd, Irvine, CA",
+            googleMapsUri: "https://maps.google.com/?cid=1",
+            rating: 4.3,
+            userRatingCount: 218,
+            priceLevel: "PRICE_LEVEL_MODERATE",
+            primaryType: "chinese_restaurant",
+            parkingOptions: { freeParkingLot: true, paidStreetParking: true },
+            reservable: true,
+            dineIn: true,
+            takeout: true,
+            servesDinner: true,
+            editorialSummary: { text: "熱鬧的地鍋雞餐廳。" },
+          }],
+        }),
+      };
+    },
+  });
+
+  const details = output.restaurant_details as Record<string, unknown>;
+  assert.deepEqual(details.platform_scores, [{ platform: "Google", score: 4.3, source: "google_places_api" }]);
+  assert.equal(details.price_range, "$$");
+  assert.equal(details.cuisine, "chinese restaurant");
+  assert.equal(details.ambiance, "熱鬧的地鍋雞餐廳。");
+  assert.equal(details.reservation_tips, "Google Places 顯示可訂位；尖峰時段建議先預約。");
+  assert.equal(details.parking, "Google Places 顯示：免費停車場、路邊付費停車。");
+  assert.deepEqual(details.best_for, ["內用", "外帶", "晚餐"]);
+  const receipt = output.analysis_receipt as Record<string, unknown>;
+  assert.equal(receipt.structured_source_used, true);
+  assert.equal(receipt.google_places_status, "used");
+  assert.equal(receipt.yelp_status, "missing_api_key");
+  assert.deepEqual(output.structured_source_sources, [{ title: "Google Places", url: "https://maps.google.com/?cid=1" }]);
+});
+
+test("enrichMaatPlaceAnalysisWithPublicWeb keeps structured details when Gemini key is missing", async () => {
+  const base = buildMaatPlaceAnalysis({ id: "place_1", name: "Utopia Euro Caffe", address: "Los Angeles, CA" }, []);
+  const output = await enrichMaatPlaceAnalysisWithPublicWeb({
+    place: { id: "place_1", name: "Utopia Euro Caffe", address: "Los Angeles, CA" },
+    claims: [],
+    analysis: base,
+  }, {
+    enabled: true,
+    model: "gemini-test",
+    googlePlacesApiKey: "places-key",
+    fetcher: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        places: [{
+          id: "google_1",
+          googleMapsUri: "https://maps.google.com/?cid=2",
+          rating: 4.6,
+          priceLevel: "PRICE_LEVEL_MODERATE",
+          reservable: true,
+        }],
+      }),
+    }),
+  });
+
+  const details = output.restaurant_details as Record<string, unknown>;
+  assert.deepEqual(details.platform_scores, [{ platform: "Google", score: 4.6, source: "google_places_api" }]);
+  assert.equal(details.price_range, "$$");
+  assert.equal(details.reservation_tips, "Google Places 顯示可訂位；尖峰時段建議先預約。");
+  const receipt = output.analysis_receipt as Record<string, unknown>;
+  assert.equal(receipt.structured_source_used, true);
+  assert.equal(receipt.public_web_used, false);
+  assert.equal(receipt.model_used, false);
+  assert.equal(receipt.public_web_status, "missing_api_key");
+});
+
+test("enrichMaatPlaceAnalysisWithStructuredSources can add Yelp score and review excerpts", async () => {
+  const base = buildMaatPlaceAnalysis({ id: "place_1", name: "Corner Bakery Cafe", address: "Irvine, CA" }, []);
+  const output = await enrichMaatPlaceAnalysisWithStructuredSources({
+    place: { id: "place_1", name: "Corner Bakery Cafe", address: "Irvine, CA" },
+    claims: [],
+    analysis: base,
+  }, {
+    enabled: true,
+    model: "gemini-test",
+    yelpApiKey: "yelp-key",
+    fetcher: async (url) => {
+      if (url.startsWith("https://api.yelp.com/v3/businesses/search")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ businesses: [{ id: "corner-bakery", url: "https://www.yelp.com/biz/corner-bakery" }] }),
+        };
+      }
+      if (url.endsWith("/corner-bakery")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: "corner-bakery",
+            url: "https://www.yelp.com/biz/corner-bakery",
+            rating: 3.8,
+            price: "$$",
+            categories: [{ title: "Cafes" }, { title: "Breakfast & Brunch" }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          reviews: [{ rating: 2, text: "Service can be slow during lunch." }],
+        }),
+      };
+    },
+  });
+
+  const details = output.restaurant_details as Record<string, unknown>;
+  assert.deepEqual(details.platform_scores, [{ platform: "Yelp", score: 3.8, source: "yelp_api" }]);
+  assert.equal(details.price_range, "$$");
+  assert.equal(details.cuisine, "Cafes / Breakfast & Brunch");
+  assert.deepEqual(details.critical_reviews, [{ issue: "Service can be slow during lunch.", source: "Yelp", frequency: "review excerpt" }]);
+  const receipt = output.analysis_receipt as Record<string, unknown>;
+  assert.equal(receipt.google_places_status, "missing_api_key");
+  assert.equal(receipt.yelp_status, "used");
 });
 
 test("enrichMaatPlaceAnalysisWithPublicWeb sends public claim summaries only", async () => {
@@ -396,7 +539,7 @@ test("enrichMaatPlaceAnalysisWithPublicWeb sends public claim summaries only", a
     apiKey: "test-key",
     model: "gemini-test",
     fetcher: async (_url, init) => {
-      requestBody = init.body;
+      requestBody = init.body ?? "";
       return {
         ok: true,
         status: 200,
