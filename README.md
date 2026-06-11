@@ -39,7 +39,6 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
    ```
 
    Xcode also creates these local files from the templates during build if they are missing. It does not overwrite existing local `Secrets.plist` files; when templates change, compare them manually and add any new keys to your local files. Fill in your local API keys in `SAV-E/Resources/Secrets.plist` and `SAV-EShareExtension/Secrets.plist`:
-   - `GEMINI_API_KEY` — from Google AI Studio
    - `GOOGLE_PLACES_API_KEY` — from [Google Cloud Console](https://console.cloud.google.com/)
    - `SAVE_API_URL` — Railway backend service URL, currently `https://wanderly-api-production.up.railway.app`
    - `SAVE_PLACE_SHARE_BASE_URL` — production place share route, currently `https://sav-e-app.vercel.app/p`
@@ -48,6 +47,7 @@ Save places from links shared from Instagram, Threads, Xiaohongshu, Maps, or the
    - `SAVE_LIST_SHARE_BASE_URL` — production collaborative list share route, currently `https://sav-e-app.vercel.app/list`
    - `PRIVY_APP_ID` — from Privy Dashboard → App Settings → Basics
    - `PRIVY_APP_CLIENT_ID` — from Privy Dashboard → App Settings → Clients. The iOS app client must allow bundle id `com.wanderly.app` and URL scheme `wanderly`.
+   - `GEMINI_API_KEY` is a backend secret. Do not ship it in app `Secrets.plist`; only set `SAVE_ALLOW_CLIENT_GEMINI=true` with a local Gemini key for private development.
 
    New production config should use the `SAVE_*` keys above. The app still reads legacy `WANDERLY_*` keys as a migration fallback when present in an older local `Secrets.plist`, but the templates and release docs are SAV-E-first.
    - Keep real values out of commits.

@@ -17,6 +17,8 @@ final class SAVEProductionConfigTests: XCTestCase {
         XCTAssertNil(mainTemplate["WANDERLY_SHARE_BASE_URL"])
         XCTAssertNil(shareTemplate["WANDERLY_API_URL"])
         XCTAssertNil(shareTemplate["WANDERLY_SHARE_BASE_URL"])
+        XCTAssertNil(mainTemplate["GEMINI_API_KEY"])
+        XCTAssertNil(shareTemplate["GEMINI_API_KEY"])
     }
 
     func testConfigNormalizationRejectsPlaceholders() {
@@ -24,6 +26,11 @@ final class SAVEProductionConfigTests: XCTestCase {
         XCTAssertNil(SAVEProductionConfig.normalizedConfigValue("REPLACE_ME"))
         XCTAssertNil(SAVEProductionConfig.normalizedConfigValue("  "))
         XCTAssertEqual(SAVEProductionConfig.normalizedConfigValue(" https://sav-e-app.vercel.app/p "), "https://sav-e-app.vercel.app/p")
+    }
+
+    func testClientGeminiFallbackIsOffByDefault() {
+        XCTAssertFalse(SAVEProductionConfig.allowsClientGeminiFallback())
+        XCTAssertNil(SAVEProductionConfig.clientGeminiAPIKeyIfAllowed())
     }
 
     func testSharedProductionConstantsMatchExistingAppleIdentifiers() {

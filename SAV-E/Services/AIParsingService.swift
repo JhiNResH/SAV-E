@@ -44,24 +44,21 @@ enum AIParsingError: LocalizedError {
 final class AIParsingService: AIParsingServiceProtocol {
     static let shared = AIParsingService()
 
-    private let apiKey: String?
-    private let modelFallbacks: [String]
+    private let geminiTransport: SAVEGeminiTransport
 
     init(apiKey: String? = nil, modelFallbacks: [String] = SAVEProductionConfig.defaultGeminiModelFallbacks) {
         let resolved = apiKey
-            ?? ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
-            ?? SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
-        self.apiKey = resolved
-        self.modelFallbacks = modelFallbacks
+            ?? SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
+        self.geminiTransport = SAVEGeminiTransport(
+            modelFallbacks: modelFallbacks,
+            accessTokenProvider: { try await PrivyAuthService.shared.accessToken() },
+            directAPIKey: resolved
+        )
     }
 
     // MARK: - Parse URL
 
     func parseURL(_ url: URL) async throws -> ParsedPlaceResult {
-        guard let apiKey, !apiKey.isEmpty else {
-            throw AIParsingError.apiKeyMissing
-        }
-
         // Step 1: Fetch OpenGraph metadata from URL
         let metadata = await fetchOpenGraphMetadata(from: url)
 
@@ -99,10 +96,6 @@ final class AIParsingService: AIParsingServiceProtocol {
     // MARK: - Parse Image
 
     func parseImage(_ imageData: Data) async throws -> ParsedPlaceResult {
-        guard let apiKey, !apiKey.isEmpty else {
-            throw AIParsingError.apiKeyMissing
-        }
-
         let base64 = imageData.base64EncodedString()
 
         let prompt = """
@@ -134,8 +127,6 @@ final class AIParsingService: AIParsingServiceProtocol {
     // MARK: - Private
 
     private func callGemini(prompt: String) async throws -> ParsedPlaceResult {
-        guard apiKey != nil else { throw AIParsingError.apiKeyMissing }
-
         let body: [String: Any] = [
             "contents": [["parts": [["text": prompt]]]],
             "generationConfig": ["temperature": 0.2, "maxOutputTokens": 512]
@@ -145,29 +136,16 @@ final class AIParsingService: AIParsingServiceProtocol {
     }
 
     private func callGemini(body: [String: Any]) async throws -> ParsedPlaceResult {
-        guard let apiKey else { throw AIParsingError.apiKeyMissing }
-        let requestBody = try JSONSerialization.data(withJSONObject: body)
-        var lastStatusCode = 0
-
-        for model in modelFallbacks {
-            let endpoint = SAVEProductionConfig.geminiGenerateContentURL(apiKey: apiKey, model: model)
-            var request = URLRequest(url: endpoint)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = requestBody
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else { continue }
-            lastStatusCode = http.statusCode
-            if http.statusCode == 200 {
-                return try parseGeminiResponse(data)
+        do {
+            let json = try await geminiTransport.generateContent(body: body)
+            let data = try JSONSerialization.data(withJSONObject: json)
+            return try parseGeminiResponse(data)
+        } catch let error as SAVEGeminiTransportError {
+            if case .upstreamStatus(let status) = error {
+                throw AIParsingError.parsingFailed(Self.userFacingGeminiError(statusCode: status))
             }
-            if http.statusCode != 404 && http.statusCode != 429 {
-                break
-            }
+            throw AIParsingError.apiKeyMissing
         }
-
-        throw AIParsingError.parsingFailed(Self.userFacingGeminiError(statusCode: lastStatusCode))
     }
 
     private static func userFacingGeminiError(statusCode: Int) -> String {

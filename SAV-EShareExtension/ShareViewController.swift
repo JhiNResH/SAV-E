@@ -1201,7 +1201,7 @@ struct ShareExtensionView: View {
 
     private func parseWithGemini(content: String, sourceURLString: String) async throws -> ParsedPlace {
         guard let apiKey = geminiAPIKey(), !apiKey.isEmpty else {
-            throw NSError(domain: "save", code: 1, userInfo: [NSLocalizedDescriptionKey: "GEMINI_API_KEY not configured"])
+            throw NSError(domain: "save", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gemini direct fallback is disabled"])
         }
 
         let prompt = """
@@ -3164,7 +3164,7 @@ struct ShareExtensionView: View {
     }
 
     private func geminiAPIKey() -> String? {
-        SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
+        SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
     }
 
     // MARK: - Save

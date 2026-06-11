@@ -312,33 +312,34 @@ struct DeterministicSaveIntentParser: SaveLLMClient {
 }
 
 final class GeminiSaveLLMClient: SaveLLMClient {
-    private let apiKey: String
-    private let modelFallbacks: [String]
     private let validator: SaveSearchIntentJSONValidator
     private let groundedAnswerValidator: GroundedAnswerJSONValidator
     private let promptPolicy: SaveAgentPromptPolicy
-    private let session: URLSession
+    private let geminiTransport: SAVEGeminiTransport
 
     init(
-        apiKey: String,
+        apiKey: String? = nil,
         modelFallbacks: [String] = SAVEProductionConfig.defaultGeminiModelFallbacks,
         validator: SaveSearchIntentJSONValidator = SaveSearchIntentJSONValidator(),
         groundedAnswerValidator: GroundedAnswerJSONValidator = GroundedAnswerJSONValidator(),
         promptPolicy: SaveAgentPromptPolicy = SaveAgentPromptPolicy(),
         session: URLSession = .shared
     ) {
-        self.apiKey = apiKey
-        self.modelFallbacks = modelFallbacks
         self.validator = validator
         self.groundedAnswerValidator = groundedAnswerValidator
         self.promptPolicy = promptPolicy
-        self.session = session
+        self.geminiTransport = SAVEGeminiTransport(
+            modelFallbacks: modelFallbacks,
+            session: session,
+            accessTokenProvider: { try await PrivyAuthService.shared.accessToken() },
+            directAPIKey: apiKey ?? SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
+        )
     }
 
     static func liveFromConfig() -> GeminiSaveLLMClient? {
-        let apiKey = ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
-            ?? SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
-        guard let apiKey, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let hasBackend = SAVEProductionConfig.URLConfigValue(for: ["SAVE_API_URL", "WANDERLY_API_URL"]) != nil
+        let apiKey = SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
+        guard hasBackend || apiKey != nil else {
             return nil
         }
         return GeminiSaveLLMClient(apiKey: apiKey)
@@ -426,31 +427,14 @@ final class GeminiSaveLLMClient: SaveLLMClient {
             "contents": [["role": "user", "parts": [["text": prompt]]]],
             "generationConfig": ["temperature": temperature, "maxOutputTokens": maxOutputTokens]
         ]
-        let requestBody = try JSONSerialization.data(withJSONObject: body)
-
-        for model in modelFallbacks {
-            let endpoint = SAVEProductionConfig.geminiGenerateContentURL(apiKey: apiKey, model: model)
-            var request = URLRequest(url: endpoint)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = requestBody
-
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { continue }
-            guard http.statusCode == 200 else {
-                if http.statusCode == 404 || http.statusCode == 429 { continue }
-                throw SaveAIError.apiError(http.statusCode)
-            }
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let candidates = json["candidates"] as? [[String: Any]],
+        let json = try await geminiTransport.generateContent(body: body)
+        guard let candidates = json["candidates"] as? [[String: Any]],
                   let content = candidates.first?["content"] as? [String: Any],
                   let parts = content["parts"] as? [[String: Any]],
                   let text = parts.first?["text"] as? String else {
-                throw SaveAIError.emptyResponse
-            }
-            return text
+            throw SaveAIError.emptyResponse
         }
-        throw SaveAIError.apiError(0)
+        return text
     }
 
     private func extractJSONObject(from text: String) -> String {
