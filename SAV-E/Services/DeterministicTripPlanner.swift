@@ -345,24 +345,22 @@ struct DeterministicTripPlanner {
             return savedMemoryPlanAnchoredByPositiveMatches(
                 positive: positive,
                 allCandidates: candidates,
+                days: days,
                 maxStops: maxStops
             )
         }
 
-        let source = candidates
-
-        return source
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score { return lhs.score > rhs.score }
-                return lhs.place.createdAt > rhs.place.createdAt
-            }
-            .prefix(maxStops)
-            .map(\.place)
+        return reasonableSelection(
+            from: candidates,
+            days: days,
+            maxStops: maxStops
+        )
     }
 
     private func savedMemoryPlanAnchoredByPositiveMatches(
         positive: [Candidate],
         allCandidates: [Candidate],
+        days: Int,
         maxStops: Int
     ) -> [Place] {
         let anchors = positive
@@ -383,7 +381,46 @@ struct DeterministicTripPlanner {
                 return lhs.place.createdAt > rhs.place.createdAt
             }
 
-        return Array((anchors + nearbySaved).prefix(maxStops).map(\.place))
+        return reasonableSelection(
+            from: anchors + nearbySaved,
+            days: days,
+            maxStops: maxStops
+        )
+    }
+
+    private func reasonableSelection(
+        from candidates: [Candidate],
+        days: Int,
+        maxStops: Int
+    ) -> [Place] {
+        let ranked = rankedCandidates(candidates)
+        let activities = ranked.filter { isActivity($0.place) }
+        guard !activities.isEmpty else {
+            return Array(ranked.prefix(maxStops).map(\.place))
+        }
+
+        let targetActivityCount = min(activities.count, max(1, min(days, maxStops / 2)))
+        var selected: [Candidate] = Array(activities.prefix(targetActivityCount))
+        var selectedIDs = Set(selected.map(\.place.id))
+
+        for candidate in ranked where selected.count < maxStops {
+            guard !selectedIDs.contains(candidate.place.id) else { continue }
+            selected.append(candidate)
+            selectedIDs.insert(candidate.place.id)
+        }
+
+        return rankedCandidates(selected).map(\.place)
+    }
+
+    private func rankedCandidates(_ candidates: [Candidate]) -> [Candidate] {
+        candidates.sorted { lhs, rhs in
+            if lhs.score != rhs.score { return lhs.score > rhs.score }
+            return lhs.place.createdAt > rhs.place.createdAt
+        }
+    }
+
+    private func isActivity(_ place: Place) -> Bool {
+        place.category == .attraction || place.category == .shopping
     }
 
     private func hasSpecificPlanningConstraint(_ message: String) -> Bool {

@@ -363,7 +363,7 @@ final class SaveAIService {
         RULES:
         - Every user-visible string in title, itineraryDays.label, itineraryDays.stops.note, messageText, and aiMessage must use the OUTPUT LANGUAGE exactly.
         - For itinerary requests: use Map Stamps to build a realistic schedule with smart times, geographic order, and the user's requested destination/day count/style.
-        - If a DETERMINISTIC PLANNER DRAFT is provided, treat it as the approved candidate set. You may reorder, assign time slots, regroup by day, and drop optional non-anchor stops. Every non-null place ID must come from USER'S MAP STAMPS.
+        - If a DETERMINISTIC PLANNER DRAFT is provided, treat it as the approved candidate set. You may reorder, assign time slots, regroup by day, and drop optional non-anchor stops. A reasonable day structure outranks maximizing the number of saved food/drink stops. Every non-null place ID must come from USER'S MAP STAMPS.
         - \(Self.itineraryCandidatePolicyInstruction(outputLanguage: outputLanguage))
         - Stops from the deterministic draft or PUBLIC DISCOVERY CANDIDATES with null or empty placeId are unsaved/public candidates. You may keep those stops only with null placeId, using their exact candidate name, and clearly label them as unsaved/public.
         - The itinerary should read like an assistant-planned draft, not a debug report. Explain the plan in aiMessage before the stop list.
@@ -381,8 +381,8 @@ final class SaveAIService {
 
     static func itineraryCandidatePolicyInstruction(outputLanguage: AppLanguage) -> String {
         outputLanguage.localized(
-            english: "For trip planning, only use the retrieval candidate set: Map Stamps by exact UUID plus public discovery candidates by exact name with placeId null. If saved places are all food/drink, the plan must reserve space for an attraction or public activity candidate when one is available; do not output an all-restaurant itinerary.",
-            traditionalChinese: "行程規劃只能使用檢索候選集合：地圖章必須用正確 UUID，公開探索候選必須用精確名稱且 placeId 維持 null。如果已存地點全是吃喝，且有景點或公開活動候選，行程必須保留景點／活動，不可直接輸出全餐廳行程。"
+            english: "For trip planning, only use the retrieval candidate set: Map Stamps by exact UUID plus public discovery candidates by exact name with placeId null. Prioritize a reasonable itinerary structure over filling every slot. If saved places are mostly or all food/drink, the plan must reserve space for an attraction or public activity candidate when one is available; do not output an all-restaurant itinerary.",
+            traditionalChinese: "行程規劃只能使用檢索候選集合：地圖章必須用正確 UUID，公開探索候選必須用精確名稱且 placeId 維持 null。合理行程結構優先於把所有空格塞滿。如果已存地點多半或全是吃喝，且有景點或公開活動候選，行程必須保留景點／活動，不可直接輸出全餐廳行程。"
         )
     }
 
