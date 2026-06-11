@@ -676,9 +676,13 @@ function evidenceGapsAfterMerge(existing: JsonObject, incoming: JsonObject): str
   const missing = new Set(stringArray(existing.evidence_gaps));
   const fieldByGap: Record<string, unknown> = {
     "missing dish evidence": incoming.must_try,
+    recommended_dishes: incoming.must_try,
     "missing parking evidence": incoming.parking,
+    parking: incoming.parking,
     "missing reservation evidence": incoming.reservation_tips,
+    reservation_tips: incoming.reservation_tips,
     "missing price evidence": incoming.price_range ?? incoming.avg_cost,
+    cost: incoming.price_range ?? incoming.avg_cost,
   };
   for (const [gap, value] of Object.entries(fieldByGap)) {
     if (Array.isArray(value) ? value.length > 0 : Boolean(value)) missing.delete(gap);

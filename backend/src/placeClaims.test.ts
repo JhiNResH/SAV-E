@@ -413,6 +413,7 @@ test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Pla
   assert.equal(details.reservation_tips, "Google Places 顯示可訂位；尖峰時段建議先預約。");
   assert.equal(details.parking, "Google Places 顯示：免費停車場、路邊付費停車。");
   assert.deepEqual(details.best_for, ["內用", "外帶", "晚餐"]);
+  assert.deepEqual(details.evidence_gaps, ["recommended_dishes"]);
   const receipt = output.analysis_receipt as Record<string, unknown>;
   assert.equal(receipt.structured_source_used, true);
   assert.equal(receipt.google_places_status, "used");
