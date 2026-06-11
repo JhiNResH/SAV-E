@@ -1307,6 +1307,20 @@ struct SaveSearchSection: Identifiable, Hashable {
     }
 }
 
+struct SaveSearchFollowUpChoice: Identifiable, Hashable {
+    var id: String
+    var label: String
+    var prompt: String
+    var systemImage: String
+
+    init(id: String, label: String, prompt: String, systemImage: String) {
+        self.id = id
+        self.label = label
+        self.prompt = prompt
+        self.systemImage = systemImage
+    }
+}
+
 struct SaveAgentGrounding: Equatable {
     var allowedResultIDs: [String]
     var sectionIDs: [String]
@@ -1351,6 +1365,7 @@ struct SaveSearchResponse: Equatable {
     var fromYourSave: SaveSearchSection
     var additionalSections: [SaveSearchSection]
     var newRecommendations: SaveSearchSection
+    var followUpChoices: [SaveSearchFollowUpChoice]
 
     init(
         query: String,
@@ -1358,7 +1373,8 @@ struct SaveSearchResponse: Equatable {
         agentAnswer: SaveAgentAnswer? = nil,
         fromYourSave: SaveSearchSection,
         additionalSections: [SaveSearchSection] = [],
-        newRecommendations: SaveSearchSection
+        newRecommendations: SaveSearchSection,
+        followUpChoices: [SaveSearchFollowUpChoice] = []
     ) {
         self.query = query
         self.assistantMessage = assistantMessage
@@ -1366,6 +1382,7 @@ struct SaveSearchResponse: Equatable {
         self.fromYourSave = fromYourSave
         self.additionalSections = additionalSections
         self.newRecommendations = newRecommendations
+        self.followUpChoices = followUpChoices
     }
 }
 

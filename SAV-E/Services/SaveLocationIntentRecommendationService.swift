@@ -433,6 +433,15 @@ struct SaveLocationIntentRecommendationService {
                     traditionalChinese: "如果想看 SAV-E 記憶以外的附近地點，可以搜尋公開探索。"
                 ) : nil,
                 showsNearbySearchAction: canSearchNearby
+            ),
+            followUpChoices: followUpChoices(
+                categoryLabel: outputLanguage.localized(
+                    english: categoryLabel(for: intent),
+                    traditionalChinese: localizedCategoryLabel(for: intent)
+                ),
+                hasSavedResults: !nearbyResults.isEmpty,
+                hasPublicResults: !mapResults.isEmpty,
+                outputLanguage: outputLanguage
             )
         )
     }
@@ -463,8 +472,79 @@ struct SaveLocationIntentRecommendationService {
                     traditionalChinese: "如果想看 SAV-E 記憶以外的附近地點，可以搜尋公開探索。"
                 ) : nil,
                 showsNearbySearchAction: showFallbackAction
+            ),
+            followUpChoices: followUpChoices(
+                categoryLabel: title,
+                hasSavedResults: false,
+                hasPublicResults: false,
+                outputLanguage: outputLanguage
             )
         )
+    }
+
+    private func followUpChoices(
+        categoryLabel: String,
+        hasSavedResults: Bool,
+        hasPublicResults: Bool,
+        outputLanguage: AppLanguage
+    ) -> [SaveSearchFollowUpChoice] {
+        guard hasSavedResults || hasPublicResults else { return [] }
+
+        if outputLanguage == .traditionalChinese {
+            return [
+                SaveSearchFollowUpChoice(
+                    id: "narrow-budget",
+                    label: "預算低一點",
+                    prompt: "幫我縮小：預算低一點的\(categoryLabel)。",
+                    systemImage: "dollarsign.circle"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "narrow-sit-down",
+                    label: "適合坐一下",
+                    prompt: "幫我比較：哪個\(categoryLabel)比較適合坐一下？",
+                    systemImage: "chair.lounge"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "narrow-takeout",
+                    label: "快速外帶",
+                    prompt: "幫我比較：哪個\(categoryLabel)比較適合快速外帶？",
+                    systemImage: "takeoutbag.and.cup.and.straw"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "save-one",
+                    label: "挑一個保存",
+                    prompt: "我想保存其中一家，先看最推薦的\(categoryLabel)。",
+                    systemImage: "bookmark.badge.plus"
+                )
+            ]
+        }
+
+        return [
+            SaveSearchFollowUpChoice(
+                id: "narrow-budget",
+                label: "Lower budget",
+                prompt: "Narrow this to lower-budget \(categoryLabel) options.",
+                systemImage: "dollarsign.circle"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "narrow-sit-down",
+                label: "Sit-down",
+                prompt: "Compare which \(categoryLabel) option is best for sitting down.",
+                systemImage: "chair.lounge"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "narrow-takeout",
+                label: "Quick takeout",
+                prompt: "Compare which \(categoryLabel) option is best for quick takeout.",
+                systemImage: "takeoutbag.and.cup.and.straw"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "save-one",
+                label: "Pick to save",
+                prompt: "Help me pick one \(categoryLabel) option to save first.",
+                systemImage: "bookmark.badge.plus"
+            )
+        ]
     }
 
     private func searchResults(

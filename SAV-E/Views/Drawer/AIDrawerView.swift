@@ -517,6 +517,9 @@ struct AIDrawerView: View {
                         onSelectResult: { result in
                             openSearchResult(result)
                         },
+                        onSelectFollowUpChoice: { choice in
+                            submitFollowUpChoice(choice)
+                        },
                         onSearchNearby: {
                             searchNearbyUnsavedCandidates(for: response.query)
                         }
@@ -1521,6 +1524,16 @@ struct AIDrawerView: View {
             reviewCandidates: reviewCandidates,
             outputLanguage: languageSettings.language
         )
+    }
+
+    private func submitFollowUpChoice(_ choice: SaveSearchFollowUpChoice) {
+        voiceQuery.stop()
+        searchFocused = false
+        viewModel.query = choice.prompt
+        withAnimation { drawerDetent = .medium }
+        Task {
+            await submitDrawerQuery()
+        }
     }
 
     private func searchNearbyUnsavedCandidates(for query: String) {

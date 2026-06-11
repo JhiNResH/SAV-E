@@ -633,8 +633,10 @@ final class AIDrawerViewModel: ObservableObject {
         let normalized = SaveSearchIntentParser.normalize(query)
         let followUpNeedles = [
             "why", "explain", "reason", "these", "those", "which", "compare", "narrow",
+            "budget", "vibe", "takeout", "sit-down", "save one", "pick one",
             "為什麼", "为什么", "推薦這些", "推荐这些", "這些", "这些", "哪個", "哪个",
-            "怎麼選", "怎么选", "原因", "比較", "比较", "不懂", "看不懂"
+            "怎麼選", "怎么选", "原因", "比較", "比较", "不懂", "看不懂",
+            "預算", "氛圍", "氣氛", "外帶", "坐一下", "保存", "挑一個", "縮小"
         ]
         return followUpNeedles.contains { normalized.contains($0) }
     }

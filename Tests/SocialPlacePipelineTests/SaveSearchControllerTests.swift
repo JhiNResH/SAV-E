@@ -1137,6 +1137,39 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testDrawerQuickChoicePromptUsesPreviousGroundedResults() async {
+        let client = StubGroundedAnswerClient(answer: "如果想坐一下，我會先看 Bright Coffee。")
+        let drawer = AIDrawerViewModel(groundedAnswerClient: client)
+        let candidate = SaveMapCandidate(
+            title: "Bright Coffee",
+            subtitle: "Santa Ana, CA",
+            latitude: 33.6849,
+            longitude: -117.8262,
+            category: .cafe,
+            rating: 4.8,
+            reviewCount: 1200,
+            distanceMeters: 180,
+            evidence: ["Apple Maps result", "Title mentions coffee"]
+        )
+        drawer.mapCandidates = [candidate]
+        drawer.query = "coffee"
+
+        await drawer.submit(outputLanguage: .traditionalChinese)
+
+        drawer.query = "幫我比較：哪個咖啡廳比較適合坐一下？"
+        await drawer.submit(outputLanguage: .traditionalChinese)
+
+        guard case .saveSearchResults(let response) = drawer.drawerState else {
+            return XCTFail("Expected follow-up save search results")
+        }
+        XCTAssertEqual(response.assistantMessage, client.answer)
+        XCTAssertEqual(client.requests.count, 2)
+        XCTAssertEqual(client.requests.last?.allowedPlaceIds, ["map-candidate-\(candidate.id)"])
+        XCTAssertTrue(client.requests.last?.query.contains("Follow-up question: 幫我比較") == true)
+        XCTAssertTrue(client.requests.last?.query.contains("Previous SAV-E query: coffee") == true)
+    }
+
+    @MainActor
     func testDrawerPreparedPublicDiscoveryKeepsRecommendationPathBounded() async {
         let client = StubGroundedAnswerClient(answer: "I would start with Saved Coffee, then compare Unsaved Coffee as public discovery.")
         let drawer = AIDrawerViewModel(
