@@ -512,6 +512,8 @@ final class AIDrawerViewModel: ObservableObject {
                 guard activeRequestID == requestID else { return }
                 activeRequestID = nil
                 drawerState = .displaying(Self.tripAnchorMessageResponse(
+                    query: query,
+                    places: places,
                     hasPlaces: !places.isEmpty,
                     outputLanguage: outputLanguage
                 ))
@@ -555,6 +557,8 @@ final class AIDrawerViewModel: ObservableObject {
             guard activeRequestID == requestID else { return }
             activeRequestID = nil
             drawerState = .displaying(Self.tripAnchorMessageResponse(
+                query: query,
+                places: places,
                 hasPlaces: !places.isEmpty,
                 outputLanguage: outputLanguage
             ))
@@ -572,7 +576,12 @@ final class AIDrawerViewModel: ObservableObject {
         }
     }
 
-    private static func tripAnchorMessageResponse(hasPlaces: Bool, outputLanguage: AppLanguage) -> SaveAIResponse {
+    private static func tripAnchorMessageResponse(
+        query: String,
+        places: [Place],
+        hasPlaces: Bool,
+        outputLanguage: AppLanguage
+    ) -> SaveAIResponse {
         let message = hasPlaces
             ? outputLanguage.localized(
                 english: "I could not find matching saved Map Stamps for that trip. Add a city, choose saved places, or ask SAV-E to search public discovery separately.",
@@ -594,8 +603,101 @@ final class AIDrawerViewModel: ObservableObject {
             itineraryDays: [],
             messageText: message,
             mapAction: nil,
-            aiMessage: message
+            aiMessage: message,
+            followUpChoices: tripAnchorChoices(query: query, places: places, outputLanguage: outputLanguage)
         )
+    }
+
+    private static func tripAnchorChoices(query: String, places: [Place], outputLanguage: AppLanguage) -> [SaveSearchFollowUpChoice] {
+        let dayText = tripDurationText(from: query, outputLanguage: outputLanguage)
+        let savedDestinations = destinationChoices(from: places)
+        var choices: [SaveSearchFollowUpChoice] = []
+
+        for destination in savedDestinations.prefix(2) {
+            choices.append(SaveSearchFollowUpChoice(
+                id: "trip-anchor-\(TripDestinationScope.normalizeID(destination))",
+                label: "\(destination) \(dayText)",
+                prompt: outputLanguage.localized(
+                    english: "Plan a \(dayText) \(destination) itinerary from my saved Map Stamps.",
+                    traditionalChinese: "規劃\(destination) \(dayText)行程"
+                ),
+                systemImage: "mappin.and.ellipse"
+            ))
+        }
+
+        let publicDestination = broadDestinationHint(from: query) ?? TripDestinationScope.destinationHint(from: query) ?? outputLanguage.localized(
+            english: "this city",
+            traditionalChinese: "這個城市"
+        )
+        choices.append(SaveSearchFollowUpChoice(
+            id: "trip-public-discovery",
+            label: outputLanguage.localized(english: "Find public options", traditionalChinese: "找公開景點"),
+            prompt: outputLanguage.localized(
+                english: "Search public activities and attractions for \(publicDestination).",
+                traditionalChinese: "搜尋\(publicDestination)公開景點和活動"
+            ),
+            systemImage: "location.magnifyingglass"
+        ))
+
+        choices.append(SaveSearchFollowUpChoice(
+            id: "trip-show-saved",
+            label: outputLanguage.localized(english: "Show saved places", traditionalChinese: "看已存地點"),
+            prompt: outputLanguage.localized(
+                english: "Show my saved places that can anchor a trip.",
+                traditionalChinese: "顯示可以當行程錨點的已存地點"
+            ),
+            systemImage: "bookmark"
+        ))
+
+        return Array(choices.prefix(4))
+    }
+
+    private static func broadDestinationHint(from query: String) -> String? {
+        let normalized = query
+            .folding(options: [.diacriticInsensitive, .widthInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+        if normalized.contains("加州") {
+            return "加州"
+        }
+        if normalized.contains("california") {
+            return "California"
+        }
+        return nil
+    }
+
+    private static func destinationChoices(from places: [Place]) -> [String] {
+        var destinations: [String] = []
+        for place in places {
+            guard let destination = TripDestinationScope.destinationHint(from: "\(place.name) \(place.address)") else {
+                continue
+            }
+            if !destinations.contains(destination) {
+                destinations.append(destination)
+            }
+        }
+        return destinations
+    }
+
+    private static func tripDurationText(from query: String, outputLanguage: AppLanguage) -> String {
+        let normalized = query.lowercased()
+        let patterns = [
+            #"(\d+)\s*[- ]?\s*days?"#,
+            #"(\d+)\s*[- ]?\s*day"#,
+            #"(\d+)\s*[天日]"#
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: normalized, range: NSRange(normalized.startIndex..<normalized.endIndex, in: normalized)),
+               match.numberOfRanges > 1,
+               let range = Range(match.range(at: 1), in: normalized),
+               let value = Int(normalized[range]) {
+                return outputLanguage == .traditionalChinese ? "\(value) 天" : "\(value) days"
+            }
+        }
+        if normalized.contains("weekend") {
+            return outputLanguage == .traditionalChinese ? "週末" : "weekend"
+        }
+        return outputLanguage == .traditionalChinese ? "1 天" : "1 day"
     }
 
     private func planAroundPrompt(for draft: SavePlanAroundDraft, outputLanguage: AppLanguage) -> String {

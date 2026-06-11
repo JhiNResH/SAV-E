@@ -148,6 +148,9 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertEqual(response.componentType, .message)
         XCTAssertTrue(response.messageText?.contains("幾天") == true)
         XCTAssertTrue(response.messageText?.contains("公開活動候選") == true)
+        XCTAssertEqual(response.followUpChoices.count, 4)
+        XCTAssertEqual(response.followUpChoices.first?.label, "Los Angeles 1 天")
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains("規劃Los Angeles 3 天吃喝加景點"))
         XCTAssertTrue(response.itineraryDays.isEmpty)
         XCTAssertNil(response.mapAction)
     }

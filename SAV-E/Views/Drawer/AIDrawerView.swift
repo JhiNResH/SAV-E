@@ -491,6 +491,18 @@ struct AIDrawerView: View {
 
                     case .message:
                         messageView(response.messageText ?? response.aiMessage ?? "")
+                        if !response.followUpChoices.isEmpty {
+                            SaveSearchFollowUpChoiceGrid(
+                                title: languageSettings.localized(
+                                    english: "Choose a next step",
+                                    traditionalChinese: "選一個繼續"
+                                ),
+                                choices: response.followUpChoices,
+                                onSelect: { choice in
+                                    submitFollowUpChoice(choice)
+                                }
+                            )
+                        }
                     }
 
                     AIResultActionBar(

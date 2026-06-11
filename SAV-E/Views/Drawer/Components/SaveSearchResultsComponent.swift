@@ -160,8 +160,9 @@ struct SaveSearchResultsComponent: View {
     }
 }
 
-private struct SaveSearchFollowUpChoiceGrid: View {
+struct SaveSearchFollowUpChoiceGrid: View {
     @Environment(\.appLanguageSettings) private var languageSettings
+    var title: String? = nil
     let choices: [SaveSearchFollowUpChoice]
     var onSelect: (SaveSearchFollowUpChoice) -> Void
 
@@ -175,7 +176,7 @@ private struct SaveSearchFollowUpChoiceGrid: View {
             HStack(spacing: 7) {
                 Image(systemName: "square.grid.2x2")
                     .font(.caption.weight(.black))
-                Text(languageSettings.localized(english: "Narrow with one tap", traditionalChinese: "點一下繼續縮小"))
+                Text(title ?? languageSettings.localized(english: "Narrow with one tap", traditionalChinese: "點一下繼續縮小"))
                     .font(.caption.weight(.black))
                 Spacer(minLength: 0)
             }
