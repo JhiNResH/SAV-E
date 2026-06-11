@@ -520,13 +520,19 @@ final class AIDrawerViewModel: ObservableObject {
             }
 
             let publicCandidates = await publicDiscoveryCandidates(for: query)
+            let deterministicPlaceIDs = Set(
+                (deterministicDraft.placeIds + [deterministicDraft.navigationPlaceId].compactMap { $0 })
+                    .compactMap(UUID.init(uuidString:))
+            )
+            let deterministicPlaces = places.filter { deterministicPlaceIDs.contains($0.id) }
             let response = try await aiService.query(
                 query,
-                places: places,
+                places: deterministicPlaces,
                 publicCandidates: publicCandidates,
                 conversationHistory: conversationTurns,
                 outputLanguage: outputLanguage,
-                deterministicDraftOverride: deterministicDraft
+                deterministicDraftOverride: deterministicDraft,
+                requiredPlaceIDs: Set(deterministicPlaces.map { $0.id.uuidString })
             )
             guard activeRequestID == requestID else { return }
             activeRequestID = nil
