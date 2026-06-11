@@ -16,6 +16,16 @@ enum SAVEProductionConfig {
         URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
     }
 
+    static func allowsClientGeminiFallback(bundle: Bundle = .main) -> Bool {
+        let value = configValue(for: ["SAVE_ALLOW_CLIENT_GEMINI"], bundle: bundle)?.lowercased()
+        return value == "true" || value == "1" || value == "yes"
+    }
+
+    static func clientGeminiAPIKeyIfAllowed(bundle: Bundle = .main) -> String? {
+        guard allowsClientGeminiFallback(bundle: bundle) else { return nil }
+        return configValue(for: ["GEMINI_API_KEY"], bundle: bundle)
+    }
+
     static func configValue(for keys: [String], bundle: Bundle = .main) -> String? {
         for key in keys {
             if let value = normalizedConfigValue(ProcessInfo.processInfo.environment[key]) {
@@ -56,4 +66,87 @@ enum SAVEProductionConfig {
         }
         return result
     }
+}
+
+struct SAVEGeminiTransport {
+    var modelFallbacks: [String] = SAVEProductionConfig.defaultGeminiModelFallbacks
+    var session: URLSession = .shared
+    var accessTokenProvider: (() async throws -> String)?
+    var directAPIKey: String? = SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
+
+    func generateContent(body: [String: Any]) async throws -> [String: Any] {
+        var lastError: Error?
+        for model in modelFallbacks {
+            do {
+                return try await generateContent(body: body, model: model)
+            } catch {
+                lastError = error
+                if case SAVEGeminiTransportError.upstreamStatus(let status) = error,
+                   status == 404 || status == 429 {
+                    continue
+                }
+                break
+            }
+        }
+        throw lastError ?? SAVEGeminiTransportError.emptyResponse
+    }
+
+    private func generateContent(body: [String: Any], model: String) async throws -> [String: Any] {
+        if let proxied = try await generateViaBackendProxy(body: body, model: model) {
+            return proxied
+        }
+        guard let directAPIKey, !directAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SAVEGeminiTransportError.notConfigured
+        }
+        return try await generateDirect(body: body, model: model, apiKey: directAPIKey)
+    }
+
+    private func generateViaBackendProxy(body: [String: Any], model: String) async throws -> [String: Any]? {
+        guard let apiBaseURL = SAVEProductionConfig.URLConfigValue(for: ["SAVE_API_URL", "WANDERLY_API_URL"]),
+              let accessTokenProvider else {
+            return nil
+        }
+        var proxyBody = body
+        proxyBody["model"] = model
+        let requestBody = try JSONSerialization.data(withJSONObject: proxyBody)
+        guard let url = URL(string: "\(apiBaseURL)/v0/llm/gemini-generate-content") else {
+            throw SAVEGeminiTransportError.notConfigured
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(try await accessTokenProvider())", forHTTPHeaderField: "Authorization")
+        request.httpBody = requestBody
+        return try await decodeResponse(for: request)
+    }
+
+    private func generateDirect(body: [String: Any], model: String, apiKey: String) async throws -> [String: Any] {
+        let endpoint = SAVEProductionConfig.geminiGenerateContentURL(apiKey: apiKey, model: model)
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await decodeResponse(for: request)
+    }
+
+    private func decodeResponse(for request: URLRequest) async throws -> [String: Any] {
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SAVEGeminiTransportError.emptyResponse
+        }
+        guard http.statusCode == 200 else {
+            throw SAVEGeminiTransportError.upstreamStatus(http.statusCode)
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw SAVEGeminiTransportError.emptyResponse
+        }
+        return json
+    }
+}
+
+enum SAVEGeminiTransportError: Error {
+    case notConfigured
+    case upstreamStatus(Int)
+    case emptyResponse
 }

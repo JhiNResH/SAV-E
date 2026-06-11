@@ -53,12 +53,13 @@ const databaseUrl = requireEnv("DATABASE_URL");
 const privyAppId = requireEnv("PRIVY_APP_ID");
 const privyVerificationKey = requireEnv("PRIVY_VERIFICATION_KEY");
 const guestSessionSecret = process.env.SAVE_GUEST_SESSION_SECRET?.trim() || randomBytes(32).toString("hex");
+const defaultJsonBodyMaxBytes = 256 * 1024;
+const geminiProxyRequestMaxBytes = 64 * 1024;
+const geminiProxyResponseMaxBytes = 512 * 1024;
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  ssl: databaseUrl.includes("railway.internal")
-    ? undefined
-    : { rejectUnauthorized: false },
+  ssl: databaseSSLConfig(databaseUrl),
 });
 
 let verificationKeyPromise: Promise<KeyLike> | undefined;
@@ -396,6 +397,9 @@ createServer(async (request, response) => {
     }
     if (isV0 && resource === "claims" && id === "usage-receipts") {
       return await handleAuthenticatedClaimUsageReceipts(request, response, userId);
+    }
+    if (isV0 && resource === "llm") {
+      return await handleLLMProxy(request, response, segments.slice(1));
     }
     if (isV0 && resource === "places" && id && segments[2] === "verified-claims") {
       return await handlePlaceVerifiedClaims(request, response, id, url, userId);
@@ -795,6 +799,73 @@ async function handleRecommendationAnalysisReceipts(
     envelope: envelopeForRecommendationAnalysisReceipt(row),
     full_payload_json: JSON.stringify(row.private_payload),
   }, 201);
+}
+
+async function handleLLMProxy(
+  request: IncomingMessage,
+  response: ServerResponse,
+  segments: string[],
+): Promise<void> {
+  const [providerAction] = segments;
+  if (providerAction !== "gemini-generate-content") {
+    return sendJson(response, { error: "Unsupported LLM route" }, 404);
+  }
+  if (request.method !== "POST") {
+    return sendJson(response, { error: "Unsupported LLM route" }, 405);
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GEMINI_API_KEY;
+  if (!apiKey) throw new ApiError(503, "Gemini proxy is not configured");
+
+  const body = await readJson(request, geminiProxyRequestMaxBytes);
+  const model = geminiProxyModel(body.model);
+  const geminiBody = geminiProxyBody(body);
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "SAV-E backend Gemini proxy/1.0",
+      },
+      body: JSON.stringify(geminiBody),
+      redirect: "manual",
+      signal: AbortSignal.timeout(20_000),
+    },
+  );
+
+  if (upstream.status >= 300 && upstream.status < 400) {
+    throw new ApiError(502, "Gemini proxy blocked redirect response");
+  }
+  const raw = await boundedResponseBuffer(upstream, geminiProxyResponseMaxBytes);
+  if (!upstream.ok) {
+    return sendJson(response, { error: "Gemini upstream request failed", status: upstream.status }, 502);
+  }
+  const parsed = JSON.parse(new TextDecoder().decode(raw));
+  return sendJson(response, parsed);
+}
+
+function geminiProxyModel(value: unknown): string {
+  const model = typeof value === "string" && value.trim() ? value.trim() : "gemini-3.5-flash";
+  const allowed = new Set((process.env.SAVE_GEMINI_PROXY_MODELS ?? "gemini-3.5-flash")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean));
+  if (!allowed.has(model)) throw new ApiError(400, "Unsupported Gemini model");
+  return model;
+}
+
+function geminiProxyBody(body: JsonBody): JsonBody {
+  const contents = body.contents;
+  if (!Array.isArray(contents) || contents.length === 0) throw new ApiError(400, "contents is required");
+  const result: JsonBody = { contents };
+  if (body.generationConfig && typeof body.generationConfig === "object" && !Array.isArray(body.generationConfig)) {
+    result.generationConfig = body.generationConfig as JsonBody;
+  }
+  if (body.systemInstruction && typeof body.systemInstruction === "object" && !Array.isArray(body.systemInstruction)) {
+    result.systemInstruction = body.systemInstruction as JsonBody;
+  }
+  return result;
 }
 
 async function placeClaimsForPlace(
@@ -2363,7 +2434,7 @@ function normalizePem(key: string): string {
   return `-----BEGIN PUBLIC KEY-----\n${value}\n-----END PUBLIC KEY-----`;
 }
 
-async function readJson(request: IncomingMessage, maxBytes = Number.POSITIVE_INFINITY): Promise<JsonBody> {
+async function readJson(request: IncomingMessage, maxBytes = defaultJsonBodyMaxBytes): Promise<JsonBody> {
   const chunks: Buffer[] = [];
   let byteLength = 0;
   for await (const chunk of request) {
@@ -2375,6 +2446,34 @@ async function readJson(request: IncomingMessage, maxBytes = Number.POSITIVE_INF
   const raw = Buffer.concat(chunks).toString("utf8").trim();
   if (!raw) return {};
   return asObject(JSON.parse(raw));
+}
+
+async function boundedResponseBuffer(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const length = Number(response.headers.get("content-length") ?? "0");
+  if (length > maxBytes) throw new ApiError(502, "Upstream response is too large");
+  if (!response.body) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  const reader = response.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > maxBytes) {
+      await reader.cancel();
+      throw new ApiError(502, "Upstream response is too large");
+    }
+    chunks.push(value);
+  }
+
+  const data = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return data;
 }
 
 function asObject(value: unknown): JsonBody {
@@ -2558,6 +2657,23 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing ${name}`);
   return value;
+}
+
+function databaseSSLConfig(url: string): undefined | { rejectUnauthorized: boolean; ca?: string } {
+  const sslMode = process.env.PGSSLMODE?.trim().toLowerCase();
+  if (sslMode === "disable") return undefined;
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    hostname = "";
+  }
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".railway.internal")) {
+    return undefined;
+  }
+  if (sslMode === "no-verify") return { rejectUnauthorized: false };
+  const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, "\n");
+  return ca ? { rejectUnauthorized: true, ca } : { rejectUnauthorized: true };
 }
 
 class ApiError extends Error {

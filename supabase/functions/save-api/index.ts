@@ -14,6 +14,7 @@ const supabaseUrl = requireEnv("SUPABASE_URL");
 const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 const privyAppId = requireEnv("PRIVY_APP_ID");
 const privyVerificationKey = requireEnv("PRIVY_VERIFICATION_KEY");
+const defaultJsonBodyMaxBytes = 256 * 1024;
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -443,7 +444,29 @@ function routeFromUrl(rawUrl: string): { resource: string; id?: string } {
 
 async function readJson(request: Request): Promise<JsonBody> {
   if (!request.body) return {};
-  return asObject(await request.json());
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  const reader = request.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > defaultJsonBodyMaxBytes) {
+      await reader.cancel();
+      throw new ApiError(413, "JSON payload is too large");
+    }
+    chunks.push(value);
+  }
+
+  const data = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const raw = new TextDecoder().decode(data).trim();
+  if (!raw) return {};
+  return asObject(JSON.parse(raw));
 }
 
 function asObject(value: unknown): JsonBody {

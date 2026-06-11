@@ -11,16 +11,17 @@ final class SaveAIService {
 
     static let defaultModelFallbacks = SAVEProductionConfig.defaultGeminiModelFallbacks
 
-    private let apiKey: String?
-    private let modelFallbacks: [String]
+    private let geminiTransport: SAVEGeminiTransport
 
     init(apiKey: String? = nil, modelFallbacks: [String] = SaveAIService.defaultModelFallbacks) {
         let resolved = apiKey
-            ?? ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
-            ?? SAVEProductionConfig.configValue(for: ["GEMINI_API_KEY"])
-        self.apiKey = resolved
-        self.modelFallbacks = modelFallbacks
-        print("[SaveAI] API key resolved: \(resolved != nil ? "yes" : "nil")")
+            ?? SAVEProductionConfig.clientGeminiAPIKeyIfAllowed()
+        self.geminiTransport = SAVEGeminiTransport(
+            modelFallbacks: modelFallbacks,
+            accessTokenProvider: { try await PrivyAuthService.shared.accessToken() },
+            directAPIKey: resolved
+        )
+        print("[SaveAI] Gemini transport configured: backend proxy or allowed direct fallback")
     }
 
     func query(
@@ -60,13 +61,6 @@ final class SaveAIService {
             outputLanguage: outputLanguage
         )
 
-        guard let apiKey, !apiKey.isEmpty else {
-            if let deterministicDraft {
-                return deterministicDraft
-            }
-            throw SaveAIError.apiKeyMissing
-        }
-
         // Build multi-turn contents array
         var contents: [[String: Any]] = []
 
@@ -101,88 +95,35 @@ final class SaveAIService {
             ]
         ]
 
-        let requestBody = try JSONSerialization.data(withJSONObject: body)
-
-        var lastError: SaveAIError?
-        for model in modelFallbacks {
-            let endpoint = SAVEProductionConfig.geminiGenerateContentURL(apiKey: apiKey, model: model)
-            var request = URLRequest(url: endpoint)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = requestBody
-
-            let data: Data
-            let response: URLResponse
-            do {
-                (data, response) = try await URLSession.shared.data(for: request)
-            } catch {
-                print("Gemini request failed on \(model): \(error)")
-                if let deterministicDraft {
-                    return deterministicDraft
-                }
-                throw error
+        do {
+            let json = try await geminiTransport.generateContent(body: body)
+            guard let candidates = json["candidates"] as? [[String: Any]],
+                  let content = candidates.first?["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]],
+                  let text = parts.first?["text"] as? String else {
+                if let deterministicDraft { return deterministicDraft }
+                throw SaveAIError.emptyResponse
             }
 
-            guard let http = response as? HTTPURLResponse else {
-                lastError = .apiError(0)
-                continue
+            let parsed = try parseResponse(text)
+            if let deterministicDraft {
+                return validatedItineraryPolish(
+                    parsed,
+                    fallback: deterministicDraft,
+                    places: places,
+                    publicCandidates: publicCandidates,
+                    requiredPlaceIDs: requiredPlaceIDs
+                )
             }
-
-            if http.statusCode == 200 {
-                let json: [String: Any]
-                do {
-                    json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-                } catch {
-                    print("Gemini envelope parse failed on \(model): \(error)")
-                    if let deterministicDraft {
-                        return deterministicDraft
-                    }
-                    throw SaveAIError.parseError
-                }
-
-                guard let candidates = json["candidates"] as? [[String: Any]],
-                      let content = candidates.first?["content"] as? [String: Any],
-                      let parts = content["parts"] as? [[String: Any]],
-                      let text = parts.first?["text"] as? String else {
-                    if let deterministicDraft {
-                        return deterministicDraft
-                    }
-                    throw SaveAIError.emptyResponse
-                }
-
-                do {
-                    let parsed = try parseResponse(text)
-                    if let deterministicDraft {
-                        return validatedItineraryPolish(
-                            parsed,
-                            fallback: deterministicDraft,
-                            places: places,
-                            publicCandidates: publicCandidates,
-                            requiredPlaceIDs: requiredPlaceIDs
-                        )
-                    }
-                    return parsed
-                } catch {
-                    print("Gemini response parse failed on \(model): \(error)")
-                    if let deterministicDraft {
-                        return deterministicDraft
-                    }
-                    throw SaveAIError.parseError
-                }
-            }
-
-            let responseBody = String(data: data, encoding: .utf8) ?? "no body"
-            print("Gemini API error \(http.statusCode) on \(model): \(responseBody)")
-            lastError = .apiError(http.statusCode)
-            if http.statusCode != 404 && http.statusCode != 429 {
-                break
-            }
+            return parsed
+        } catch let error as SAVEGeminiTransportError {
+            if let deterministicDraft { return deterministicDraft }
+            if case .upstreamStatus(let status) = error { throw SaveAIError.apiError(status) }
+            throw SaveAIError.apiKeyMissing
+        } catch {
+            if let deterministicDraft { return deterministicDraft }
+            throw error
         }
-
-        if let deterministicDraft {
-            return deterministicDraft
-        }
-        throw lastError ?? SaveAIError.apiError(0)
     }
 
     func polishItineraryDraft(

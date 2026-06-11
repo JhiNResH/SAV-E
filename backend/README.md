@@ -6,6 +6,8 @@ Railway-hosted API for SAV-E mobile persistence. It replaces the previous Supaba
 
 ```bash
 DATABASE_URL=postgresql://...
+DATABASE_CA_CERT=
+PGSSLMODE=
 PRIVY_APP_ID=...
 PRIVY_VERIFICATION_KEY='-----BEGIN PUBLIC KEY-----...'
 SAVE_GUEST_SESSION_SECRET=...
@@ -21,15 +23,16 @@ SAVE_EVIDENCE_RUBRIC_URL=
 SAVE_EVIDENCE_RUBRIC_TOKEN=
 SAVE_ENABLE_MAAT_PUBLIC_WEB=
 GEMINI_API_KEY=
+SAVE_GEMINI_PROXY_MODELS=gemini-3.5-flash
 SAVE_MAAT_GEMINI_MODEL=gemini-3.5-flash
 YELP_API_KEY=
 ```
 
-Railway provides `DATABASE_URL` and `PORT`. Set the Privy values and a stable `SAVE_GUEST_SESSION_SECRET` on the backend service. If the guest secret is omitted, the backend generates an ephemeral process-local secret, which is only suitable for local development because guest sessions will expire on restart.
+Railway provides `DATABASE_URL` and `PORT`. Set the Privy values and a stable `SAVE_GUEST_SESSION_SECRET` on the backend service. If the guest secret is omitted, the backend generates an ephemeral process-local secret, which is only suitable for local development because guest sessions will expire on restart. External Postgres TLS verifies certificates by default; use Railway internal URLs, set `DATABASE_CA_CERT`, or use `PGSSLMODE=no-verify` only for a deliberately accepted temporary environment.
 
 Source recovery can run with metadata and public search only. Set `GOOGLE_PLACES_API_KEY` to let the worker corroborate Review Candidates with Places address/coordinates. Set `SAVE_ENABLE_SERVER_KEYFRAME_EXTRACTION=true` to allow bounded public video fetch plus one keyframe sample, and set `SAVE_ENABLE_SERVER_OCR=true` only on workers that have `tesseract` installed. Set `SAVE_ENABLE_SERVER_ASR=true` only on workers that have a local Whisper-compatible CLI available through `SAVE_SERVER_ASR_COMMAND`; transcripts are attached as cited evidence and never used to invent address/coordinates. Set `SAVE_EVIDENCE_RUBRIC_URL` to an HTTPS public rubric service endpoint when you want an external LLM rubric; the worker sends a bounded projection of metadata/candidate/search/media text, validates the response schema, blocks redirects/private hosts, and falls back to the deterministic rubric when unavailable. If these toggles are off or unavailable, recovery keeps the source as a cited clue instead of inventing place details.
 
-Ma'at restaurant detail enrichment is deterministic unless the caller opts into public web. When `GET /v0/places/:id/maat-analysis?includePublicWeb=true` is called, the backend first uses structured sources before asking the model: `GOOGLE_PLACES_API_KEY` can fill Google rating, price level, parking options, reservable status, dine-in/takeout traits, and Google source links; `YELP_API_KEY` can optionally add Yelp score, price, categories, and bounded review excerpts through the official Yelp API. When `GEMINI_API_KEY` or `GOOGLE_GEMINI_API_KEY` is configured, the backend then asks Gemini with public web search for remaining restaurant details such as dishes, parking, reservation tips, average cost, and common negative reviews. Set `SAVE_ENABLE_MAAT_PUBLIC_WEB=false` only when this enrichment must be disabled. The prompt only sends bounded place metadata and non-private claim summaries; raw private evidence is never included. If structured sources or the model are unavailable, the route falls back to the selected-place evidence analysis and marks `analysis_receipt.structured_source_status` / `analysis_receipt.public_web_status`.
+Ma'at restaurant detail enrichment is deterministic unless the caller opts into public web. When `GET /v0/places/:id/maat-analysis?includePublicWeb=true` is called, the backend first uses structured sources before asking the model: `GOOGLE_PLACES_API_KEY` can fill Google rating, price level, parking options, reservable status, dine-in/takeout traits, and Google source links; `YELP_API_KEY` can optionally add Yelp score, price, categories, and bounded review excerpts through the official Yelp API. When `GEMINI_API_KEY` or `GOOGLE_GEMINI_API_KEY` is configured, the backend then asks Gemini with public web search for remaining restaurant details such as dishes, parking, reservation tips, average cost, and common negative reviews. The same backend key powers authenticated `/v0/llm/gemini-generate-content` proxy calls from the iOS app so Gemini keys do not ship in the app bundle. Set `SAVE_ENABLE_MAAT_PUBLIC_WEB=false` only when this enrichment must be disabled. The prompt only sends bounded place metadata and non-private claim summaries; raw private evidence is never included. If structured sources or the model are unavailable, the route falls back to the selected-place evidence analysis and marks `analysis_receipt.structured_source_status` / `analysis_receipt.public_web_status`.
 
 ## Local
 
