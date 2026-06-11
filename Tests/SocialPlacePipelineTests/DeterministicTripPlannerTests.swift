@@ -257,6 +257,34 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertTrue(health.warnings.contains { $0.type == .hoursUnknown })
     }
 
+    func testPlannerPrioritizesReasonableActivitySlotOverMoreFoodStops() throws {
+        let now = Date()
+        let places = [
+            makePlace("Tokyo Ramen A", address: "Tokyo", latitude: 35.6700, longitude: 139.7600, category: .food, createdAt: now.addingTimeInterval(60)),
+            makePlace("Tokyo Ramen B", address: "Tokyo", latitude: 35.6710, longitude: 139.7610, category: .food, createdAt: now.addingTimeInterval(50)),
+            makePlace("Tokyo Cafe A", address: "Tokyo", latitude: 35.6720, longitude: 139.7620, category: .cafe, createdAt: now.addingTimeInterval(40)),
+            makePlace("Tokyo Cafe B", address: "Tokyo", latitude: 35.6730, longitude: 139.7630, category: .cafe, createdAt: now.addingTimeInterval(30)),
+            makePlace("Tokyo Dinner A", address: "Tokyo", latitude: 35.6740, longitude: 139.7640, category: .food, createdAt: now.addingTimeInterval(20)),
+            makePlace("Tokyo Dinner B", address: "Tokyo", latitude: 35.6750, longitude: 139.7650, category: .food, createdAt: now.addingTimeInterval(10)),
+            makePlace("Tokyo Museum", address: "Tokyo", latitude: 35.6760, longitude: 139.7660, category: .attraction, createdAt: now)
+        ]
+
+        let response = try XCTUnwrap(DeterministicTripPlanner().plan(
+            for: "Plan a one day Tokyo trip",
+            places: places
+        ))
+        let stops = response.itineraryDays.flatMap(\.stops)
+        let plannedNames = stops.map(\.placeName)
+        let foodDrinkCount = stops.filter { stop in
+            guard let place = places.first(where: { $0.name == stop.placeName }) else { return false }
+            return [.food, .cafe, .bar].contains(place.category)
+        }.count
+
+        XCTAssertLessThanOrEqual(stops.count, ItineraryPace.balanced.maxStopsPerDay)
+        XCTAssertTrue(plannedNames.contains("Tokyo Museum"))
+        XCTAssertLessThan(foodDrinkCount, stops.count)
+    }
+
     func testPlannerLabelsDeterministicStopsAsConfirmedMapStampsWithUnknownRisks() throws {
         let places = [
             makePlace("Tokyo Museum", address: "Tokyo", latitude: 35.6710, longitude: 139.7640, category: .attraction),
@@ -368,7 +396,8 @@ final class DeterministicTripPlannerTests: XCTestCase {
         latitude: Double,
         longitude: Double,
         category: PlaceCategory,
-        status: PlaceStatus = .wantToGo
+        status: PlaceStatus = .wantToGo,
+        createdAt: Date = Date()
     ) -> Place {
         Place(
             id: UUID(),
@@ -390,7 +419,7 @@ final class DeterministicTripPlannerTests: XCTestCase {
             googleRating: nil,
             googlePriceLevel: nil,
             openingHours: nil,
-            createdAt: Date()
+            createdAt: createdAt
         )
     }
 
