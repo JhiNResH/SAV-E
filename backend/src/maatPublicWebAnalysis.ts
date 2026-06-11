@@ -3,7 +3,7 @@ import type { JsonObject } from "./placeClaims.js";
 type Fetcher = (url: string, init: {
   method: string;
   headers: Record<string, string>;
-  body: string;
+  body?: string;
 }) => Promise<{
   ok: boolean;
   status: number;
@@ -14,6 +14,8 @@ export interface MaatPublicWebConfig {
   enabled: boolean;
   apiKey?: string;
   model: string;
+  googlePlacesApiKey?: string;
+  yelpApiKey?: string;
   fetcher?: Fetcher;
 }
 
@@ -50,6 +52,8 @@ export function publicWebConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Ma
     enabled: env.SAVE_ENABLE_MAAT_PUBLIC_WEB !== "false",
     apiKey: env.GEMINI_API_KEY ?? env.GOOGLE_GEMINI_API_KEY,
     model: env.SAVE_MAAT_GEMINI_MODEL ?? defaultModel,
+    googlePlacesApiKey: env.GOOGLE_PLACES_API_KEY,
+    yelpApiKey: env.YELP_API_KEY,
   };
 }
 
@@ -58,23 +62,35 @@ export async function enrichMaatPlaceAnalysisWithPublicWeb(
   config: MaatPublicWebConfig = publicWebConfigFromEnv(),
 ): Promise<JsonObject> {
   if (!config.enabled) return withPublicWebReceipt(input.analysis, false, false, "disabled");
-  if (!config.apiKey) return withPublicWebReceipt(input.analysis, false, false, "missing_api_key");
+  let analysis = await enrichMaatPlaceAnalysisWithStructuredSources(input, config);
+  if (!config.apiKey) return withPublicWebReceipt(analysis, false, false, "missing_api_key");
 
   try {
-    const response = await callGemini(input, config);
+    const response = await callGemini({ ...input, analysis }, config);
     const candidate = response.candidates?.[0];
     const text = candidate?.content?.parts?.map((part) => part.text ?? "").join("\n").trim() ?? "";
     const details = normalizePublicWebDetails(parseJsonObject(text));
     const sources = groundingSources(candidate).slice(0, 5);
 
     if (!hasMeaningfulDetails(details)) {
-      return withPublicWebReceipt(input.analysis, false, true, "no_structured_details");
+      return withPublicWebReceipt(analysis, false, true, "no_structured_details");
     }
 
-    return mergePublicWebDetails(input.analysis, details, sources, config.model);
+    return mergePublicWebDetails(analysis, details, sources, config.model);
   } catch {
-    return withPublicWebReceipt(input.analysis, false, false, "request_failed");
+    return withPublicWebReceipt(analysis, false, false, "request_failed");
   }
+}
+
+export async function enrichMaatPlaceAnalysisWithStructuredSources(
+  input: MaatPublicWebInput,
+  config: MaatPublicWebConfig = publicWebConfigFromEnv(),
+): Promise<JsonObject> {
+  const { details, sources, statuses } = await fetchStructuredSourceDetails(input.place, config);
+  if (!hasMeaningfulDetails(details)) {
+    return withStructuredSourceReceipt(input.analysis, false, statuses);
+  }
+  return mergeStructuredSourceDetails(input.analysis, details, sources, statuses);
 }
 
 export function mergePublicWebDetails(
@@ -118,6 +134,47 @@ export function mergePublicWebDetails(
   };
 }
 
+export function mergeStructuredSourceDetails(
+  analysis: JsonObject,
+  sourceDetails: JsonObject,
+  sources: JsonObject[] = [],
+  statuses: Record<string, string> = {},
+): JsonObject {
+  const currentDetails = objectValue(analysis.restaurant_details) ?? {};
+  const mergedDetails: JsonObject = {
+    ...currentDetails,
+    platform_scores: mergePlatformScores(arrayValue(currentDetails.platform_scores), arrayValue(sourceDetails.platform_scores)),
+    must_try: mergeDishes(arrayValue(currentDetails.must_try), arrayValue(sourceDetails.must_try)),
+    warnings: mergeStrings(arrayValue(currentDetails.warnings), arrayValue(sourceDetails.warnings)),
+    critical_reviews: preferArray(currentDetails.critical_reviews, sourceDetails.critical_reviews),
+    price_range: currentDetails.price_range ?? sourceDetails.price_range ?? null,
+    avg_cost: currentDetails.avg_cost ?? sourceDetails.avg_cost ?? null,
+    best_for: mergeStrings(arrayValue(currentDetails.best_for), arrayValue(sourceDetails.best_for)).slice(0, 5),
+    cuisine: currentDetails.cuisine ?? sourceDetails.cuisine ?? null,
+    ambiance: currentDetails.ambiance ?? sourceDetails.ambiance ?? null,
+    service_rating: currentDetails.service_rating ?? sourceDetails.service_rating ?? null,
+    reservation_tips: currentDetails.reservation_tips ?? sourceDetails.reservation_tips ?? null,
+    parking: currentDetails.parking ?? sourceDetails.parking ?? null,
+    evidence_gaps: evidenceGapsAfterMerge(currentDetails, sourceDetails),
+  };
+
+  return {
+    ...analysis,
+    restaurant_details: mergedDetails,
+    structured_source_sources: sources,
+    analysis_receipt: {
+      ...(objectValue(analysis.analysis_receipt) ?? {}),
+      input_scope: "selected_place_plus_structured_sources",
+      structured_source_used: true,
+      structured_source_status: "used",
+      google_places_status: statuses.google_places ?? "not_configured",
+      yelp_status: statuses.yelp ?? "not_configured",
+      structured_source_count: sources.length,
+      raw_private_evidence_included: false,
+    },
+  };
+}
+
 function withPublicWebReceipt(
   analysis: JsonObject,
   publicWebUsed: boolean,
@@ -134,6 +191,276 @@ function withPublicWebReceipt(
       raw_private_evidence_included: false,
     },
   };
+}
+
+function withStructuredSourceReceipt(
+  analysis: JsonObject,
+  used: boolean,
+  statuses: Record<string, string>,
+): JsonObject {
+  return {
+    ...analysis,
+    analysis_receipt: {
+      ...(objectValue(analysis.analysis_receipt) ?? {}),
+      structured_source_used: used,
+      structured_source_status: used ? "used" : "not_used",
+      google_places_status: statuses.google_places ?? "not_configured",
+      yelp_status: statuses.yelp ?? "not_configured",
+      raw_private_evidence_included: false,
+    },
+  };
+}
+
+interface StructuredSourceFetchResult {
+  details: JsonObject;
+  sources: JsonObject[];
+  statuses: Record<string, string>;
+}
+
+async function fetchStructuredSourceDetails(place: JsonObject, config: MaatPublicWebConfig): Promise<StructuredSourceFetchResult> {
+  const google = await fetchGooglePlacesStructuredDetails(place, config);
+  const yelp = await fetchYelpStructuredDetails(place, config);
+  return {
+    details: mergeStructuredPayloads(google.details, yelp.details),
+    sources: [...google.sources, ...yelp.sources].slice(0, 5),
+    statuses: {
+      google_places: google.status,
+      yelp: yelp.status,
+    },
+  };
+}
+
+async function fetchGooglePlacesStructuredDetails(
+  place: JsonObject,
+  config: MaatPublicWebConfig,
+): Promise<{ details: JsonObject; sources: JsonObject[]; status: string }> {
+  if (!config.googlePlacesApiKey) return { details: {}, sources: [], status: "missing_api_key" };
+  const fetcher = config.fetcher ?? fetch;
+  const fieldMask = [
+    "id",
+    "displayName",
+    "formattedAddress",
+    "googleMapsUri",
+    "websiteUri",
+    "rating",
+    "userRatingCount",
+    "priceLevel",
+    "primaryType",
+    "currentOpeningHours",
+    "regularOpeningHours",
+    "location",
+    "parkingOptions",
+    "reservable",
+    "servesBreakfast",
+    "servesLunch",
+    "servesDinner",
+    "takeout",
+    "delivery",
+    "dineIn",
+    "businessStatus",
+    "editorialSummary",
+  ].join(",");
+
+  try {
+    const googlePlaceId = clippedString(place.google_place_id ?? place.googlePlaceId, 180);
+    const headers = {
+      "content-type": "application/json",
+      "x-goog-api-key": config.googlePlacesApiKey,
+      "x-goog-fieldmask": googlePlaceId ? fieldMask : fieldMask.split(",").map((field) => `places.${field}`).join(","),
+    };
+    const response = googlePlaceId
+      ? await fetcher(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}`, {
+        method: "GET",
+        headers,
+      })
+      : await fetcher("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          textQuery: googlePlacesTextQuery(place),
+          languageCode: "zh-TW",
+          regionCode: clippedString(place.country_code ?? place.countryCode, 2),
+          maxResultCount: 1,
+        }),
+      });
+
+    if (!response.ok) return { details: {}, sources: [], status: `request_failed_${response.status}` };
+    const payload = objectValue(await response.json());
+    const googlePlace = googlePlaceId ? payload : objectValue(arrayValue(payload?.places)[0]);
+    if (!googlePlace) return { details: {}, sources: [], status: "not_found" };
+    const details = normalizePublicWebDetails(googlePlaceToRestaurantDetails(googlePlace));
+    const sources = googlePlaceSource(googlePlace);
+    return { details, sources, status: hasMeaningfulDetails(details) ? "used" : "no_structured_details" };
+  } catch {
+    return { details: {}, sources: [], status: "request_failed" };
+  }
+}
+
+async function fetchYelpStructuredDetails(
+  place: JsonObject,
+  config: MaatPublicWebConfig,
+): Promise<{ details: JsonObject; sources: JsonObject[]; status: string }> {
+  if (!config.yelpApiKey) return { details: {}, sources: [], status: "missing_api_key" };
+  const name = clippedString(place.name, 160);
+  const location = clippedString(place.address ?? place.city, 220);
+  if (!name || !location) return { details: {}, sources: [], status: "missing_place_identity" };
+  const fetcher = config.fetcher ?? fetch;
+  const headers = {
+    authorization: `Bearer ${config.yelpApiKey}`,
+    accept: "application/json",
+  };
+
+  try {
+    const searchUrl = new URL("https://api.yelp.com/v3/businesses/search");
+    searchUrl.searchParams.set("term", name);
+    searchUrl.searchParams.set("location", location);
+    searchUrl.searchParams.set("limit", "1");
+    const searchResponse = await fetcher(searchUrl.toString(), { method: "GET", headers });
+    if (!searchResponse.ok) return { details: {}, sources: [], status: `request_failed_${searchResponse.status}` };
+    const searchPayload = objectValue(await searchResponse.json());
+    const business = objectValue(arrayValue(searchPayload?.businesses)[0]);
+    const businessId = clippedString(business?.id, 160);
+    if (!business || !businessId) return { details: {}, sources: [], status: "not_found" };
+
+    const [detailsResponse, reviewsResponse] = await Promise.all([
+      fetcher(`https://api.yelp.com/v3/businesses/${encodeURIComponent(businessId)}`, { method: "GET", headers }),
+      fetcher(`https://api.yelp.com/v3/businesses/${encodeURIComponent(businessId)}/reviews`, { method: "GET", headers }),
+    ]);
+    const detailsPayload = (detailsResponse.ok ? objectValue(await detailsResponse.json()) : undefined) ?? business;
+    const reviewsPayload = reviewsResponse.ok ? objectValue(await reviewsResponse.json()) : {};
+    const details = normalizePublicWebDetails(yelpBusinessToRestaurantDetails(detailsPayload, reviewsPayload));
+    const sources = yelpBusinessSource(detailsPayload);
+    return { details, sources, status: hasMeaningfulDetails(details) ? "used" : "no_structured_details" };
+  } catch {
+    return { details: {}, sources: [], status: "request_failed" };
+  }
+}
+
+function googlePlacesTextQuery(place: JsonObject): string {
+  return [
+    clippedString(place.name, 160),
+    clippedString(place.address, 220),
+    clippedString(place.city, 120),
+  ].filter(Boolean).join(" ");
+}
+
+function googlePlaceToRestaurantDetails(place: JsonObject): JsonObject {
+  const parking = googleParkingText(objectValue(place.parkingOptions));
+  const bestFor = [
+    place.dineIn === true ? "內用" : undefined,
+    place.takeout === true ? "外帶" : undefined,
+    place.delivery === true ? "外送" : undefined,
+    place.servesBreakfast === true ? "早餐" : undefined,
+    place.servesLunch === true ? "午餐" : undefined,
+    place.servesDinner === true ? "晚餐" : undefined,
+  ].filter(Boolean);
+  const rating = numberValue(place.rating);
+  return {
+    platform_scores: rating === undefined ? [] : [{
+      platform: "Google",
+      score: rating,
+      source: "google_places_api",
+    }],
+    warnings: place.businessStatus && place.businessStatus !== "OPERATIONAL"
+      ? [`Google Places 狀態：${clippedString(place.businessStatus, 60)}`]
+      : [],
+    price_range: googlePriceLevelToSymbol(place.priceLevel),
+    best_for: bestFor,
+    cuisine: readablePlaceType(place.primaryType),
+    ambiance: clippedString(objectValue(place.editorialSummary)?.text, 240),
+    reservation_tips: place.reservable === true ? "Google Places 顯示可訂位；尖峰時段建議先預約。" : undefined,
+    parking,
+  };
+}
+
+function yelpBusinessToRestaurantDetails(business: JsonObject, reviewsPayload: JsonObject | undefined): JsonObject {
+  const categories = arrayValue(business.categories)
+    .map((category) => clippedString(objectValue(category)?.title, 80))
+    .filter(Boolean);
+  const reviews = arrayValue(reviewsPayload?.reviews)
+    .map((review) => objectValue(review))
+    .filter((review): review is JsonObject => Boolean(review));
+  return {
+    platform_scores: numberValue(business.rating) === undefined ? [] : [{
+      platform: "Yelp",
+      score: numberValue(business.rating),
+      source: "yelp_api",
+    }],
+    warnings: business.is_closed === true ? ["Yelp 顯示此店可能已停止營業。"] : [],
+    critical_reviews: reviews
+      .filter((review) => {
+        const rating = numberValue(review.rating);
+        return rating !== undefined && rating <= 3;
+      })
+      .map((review) => ({
+        issue: clippedString(review.text, 240),
+        source: "Yelp",
+        frequency: "review excerpt",
+      })),
+    price_range: clippedString(business.price, 40),
+    cuisine: categories.length ? categories.slice(0, 3).join(" / ") : undefined,
+  };
+}
+
+function googlePlaceSource(place: JsonObject): JsonObject[] {
+  const url = publicHttpUrl(place.googleMapsUri ?? place.websiteUri);
+  return url ? [{ title: "Google Places", url }] : [];
+}
+
+function yelpBusinessSource(business: JsonObject): JsonObject[] {
+  const url = publicHttpUrl(business.url);
+  return url ? [{ title: "Yelp", url }] : [];
+}
+
+function mergeStructuredPayloads(left: JsonObject, right: JsonObject): JsonObject {
+  return {
+    platform_scores: mergePlatformScores(arrayValue(left.platform_scores), arrayValue(right.platform_scores)),
+    must_try: mergeDishes(arrayValue(left.must_try), arrayValue(right.must_try)),
+    warnings: mergeStrings(arrayValue(left.warnings), arrayValue(right.warnings)),
+    critical_reviews: preferArray(left.critical_reviews, right.critical_reviews),
+    price_range: left.price_range ?? right.price_range ?? null,
+    avg_cost: left.avg_cost ?? right.avg_cost ?? null,
+    best_for: mergeStrings(arrayValue(left.best_for), arrayValue(right.best_for)).slice(0, 5),
+    cuisine: left.cuisine ?? right.cuisine ?? null,
+    ambiance: left.ambiance ?? right.ambiance ?? null,
+    service_rating: left.service_rating ?? right.service_rating ?? null,
+    reservation_tips: left.reservation_tips ?? right.reservation_tips ?? null,
+    parking: left.parking ?? right.parking ?? null,
+  };
+}
+
+function googlePriceLevelToSymbol(value: unknown): string | undefined {
+  switch (clippedString(value, 60)) {
+    case "PRICE_LEVEL_INEXPENSIVE":
+      return "$";
+    case "PRICE_LEVEL_MODERATE":
+      return "$$";
+    case "PRICE_LEVEL_EXPENSIVE":
+      return "$$$";
+    case "PRICE_LEVEL_VERY_EXPENSIVE":
+      return "$$$$";
+    default:
+      return undefined;
+  }
+}
+
+function googleParkingText(parkingOptions: JsonObject | undefined): string | undefined {
+  if (!parkingOptions) return undefined;
+  const labels = [
+    parkingOptions.freeParkingLot === true ? "免費停車場" : undefined,
+    parkingOptions.paidParkingLot === true ? "付費停車場" : undefined,
+    parkingOptions.freeStreetParking === true ? "路邊免費停車" : undefined,
+    parkingOptions.paidStreetParking === true ? "路邊付費停車" : undefined,
+    parkingOptions.valetParking === true ? "代客泊車" : undefined,
+    parkingOptions.freeGarageParking === true ? "免費室內停車" : undefined,
+    parkingOptions.paidGarageParking === true ? "付費室內停車" : undefined,
+  ].filter(Boolean);
+  return labels.length ? `Google Places 顯示：${labels.join("、")}。` : undefined;
+}
+
+function readablePlaceType(value: unknown): string | undefined {
+  const type = clippedString(value, 80);
+  return type ? type.replace(/_/g, " ") : undefined;
 }
 
 async function callGemini(input: MaatPublicWebInput, config: MaatPublicWebConfig): Promise<GeminiResponse> {
@@ -192,6 +519,9 @@ ${JSON.stringify({
 
 Visible SAV-E claim summaries:
 ${JSON.stringify(visibleClaims)}
+
+Structured source details already found:
+${JSON.stringify(objectValue(input.analysis.restaurant_details) ?? {})}
 
 Return this JSON shape:
 {
