@@ -223,21 +223,35 @@ struct DeterministicTripPlanner {
                 constraints: constraints,
                 outputLanguage: outputLanguage
             )
+            let stops = scheduled.map { item in
+                ItineraryStop(
+                    id: UUID(),
+                    placeId: item.place.id.uuidString,
+                    placeState: .confirmedMapStamp,
+                    placeName: item.place.name,
+                    time: item.time,
+                    duration: item.duration,
+                    note: item.note,
+                    sourceSummary: outputLanguage.localized(
+                        english: "Confirmed Map Stamp from your SAV-E memory.",
+                        traditionalChinese: "來自你的 SAV-E 記憶，已確認為地圖章。"
+                    ),
+                    risks: [.hoursUnknown, .bookingUnknown]
+                )
+            }
             return ItineraryDay(
                 dayNumber: index + 1,
                 label: dayLabel(index + 1, outputLanguage: outputLanguage),
-                stops: scheduled.map { item in
-                    ItineraryStop(
-                        id: UUID(),
-                        placeId: item.place.id.uuidString,
-                        placeName: item.place.name,
-                        time: item.time,
-                        duration: item.duration,
-                        note: item.note
-                    )
-                }
+                stops: stops,
+                health: tripHealth(
+                    for: stops,
+                    dayNumber: index + 1,
+                    maxStopsPerDay: constraints.pace.maxStopsPerDay,
+                    outputLanguage: outputLanguage
+                )
             )
         }
+        let health = overallTripHealth(for: itineraryDays, outputLanguage: outputLanguage)
 
         let placeIds = orderedPlaces.map { $0.id.uuidString }
         return SaveAIResponse(
@@ -247,6 +261,7 @@ struct DeterministicTripPlanner {
             navigationPlaceId: nil,
             transportMode: constraints.transportMode ?? (selectedPlaces.count > 3 ? .driving : .walking),
             itineraryDays: itineraryDays,
+            tripHealth: health,
             messageText: nil,
             mapAction: MapActionData(type: .showRoute, placeIds: placeIds, lat: nil, lng: nil, span: nil),
             aiMessage: planningMessage(for: message, selectedPlaces: selectedPlaces, outputLanguage: outputLanguage)
@@ -558,5 +573,151 @@ struct DeterministicTripPlanner {
             "一天", "一日", "兩天", "两天", "二天", "二日", "三天", "三日",
             "四天", "四日", "五天", "五日", "六天", "六日", "七天", "七日"
         ].contains { normalized.contains($0) }
+    }
+
+    // MARK: - Trip Judge
+
+    private func tripHealth(
+        for stops: [ItineraryStop],
+        dayNumber: Int,
+        maxStopsPerDay: Int,
+        outputLanguage: AppLanguage
+    ) -> TripHealth {
+        let dayId = "day-\(dayNumber)"
+        var warnings: [TripWarning] = []
+        var gaps: [TripGap] = []
+
+        if stops.count > maxStopsPerDay {
+            warnings.append(TripWarning(
+                id: "\(dayId)-too-many-stops",
+                type: .tooManyStops,
+                severity: .medium,
+                message: outputLanguage.localized(
+                    english: "This day has \(stops.count) stops; make it less rushed before committing.",
+                    traditionalChinese: "這天有 \(stops.count) 站；確認前建議排鬆一點。"
+                ),
+                affectedBlockIds: stops.map(\.id.uuidString)
+            ))
+        }
+
+        if stops.contains(where: { $0.risks.contains(.hoursUnknown) }) {
+            warnings.append(TripWarning(
+                id: "\(dayId)-hours-unknown",
+                type: .hoursUnknown,
+                severity: .low,
+                message: outputLanguage.localized(
+                    english: "Opening hours are not verified for every stop.",
+                    traditionalChinese: "不是每一站都已確認營業時間。"
+                ),
+                affectedBlockIds: stops.filter { $0.risks.contains(.hoursUnknown) }.map(\.id.uuidString)
+            ))
+        }
+
+        if !hasMealSlot(in: stops, matching: ["12:", "1:"]) {
+            gaps.append(TripGap(
+                id: "\(dayId)-missing-lunch",
+                type: .missingLunch,
+                dayId: dayId,
+                severity: .medium,
+                message: outputLanguage.localized(
+                    english: "Lunch is not clearly covered.",
+                    traditionalChinese: "午餐還沒有明確安排。"
+                )
+            ))
+        }
+
+        if !hasMealSlot(in: stops, matching: ["6:", "7:"]) {
+            gaps.append(TripGap(
+                id: "\(dayId)-missing-dinner",
+                type: .missingDinner,
+                dayId: dayId,
+                severity: .medium,
+                message: outputLanguage.localized(
+                    english: "Dinner is not clearly covered.",
+                    traditionalChinese: "晚餐還沒有明確安排。"
+                )
+            ))
+        }
+
+        if !hasAfternoonActivity(in: stops) {
+            gaps.append(TripGap(
+                id: "\(dayId)-missing-afternoon-activity",
+                type: .missingAfternoonActivity,
+                dayId: dayId,
+                severity: .medium,
+                message: outputLanguage.localized(
+                    english: "There is no clear afternoon activity between meals.",
+                    traditionalChinese: "兩餐之間還沒有明確的下午活動。"
+                )
+            ))
+        }
+
+        let score = healthScore(warnings: warnings, gaps: gaps)
+        let strengths = [
+            outputLanguage.localized(
+                english: "Uses confirmed saved Map Stamps first.",
+                traditionalChinese: "優先使用你已確認的地圖章。"
+            ),
+            outputLanguage.localized(
+                english: "Keeps unverifiable external additions out of the draft.",
+                traditionalChinese: "不會把未確認的外部建議直接混進行程。"
+            )
+        ]
+
+        return TripHealth(score: score, strengths: strengths, warnings: warnings, gaps: gaps)
+    }
+
+    private func overallTripHealth(for days: [ItineraryDay], outputLanguage: AppLanguage) -> TripHealth {
+        let warnings = days.flatMap { $0.health?.warnings ?? [] }
+        let gaps = days.flatMap { $0.health?.gaps ?? [] }
+        let averageScore = days.compactMap(\.health?.score).reduce(0, +) / max(1, days.count)
+        let strengths = [
+            outputLanguage.localized(
+                english: "Built from saved place memory, not unlabeled public guesses.",
+                traditionalChinese: "從已存地點記憶生成，不混入未標記的公開猜測。"
+            ),
+            outputLanguage.localized(
+                english: "Each stop keeps its source state visible.",
+                traditionalChinese: "每一站都保留來源狀態標籤。"
+            )
+        ]
+        return TripHealth(score: averageScore, strengths: strengths, warnings: warnings, gaps: gaps)
+    }
+
+    private func healthScore(warnings: [TripWarning], gaps: [TripGap]) -> Int {
+        let warningPenalty = warnings.reduce(0) { score, warning in
+            score + penalty(for: warning.severity)
+        }
+        let gapPenalty = gaps.reduce(0) { score, gap in
+            score + penalty(for: gap.severity)
+        }
+        return max(45, 100 - warningPenalty - gapPenalty)
+    }
+
+    private func penalty(for severity: Severity) -> Int {
+        switch severity {
+        case .low: return 4
+        case .medium: return 10
+        case .high: return 18
+        }
+    }
+
+    private func hasMealSlot(in stops: [ItineraryStop], matching prefixes: [String]) -> Bool {
+        stops.contains { stop in
+            guard let time = stop.time?.lowercased(), time.contains("pm") else { return false }
+            return prefixes.contains { time.hasPrefix($0) }
+        }
+    }
+
+    private func hasAfternoonActivity(in stops: [ItineraryStop]) -> Bool {
+        stops.contains { stop in
+            guard let time = stop.time?.lowercased(), time.contains("pm") else { return false }
+            let isAfternoon = time.hasPrefix("2:") || time.hasPrefix("3:") || time.hasPrefix("4:")
+            guard isAfternoon else { return false }
+            let lowerName = stop.placeName.lowercased()
+            let lowerNote = (stop.note ?? "").lowercased()
+            let activitySignals = ["museum", "park", "shop", "market", "activity", "景點", "活動", "購物"]
+            return activitySignals.contains { lowerName.contains($0) || lowerNote.contains($0) }
+        }
     }
 }

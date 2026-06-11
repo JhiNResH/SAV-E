@@ -484,6 +484,7 @@ struct AIDrawerView: View {
                                 traditionalChinese: "你的行程"
                             ),
                             days: response.itineraryDays,
+                            tripHealth: response.tripHealth,
                             aiMessage: response.aiMessage,
                             places: viewModel.places
                         )

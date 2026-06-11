@@ -239,6 +239,42 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertEqual(stops.first(where: { $0.placeName == "Lunch Ramen" })?.time, "12:30 PM")
     }
 
+    func testPlannerAddsTripHealthAndFoodOnlyActivityGap() throws {
+        let places = [
+            makePlace("Tokyo Coffee", address: "Tokyo", latitude: 35.6710, longitude: 139.7640, category: .cafe),
+            makePlace("Tokyo Ramen", address: "Tokyo", latitude: 35.6720, longitude: 139.7650, category: .food),
+            makePlace("Tokyo Dinner", address: "Tokyo", latitude: 35.6730, longitude: 139.7660, category: .food)
+        ]
+
+        let response = try XCTUnwrap(DeterministicTripPlanner().plan(
+            for: "Plan a food-heavy one day Tokyo trip",
+            places: places
+        ))
+
+        let health = try XCTUnwrap(response.tripHealth)
+        XCTAssertLessThan(health.score, 100)
+        XCTAssertTrue(health.gaps.contains { $0.type == .missingAfternoonActivity })
+        XCTAssertTrue(health.warnings.contains { $0.type == .hoursUnknown })
+    }
+
+    func testPlannerLabelsDeterministicStopsAsConfirmedMapStampsWithUnknownRisks() throws {
+        let places = [
+            makePlace("Tokyo Museum", address: "Tokyo", latitude: 35.6710, longitude: 139.7640, category: .attraction),
+            makePlace("Tokyo Ramen", address: "Tokyo", latitude: 35.6720, longitude: 139.7650, category: .food)
+        ]
+
+        let response = try XCTUnwrap(DeterministicTripPlanner().plan(
+            for: "Plan a one day Tokyo trip",
+            places: places
+        ))
+        let stops = response.itineraryDays.flatMap(\.stops)
+
+        XCTAssertTrue(stops.allSatisfy { $0.placeState == .confirmedMapStamp })
+        XCTAssertTrue(stops.allSatisfy { $0.sourceSummary?.contains("Confirmed Map Stamp") == true })
+        XCTAssertTrue(stops.allSatisfy { $0.risks.contains(.hoursUnknown) })
+        XCTAssertTrue(stops.allSatisfy { $0.risks.contains(.bookingUnknown) })
+    }
+
     func testItineraryPlanValidatorAllowsReorderDayGroupingAndPublicCandidatesOnlyFromRetrievalSet() throws {
         let museum = makePlace("Taipei Museum", address: "台北市中正區", latitude: 25.0400, longitude: 121.5200, category: .attraction)
         let lunch = makePlace("Taipei Lunch", address: "台北市大安區", latitude: 25.0410, longitude: 121.5450, category: .food)

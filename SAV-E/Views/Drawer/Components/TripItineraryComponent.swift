@@ -3,6 +3,7 @@ import SwiftUI
 struct TripItineraryComponent: View {
     let title: String
     let days: [ItineraryDay]
+    var tripHealth: TripHealth?
     let aiMessage: String?
     var places: [Place] = []
     @Environment(\.appLanguageSettings) private var languageSettings
@@ -72,6 +73,10 @@ struct TripItineraryComponent: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
 
+            if let tripHealth {
+                TripHealthSummaryCard(health: tripHealth)
+            }
+
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(days) { day in
                     DaySection(day: day)
@@ -98,6 +103,90 @@ struct TripItineraryComponent: View {
             return days.count == 1 ? "1 day" : "\(days.count) days"
         case .traditionalChinese:
             return "\(days.count) 天"
+        }
+    }
+}
+
+// MARK: - Trip Health
+
+private struct TripHealthSummaryCard: View {
+    let health: TripHealth
+    @Environment(\.appLanguageSettings) private var languageSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Label(
+                    languageSettings.localized(english: "Trip Health", traditionalChinese: "行程健康度"),
+                    systemImage: "checklist.checked"
+                )
+                .font(.caption.weight(.black))
+                .foregroundColor(.saveInk)
+
+                Spacer()
+
+                Text("\(health.score)/100")
+                    .font(.caption.weight(.black))
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(scoreColor.opacity(0.74))
+                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                    .clipShape(Capsule())
+            }
+
+            if let strength = health.strengths.first {
+                Text(strength)
+                    .font(.caption)
+                    .foregroundColor(.saveInk.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !health.warnings.isEmpty || !health.gaps.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(health.warnings.prefix(2)) { warning in
+                        TripHealthLine(icon: "exclamationmark.triangle.fill", text: warning.message, tint: .saveHoney)
+                    }
+                    ForEach(health.gaps.prefix(3)) { gap in
+                        TripHealthLine(icon: "plus.square.dashed", text: gap.message, tint: .saveSky)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.saveSky.opacity(0.14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var scoreColor: Color {
+        if health.score >= 80 { return .saveMint }
+        if health.score >= 65 { return .saveHoney }
+        return .saveCoral
+    }
+}
+
+private struct TripHealthLine: View {
+    let icon: String
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.black))
+                .foregroundColor(.saveInk)
+                .frame(width: 18, height: 18)
+                .background(tint.opacity(0.52))
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.saveInk.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -176,11 +265,25 @@ private struct DaySection: View {
                                 .font(.caption2.weight(.semibold))
                                 .foregroundColor(.saveInk.opacity(0.76))
                         }
+                        HStack(spacing: 6) {
+                            if let placeState = stop.placeState {
+                                StopBadge(text: stateLabel(placeState), tint: stateTint(placeState))
+                            }
+                            ForEach(stop.risks.prefix(2), id: \.self) { risk in
+                                StopBadge(text: riskLabel(risk), tint: .saveHoney)
+                            }
+                        }
                         if let note = stop.note {
                             Text(note)
                                 .font(.caption)
                                 .foregroundColor(.saveInk.opacity(0.78))
                                 .padding(.top, 1)
+                        }
+                        if let sourceSummary = stop.sourceSummary {
+                            Text(sourceSummary)
+                                .font(.caption2)
+                                .foregroundColor(.saveMutedText)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .padding(.bottom, 14)
@@ -225,5 +328,61 @@ private struct DaySection: View {
         case .traditionalChinese:
             return "\(minutes) 分鐘"
         }
+    }
+
+    private func stateLabel(_ state: ItineraryPlaceState) -> String {
+        switch state {
+        case .sourceOnly:
+            return languageSettings.localized(english: "Source clue", traditionalChinese: "來源線索")
+        case .reviewCandidate:
+            return languageSettings.localized(english: "Needs review", traditionalChinese: "待確認")
+        case .confirmedMapStamp:
+            return languageSettings.localized(english: "Confirmed", traditionalChinese: "已確認")
+        case .externalSuggestion:
+            return languageSettings.localized(english: "External", traditionalChinese: "外部建議")
+        }
+    }
+
+    private func stateTint(_ state: ItineraryPlaceState) -> Color {
+        switch state {
+        case .sourceOnly: return .saveSky
+        case .reviewCandidate: return .saveHoney
+        case .confirmedMapStamp: return .saveMint
+        case .externalSuggestion: return .saveCoral
+        }
+    }
+
+    private func riskLabel(_ risk: TripRisk) -> String {
+        switch risk {
+        case .hoursUnknown:
+            return languageSettings.localized(english: "Hours?", traditionalChinese: "營業待查")
+        case .bookingUnknown:
+            return languageSettings.localized(english: "Booking?", traditionalChinese: "預約待查")
+        case .needsReview:
+            return languageSettings.localized(english: "Review", traditionalChinese: "需確認")
+        case .externalSuggestion:
+            return languageSettings.localized(english: "Approve first", traditionalChinese: "先批准")
+        case .tooFarFromPrevious:
+            return languageSettings.localized(english: "Far", traditionalChinese: "距離遠")
+        case .sourceWeak:
+            return languageSettings.localized(english: "Weak source", traditionalChinese: "來源弱")
+        }
+    }
+}
+
+private struct StopBadge: View {
+    let text: String
+    let tint: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.black))
+            .foregroundColor(.saveInk)
+            .lineLimit(1)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.52))
+            .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+            .clipShape(Capsule())
     }
 }
