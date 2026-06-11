@@ -90,15 +90,11 @@ struct TripItineraryComponent: View {
             }
 
             if let tripHealth {
-                TripHealthSummaryCard(health: tripHealth) { gap in
-                    canvas.insertExternalSuggestion(
-                        title: suggestionTitle(for: gap),
+                TripHealthSummaryCard(health: tripHealth, suggestionsByGapID: suggestionsByGapID) { gap, option in
+                    canvas.insertGapSuggestion(
+                        option,
                         dayNumber: dayNumber(for: gap),
-                        note: gap.message,
-                        sourceSummary: languageSettings.localized(
-                            english: "External gap-fill suggestion. Approve before treating it as part of the plan.",
-                            traditionalChinese: "外部補缺建議。先批准，才會視為行程的一部分。"
-                        )
+                        note: gap.message
                     )
                 }
             }
@@ -150,6 +146,19 @@ struct TripItineraryComponent: View {
         }
     }
 
+    private var suggestionsByGapID: [String: GapSuggestion] {
+        guard let gaps = tripHealth?.gaps, !gaps.isEmpty else { return [:] }
+        let suggestions = TripGapSuggestionEngine().suggestions(
+            for: gaps,
+            days: canvas.visibleDays,
+            savedPlaces: places,
+            reviewCandidates: [],
+            mapCandidates: [],
+            outputLanguage: languageSettings.language
+        )
+        return Dictionary(uniqueKeysWithValues: suggestions.map { ($0.gapId, $0) })
+    }
+
     private func dayNumber(for gap: TripGap) -> Int {
         if let explicit = Int(gap.dayId.filter(\.isNumber)) {
             return explicit
@@ -157,35 +166,14 @@ struct TripItineraryComponent: View {
         return canvas.visibleDays.first?.dayNumber ?? 1
     }
 
-    private func suggestionTitle(for gap: TripGap) -> String {
-        switch gap.type {
-        case .missingBreakfast:
-            return languageSettings.localized(english: "Breakfast option", traditionalChinese: "早餐候選")
-        case .missingLunch:
-            return languageSettings.localized(english: "Lunch option", traditionalChinese: "午餐候選")
-        case .missingDinner:
-            return languageSettings.localized(english: "Dinner option", traditionalChinese: "晚餐候選")
-        case .missingCoffeeBreak:
-            return languageSettings.localized(english: "Coffee break option", traditionalChinese: "咖啡休息候選")
-        case .missingAfternoonActivity:
-            return languageSettings.localized(english: "Afternoon activity option", traditionalChinese: "下午活動候選")
-        case .missingEveningPlan:
-            return languageSettings.localized(english: "Evening option", traditionalChinese: "晚間候選")
-        case .needsAreaCluster:
-            return languageSettings.localized(english: "Nearby stop option", traditionalChinese: "附近停留候選")
-        case .needsRainBackup:
-            return languageSettings.localized(english: "Rain backup option", traditionalChinese: "雨天備案候選")
-        case .needsHoursCheck:
-            return languageSettings.localized(english: "Hours check needed", traditionalChinese: "營業時間待查")
-        }
-    }
 }
 
 // MARK: - Trip Health
 
 private struct TripHealthSummaryCard: View {
     let health: TripHealth
-    var onAddSuggestion: ((TripGap) -> Void)?
+    var suggestionsByGapID: [String: GapSuggestion] = [:]
+    var onAddSuggestion: ((TripGap, GapSuggestionOption) -> Void)?
     @Environment(\.appLanguageSettings) private var languageSettings
 
     var body: some View {
@@ -225,21 +213,27 @@ private struct TripHealthSummaryCard: View {
                     ForEach(health.gaps.prefix(3)) { gap in
                         VStack(alignment: .leading, spacing: 6) {
                             TripHealthLine(icon: "plus.square.dashed", text: gap.message, tint: .saveSky)
-                            if let onAddSuggestion {
-                                Button(action: { onAddSuggestion(gap) }) {
-                                    Label(
-                                        languageSettings.localized(english: "Add option", traditionalChinese: "加入候選"),
-                                        systemImage: "plus"
-                                    )
-                                    .font(.caption2.weight(.black))
-                                    .foregroundColor(.saveInk)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(Color.saveMint.opacity(0.52))
-                                    .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
-                                    .clipShape(Capsule())
+                            if let suggestion = suggestionsByGapID[gap.id], let onAddSuggestion {
+                                ForEach(suggestion.options.prefix(3)) { option in
+                                    Button(action: { onAddSuggestion(gap, option) }) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Label(optionButtonTitle(for: option), systemImage: iconName(for: option.source))
+                                                .font(.caption2.weight(.black))
+                                            Text(option.reason)
+                                                .font(.caption2.weight(.semibold))
+                                                .lineLimit(2)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .foregroundColor(.saveInk)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 6)
+                                        .background(optionBackground(for: option.source))
+                                        .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1))
+                                        .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -259,6 +253,45 @@ private struct TripHealthSummaryCard: View {
         if health.score >= 80 { return .saveMint }
         if health.score >= 65 { return .saveHoney }
         return .saveCoral
+    }
+
+    private func optionButtonTitle(for option: GapSuggestionOption) -> String {
+        switch option.source {
+        case .confirmedSaved:
+            return languageSettings.localized(english: "Add saved: \(option.title)", traditionalChinese: "加入已存：\(option.title)")
+        case .reviewCandidate:
+            return languageSettings.localized(english: "Review candidate: \(option.title)", traditionalChinese: "確認候選：\(option.title)")
+        case .sourceClue:
+            return languageSettings.localized(english: "Resolve clue: \(option.title)", traditionalChinese: "查證線索：\(option.title)")
+        case .externalSuggestion:
+            return languageSettings.localized(english: "Approve external: \(option.title)", traditionalChinese: "批准公開候選：\(option.title)")
+        }
+    }
+
+    private func iconName(for source: GapSuggestionSource) -> String {
+        switch source {
+        case .confirmedSaved:
+            return "mappin.and.ellipse"
+        case .reviewCandidate:
+            return "checkmark.seal"
+        case .sourceClue:
+            return "link"
+        case .externalSuggestion:
+            return "globe"
+        }
+    }
+
+    private func optionBackground(for source: GapSuggestionSource) -> Color {
+        switch source {
+        case .confirmedSaved:
+            return .saveMint.opacity(0.52)
+        case .reviewCandidate:
+            return .saveSky.opacity(0.42)
+        case .sourceClue:
+            return .saveHoney.opacity(0.42)
+        case .externalSuggestion:
+            return .saveCoral.opacity(0.24)
+        }
     }
 }
 
