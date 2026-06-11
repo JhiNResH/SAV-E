@@ -428,9 +428,10 @@ struct SaveSearchController {
 
     private func evidenceWithRecoveryReceipt(_ evidence: [String], diagnostic: SocialPlaceEvidenceDiagnostic?) -> [String] {
         guard let diagnostic else { return evidence }
+        let isSourceOnly = diagnostic.recoveryPlan?.decision == .sourceOnly
         var receipt = [
-            "Recovery status: \(diagnostic.statusLabel)",
-            "Next action: \(diagnostic.primaryActionLabel)"
+            "Recovery status: \(isSourceOnly ? "Source clue" : diagnostic.statusLabel)",
+            "Next action: \(isSourceOnly ? "Add caption / screenshot / map link" : diagnostic.primaryActionLabel)"
         ]
         if let recoveryPlan = diagnostic.recoveryPlan {
             receipt.append("Recovery decision: \(recoveryPlan.decision.rawValue); direct save \(recoveryPlan.allowsDirectSave ? "allowed" : "blocked")")

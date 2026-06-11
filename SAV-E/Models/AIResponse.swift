@@ -136,6 +136,45 @@ struct TripCanvasDraft: Equatable {
         days[index] = days[index].replacingStops(stops)
     }
 
+    mutating func insertGapSuggestion(
+        _ option: GapSuggestionOption,
+        dayNumber: Int,
+        note: String
+    ) {
+        guard option.action != .skip,
+              let index = days.firstIndex(where: { $0.dayNumber == dayNumber }) else { return }
+        let placeState: ItineraryPlaceState
+        let risks: [TripRisk]
+        switch option.source {
+        case .confirmedSaved:
+            placeState = .confirmedMapStamp
+            risks = [.hoursUnknown, .bookingUnknown]
+        case .reviewCandidate:
+            placeState = .reviewCandidate
+            risks = [.needsReview, .hoursUnknown, .bookingUnknown]
+        case .sourceClue:
+            placeState = .sourceOnly
+            risks = [.sourceWeak, .needsReview]
+        case .externalSuggestion:
+            placeState = .externalSuggestion
+            risks = [.externalSuggestion, .hoursUnknown, .bookingUnknown]
+        }
+        let suggestion = ItineraryStop(
+            id: UUID(),
+            placeId: option.placeId,
+            placeState: placeState,
+            placeName: option.title,
+            time: nil,
+            duration: 60,
+            note: note,
+            sourceSummary: option.reason,
+            risks: risks
+        )
+        var stops = days[index].stops
+        stops.append(suggestion)
+        days[index] = days[index].replacingStops(stops)
+    }
+
     func isApprovedExternalStop(_ stopID: UUID) -> Bool {
         approvedExternalStopIDs.contains(stopID)
     }
@@ -233,6 +272,49 @@ struct TripGap: Identifiable, Codable, Equatable, Hashable {
         case needsRainBackup = "needs_rain_backup"
         case needsHoursCheck = "needs_hours_check"
     }
+}
+
+struct GapSuggestion: Identifiable, Codable, Equatable, Hashable {
+    var id: String
+    var gapId: String
+    var dayId: String
+    var message: String
+    var options: [GapSuggestionOption]
+    var requiresUserApproval: Bool
+}
+
+struct GapSuggestionOption: Identifiable, Codable, Equatable, Hashable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var source: GapSuggestionSource
+    var placeId: String?
+    var reviewCandidateId: String?
+    var mapCandidateId: String?
+    var reason: String
+    var confidence: ConfidenceLevel
+    var action: GapSuggestionAction
+}
+
+enum GapSuggestionSource: String, Codable, Equatable, Hashable {
+    case confirmedSaved
+    case reviewCandidate
+    case sourceClue
+    case externalSuggestion
+}
+
+enum GapSuggestionAction: String, Codable, Equatable, Hashable {
+    case addToPlan
+    case reviewThenAdd
+    case resolveThenAdd
+    case addExternalWithApproval
+    case skip
+}
+
+enum ConfidenceLevel: String, Codable, Equatable, Hashable {
+    case low
+    case medium
+    case high
 }
 
 enum Severity: String, Codable, Equatable, Hashable {

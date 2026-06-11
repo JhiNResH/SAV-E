@@ -681,11 +681,11 @@ final class SocialLinkReviewCandidateService {
         var seenKeys = Set<String>()
         return candidates
             .map { candidate in
-                var normalized = candidate
-                normalized.address = cleanLocationMarker(from: candidate.address)
-                return normalized
+                normalizedSocialCandidate(candidate)
             }
             .filter { !isTransitAccessCandidate($0) }
+            .filter { !looksLikeMarketingLine($0.candidateName) }
+            .filter { !isProseFragmentCandidate($0.candidateName) }
             .sorted { lhs, rhs in
                 socialAnalysisScore(lhs) > socialAnalysisScore(rhs)
             }
@@ -695,6 +695,62 @@ final class SocialLinkReviewCandidateService {
                 seenKeys.insert(key)
                 return true
             }
+    }
+
+    private func normalizedSocialCandidate(_ candidate: PendingReviewCandidate) -> PendingReviewCandidate {
+        var normalized = candidate
+        let sourceText = candidate.sourceText ?? candidate.evidence.joined(separator: "\n")
+        if candidate.candidateName.contains("📍") || candidate.candidateName.contains("🚩") {
+            normalized.candidateName = candidateNameFromCaptionLine(candidate.candidateName) ?? cleanCandidateName(candidate.candidateName)
+        }
+        normalized.address = cleanLocationMarker(from: candidate.address)
+        if normalized.address.isEmpty ||
+            normalized.address.contains("@") ||
+            looksLikeCityOnlyAddress(normalized.address) ||
+            (candidate.address.contains("📍") && !looksLikeAddressLine(normalized.address)) {
+            normalized.address = streetAddressLine(in: sourceText) ?? normalized.address
+        }
+        if let markerCandidate = strongestMarkedVenueCandidate(in: sourceText),
+           shouldPreferMarkedVenue(markerCandidate, over: normalized.candidateName) {
+            normalized.candidateName = markerCandidate
+            if let address = streetAddressLine(in: sourceText) {
+                normalized.address = address
+            }
+            normalized.confidence = max(normalized.confidence, 0.68)
+            normalized.evidence = appendUnique(
+                normalized.evidence,
+                ["Public metadata venue anchor: \(markerCandidate)"]
+            )
+        }
+        return normalized
+    }
+
+    private func strongestMarkedVenueCandidate(in text: String) -> String? {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map(cleanHTMLText)
+            .filter { !$0.isEmpty }
+        for line in lines {
+            if line.range(of: #"(?i)\b(?:on\s+Instagram|Instagram\s+reel)\b"#, options: .regularExpression) != nil ||
+                line.contains("(@") ||
+                line.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("@") {
+                continue
+            }
+            guard let candidate = candidateNameFromCaptionLine(line),
+                  isLikelyCaptionPlaceName(candidate),
+                  !looksLikeAddressLine(candidate),
+                  !looksLikeMarketingLine(candidate) else { continue }
+            return candidate
+        }
+        return nil
+    }
+
+    private func shouldPreferMarkedVenue(_ markedVenue: String, over currentName: String) -> Bool {
+        if currentName.isEmpty { return true }
+        if currentName.contains("📍") || currentName.contains("🚩") { return true }
+        if currentName.range(of: #","#, options: .regularExpression) != nil { return true }
+        if markedVenue.count > currentName.count + 4 { return true }
+        return false
     }
 
     private func isTransitAccessCandidate(_ candidate: PendingReviewCandidate) -> Bool {
@@ -708,6 +764,16 @@ final class SocialLinkReviewCandidateService {
         }
         return name == "Address-only place clue" &&
             (address.contains("出口") || address.localizedCaseInsensitiveContains("exit"))
+    }
+
+    private func isProseFragmentCandidate(_ name: String) -> Bool {
+        let lowered = name.lowercased()
+        return lowered.hasPrefix("to ") ||
+            lowered.hasPrefix("and ") ||
+            lowered.hasPrefix("or ") ||
+            lowered.contains(" enjoy the ") ||
+            lowered.contains(" perfect ") ||
+            lowered.contains(" packed with ")
     }
 
     private func socialAnalysisScore(_ candidate: PendingReviewCandidate) -> Double {
@@ -1161,7 +1227,7 @@ final class SocialLinkReviewCandidateService {
 
     private func captionNamedCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = bracketedPlaceName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = streetAddressLine(in: evidenceText) ?? firstLocationPin(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURL)",
@@ -1190,7 +1256,7 @@ final class SocialLinkReviewCandidateService {
 
     private func captionVenueIntroCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = venueIntroName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = streetAddressLine(in: evidenceText) ?? firstLocationPin(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURL)",
@@ -1245,7 +1311,7 @@ final class SocialLinkReviewCandidateService {
 
     private func chineseSocialTitleCandidate(from evidenceText: String, sourceURL: String) -> PendingReviewCandidate? {
         guard let name = chineseVenueName(in: evidenceText) else { return nil }
-        let address = firstLocationPin(in: evidenceText) ?? streetAddressLine(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
+        let address = streetAddressLine(in: evidenceText) ?? firstLocationPin(in: evidenceText) ?? locatedCity(in: evidenceText) ?? cityAddress(in: evidenceText) ?? ""
         let tier = SocialPlaceEvidenceScorer.tier(hasAddress: !address.isEmpty)
         var evidence = [
             "Source URL: \(sourceURL)",
@@ -2316,9 +2382,12 @@ final class SocialLinkReviewCandidateService {
         ]
         for pattern in patterns {
             if let match = firstCapture(in: text, pattern: pattern) {
-                let cleaned = cleanHTMLText(match)
+                let cleaned = cleanLocationMarker(from: match)
                     .trimmingCharacters(in: CharacterSet(charactersIn: " ：:"))
-                if !cleaned.isEmpty { return cleaned }
+                guard !cleaned.isEmpty else { continue }
+                if looksLikeAddressLine(cleaned) {
+                    return cleaned
+                }
             }
         }
         return nil
@@ -2333,6 +2402,7 @@ final class SocialLinkReviewCandidateService {
         guard lines.count >= 2 else { return nil }
 
         for (index, line) in lines.enumerated() where looksLikeAddressLine(line) {
+            let address = cleanLocationMarker(from: line)
             let priorLines = Array(lines.prefix(index))
 
             // Prefer structural venue anchors over the closest freeform line.
@@ -2343,7 +2413,7 @@ final class SocialLinkReviewCandidateService {
             for priorLine in priorLines {
                 guard let candidate = candidateNameFromCaptionLine(priorLine) else { continue }
                 if isLikelyCaptionPlaceName(candidate) {
-                    return (candidate, line)
+                    return (candidate, address)
                 }
             }
 
@@ -2351,7 +2421,7 @@ final class SocialLinkReviewCandidateService {
             while previousIndex >= 0 {
                 let candidate = cleanCandidateName(lines[previousIndex])
                 if isLikelyCaptionPlaceName(candidate) {
-                    return (candidate, line)
+                    return (candidate, address)
                 }
                 previousIndex -= 1
             }
@@ -2364,8 +2434,13 @@ final class SocialLinkReviewCandidateService {
             .components(separatedBy: .newlines)
             .map(cleanHTMLText)
             .filter { !$0.isEmpty }
-        guard let line = lines.first(where: looksLikeAddressLine) else { return nil }
-        return cleanLocationMarker(from: line)
+        if let line = lines.first(where: looksLikeAddressLine) {
+            return cleanLocationMarker(from: line)
+        }
+        if let western = lines.first(where: looksLikeWesternStreetAddress) {
+            return cleanLocationMarker(from: western)
+        }
+        return nil
     }
 
     private func cleanLocationMarker(from value: String) -> String {
@@ -2384,13 +2459,38 @@ final class SocialLinkReviewCandidateService {
     }
 
     private func candidateNameFromCaptionLine(_ line: String) -> String? {
-        if let venueMarkerName = firstCapture(in: line, pattern: #"^\s*[🏠🏡🏘️🏚️🏪🏬🏢🍽️🍴☕️📍🚩]\s*([^\n\r]{2,60})"#) {
-            let cleaned = cleanCandidateName(venueMarkerName)
+        if !looksLikeAddressLine(line),
+           let pinnedName = firstCapture(in: line, pattern: #"[📍🚩]\s*([^@\n\r]{2,80})(?:\s+@[A-Za-z0-9._]{3,30})?"#) {
+            let cleaned = cleanCandidateName(pinnedName)
             if isUsableCandidateName(cleaned),
                !looksLikeAddressLine(cleaned),
                !looksLikeOperatingHoursLine(cleaned),
                !looksLikeReviewMetricLine(cleaned),
                !looksLikeMarketingLine(cleaned) {
+                return cleaned
+            }
+        }
+
+        if let venueMarkerName = firstCapture(in: line, pattern: #"^\s*[🏠🏡🏘️🏚️🏪🏬🏢🍽️🍴☕️📍🚩]\s*([^\n\r]{2,60})"#) {
+            let cleaned = cleanMarkedCandidateName(venueMarkerName)
+            if isUsableCandidateName(cleaned),
+               !looksLikeAddressLine(cleaned),
+               !looksLikeOperatingHoursLine(cleaned),
+               !looksLikeReviewMetricLine(cleaned),
+               !looksLikeMarketingLine(cleaned) {
+                return cleaned
+            }
+        }
+
+        if let socialArrowName = firstCapture(in: line, pattern: #"^\s*[👉➡→➜📌🏻🏼🏽🏾🏿️]+\s*([^\n\r]{2,60})"#) {
+            let cleaned = cleanMarkedCandidateName(socialArrowName)
+            if isUsableCandidateName(cleaned),
+               !looksLikeAddressLine(cleaned),
+               !looksLikeOperatingHoursLine(cleaned),
+               !looksLikeReviewMetricLine(cleaned),
+               !looksLikeMarketingLine(cleaned),
+               !isProseFragmentCandidate(cleaned),
+               looksLikeStandaloneMarkedVenueName(cleaned) {
                 return cleaned
             }
         }
@@ -2420,6 +2520,15 @@ final class SocialLinkReviewCandidateService {
                 return cleaned
             }
         }
+        if let quoted = firstCapture(in: line, pattern: #"[「《\"]\s*([^」》\"]{2,60})\s*[」》\"]"#) {
+            let cleaned = cleanCandidateName(quoted)
+            if isUsableCandidateName(cleaned),
+               !looksLikeMarketingLine(cleaned),
+               looksLikeVenueTitle(cleaned),
+               looksLikeStandaloneMarkedVenueName(cleaned) {
+                return cleaned
+            }
+        }
         if let handle = firstCapture(in: line, pattern: #"@([A-Za-z0-9._]{3,30})"#) {
             let cleaned = SocialPlaceEvidenceScorer.resolvedDisplayName(fromSocialHandle: handle).name
             if isUsableCandidateName(cleaned), !looksLikeMarketingLine(cleaned) {
@@ -2439,6 +2548,45 @@ final class SocialLinkReviewCandidateService {
 
     private func looksLikeMarketingLine(_ value: String) -> Bool {
         SocialPlaceEvidenceScorer.looksLikeMarketingLine(value)
+    }
+
+    private func looksLikeWesternStreetAddress(_ value: String) -> Bool {
+        value.range(
+            of: #"^\s*\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\s(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy)\b"#,
+            options: .regularExpression
+        ) != nil
+    }
+
+    private func looksLikeCityOnlyAddress(_ value: String) -> Bool {
+        value.range(of: #"^[A-Za-z .'-]{2,40},\s*(?:CA|NY|TX|FL|WA|IL|NV|AZ|OR|MA|HI|UT|CO)$"#, options: .regularExpression) != nil
+    }
+
+    private func cleanMarkedCandidateName(_ value: String) -> String {
+        let truncated = value
+            .replacingOccurrences(of: #"[」》\"].*$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\s+(?:我已經|我已经|不是|而且|但|不但|with|because)\b.*$"#, with: "", options: .regularExpression)
+        return cleanCandidateName(truncated)
+    }
+
+    private func looksLikeVenueTitle(_ value: String) -> Bool {
+        if value.range(of: #"(?i)\b(restaurant|cafe|coffee|bar|bakery|bistro|kitchen|grill|pizzeria|sushi|ramen|hotel|resort|inn|villa|district|market|museum|gallery|park|beach|garden|dining|pottery|studio)\b"#, options: .regularExpression) != nil {
+            return true
+        }
+        return value.range(of: #"店|館|馆|餐廳|餐厅|咖啡|茶|酒吧|烘焙|燒肉|烧肉|火鍋|火锅|壽喜燒|寿喜烧|麵|面|飯|饭|屋|坊|室|湯|汤|菜"#, options: .regularExpression) != nil
+    }
+
+    private func looksLikeStandaloneMarkedVenueName(_ value: String) -> Bool {
+        guard value.count <= 40 else { return false }
+        if value.range(of: #"[，,。！!？?；;]"#, options: .regularExpression) != nil {
+            return false
+        }
+        if value.range(of: #"(?i)\b(?:best\s+for|coffee\s+quality|unique\s+coffee\s+experiences|atmosphere|aesthetic|desserts?\s+worth|bookings?)\b"#, options: .regularExpression) != nil {
+            return false
+        }
+        if value.range(of: #"最強|最强|免費|免费|吃到飽|吃到饱|必吃|必喝|推薦|推荐|隱藏版|隐藏版|打卡|排隊|排队"#, options: .regularExpression) != nil {
+            return false
+        }
+        return true
     }
 
     private func cityAddress(in text: String) -> String? {

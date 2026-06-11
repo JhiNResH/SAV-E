@@ -983,11 +983,12 @@ struct SocialPlaceParser {
         for (index, line) in lines.enumerated() where SocialPlaceEvidenceScorer.looksLikeAddressLine(line) &&
             !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line) &&
             !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(line) {
+            let address = firstLocationClue(in: line) ?? cleanLocationMarker(from: line)
+            guard strictAddressLike(address) || firstStreetAddress(in: address) != nil else { continue }
             let priorLines = Array(lines.prefix(index))
             let candidateLines = priorLines.reversed() + priorLines
             for priorLine in candidateLines {
                 guard let name = candidateNameFromCaptionLine(priorLine) ?? standaloneVenueNameBeforeAddress(priorLine) else { continue }
-                let address = firstLocationClue(in: line) ?? cleanLocationMarker(from: line)
                 let bookingLinks = bookingLinks(in: fullText)
                 var atoms = [
                     SocialEvidenceAtom(source: .captionSentence, role: .venueName, value: name, line: priorLine, confidence: 0.62),
@@ -1612,6 +1613,17 @@ struct SocialPlaceParser {
             let cleaned = cleanDisplayName(pinnedName)
             if (line.contains("@") || looksLikeVenueTitle(cleaned)),
                SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned) {
+                return cleaned
+            }
+        }
+
+        if !SocialPlaceEvidenceScorer.looksLikeAddressLine(line),
+           let arrowName = firstCapture(in: line, pattern: #"^\s*[👉➡→➜📌🏻🏼🏽🏾🏿️]+\s*([^\n\r]{2,80})"#) {
+            let cleaned = cleanDisplayName(arrowName)
+            if SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(cleaned),
+               !SocialPlaceEvidenceScorer.looksLikeOperatingHoursLine(cleaned),
+               !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(cleaned),
+               looksLikeStandaloneMarkedVenueName(cleaned) {
                 return cleaned
             }
         }

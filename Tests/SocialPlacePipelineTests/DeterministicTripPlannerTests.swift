@@ -438,6 +438,98 @@ final class DeterministicTripPlannerTests: XCTestCase {
         XCTAssertEqual(canvas.visibleDays.flatMap(\.stops).compactMap(\.placeId).sorted(), originalIDs)
     }
 
+    func testGapSuggestionEngineRanksSavedActivityBeforeExternalCandidate() throws {
+        let savedMuseum = makePlace("Taipei Museum", address: "台北市中正區", latitude: 25.0400, longitude: 121.5200, category: .attraction)
+        let externalPark = SaveMapCandidate(
+            id: "public-park",
+            title: "大安森林公園",
+            subtitle: "台北市大安區",
+            latitude: 25.0260,
+            longitude: 121.5350,
+            category: .attraction
+        )
+        let suggestion = try XCTUnwrap(TripGapSuggestionEngine().suggestions(
+            for: [tripGap(.missingAfternoonActivity)],
+            days: [ItineraryDay(dayNumber: 1, label: "第 1 天", stops: [])],
+            savedPlaces: [savedMuseum],
+            reviewCandidates: [],
+            mapCandidates: [externalPark],
+            outputLanguage: .traditionalChinese
+        ).first)
+
+        XCTAssertEqual(suggestion.options.map(\.source), [.confirmedSaved, .externalSuggestion])
+        XCTAssertEqual(suggestion.options.first?.title, "Taipei Museum")
+        XCTAssertEqual(suggestion.options.first?.action, .addToPlan)
+        XCTAssertEqual(suggestion.options.last?.action, .addExternalWithApproval)
+        XCTAssertNil(suggestion.options.last?.placeId)
+        XCTAssertTrue(suggestion.requiresUserApproval)
+    }
+
+    func testGapSuggestionEngineLabelsReviewCandidateAndSourceOnlySeparately() throws {
+        let mapReadyReview = reviewCandidate(
+            name: "Review Gallery",
+            address: "Los Angeles, CA",
+            latitude: 34.0500,
+            longitude: -118.2400,
+            evidence: ["Gallery attraction"]
+        )
+        let sourceOnly = reviewCandidate(
+            name: "Unresolved Museum Clue",
+            address: "",
+            latitude: nil,
+            longitude: nil,
+            evidence: ["Caption mentions museum"]
+        )
+        let suggestion = try XCTUnwrap(TripGapSuggestionEngine().suggestions(
+            for: [tripGap(.missingAfternoonActivity)],
+            days: [ItineraryDay(dayNumber: 1, label: nil, stops: [])],
+            savedPlaces: [],
+            reviewCandidates: [mapReadyReview, sourceOnly],
+            mapCandidates: [],
+            outputLanguage: .english
+        ).first)
+
+        XCTAssertEqual(suggestion.options.map(\.source), [.reviewCandidate, .sourceClue])
+        XCTAssertEqual(suggestion.options.first?.action, .reviewThenAdd)
+        XCTAssertEqual(suggestion.options.last?.action, .resolveThenAdd)
+        XCTAssertNil(suggestion.options.first?.placeId)
+        XCTAssertEqual(suggestion.options.first?.reviewCandidateId, mapReadyReview.id.uuidString)
+    }
+
+    func testGapSuggestionEngineExternalSuggestionRequiresApprovalAndDoesNotSaveMemory() throws {
+        let external = SaveMapCandidate(
+            id: "public-activity",
+            title: "Public Activity",
+            subtitle: "Tokyo",
+            latitude: 35.6700,
+            longitude: 139.7600,
+            category: .attraction
+        )
+        let gap = tripGap(.missingAfternoonActivity)
+        let suggestion = try XCTUnwrap(TripGapSuggestionEngine().suggestions(
+            for: [gap],
+            days: [ItineraryDay(dayNumber: 1, label: nil, stops: [])],
+            savedPlaces: [],
+            reviewCandidates: [],
+            mapCandidates: [external],
+            outputLanguage: .english
+        ).first)
+        let option = try XCTUnwrap(suggestion.options.first)
+
+        XCTAssertEqual(option.source, .externalSuggestion)
+        XCTAssertEqual(option.action, .addExternalWithApproval)
+        XCTAssertNil(option.placeId)
+        XCTAssertEqual(option.mapCandidateId, "public-activity")
+
+        var canvas = TripCanvasDraft(days: [ItineraryDay(dayNumber: 1, label: nil, stops: [])])
+        canvas.insertGapSuggestion(option, dayNumber: 1, note: gap.message)
+        let inserted = try XCTUnwrap(canvas.visibleDays.first?.stops.first)
+
+        XCTAssertNil(inserted.placeId)
+        XCTAssertEqual(inserted.placeState, .externalSuggestion)
+        XCTAssertTrue(inserted.risks.contains(.externalSuggestion))
+    }
+
     private func makePlace(
         _ name: String,
         address: String,
@@ -505,6 +597,39 @@ final class DeterministicTripPlannerTests: XCTestCase {
             time: time,
             duration: 60,
             note: "公開探索候選"
+        )
+    }
+
+    private func tripGap(_ type: TripGap.GapType) -> TripGap {
+        TripGap(
+            id: "gap-\(type.rawValue)",
+            type: type,
+            dayId: "day-1",
+            severity: .medium,
+            message: "Day 1 needs \(type.rawValue)"
+        )
+    }
+
+    private func reviewCandidate(
+        name: String,
+        address: String,
+        latitude: Double?,
+        longitude: Double?,
+        evidence: [String]
+    ) -> PlaceReviewCandidate {
+        PlaceReviewCandidate(
+            id: UUID(),
+            captureId: nil,
+            name: name,
+            address: address,
+            city: nil,
+            latitude: latitude,
+            longitude: longitude,
+            evidence: evidence,
+            confidence: nil,
+            missingInfo: [],
+            status: "pending",
+            createdAt: Date()
         )
     }
 }

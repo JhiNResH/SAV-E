@@ -35,15 +35,15 @@ struct SocialPlaceStructuredHighlights: Codable, Hashable {
 
     static func extracted(from evidence: [String], sourceURL: String? = nil) -> SocialPlaceStructuredHighlights {
         var result = SocialPlaceStructuredHighlights(sourceHandle: sourceHandle(from: evidence, sourceURL: sourceURL))
-        for rawLine in evidence {
+        for rawLine in evidence.flatMap({ $0.components(separatedBy: .newlines) }) {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty else { continue }
 
-            if let item = recommendedItem(from: line) {
+            if let item = recommendedItem(from: line) ?? rawRecommendedItem(from: line) {
                 result.recommendedItems.append(item)
                 continue
             }
-            if let highlight = highlight(from: line) {
+            if let highlight = highlight(from: line) ?? rawHighlight(from: line) {
                 result.placeHighlights.append(highlight)
                 result.vibeTags.append(contentsOf: vibeTags(from: highlight))
                 result.accessNotes.append(contentsOf: accessNotes(from: highlight))
@@ -69,12 +69,39 @@ struct SocialPlaceStructuredHighlights: Codable, Hashable {
         return RecommendedItem(name: value, price: nil)
     }
 
+    private static func rawRecommendedItem(from line: String) -> RecommendedItem? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("*") || trimmed.hasPrefix("＊") else { return nil }
+        let value = trimmed
+            .dropFirst()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        if let range = value.range(of: #"[$＄]\s*\d+(?:[,，]?\d+)*(?:\.\d+)?"#, options: .regularExpression) {
+            let name = value[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+            let price = String(value[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return RecommendedItem(name: name.isEmpty ? String(value) : name, price: price)
+        }
+        return nil
+    }
+
     private static func highlight(from line: String) -> String? {
         let prefix = "Highlight:"
         guard line.localizedCaseInsensitiveContains(prefix) else { return nil }
         let value = line.replacingOccurrences(of: prefix, with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty, !value.localizedCaseInsensitiveContains("Recommended item:") else { return nil }
         return value
+    }
+
+    private static func rawHighlight(from line: String) -> String? {
+        let ignoredPrefixes = ["#", "@", "<", "《", "【", "店名", "地址", "地點", "地点", "🏠", "📍"]
+        guard !ignoredPrefixes.contains(where: { line.hasPrefix($0) }) else { return nil }
+        if line.range(of: #"捷運|地鐵|地铁|步行|station|metro|mrt"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return line
+        }
+        if line.range(of: #"深夜|咖啡廳|咖啡厅|小餐館|小餐馆|份量|環境|环境|舒適|舒适|暖色|大推|好吃"#, options: .regularExpression) != nil {
+            return line
+        }
+        return nil
     }
 
     private static func vibeTags(from highlight: String) -> [String] {
