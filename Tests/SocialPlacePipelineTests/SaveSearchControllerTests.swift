@@ -765,8 +765,57 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertEqual(response.componentType, .message)
         XCTAssertEqual(response.title, "需要行程天數")
         XCTAssertTrue(response.messageText?.contains("幾天") == true)
+        XCTAssertEqual(response.followUpChoices.map(\.label), [
+            "Los Angeles 1 天",
+            "Los Angeles 3 天",
+            "週末輕鬆",
+            "吃喝 + 景點"
+        ])
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains("規劃Los Angeles 1 天輕鬆行程"))
         XCTAssertTrue(response.itineraryDays.isEmpty)
         XCTAssertNil(response.mapAction)
+    }
+
+    @MainActor
+    func testDrawerShowsTripAnchorChoicesWhenRequestedRegionDoesNotMatchSavedPlaces() async {
+        let drawer = AIDrawerViewModel(
+            aiService: SaveAIService(apiKey: ""),
+            groundedAnswerClient: nil
+        )
+        drawer.places = [
+            place(
+                name: "Los Angeles Taco",
+                address: "Los Angeles, CA",
+                category: .food,
+                latitude: 34.0522,
+                longitude: -118.2437
+            ),
+            place(
+                name: "Irvine Coffee",
+                address: "Irvine, CA",
+                category: .cafe,
+                latitude: 33.6846,
+                longitude: -117.8265
+            )
+        ]
+        drawer.query = "規劃加州 5天行程"
+
+        await drawer.submit(outputLanguage: .traditionalChinese)
+
+        guard case .displaying(let response) = drawer.drawerState else {
+            return XCTFail("Expected bounded anchor message")
+        }
+        XCTAssertEqual(response.componentType, .message)
+        XCTAssertEqual(response.title, "需要行程錨點")
+        XCTAssertTrue(response.messageText?.contains("已存地圖章") == true)
+        XCTAssertEqual(response.followUpChoices.map(\.label), [
+            "Los Angeles 5 天",
+            "Irvine 5 天",
+            "找公開景點",
+            "看已存地點"
+        ])
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains("規劃Los Angeles 5 天行程"))
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains("搜尋加州公開景點和活動"))
     }
 
     @MainActor
@@ -793,6 +842,7 @@ final class SaveSearchControllerTests: XCTestCase {
         }
         XCTAssertEqual(response.componentType, .message)
         XCTAssertTrue(response.messageText?.contains("matching saved Map Stamps") == true)
+        XCTAssertTrue(response.followUpChoices.map(\.label).contains("Find public options"))
         XCTAssertNil(response.mapAction)
     }
 

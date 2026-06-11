@@ -41,6 +41,12 @@ struct TripDestinationScope {
         return destinationHint(from: joinedAddresses)
     }
 
+    static func normalizeID(_ text: String) -> String {
+        normalize(text)
+            .replacingOccurrences(of: " ", with: "-")
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    }
+
     private func matches(text: String) -> Bool {
         let normalized = Self.normalize(text)
         if normalized.contains(normalizedDestination) {

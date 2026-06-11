@@ -14,6 +14,7 @@ struct SaveAIResponse: Equatable {
     let messageText: String?
     let mapAction: MapActionData?
     let aiMessage: String?
+    var followUpChoices: [SaveSearchFollowUpChoice] = []
 
     enum ComponentType: String, Codable, Equatable {
         case placeList, navigationCard, tripItinerary, message
@@ -348,7 +349,8 @@ struct SaveAIResponseDTO: Codable {
             tripHealth: tripHealth,
             messageText: messageText,
             mapAction: mapAction,
-            aiMessage: aiMessage
+            aiMessage: aiMessage,
+            followUpChoices: []
         )
     }
 }

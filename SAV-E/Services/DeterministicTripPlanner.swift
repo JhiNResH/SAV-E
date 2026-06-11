@@ -352,8 +352,72 @@ struct DeterministicTripPlanner {
             itineraryDays: [],
             messageText: text,
             mapAction: nil,
-            aiMessage: text
+            aiMessage: text,
+            followUpChoices: clarificationChoices(for: message, outputLanguage: outputLanguage)
         )
+    }
+
+    private func clarificationChoices(for message: String, outputLanguage: AppLanguage) -> [SaveSearchFollowUpChoice] {
+        let destination = TripDestinationScope.destinationHint(from: message) ?? outputLanguage.localized(
+            english: "this trip",
+            traditionalChinese: "這趟"
+        )
+        if outputLanguage == .traditionalChinese {
+            return [
+                SaveSearchFollowUpChoice(
+                    id: "trip-one-day",
+                    label: "\(destination) 1 天",
+                    prompt: "規劃\(destination) 1 天輕鬆行程",
+                    systemImage: "sun.max"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "trip-three-days",
+                    label: "\(destination) 3 天",
+                    prompt: "規劃\(destination) 3 天吃喝加景點",
+                    systemImage: "calendar"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "trip-weekend",
+                    label: "週末輕鬆",
+                    prompt: "規劃\(destination)週末輕鬆行程",
+                    systemImage: "sparkles"
+                ),
+                SaveSearchFollowUpChoice(
+                    id: "trip-food-activity",
+                    label: "吃喝 + 景點",
+                    prompt: "規劃\(destination) 2 天吃喝加景點行程",
+                    systemImage: "fork.knife.circle"
+                )
+            ]
+        }
+
+        let destinationSuffix = destination == "this trip" ? "" : " \(destination)"
+        return [
+            SaveSearchFollowUpChoice(
+                id: "trip-one-day",
+                label: "1 day",
+                prompt: "Plan a relaxed 1 day\(destinationSuffix) itinerary.",
+                systemImage: "sun.max"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "trip-three-days",
+                label: "3 days",
+                prompt: "Plan a 3 day\(destinationSuffix) itinerary with food and activities.",
+                systemImage: "calendar"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "trip-weekend",
+                label: "Weekend",
+                prompt: "Plan a relaxed weekend\(destinationSuffix) itinerary.",
+                systemImage: "sparkles"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "trip-food-activity",
+                label: "Food + sights",
+                prompt: "Plan a 2 day\(destinationSuffix) itinerary with food and sights.",
+                systemImage: "fork.knife.circle"
+            )
+        ]
     }
 
     // MARK: - Selection
