@@ -871,6 +871,31 @@ final class SaveLocationIntentRecommendationServiceTests: XCTestCase {
         XCTAssertFalse(response.followUpChoices.map(\.label).contains { $0.contains("Budget") })
     }
 
+    func testFarSavedNearbyRecommendationStillIncludesFollowUpChoices() throws {
+        let service = SaveLocationIntentRecommendationService()
+        let currentLocation = CLLocation(latitude: 33.6846, longitude: -117.8265)
+        let farBoba = place(
+            name: "Tainan Milk Tea",
+            category: .cafe,
+            latitude: 32.9997,
+            longitude: -117.1611,
+            note: "Brown sugar boba milk tea"
+        )
+
+        let response = try XCTUnwrap(service.recommendationSearchResponse(
+            for: "推薦我附近奶茶",
+            places: [farBoba],
+            mapCandidates: [],
+            currentLocation: currentLocation,
+            outputLanguage: .traditionalChinese
+        ))
+
+        XCTAssertTrue(response.fromYourSave.results.isEmpty)
+        XCTAssertEqual(response.additionalSections.first { $0.id == "saved-but-not-nearby" }?.results.map(\.title), ["Tainan Milk Tea"])
+        XCTAssertTrue(response.newRecommendations.results.isEmpty)
+        XCTAssertEqual(response.followUpChoices.count, 4)
+    }
+
     func testDeterministicParserRecognizesNearbyCafeIntent() throws {
         let parser = SaveSearchIntentParser()
         let intent = try XCTUnwrap(parser.parse("附近咖啡廳"))

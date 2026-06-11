@@ -439,7 +439,7 @@ struct SaveLocationIntentRecommendationService {
                     english: categoryLabel(for: intent),
                     traditionalChinese: localizedCategoryLabel(for: intent)
                 ),
-                hasSavedResults: !nearbyResults.isEmpty,
+                hasSavedResults: !nearbyResults.isEmpty || !farResults.isEmpty,
                 hasPublicResults: !mapResults.isEmpty,
                 outputLanguage: outputLanguage
             )
