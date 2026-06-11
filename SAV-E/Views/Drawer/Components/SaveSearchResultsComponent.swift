@@ -4,6 +4,7 @@ struct SaveSearchResultsComponent: View {
     @Environment(\.appLanguageSettings) private var languageSettings
     let response: SaveSearchResponse
     var onSelectResult: (SaveSearchResult) -> Void = { _ in }
+    var onSelectFollowUpChoice: (SaveSearchFollowUpChoice) -> Void = { _ in }
     var onSearchNearby: () -> Void = {}
 
     var body: some View {
@@ -11,6 +12,13 @@ struct SaveSearchResultsComponent: View {
             if let assistantMessage = response.assistantMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
                !assistantMessage.isEmpty {
                 SaveSearchAssistantMessage(text: assistantMessage)
+            }
+
+            if !response.followUpChoices.isEmpty {
+                SaveSearchFollowUpChoiceGrid(
+                    choices: response.followUpChoices,
+                    onSelect: onSelectFollowUpChoice
+                )
             }
 
             if hasAssistantAnswer {
@@ -149,6 +157,68 @@ struct SaveSearchResultsComponent: View {
             return languageSettings.localized(english: "FROM YOUR SAV-E", traditionalChinese: "來自你的 SAV-E")
         }
         return languageSettings.localized(english: "PUBLIC DISCOVERY", traditionalChinese: "公開探索")
+    }
+}
+
+private struct SaveSearchFollowUpChoiceGrid: View {
+    @Environment(\.appLanguageSettings) private var languageSettings
+    let choices: [SaveSearchFollowUpChoice]
+    var onSelect: (SaveSearchFollowUpChoice) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 8)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.caption.weight(.black))
+                Text(languageSettings.localized(english: "Narrow with one tap", traditionalChinese: "點一下繼續縮小"))
+                    .font(.caption.weight(.black))
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(.saveCocoa.opacity(0.82))
+
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(choices) { choice in
+                    Button {
+                        onSelect(choice)
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: choice.systemImage)
+                                .font(.caption.weight(.black))
+                                .frame(width: 18, height: 18)
+                            Text(choice.label)
+                                .font(.caption.weight(.black))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.76)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .foregroundColor(.saveInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(Color.saveHoney.opacity(0.72))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.saveNotebookLine, lineWidth: 1.2)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(choice.label)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.saveNotebookPage.opacity(0.66))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.82), lineWidth: 1.2)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
