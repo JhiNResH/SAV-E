@@ -1565,6 +1565,30 @@ final class SaveSearchControllerTests: XCTestCase {
     }
 
     @MainActor
+    func testShortShowRouteActionClearsStaleTripRoute() async {
+        let savedPlace = place(name: "Saved Stop", address: "Los Angeles, CA", category: .food)
+        let map = MapViewModel()
+        var route = [
+            CLLocationCoordinate2D(latitude: 34.0522, longitude: -118.2437),
+            CLLocationCoordinate2D(latitude: 34.1184, longitude: -118.3004)
+        ]
+        map.places = [savedPlace]
+        map.routeCoordinates = route
+        map.calculatedRoute = MKPolyline(coordinates: &route, count: route.count)
+
+        map.apply(MapActionData(
+            type: .showRoute,
+            placeIds: [savedPlace.id.uuidString, UUID().uuidString],
+            lat: nil,
+            lng: nil,
+            span: nil
+        ))
+        await Task.yield()
+
+        XCTAssertNil(map.calculatedRoute)
+    }
+
+    @MainActor
     func testSelectedApplePOIBecomesEphemeralUnsavedMapCandidateDetail() {
         let map = MapViewModel()
         let coordinate = CLLocationCoordinate2D(latitude: 33.6846, longitude: -117.8265)

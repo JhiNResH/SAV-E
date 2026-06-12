@@ -1710,8 +1710,8 @@ final class MapViewModel: ObservableObject {
 
     private func calculateRoute(for places: [Place], calculationID: UUID) async {
         guard calculationID == routeCalculationID else { return }
-        guard places.count >= 2 else { return }
         calculatedRoute = nil
+        guard places.count >= 2 else { return }
 
         var allCoordinates: [CLLocationCoordinate2D] = []
 
