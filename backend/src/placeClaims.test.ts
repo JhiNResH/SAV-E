@@ -368,9 +368,10 @@ test("publicWebConfigFromEnv enables requested Ma'at web analysis unless explici
 });
 
 test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Places", async () => {
+  const googleUrls: string[] = [];
   const base = buildMaatPlaceAnalysis({ id: "place_1", name: "一號地鍋雞", address: "Irvine, CA" }, []);
   const output = await enrichMaatPlaceAnalysisWithStructuredSources({
-    place: { id: "place_1", name: "一號地鍋雞", address: "Irvine, CA" },
+    place: { id: "place_1", name: "一號地鍋雞", address: "Irvine, CA", latitude: 33.6846, longitude: -117.8265 },
     claims: [],
     analysis: base,
   }, {
@@ -378,13 +379,27 @@ test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Pla
     model: "gemini-test",
     googlePlacesApiKey: "places-key",
     fetcher: async (url, init) => {
-      assert.equal(url, "https://places.googleapis.com/v1/places:searchText");
-      assert.match(init.body ?? "", /一號地鍋雞/);
+      googleUrls.push(url);
+      if (url === "https://places.googleapis.com/v1/places:searchText") {
+        assert.match(init.body ?? "", /一號地鍋雞/);
+        assert.match(init.body ?? "", /locationBias/);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            places: [{
+              id: "google_1",
+              displayName: { text: "一號地鍋雞" },
+              rating: 4.3,
+            }],
+          }),
+        };
+      }
+      assert.equal(url, "https://places.googleapis.com/v1/places/google_1");
       return {
         ok: true,
         status: 200,
         json: async () => ({
-          places: [{
             id: "google_1",
             displayName: { text: "一號地鍋雞" },
             formattedAddress: "1 Test Rd, Irvine, CA",
@@ -399,7 +414,6 @@ test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Pla
             takeout: true,
             servesDinner: true,
             editorialSummary: { text: "熱鬧的地鍋雞餐廳。" },
-          }],
         }),
       };
     },
@@ -419,6 +433,10 @@ test("enrichMaatPlaceAnalysisWithStructuredSources fills details from Google Pla
   assert.equal(receipt.google_places_status, "used");
   assert.equal(receipt.yelp_status, "missing_api_key");
   assert.deepEqual(output.structured_source_sources, [{ title: "Google Places", url: "https://maps.google.com/?cid=1" }]);
+  assert.deepEqual(googleUrls, [
+    "https://places.googleapis.com/v1/places:searchText",
+    "https://places.googleapis.com/v1/places/google_1",
+  ]);
 });
 
 test("enrichMaatPlaceAnalysisWithPublicWeb keeps structured details when Gemini key is missing", async () => {
@@ -431,19 +449,28 @@ test("enrichMaatPlaceAnalysisWithPublicWeb keeps structured details when Gemini 
     enabled: true,
     model: "gemini-test",
     googlePlacesApiKey: "places-key",
-    fetcher: async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        places: [{
+    fetcher: async (url) => {
+      if (url === "https://places.googleapis.com/v1/places:searchText") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            places: [{ id: "google_1" }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
           id: "google_1",
           googleMapsUri: "https://maps.google.com/?cid=2",
           rating: 4.6,
           priceLevel: "PRICE_LEVEL_MODERATE",
           reservable: true,
-        }],
-      }),
-    }),
+        }),
+      };
+    },
   });
 
   const details = output.restaurant_details as Record<string, unknown>;
