@@ -276,23 +276,44 @@ async function fetchGooglePlacesStructuredDetails(
       : await fetcher("https://places.googleapis.com/v1/places:searchText", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          textQuery: googlePlacesTextQuery(place),
-          languageCode: "zh-TW",
-          regionCode: clippedString(place.country_code ?? place.countryCode, 2),
-          maxResultCount: 1,
-        }),
+        body: JSON.stringify(googlePlacesSearchBody(place)),
       });
 
     if (!response.ok) return { details: {}, sources: [], status: `request_failed_${response.status}` };
     const payload = objectValue(await response.json());
-    const googlePlace = googlePlaceId ? payload : objectValue(arrayValue(payload?.places)[0]);
+    const searchPlace = googlePlaceId ? undefined : objectValue(arrayValue(payload?.places)[0]);
+    const searchedPlaceId = clippedString(searchPlace?.id, 180);
+    const googlePlace = googlePlaceId
+      ? payload
+      : await fetchGooglePlaceDetailsById(searchedPlaceId, fieldMask, config, fetcher) ?? searchPlace;
     if (!googlePlace) return { details: {}, sources: [], status: "not_found" };
     const details = normalizePublicWebDetails(googlePlaceToRestaurantDetails(googlePlace));
     const sources = googlePlaceSource(googlePlace);
     return { details, sources, status: hasMeaningfulDetails(details) ? "used" : "no_structured_details" };
   } catch {
     return { details: {}, sources: [], status: "request_failed" };
+  }
+}
+
+async function fetchGooglePlaceDetailsById(
+  googlePlaceId: string | undefined,
+  fieldMask: string,
+  config: MaatPublicWebConfig,
+  fetcher: Fetcher,
+): Promise<JsonObject | undefined> {
+  if (!googlePlaceId || !config.googlePlacesApiKey) return undefined;
+  try {
+    const response = await fetcher(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": config.googlePlacesApiKey,
+        "x-goog-fieldmask": fieldMask,
+      },
+    });
+    return response.ok ? objectValue(await response.json()) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -342,6 +363,29 @@ function googlePlacesTextQuery(place: JsonObject): string {
     clippedString(place.address, 220),
     clippedString(place.city, 120),
   ].filter(Boolean).join(" ");
+}
+
+function googlePlacesSearchBody(place: JsonObject): JsonObject {
+  const locationBias = googlePlacesLocationBias(place);
+  return {
+    textQuery: googlePlacesTextQuery(place),
+    languageCode: "zh-TW",
+    regionCode: clippedString(place.country_code ?? place.countryCode, 2),
+    maxResultCount: 1,
+    ...(locationBias ? { locationBias } : {}),
+  };
+}
+
+function googlePlacesLocationBias(place: JsonObject): JsonObject | undefined {
+  const latitude = numberValue(place.latitude ?? place.lat);
+  const longitude = numberValue(place.longitude ?? place.lng);
+  if (latitude === undefined || longitude === undefined) return undefined;
+  return {
+    circle: {
+      center: { latitude, longitude },
+      radius: 1000,
+    },
+  };
 }
 
 function googlePlaceToRestaurantDetails(place: JsonObject): JsonObject {
