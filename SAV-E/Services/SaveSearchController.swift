@@ -158,7 +158,8 @@ struct SaveSearchController {
                 subtitle: "Contextual answers from SAV-E. Unsaved candidates stay separate from Map Stamps.",
                 results: recommendationResults,
                 emptyMessage: "Type “recommend new cafe in LA” to ask the drawer for a contextual answer."
-            )
+            ),
+            followUpChoices: sourceRecoveryFollowUpChoices(for: localResults)
         )
     }
 
@@ -290,6 +291,37 @@ struct SaveSearchController {
         case .confirmedPlace:
             return .recommendOrder
         }
+    }
+
+    private func sourceRecoveryFollowUpChoices(for results: [SaveSearchResult]) -> [SaveSearchFollowUpChoice] {
+        guard results.contains(where: { result in
+            result.objectType == .sourceOnlyClue &&
+                result.sourcePlatform == .xiaohongshu &&
+                result.primaryAction == .runRecovery
+        }) else {
+            return []
+        }
+
+        return [
+            SaveSearchFollowUpChoice(
+                id: "xhs-paste-caption",
+                label: "貼 caption",
+                prompt: "我貼上小紅書 caption，幫我找 Review Candidate",
+                systemImage: "text.quote"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "xhs-add-screenshot",
+                label: "加截圖/OCR",
+                prompt: "我要補小紅書截圖或 OCR 文字，幫我查證地點",
+                systemImage: "camera.viewfinder"
+            ),
+            SaveSearchFollowUpChoice(
+                id: "xhs-share-map-link",
+                label: "貼地圖連結",
+                prompt: "我有小紅書對應的地圖連結，幫我轉成 Review Candidate",
+                systemImage: "map"
+            )
+        ]
     }
 
     private func canConfirmMapStamp(_ record: SaveMemoryRecord) -> Bool {

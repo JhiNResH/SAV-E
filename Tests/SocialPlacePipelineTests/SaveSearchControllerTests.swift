@@ -2263,6 +2263,79 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertTrue(drawer.evidenceAtoms.contains { $0.kind == .caption && $0.value.contains("best pasta in LA") })
     }
 
+    func testXiaohongshuSourceOnlySearchAddsRecoveryChoiceChips() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "Xiaohongshu",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "https://www.xiaohongshu.com/explore/65abc123",
+                    title: "Xiaohongshu link",
+                    evidence: [
+                        "Xiaohongshu note id: 65abc123",
+                        "Readable metadata/caption/OCR: present but no verified address/map link"
+                    ],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source URL: https://www.xiaohongshu.com/explore/65abc123"],
+                        attempts: ["Detected blocked or generic Xiaohongshu metadata shell instead of usable caption text"],
+                        missingFields: [
+                            "Verified place name",
+                            "Readable Xiaohongshu caption or screenshot OCR",
+                            "Xiaohongshu map link or copied place address"
+                        ],
+                        nextBestClue: "Share a Xiaohongshu screenshot/OCR frame, copied caption, or map link so SAV-E can turn this source into a Review Candidate.",
+                        suggestedSearchQueries: ["xiaohongshu 65abc123 place"]
+                    )
+                )
+            ]
+        )
+
+        let result = try XCTUnwrap(response.fromYourSave.results.first)
+        XCTAssertEqual(result.objectType, .sourceOnlyClue)
+        XCTAssertEqual(result.sourcePlatform, .xiaohongshu)
+        XCTAssertEqual(response.followUpChoices.map(\.id), [
+            "xhs-paste-caption",
+            "xhs-add-screenshot",
+            "xhs-share-map-link"
+        ])
+        XCTAssertEqual(response.followUpChoices.map(\.label), [
+            "貼 caption",
+            "加截圖/OCR",
+            "貼地圖連結"
+        ])
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains { $0.contains("Review Candidate") })
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains { $0.contains("截圖") })
+        XCTAssertTrue(response.followUpChoices.map(\.prompt).contains { $0.contains("地圖連結") })
+    }
+
+    func testNonXiaohongshuSourceOnlyDoesNotShowXHSRecoveryChoiceChips() throws {
+        let controller = SaveSearchController()
+        let response = controller.search(
+            query: "pasta",
+            places: [],
+            localRecords: [
+                SaveMemoryRecord(
+                    state: .sourceOnly,
+                    sourceURL: "https://www.instagram.com/reel/pasta/",
+                    title: "Best pasta reel",
+                    evidence: ["Caption says best pasta in LA"],
+                    evidenceDiagnostic: SocialPlaceEvidenceDiagnostic(
+                        found: ["Source URL: https://www.instagram.com/reel/pasta/"],
+                        attempts: ["Checked public metadata/caption text"],
+                        missingFields: ["exact venue", "address", "coordinates"],
+                        nextBestClue: "Run source recovery search",
+                        suggestedSearchQueries: ["best pasta LA instagram reel"]
+                    )
+                )
+            ]
+        )
+
+        XCTAssertEqual(response.fromYourSave.results.first?.sourcePlatform, .instagram)
+        XCTAssertTrue(response.followUpChoices.isEmpty)
+    }
+
     func testSourceOnlyEvidenceDrawerIgnoresMidLineConfidenceReasonToken() throws {
         let controller = SaveSearchController()
         let midLineEvidence = "Caption says pasta in LA. Confidence reason: this is user caption text, not resolver metadata."

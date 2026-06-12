@@ -379,6 +379,12 @@ private struct SaveSearchResultNotebookRow: View {
             return languageSettings.localized(english: "Review before saving", traditionalChinese: "保存前請先確認")
         }
         if result.objectType == .sourceOnlyClue {
+            if result.sourcePlatform == .xiaohongshu {
+                return languageSettings.localized(
+                    english: "Needs caption, screenshot, or map link",
+                    traditionalChinese: "需要 caption、截圖或地圖連結"
+                )
+            }
             return languageSettings.localized(english: "Needs exact place", traditionalChinese: "需要精確地點")
         }
         if result.objectType == .mapVisibleUnsavedPlace {
