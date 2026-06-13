@@ -113,7 +113,10 @@ final class SaveLocalVaultService {
             category: place.category,
             status: place.status,
             rating: place.rating ?? place.googleRating,
-            createdAt: place.createdAt
+            createdAt: place.createdAt,
+            googlePlaceId: place.googlePlaceId,
+            sourceImageUrl: place.sourceImageUrl,
+            businessPhotoUrls: place.businessPhotoUrls
         )
         try append(record)
         return record
@@ -298,14 +301,15 @@ private extension SaveMemoryRecord {
             address: address,
             latitude: latitude,
             longitude: longitude,
-            googlePlaceId: nil,
+            googlePlaceId: googlePlaceId,
             category: category ?? PlaceCategory.inferred(from: "\(name) \(address)"),
             status: status ?? .wantToGo,
             rating: rating,
             note: sourceText,
             sourceUrl: sourceURL,
             sourcePlatform: SourcePlatform.from(urlString: sourceURL),
-            sourceImageUrl: nil,
+            sourceImageUrl: sourceImageUrl,
+            businessPhotoUrls: businessPhotoUrls,
             extractedDishes: recommendedItems.map(\.name).nilIfEmpty,
             priceRange: nil,
             recommender: sourceHandle,

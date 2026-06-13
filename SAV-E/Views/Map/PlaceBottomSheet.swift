@@ -14,6 +14,13 @@ struct PlaceBottomSheet: View {
     @State private var maatAnalysisPlaceId: UUID?
     @State private var maatAnalysisError: String?
     @State private var isLoadingMaatAnalysis = false
+    @State private var enrichedPlace: Place?
+
+    /// Place rendered by the sheet: prefers the background-enriched copy so
+    /// photos/rating/hours fill in without blocking the initial open.
+    private var displayPlace: Place {
+        enrichedPlace?.id == place.id ? (enrichedPlace ?? place) : place
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -74,12 +81,12 @@ struct PlaceBottomSheet: View {
                 }
             }
 
-            PlaceBusinessPhotoCarousel(imageURLs: place.businessPhotoURLStrings)
+            PlaceBusinessPhotoCarousel(imageURLs: displayPlace.businessPhotoURLStrings)
 
-            PlaceBasicInfoPanel(place: place)
-            PlaceInsightSummaryPanel(place: place, fallbackSummary: memorySummary)
+            PlaceBasicInfoPanel(place: displayPlace)
+            PlaceInsightSummaryPanel(place: displayPlace, fallbackSummary: memorySummary)
             SavePlaceInsightsPanel(
-                place: place,
+                place: displayPlace,
                 analysis: maatAnalysis,
                 isLoading: isLoadingMaatAnalysis,
                 error: maatAnalysisError,
@@ -90,11 +97,11 @@ struct PlaceBottomSheet: View {
             PlaceProofPlaceholderCard()
 
             FlowLayout(spacing: 8) {
-                CategoryPill(category: place.category, isSelected: true)
-                if let rating = place.googleRating {
+                CategoryPill(category: displayPlace.category, isSelected: true)
+                if let rating = displayPlace.googleRating {
                     PlaceMemoryChip(icon: "star.fill", text: String(format: "%.1f", rating))
                 }
-                if let priceRange = place.priceRange {
+                if let priceRange = displayPlace.priceRange {
                     PlaceMemoryChip(icon: "tag.fill", text: priceRange)
                 }
                 ForEach(verificationChips, id: \.text) { chip in
@@ -159,6 +166,9 @@ struct PlaceBottomSheet: View {
         .task(id: place.id) {
             await loadMaatAnalysis()
         }
+        .task(id: place.id) {
+            await enrichBusinessDetails()
+        }
         .confirmationDialog(
             languageSettings.localized(english: "Delete \(place.name)?", traditionalChinese: "刪除「\(place.name)」？"),
             isPresented: $showDeleteConfirmation,
@@ -179,27 +189,46 @@ struct PlaceBottomSheet: View {
         if maatAnalysisPlaceId != placeId {
             maatAnalysis = nil
             maatAnalysisError = nil
+            // Render last-known analysis from disk instantly while we refresh.
+            if let cached = MaatAnalysisCache.shared.analysis(for: placeId) {
+                maatAnalysis = cached
+            }
         }
 
+        // Never block the panel on the network once we already have a value
+        // (either from this session or the disk cache) unless forced.
         guard force || maatAnalysisPlaceId != placeId || maatAnalysis == nil else { return }
-        isLoadingMaatAnalysis = true
+
+        // Only show the spinner when there's nothing to display yet.
+        isLoadingMaatAnalysis = maatAnalysis == nil
         maatAnalysisError = nil
         defer { isLoadingMaatAnalysis = false }
 
         do {
-            maatAnalysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
+            let analysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
                 for: placeId,
                 includePrivateEvidence: false,
                 includePublicWeb: true
             )
+            maatAnalysis = analysis
             maatAnalysisPlaceId = placeId
+            MaatAnalysisCache.shared.store(analysis, for: placeId)
         } catch SupabaseError.notConfigured {
-            maatAnalysis = nil
             maatAnalysisPlaceId = placeId
         } catch {
-            maatAnalysisError = error.localizedDescription
+            // Keep any cached analysis visible; only surface the error when we
+            // have nothing else to show.
+            if maatAnalysis == nil {
+                maatAnalysisError = error.localizedDescription
+            }
             maatAnalysisPlaceId = placeId
         }
+    }
+
+    private func enrichBusinessDetails() async {
+        guard let updatedPlace = await PlaceBusinessEnricher.enrich(displayPlace) else { return }
+        guard place.id == updatedPlace.id else { return }
+        enrichedPlace = updatedPlace
     }
 
     private func deletePlace() async {
@@ -216,15 +245,15 @@ struct PlaceBottomSheet: View {
     }
 
     private var sourceConfirmationLabel: String {
-        place.sourceConfirmationLabel(language: languageSettings.language)
+        displayPlace.sourceConfirmationLabel(language: languageSettings.language)
     }
 
     private var verificationChips: [PlaceVerificationChip] {
-        place.verificationChips(language: languageSettings.language, sourceLabel: sourceConfirmationLabel)
+        displayPlace.verificationChips(language: languageSettings.language, sourceLabel: sourceConfirmationLabel)
     }
 
     private var memorySummary: String {
-        place.memorySummary(language: languageSettings.language)
+        displayPlace.memorySummary(language: languageSettings.language)
     }
 
 }
@@ -816,7 +845,7 @@ struct PlaceBusinessPhotoCarousel: View {
             } else {
                 TabView {
                     ForEach(Array(photoURLs.enumerated()), id: \.offset) { index, url in
-                        AsyncImage(url: url) { phase in
+                        CachedAsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
                                 image

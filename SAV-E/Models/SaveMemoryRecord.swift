@@ -35,6 +35,9 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
     var status: PlaceStatus?
     var rating: Double?
     var createdAt: Date
+    var googlePlaceId: String?
+    var sourceImageUrl: String?
+    var businessPhotoUrls: [String]?
 
     init(
         id: UUID = UUID(),
@@ -56,7 +59,10 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         category: PlaceCategory? = nil,
         status: PlaceStatus? = nil,
         rating: Double? = nil,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        googlePlaceId: String? = nil,
+        sourceImageUrl: String? = nil,
+        businessPhotoUrls: [String]? = nil
     ) {
         self.id = id
         self.state = state
@@ -79,6 +85,9 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         self.status = status
         self.rating = rating
         self.createdAt = createdAt
+        self.googlePlaceId = googlePlaceId
+        self.sourceImageUrl = sourceImageUrl
+        self.businessPhotoUrls = businessPhotoUrls
     }
 
     var displayTitle: String {
@@ -108,6 +117,9 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         case status
         case rating
         case createdAt
+        case googlePlaceId
+        case sourceImageUrl
+        case businessPhotoUrls
     }
 
     init(from decoder: Decoder) throws {
@@ -133,5 +145,8 @@ struct SaveMemoryRecord: Identifiable, Codable, Hashable {
         status = try container.decodeIfPresent(PlaceStatus.self, forKey: .status)
         rating = try container.decodeIfPresent(Double.self, forKey: .rating)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        googlePlaceId = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
+        sourceImageUrl = try container.decodeIfPresent(String.self, forKey: .sourceImageUrl)
+        businessPhotoUrls = try container.decodeIfPresent([String].self, forKey: .businessPhotoUrls)
     }
 }

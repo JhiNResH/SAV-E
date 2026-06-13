@@ -337,7 +337,7 @@ private struct SaveSearchResultNotebookRow: View {
     private var resultThumbnail: some View {
         if result.objectType == .mapVisibleUnsavedPlace,
            let url = result.businessPhotoURLStrings.first.flatMap(URL.init(string:)) {
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image
