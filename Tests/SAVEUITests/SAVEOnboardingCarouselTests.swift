@@ -71,7 +71,7 @@ final class SAVEOnboardingCarouselTests: XCTestCase {
     private func launchOnboardingApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
-            "-hasCompletedOnboarding", "NO",
+            "--uitest-reset-onboarding",
             "-save.appLanguage", "en"
         ]
         app.launch()
