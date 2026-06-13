@@ -214,23 +214,8 @@ struct PlaceDetailView: View {
     }
 
     private func enrichBusinessDetails() async {
-        guard detailPlace.businessPhotoURLStrings.count < 2 ||
-                detailPlace.googleRating == nil ||
-                detailPlace.priceRange == nil ||
-                detailPlace.openingHours == nil
-        else { return }
-        guard let update = await businessDetails(for: detailPlace) else { return }
-        guard place.id == detailPlace.id else { return }
-
-        var updatedPlace = detailPlace
-        if !update.photoURLs.isEmpty {
-            let urls = update.photoURLs.map(\.absoluteString)
-            updatedPlace.sourceImageUrl = updatedPlace.sourceImageUrl ?? urls.first
-            updatedPlace.businessPhotoUrls = urls
-        }
-        updatedPlace.googleRating = updatedPlace.googleRating ?? update.rating
-        updatedPlace.priceRange = updatedPlace.priceRange ?? update.priceRange
-        updatedPlace.openingHours = updatedPlace.openingHours ?? update.openingHours
+        guard let updatedPlace = await PlaceBusinessEnricher.enrich(detailPlace) else { return }
+        guard place.id == updatedPlace.id else { return }
         enrichedPlace = updatedPlace
     }
 
@@ -249,60 +234,6 @@ struct PlaceDetailView: View {
             maatAnalysis = nil
         } catch {
             maatAnalysisError = error.localizedDescription
-        }
-    }
-
-    private func businessDetails(for place: Place) async -> (photoURLs: [URL], rating: Double?, priceRange: String?, openingHours: String?)? {
-        let service = GooglePlacesService.shared
-        let details: GooglePlaceDetails?
-        let fallbackMatch: GooglePlaceMatch?
-        if let googlePlaceId = place.googlePlaceId {
-            details = try? await service.getPlaceDetails(placeId: googlePlaceId)
-            fallbackMatch = nil
-        } else {
-            guard let match = await bestGoogleMatch(for: place, service: service) else { return nil }
-            details = try? await service.getPlaceDetails(placeId: match.id)
-            fallbackMatch = match
-        }
-
-        let photoReferences = details?.photoReferences?.isEmpty == false
-            ? details?.photoReferences ?? []
-            : [fallbackMatch?.photoReference].compactMap { $0 }
-        let photoURLs = photoReferences
-            .prefix(6)
-            .compactMap { service.photoURL(reference: $0, maxWidth: 900) }
-        let priceLevel = details?.priceLevel ?? fallbackMatch?.priceLevel
-        let hasDetails = !photoURLs.isEmpty ||
-            details?.rating != nil ||
-            fallbackMatch?.rating != nil ||
-            priceLevel != nil ||
-            details?.openingHours?.isEmpty == false
-        guard hasDetails else { return nil }
-
-        return (
-            photoURLs,
-            details?.rating ?? fallbackMatch?.rating,
-            priceLevel.map { String(repeating: "$", count: max(1, $0)) },
-            details?.openingHours?.first
-        )
-    }
-
-    private func bestGoogleMatch(for place: Place, service: GooglePlacesServiceProtocol) async -> GooglePlaceMatch? {
-        do {
-            let matches = try await service.searchPlace(
-                query: "\(place.name) \(place.address)",
-                near: place.coordinate
-            )
-            let placeLocation = CLLocation(latitude: place.latitude, longitude: place.longitude)
-            return matches.first { match in
-                let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
-                let sameArea = placeLocation.distance(from: matchLocation) < 250
-                let sameName = match.name.localizedCaseInsensitiveContains(place.name) ||
-                    place.name.localizedCaseInsensitiveContains(match.name)
-                return sameArea || sameName
-            }
-        } catch {
-            return nil
         }
     }
 

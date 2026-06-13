@@ -483,7 +483,7 @@ private struct ProfileAvatarView: View {
                     .resizable()
                     .scaledToFill()
             } else if let remoteURL {
-                AsyncImage(url: remoteURL) { phase in
+                CachedAsyncImage(url: remoteURL) { phase in
                     switch phase {
                     case .success(let image):
                         image

@@ -18,15 +18,21 @@ struct SaveApp: App {
     private let pendingImportService = PendingPlaceImportService.shared
     private let minimumOpeningAnimationDuration: UInt64 = 1_800_000_000
 
-#if DEBUG
     init() {
+        // Generous shared image/network cache so place photos load once then
+        // render instantly on every subsequent open.
+        URLCache.shared = URLCache(
+            memoryCapacity: 50 * 1024 * 1024,
+            diskCapacity: 200 * 1024 * 1024
+        )
+#if DEBUG
         // UI tests cannot use "-hasCompletedOnboarding NO": NSArgumentDomain outranks
         // the persistent domain, so the in-app write back to true would never be read.
         if ProcessInfo.processInfo.arguments.contains("--uitest-reset-onboarding") {
             UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
         }
-    }
 #endif
+    }
 
     var body: some Scene {
         WindowGroup {
