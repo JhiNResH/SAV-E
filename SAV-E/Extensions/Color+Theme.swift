@@ -124,6 +124,13 @@ extension Color {
     static let saveNotebookSpine = Color(light: "F6C181", dark: "7A5533")
     static let saveNotebookLine = Color(light: "3A2415", dark: "6E6257")
 
+    // MARK: - Drawer surface (cream-notebook tint over the system blur)
+    /// Adaptive tint laid over the drawer's material blur so the AI drawer
+    /// reads as the cream notebook canvas instead of generic glass.
+    static let saveDrawerSurface = Color(light: "FFF0DC", dark: "1B2027")
+    /// Hairline stroke for drawer surfaces (search bar, nav header, glass edge).
+    static let saveDrawerStroke = Color(light: "3A2415", dark: "F7EFE5")
+
     // MARK: - Category Colors
     static func categoryColor(for category: PlaceCategory) -> Color {
         saveStampColor(for: category)
