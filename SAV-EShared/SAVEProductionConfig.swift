@@ -10,7 +10,9 @@ enum SAVEProductionConfig {
     static let defaultPlaceShareBaseURL = "https://sav-e-app.vercel.app/p"
     static let defaultTripShareBaseURL = "https://sav-e-app.vercel.app/trip"
     static let defaultListShareBaseURL = "https://sav-e-app.vercel.app/list"
-    static let defaultGeminiModelFallbacks = ["gemini-3.5-flash"]
+    // Strongest current flash-class model first; transport falls back to the
+    // next entry on 404 (model unavailable) or 429 (rate limited).
+    static let defaultGeminiModelFallbacks = ["gemini-3.5-flash", "gemini-2.5-flash"]
 
     static func geminiGenerateContentURL(apiKey: String, model: String) -> URL {
         URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
