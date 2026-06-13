@@ -589,7 +589,11 @@ final class GeminiSaveLLMClient: SaveLLMClient {
 
     func renderGroundedAnswer(_ request: GroundedAnswerRequest) async throws -> GroundedLLMAnswer {
         let prompt = promptPolicy.groundedAnswerPrompt(for: request)
-        let answer = try await generateText(prompt: prompt, temperature: 0.2, maxOutputTokens: 1_024)
+        // gemini-3.5-flash is a thinking model: its reasoning tokens count against
+        // maxOutputTokens, so a rich grounded prompt frequently truncated the user-facing
+        // answer at 1_024 (finishReason MAX_TOKENS), which then failed the completeness
+        // check and burned the repair retry. 2_048 reliably fits thinking + a <90-word answer.
+        let answer = try await generateText(prompt: prompt, temperature: 0.2, maxOutputTokens: 2_048)
         do {
             return try groundedAnswerValidator.parseAndValidate(answer, request: request)
         } catch {
@@ -610,7 +614,10 @@ final class GeminiSaveLLMClient: SaveLLMClient {
             - Do not call unsaved/public/review/source-only results Map Stamps.
             - Finish the final sentence.
             """
-            let repaired = try await generateText(prompt: repairPrompt, temperature: 0.1, maxOutputTokens: 512)
+            // The repair prompt is strictly longer than the original (it appends the failed
+            // response + extra rules), so it needs at least as much output budget. 512 was
+            // below the original 1_024 and effectively guaranteed a second truncation.
+            let repaired = try await generateText(prompt: repairPrompt, temperature: 0.1, maxOutputTokens: 2_048)
             return try groundedAnswerValidator.parseAndValidate(repaired, request: request)
         }
     }
