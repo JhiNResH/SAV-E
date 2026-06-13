@@ -153,7 +153,8 @@ struct AIDrawerView: View {
         }
         .onChange(of: viewModel.drawerState) { _, state in
             guard mapDetailDrawerItem == nil else { return }
-            withAnimation(.spring(duration: 0.3)) {
+            if case .error = state { SaveHaptics.warning() }
+            withAnimation(SaveTheme.Motion.standardSpring) {
                 switch state {
                 case .idle:             drawerDetent = .fraction(0.34)
                 case .loading:          drawerDetent = .medium
@@ -258,7 +259,7 @@ struct AIDrawerView: View {
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SaveTheme.Spacing.sm) {
             Image(systemName: commandBarIcon)
                 .foregroundColor(commandBarTextColor)
                 .font(.caption.weight(.black))
@@ -297,7 +298,7 @@ struct AIDrawerView: View {
                 commandBarTrailingActions
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, SaveTheme.Spacing.md)
         .frame(height: 52)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -305,7 +306,7 @@ struct AIDrawerView: View {
                 .opacity(colorScheme == .dark ? 0.50 : 0.32)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.black.opacity(0.08) : Color.white.opacity(0.06))
+                        .fill(Color.saveDrawerSurface.opacity(colorScheme == .dark ? 0.28 : 0.42))
                 )
                 .overlay(commandBarFill)
         }
@@ -314,8 +315,8 @@ struct AIDrawerView: View {
                 .stroke(commandBarStroke, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, SaveTheme.Spacing.md)
+        .padding(.vertical, SaveTheme.Spacing.sm)
         .frame(height: 72)
         .background(.clear)
     }
@@ -335,7 +336,7 @@ struct AIDrawerView: View {
     }
 
     private var commandBarStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.18) : Color.saveNotebookLine.opacity(0.18)
+        Color.saveDrawerStroke.opacity(colorScheme == .dark ? 0.18 : 0.18)
     }
 
     private var commandBarTextColor: Color {
@@ -429,31 +430,7 @@ struct AIDrawerView: View {
             commandHomeView
 
         case .loading:
-            VStack(spacing: 12) {
-                Spacer()
-                ProgressView().tint(.saveInk)
-                Text(languageSettings.text(.memoSorting)).font(.subheadline).foregroundColor(.saveCocoa.opacity(0.78))
-                Button(action: {
-                    viewModel.cancelCurrentRequest()
-                    searchFocused = false
-                    withAnimation { drawerDetent = .medium }
-                }) {
-                    Label(languageSettings.text(.cancel), systemImage: "xmark")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.saveInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Color.saveNotebookPage.opacity(0.62))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Color.saveNotebookLine, lineWidth: 1.4)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
+            loadingStateView
 
         case .displaying(let response):
             ScrollView {
@@ -518,8 +495,8 @@ struct AIDrawerView: View {
                         }
                     )
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
+                .padding(.vertical, SaveTheme.Spacing.lg)
             }
 
         case .saveSearchResults(let response):
@@ -551,8 +528,8 @@ struct AIDrawerView: View {
                         }
                     )
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
+                .padding(.vertical, SaveTheme.Spacing.lg)
             }
 
         case .placeDetail(let place):
@@ -561,7 +538,7 @@ struct AIDrawerView: View {
                     PlaceBottomSheet(place: place) {
                         try await onDeletePlace(place)
                         viewModel.removePlace(place)
-                        withAnimation(.spring(duration: 0.3)) {
+                        withAnimation(SaveTheme.Motion.standardSpring) {
                             drawerDetent = .height(72)
                         }
                     } onPlanAround: {
@@ -587,7 +564,7 @@ struct AIDrawerView: View {
                         }
                     )
                 }
-                .padding(14)
+                .padding(SaveTheme.Spacing.lg)
             }
 
         case .reviewCandidateDetail(let candidate):
@@ -611,7 +588,7 @@ struct AIDrawerView: View {
                         }
                     }
                 )
-                .padding(14)
+                .padding(SaveTheme.Spacing.lg)
             }
 
         case .mapCandidateDetail(let candidate):
@@ -631,7 +608,7 @@ struct AIDrawerView: View {
                         }
                     )
                 }
-                .padding(14)
+                .padding(SaveTheme.Spacing.lg)
             }
 
         case .error(let msg):
@@ -664,8 +641,66 @@ struct AIDrawerView: View {
         }
     }
 
+    // MARK: - Loading
+
+    /// Branded "Memo is sorting" treatment. Memo leads, a quiescent symbol
+    /// pulse signals progress without an infinite layout animation that would
+    /// trip UI-test quiescence checks.
+    private var loadingStateView: some View {
+        VStack(spacing: SaveTheme.Spacing.md) {
+            Spacer()
+
+            ZStack(alignment: .bottomTrailing) {
+                MemoMascotMark(size: 76)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundColor(.saveInk)
+                    .frame(width: 30, height: 30)
+                    .background(Color.saveHoney)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .symbolEffect(.pulse, isActive: true)
+                    .offset(x: 10, y: 8)
+            }
+
+            VStack(spacing: SaveTheme.Spacing.xs) {
+                ProgressView().tint(.saveInk)
+                Text(languageSettings.text(.memoSorting))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.saveCocoa.opacity(0.78))
+                    .multilineTextAlignment(.center)
+            }
+
+            Button(action: {
+                viewModel.cancelCurrentRequest()
+                searchFocused = false
+                withAnimation { drawerDetent = .medium }
+            }) {
+                Label(languageSettings.text(.cancel), systemImage: "xmark")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.saveInk)
+                    .padding(.horizontal, SaveTheme.Spacing.md)
+                    .padding(.vertical, SaveTheme.Spacing.sm)
+                    .background(Color.saveNotebookPage.opacity(0.62))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.saveNotebookLine, lineWidth: 1.4)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private var navigationHeader: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SaveTheme.Spacing.sm) {
             Button(action: {
                 viewModel.returnToCommands()
                 showSavedCategories = false
@@ -689,8 +724,7 @@ struct AIDrawerView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(navigationTitle)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(SaveTheme.Typography.rowTitle)
                     .foregroundColor(.saveInk)
                     .lineLimit(1)
                 Text(navigationSubtitle)
@@ -721,24 +755,19 @@ struct AIDrawerView: View {
             }
             .accessibilityLabel(languageSettings.text(.closeDrawerContent))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, SaveTheme.Spacing.lg)
+        .padding(.vertical, SaveTheme.Spacing.sm)
         .background {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .opacity(colorScheme == .dark ? 0.24 : 0.26)
-                .background(colorScheme == .dark ? Color.black.opacity(0.03) : Color.white.opacity(0.04))
-                .overlay(navigationHeaderTint)
+                .background(Color.saveDrawerSurface.opacity(colorScheme == .dark ? 0.22 : 0.34))
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.13) : Color.saveNotebookLine.opacity(0.18))
+                .fill(Color.saveDrawerStroke.opacity(colorScheme == .dark ? 0.13 : 0.18))
                 .frame(height: 1)
         }
-    }
-
-    private var navigationHeaderTint: Color {
-        colorScheme == .dark ? Color.black.opacity(0.04) : Color.white.opacity(0.03)
     }
 
     private var showsNavigationHeader: Bool {
@@ -849,9 +878,9 @@ struct AIDrawerView: View {
     private var commandHomeView: some View {
         VStack(spacing: 0) {
             commandTabBar
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
+                .padding(.top, SaveTheme.Spacing.sm)
+                .padding(.bottom, SaveTheme.Spacing.sm)
 
             switch activeCommandTab {
             case .saved:
@@ -867,9 +896,11 @@ struct AIDrawerView: View {
     }
 
     private var commandTabBar: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: SaveTheme.Spacing.sm) {
             ForEach(CommandDrawerTab.publicTestCases, id: \.self) { tab in
                 Button {
+                    guard activeCommandTab != tab else { return }
+                    SaveHaptics.select()
                     activeCommandTab = tab
                     showSavedCategories = false
                     showReviewInbox = false
@@ -908,10 +939,10 @@ struct AIDrawerView: View {
                         .font(.caption)
                         .foregroundColor(.saveCocoa.opacity(0.74))
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, SaveTheme.Spacing.lg)
                 }
             }
-            .padding(.top, 14)
+            .padding(.top, SaveTheme.Spacing.lg)
             .padding(.bottom, 24)
         }
     }
@@ -925,14 +956,14 @@ struct AIDrawerView: View {
                     onReview: openReviewInbox,
                     onAsk: askFromSavedMemory
                 )
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
 
                 categoryFilterStrip
                 publicTestFocusNote
 
                 if !viewModel.chatHistory.isEmpty {
                     NotebookBandLabel(languageSettings.localized(english: "Recent", traditionalChinese: "最近"))
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, SaveTheme.Spacing.lg)
 
                     ForEach(viewModel.chatHistory.prefix(5)) { entry in
                         Button(action: {
@@ -942,12 +973,12 @@ struct AIDrawerView: View {
                             DrawerSuggestionRow(icon: "clock.arrow.circlepath", text: entry.query)
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, SaveTheme.Spacing.lg)
                     }
                 }
 
                 NotebookBandLabel(languageSettings.localized(english: "Try asking", traditionalChinese: "試著問"))
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, SaveTheme.Spacing.lg)
 
                 ForEach(suggestions, id: \.self) { suggestion in
                     Button(action: {
@@ -957,7 +988,7 @@ struct AIDrawerView: View {
                         DrawerSuggestionRow(icon: "arrow.up.left", text: suggestion)
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, SaveTheme.Spacing.lg)
                 }
 
                 if let addSpotStatus {
@@ -965,10 +996,10 @@ struct AIDrawerView: View {
                         .font(.caption)
                         .foregroundColor(.saveCocoa.opacity(0.74))
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, SaveTheme.Spacing.lg)
                 }
             }
-            .padding(.top, 12)
+            .padding(.top, SaveTheme.Spacing.md)
             .padding(.bottom, 18)
         }
     }
@@ -980,7 +1011,7 @@ struct AIDrawerView: View {
     private var categoryFilterStrip: some View {
         VStack(alignment: .leading, spacing: 8) {
             NotebookBandLabel(languageSettings.localized(english: "Filters", traditionalChinese: "篩選"))
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
@@ -992,7 +1023,7 @@ struct AIDrawerView: View {
                         .onTapGesture { onToggleCategory(category) }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
                 .padding(.vertical, 2)
             }
         }
@@ -1001,20 +1032,20 @@ struct AIDrawerView: View {
     private var publicTestFocusNote: some View {
         VStack(alignment: .leading, spacing: 8) {
             NotebookBandLabel(languageSettings.localized(english: "Public test focus", traditionalChinese: "Public test 主線"))
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
 
             Text(SaveMVPDrawerEntryCopy.focusNote(language: languageSettings.language))
             .font(.caption.weight(.semibold))
             .foregroundColor(.saveCocoa.opacity(0.74))
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
         }
     }
 
     private var socialSignalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             NotebookBandLabel(languageSettings.localized(english: "Friend signal", traditionalChinese: "朋友訊號"))
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SaveTheme.Spacing.lg)
 
             HStack(spacing: 7) {
                 ForEach(SaveSocialLens.allCases, id: \.self) { lens in
@@ -1038,7 +1069,7 @@ struct AIDrawerView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
 
             if socialPlaces.isEmpty {
                 followFriendEmptyState
@@ -1047,7 +1078,7 @@ struct AIDrawerView: View {
                     SocialPlaceRow(place: place) {
                         Task { await saveSocialPlace(place) }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, SaveTheme.Spacing.lg)
                 }
             }
         }
@@ -1105,7 +1136,7 @@ struct AIDrawerView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, SaveTheme.Spacing.lg)
     }
 
     private var canFollowReferral: Bool {
@@ -1179,9 +1210,11 @@ struct AIDrawerView: View {
                     places: savedPlacesForDrawer,
                     totalCount: viewModel.places.count,
                     isFiltered: !selectedCategories.isEmpty,
+                    suggestions: suggestions,
                     onSelect: openSavedPlace,
                     onReview: openReviewInbox,
-                    onAsk: askFromSavedMemory
+                    onAsk: askFromSavedMemory,
+                    onSuggestion: runSuggestion
                 )
 
                 if let addSpotStatus {
@@ -1191,8 +1224,8 @@ struct AIDrawerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
+            .padding(.top, SaveTheme.Spacing.lg)
             .padding(.bottom, 24)
         }
     }
@@ -1232,8 +1265,8 @@ struct AIDrawerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
+            .padding(.top, SaveTheme.Spacing.lg)
             .padding(.bottom, 24)
         }
     }
@@ -1322,8 +1355,8 @@ struct AIDrawerView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
+            .padding(.top, SaveTheme.Spacing.lg)
             .padding(.bottom, 24)
         }
     }
@@ -1419,12 +1452,18 @@ struct AIDrawerView: View {
         focusAgentPrompt("What should I pick from my saved places first?")
     }
 
+    /// Prefills the search field with a suggestion chip and submits it.
+    private func runSuggestion(_ suggestion: String) {
+        viewModel.query = suggestion
+        submitSearchField()
+    }
+
     private func openSavedPlace(_ place: Place) {
         prepareMapDetailOpening()
         viewModel.showPlace(place)
         viewModel.returnToCommands()
         mapDetailDrawerItem = .savedPlace(place)
-        withAnimation(.spring(duration: 0.28)) {
+        withAnimation(SaveTheme.Motion.standardSpring) {
             drawerDetent = .fraction(0.34)
         }
     }
@@ -1434,7 +1473,7 @@ struct AIDrawerView: View {
         viewModel.showReviewCandidate(candidate)
         viewModel.returnToCommands()
         mapDetailDrawerItem = .reviewCandidate(candidate)
-        withAnimation(.spring(duration: 0.28)) {
+        withAnimation(SaveTheme.Motion.standardSpring) {
             drawerDetent = .fraction(0.34)
         }
     }
@@ -1444,7 +1483,7 @@ struct AIDrawerView: View {
         viewModel.showMapCandidate(candidate)
         viewModel.returnToCommands()
         mapDetailDrawerItem = .unsavedCandidate(candidate)
-        withAnimation(.spring(duration: 0.28)) {
+        withAnimation(SaveTheme.Motion.standardSpring) {
             drawerDetent = .fraction(0.34)
         }
     }
@@ -1464,6 +1503,7 @@ struct AIDrawerView: View {
     }
 
     private func openSearchResult(_ result: SaveSearchResult) {
+        SaveHaptics.select()
         if let candidate = reviewCandidate(for: result) {
             openReviewCandidateDetail(candidate)
             return
@@ -1495,6 +1535,7 @@ struct AIDrawerView: View {
     }
 
     private func submitSearchField() {
+        SaveHaptics.tap()
         voiceQuery.stop()
         searchFocused = false
         if let url = firstURL(in: viewModel.query) {
@@ -1520,6 +1561,7 @@ struct AIDrawerView: View {
     }
 
     private func submitFollowUpChoice(_ choice: SaveSearchFollowUpChoice) {
+        SaveHaptics.tap()
         voiceQuery.stop()
         searchFocused = false
         viewModel.query = choice.prompt
@@ -1645,7 +1687,7 @@ struct AIDrawerView: View {
     private func closeMapDetail() {
         mapDetailDrawerItem = nil
         onDismissMapDetail()
-        withAnimation(.spring(duration: 0.28)) {
+        withAnimation(SaveTheme.Motion.standardSpring) {
             drawerDetent = .height(72)
         }
     }
@@ -1773,20 +1815,21 @@ private struct DrawerGlassBackground: View {
     }
 
     private var tintStops: [Color] {
+        // Warm the blur toward the cream notebook page instead of neutral glass.
         if colorScheme == .dark {
             return [
-                Color.black.opacity(0.01),
-                Color.black.opacity(0.03)
+                Color.saveDrawerSurface.opacity(0.06),
+                Color.saveDrawerSurface.opacity(0.14)
             ]
         }
         return [
-            Color.white.opacity(0.01),
-            Color.saveCream.opacity(0.02)
+            Color.saveDrawerSurface.opacity(0.10),
+            Color.saveDrawerSurface.opacity(0.22)
         ]
     }
 
     private var baseTint: Color {
-        colorScheme == .dark ? Color.black.opacity(0.04) : Color.white.opacity(0.03)
+        Color.saveDrawerSurface.opacity(colorScheme == .dark ? 0.16 : 0.24)
     }
 
     private var materialOpacity: Double {
@@ -1794,7 +1837,7 @@ private struct DrawerGlassBackground: View {
     }
 
     private var topStroke: Color {
-        colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.24)
+        Color.saveDrawerStroke.opacity(colorScheme == .dark ? 0.12 : 0.20)
     }
 }
 
@@ -1891,7 +1934,7 @@ private struct MapDetailDrawerView: View {
     }
 
     private func expandDetail() {
-        withAnimation(.spring(duration: 0.28)) {
+        withAnimation(SaveTheme.Motion.standardSpring) {
             detent = .fraction(0.38)
         }
     }
@@ -1964,8 +2007,8 @@ private struct MapDetailDrawerView: View {
                         .padding(.horizontal, 4)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
+            .padding(.top, SaveTheme.Spacing.lg)
             .padding(.bottom, 28)
         }
     }
@@ -2803,7 +2846,7 @@ private struct SocialPlaceDetailCard: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(14)
+        .padding(SaveTheme.Spacing.lg)
         .background(Color.saveNotebookPage.opacity(0.52))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
@@ -3266,16 +3309,24 @@ private struct SavedPlacesSection: View {
     var places: [Place]
     var totalCount: Int
     var isFiltered: Bool
+    var suggestions: [String] = []
     var onSelect: (Place) -> Void
     var onReview: () -> Void
     var onAsk: () -> Void
+    var onSuggestion: (String) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             savedHeader
 
             if places.isEmpty {
-                SavedPlacesEmptyState(isFiltered: isFiltered, onReview: onReview, onAsk: onAsk)
+                SavedPlacesEmptyState(
+                    isFiltered: isFiltered,
+                    suggestions: suggestions,
+                    onReview: onReview,
+                    onAsk: onAsk,
+                    onSuggestion: onSuggestion
+                )
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(sectionedPlaces, id: \.category) { section in
@@ -3414,7 +3465,7 @@ private struct SavedPlaceRow: View {
                     .foregroundColor(.saveInk)
                     .frame(width: 34, height: 34)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
             .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
@@ -3442,23 +3493,33 @@ private extension PlaceCategory {
 private struct SavedPlacesEmptyState: View {
     @Environment(\.appLanguageSettings) private var languageSettings
     var isFiltered: Bool
+    var suggestions: [String] = []
     var onReview: () -> Void
     var onAsk: () -> Void
+    var onSuggestion: (String) -> Void = { _ in }
+
+    private var chipSuggestions: [String] {
+        Array(suggestions.prefix(2))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "sparkles")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundColor(SaveTheme.Colors.nearBlack)
-                    .frame(width: 42, height: 42)
-                    .background(SaveTheme.Colors.cream)
-                    .clipShape(Circle())
+        VStack(alignment: .leading, spacing: SaveTheme.Spacing.lg) {
+            HStack(alignment: .center, spacing: SaveTheme.Spacing.md) {
+                if isFiltered {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(SaveTheme.Colors.nearBlack)
+                        .frame(width: 42, height: 42)
+                        .background(SaveTheme.Colors.cream)
+                        .clipShape(Circle())
+                } else {
+                    MemoMascotMark(size: 52)
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isFiltered
                          ? languageSettings.localized(english: "No matching Map Stamps", traditionalChinese: "沒有符合條件的地圖章")
-                         : languageSettings.localized(english: "Start your place memory", traditionalChinese: "開始你的地點記憶"))
+                         : languageSettings.localized(english: "Memo is ready to start your map", traditionalChinese: "Memo 準備好開始你的地圖了"))
                         .font(.headline.weight(.black))
                         .foregroundColor(SaveTheme.Colors.cream)
                         .fixedSize(horizontal: false, vertical: true)
@@ -3473,7 +3534,46 @@ private struct SavedPlacesEmptyState: View {
             }
 
             if !isFiltered {
-                HStack(spacing: 10) {
+                if !chipSuggestions.isEmpty {
+                    VStack(alignment: .leading, spacing: SaveTheme.Spacing.sm) {
+                        Text(languageSettings.localized(english: "Try asking Memo", traditionalChinese: "試著問 Memo"))
+                            .font(SaveTheme.Typography.eyebrow)
+                            .foregroundColor(SaveTheme.Colors.cream.opacity(0.6))
+
+                        ForEach(chipSuggestions, id: \.self) { suggestion in
+                            Button {
+                                SaveHaptics.tap()
+                                onSuggestion(suggestion)
+                            } label: {
+                                HStack(spacing: SaveTheme.Spacing.sm) {
+                                    Image(systemName: "sparkle")
+                                        .font(.caption2.weight(.black))
+                                    Text(suggestion)
+                                        .font(.caption.weight(.semibold))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.82)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "arrow.up.left")
+                                        .font(.caption2.weight(.black))
+                                        .foregroundColor(SaveTheme.Colors.cream.opacity(0.6))
+                                }
+                                .foregroundColor(SaveTheme.Colors.cream)
+                                .padding(.horizontal, SaveTheme.Spacing.md)
+                                .padding(.vertical, SaveTheme.Spacing.sm)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(SaveTheme.Colors.cream.opacity(0.16), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                HStack(spacing: SaveTheme.Spacing.sm) {
                     Button(action: onReview) {
                         Label(languageSettings.localized(english: "Open Review", traditionalChinese: "打開待確認"), systemImage: "checklist.unchecked")
                     }
@@ -3496,7 +3596,7 @@ private struct SavedPlacesEmptyState: View {
                 }
             }
         }
-        .padding(16)
+        .padding(SaveTheme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SaveTheme.Colors.nearBlack.opacity(0.90))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -3619,7 +3719,7 @@ private struct ReviewCandidatePlaceRow: View {
                     .foregroundColor(.saveInk)
                     .frame(width: 34, height: 34)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, SaveTheme.Spacing.lg)
             .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
@@ -4490,7 +4590,7 @@ private struct MemoryFlowCTA: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(14)
+        .padding(SaveTheme.Spacing.lg)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial)
