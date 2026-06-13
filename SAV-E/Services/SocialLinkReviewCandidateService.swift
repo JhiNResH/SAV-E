@@ -917,9 +917,18 @@ final class SocialLinkReviewCandidateService {
         return nil
     }
 
+    private func isValidMapCoordinate(latitude: Double, longitude: Double) -> Bool {
+        latitude.isFinite
+            && longitude.isFinite
+            && abs(latitude) <= 90
+            && abs(longitude) <= 180
+            && (latitude != 0 || longitude != 0)
+    }
+
     private func westernMapLinkMatch(in urlString: String) -> (providerName: String, name: String, latitude: Double, longitude: Double)? {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return nil }
-        if host.contains("google"), url.path.lowercased().contains("/maps/place/") {
+        let isGoogleMapsHost = host.matchesSocialDomain("google.com") || host.matchesSocialDomain("maps.google.com")
+        if isGoogleMapsHost, url.path.lowercased().contains("/maps/place/") {
             guard let regex = try? NSRegularExpression(pattern: #"/maps/place/([^/@?#]+)/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)"#) else { return nil }
             let range = NSRange(urlString.startIndex..<urlString.endIndex, in: urlString)
             guard let match = regex.firstMatch(in: urlString, range: range),
@@ -930,7 +939,7 @@ final class SocialLinkReviewCandidateService {
                   let latitude = Double(urlString[latRange]),
                   let longitude = Double(urlString[lngRange]) else { return nil }
             let name = decodedMapPlaceName(String(urlString[nameRange]))
-            guard isUsableCandidateName(name), latitude != 0 || longitude != 0 else { return nil }
+            guard isUsableCandidateName(name), isValidMapCoordinate(latitude: latitude, longitude: longitude) else { return nil }
             return ("Google Maps", name, latitude, longitude)
         }
         if host.matchesSocialDomain("maps.apple.com") {
@@ -939,7 +948,7 @@ final class SocialLinkReviewCandidateService {
             let ll = queryItems.first(where: { $0.name == "ll" })?.value ?? ""
             let parts = ll.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
             let name = decodedMapPlaceName(query)
-            guard isUsableCandidateName(name), parts.count == 2, parts[0] != 0 || parts[1] != 0 else { return nil }
+            guard isUsableCandidateName(name), parts.count == 2, isValidMapCoordinate(latitude: parts[0], longitude: parts[1]) else { return nil }
             return ("Apple Maps", name, parts[0], parts[1])
         }
         return nil

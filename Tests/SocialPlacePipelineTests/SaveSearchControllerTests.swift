@@ -997,6 +997,28 @@ final class SaveSearchControllerTests: XCTestCase {
         XCTAssertFalse(GeminiSaveLLMClient.looksIncompleteGroundedAnswer("我會先看 Tea Maru，因為最近且評分高。想喝奶茶還是水果茶？"))
     }
 
+    func testDrawerContextBuilderKeepsCommaLessStreetAddressesOffDigest() {
+        let cjkStreetAddress = place(
+            name: "巷弄甜點店",
+            address: "台北市大安區忠孝東路四段181巷40號",
+            category: .cafe
+        )
+        let digest = SaveDrawerContextBuilder.savedPlaceDigest(
+            query: "甜點",
+            places: [cjkStreetAddress],
+            currentLocation: nil
+        )
+        XCTAssertTrue(digest.first?.contains("巷弄甜點店") == true)
+        XCTAssertFalse(digest.contains { $0.contains("忠孝東路") })
+        XCTAssertNil(SaveDrawerContextBuilder.localityHint(places: [cjkStreetAddress], currentLocation: nil))
+
+        let bareLocality = place(name: "Beach Cafe", address: "Santa Monica", category: .cafe)
+        XCTAssertEqual(
+            SaveDrawerContextBuilder.localityHint(places: [bareLocality], currentLocation: nil),
+            "Santa Monica"
+        )
+    }
+
     func testDrawerContextBuilderSelectsRelevantBoundedPlacesWithoutNotes() {
         var boba = place(
             name: "Omomo Tea Shoppe",

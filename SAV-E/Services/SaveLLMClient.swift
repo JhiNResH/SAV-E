@@ -153,7 +153,14 @@ struct SaveDrawerContextBuilder {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        guard pieces.count >= 2 else { return pieces.first }
+        guard pieces.count >= 2 else {
+            // Comma-less addresses (common for CJK) may be full street addresses; only
+            // pass through short digit-free values so street-level detail never leaves the device.
+            guard let only = pieces.first,
+                  only.count <= 20,
+                  only.rangeOfCharacter(from: .decimalDigits) == nil else { return nil }
+            return only
+        }
         return pieces[pieces.count - 2]
     }
 

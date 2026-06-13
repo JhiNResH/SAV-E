@@ -2777,6 +2777,37 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertEqual(apple.first?.reviewState, "map_match_ready")
     }
 
+    func testWesternMapLinkRejectsInvalidCoordinatesAndLookalikeHosts() {
+        let service = SocialLinkReviewCandidateService(googlePlacesService: EmptyGooglePlacesService())
+
+        let nanApple = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://maps.apple.com/?q=Fake%20Spot&ll=nan,nan"
+        )
+        XCTAssertNotEqual(nanApple.first?.reviewState, "map_match_ready")
+        XCTAssertNil(nanApple.first?.latitude)
+
+        let outOfRangeApple = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://maps.apple.com/?q=Fake%20Spot&ll=95.0,200.0"
+        )
+        XCTAssertNotEqual(outOfRangeApple.first?.reviewState, "map_match_ready")
+        XCTAssertNil(outOfRangeApple.first?.latitude)
+
+        let outOfRangeGoogle = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://www.google.com/maps/place/Fake+Spot/@999.0779,-118.2543,17z"
+        )
+        XCTAssertNotEqual(outOfRangeGoogle.first?.reviewState, "map_match_ready")
+
+        let lookalikeHost = service.reviewCandidatesOrSourceOnly(
+            fromEvidenceText: "",
+            sourceURL: "https://maps.google.evil.com/maps/place/Fake+Spot/@34.0779,-118.2543,17z"
+        )
+        XCTAssertNotEqual(lookalikeHost.first?.reviewState, "map_match_ready")
+        XCTAssertNil(lookalikeHost.first?.latitude)
+    }
+
     func testTikTokAndInstagramPostVariantsKeepDescriptorBackedSourceReceipts() {
         let service = SocialLinkReviewCandidateService(googlePlacesService: EmptyGooglePlacesService())
 
