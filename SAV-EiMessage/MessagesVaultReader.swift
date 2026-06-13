@@ -66,7 +66,9 @@ enum MessagesVaultReader {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !name.isEmpty else { return nil }
 
-                let photo = firstNonEmpty(record.sourceImageUrl, record.businessPhotoUrls?.first)
+                let firstBusinessPhoto = record.businessPhotoUrls?
+                    .first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                let photo = firstNonEmpty(record.sourceImageUrl, firstBusinessPhoto)
 
                 return MessagesPlace(
                     id: record.id,
