@@ -22,8 +22,17 @@ final class MessagesViewController: MSMessagesAppViewController {
     // MARK: - SwiftUI hosting
 
     private func presentPicker() {
-        let places = MessagesVaultReader.confirmedPlaces()
+        // Read/decode the vault off the main thread so a growing JSON file never
+        // stalls the Messages extension UI; render back on main.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let places = MessagesVaultReader.confirmedPlaces()
+            await MainActor.run {
+                self?.renderPicker(with: places)
+            }
+        }
+    }
 
+    private func renderPicker(with places: [MessagesPlace]) {
         let root = PlacePickerView(places: places) { [weak self] place in
             self?.insertCard(for: place)
         }
