@@ -96,6 +96,8 @@ final class GeminiCaptionVenueExtractor: SocialCaptionVenueExtractor {
         Rules:
         - name: the venue's proper name, exactly as it literally appears in the caption.
         - The name MUST be text that literally appears in the caption (do not translate, normalize, or invent it).
+        - NEVER return a @username/handle or a #hashtag as the name. If the only thing naming the place is a @handle, return the venue's real proper name if the caption states it, otherwise {"name": null}.
+        - Prefer the place's real name over the name of a larger campus/area it sits inside (e.g. a specific viewpoint over the whole university).
         - area: the city, neighborhood, or country the place is in, if the caption names one; otherwise null.
         - category: one of cafe, food, bar, hotel, attraction, shopping, stay — your best guess for this place.
         - confidence: a number from 0 to 1 for how sure you are this is a real, specific named venue.

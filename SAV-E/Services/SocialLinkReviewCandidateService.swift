@@ -469,6 +469,11 @@ final class SocialLinkReviewCandidateService {
         }
 
         let name = cleanCandidateName(extracted.name)
+        // GUARDRAIL 0: never accept a bare @handle or #hashtag as a venue name —
+        // they search poorly and read as noise. Deterministic backstop in case the
+        // model returns one despite the prompt.
+        let firstChar = name.trimmingCharacters(in: .whitespaces).first
+        guard firstChar != "@", firstChar != "#" else { return nil }
         // GUARDRAIL 1 (anti-hallucination): the extracted name MUST literally
         // appear in the caption (case/diacritic-insensitive). A name the LLM
         // invented or paraphrased is discarded → deterministic source-only.
