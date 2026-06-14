@@ -1273,6 +1273,26 @@ struct SocialPlaceParser {
             guard SocialPlaceEvidenceScorer.looksLikeAddressLine(line),
                   !SocialPlaceEvidenceScorer.looksLikeMarketingLine(line),
                   !SocialPlaceEvidenceScorer.looksLikeMenuOrPriceLine(line) else { return nil }
+            // "📍Ulaman, Bali, Indonesia": the pin marks a venue stem with a
+            // region tail. Promote the stem to the candidate name (region as the
+            // location clue) rather than emitting a nameless address-only clue,
+            // so source recovery keys off the venue stem instead of dropping it.
+            if let stem = pinnedVenueStemBeforeRegionTail(in: line) {
+                let regionTail = cleanLocationMarker(from: line)
+                return draft(
+                    name: stem,
+                    category: category(from: "\(stem)\n\(fullText)"),
+                    sourceURL: sourceURL,
+                    fullText: fullText,
+                    locationClues: regionTail.isEmpty ? [] : [regionTail],
+                    atoms: [
+                        SocialEvidenceAtom(source: .captionSentence, role: .venueName, value: stem, line: line, confidence: 0.6)
+                    ],
+                    confidence: 0.56,
+                    tier: .weakCandidate,
+                    extraMissingInfo: ["Venue stem from caption pin; confirm exact name/address before saving"]
+                )
+            }
             let address = firstLocationClue(in: line) ?? cleanLocationMarker(from: line)
             guard !address.isEmpty else { return nil }
             return draft(
@@ -1866,7 +1886,44 @@ struct SocialPlaceParser {
         )
     }
 
+    /// A `📍`-pinned line whose body is "VenueStem, Region, Country" (e.g.
+    /// "📍Ulaman, Bali, Indonesia"). The whole line trips `looksLikeAddressLine`
+    /// (Bali/Indonesia), so the venue stem before the first comma is otherwise
+    /// swallowed into an address-only clue. Returns the head segment as the
+    /// venue name only when (a) it is a short standalone Latin/CJK token, and
+    /// (b) the tail genuinely reads as a known travel region — so a real street
+    /// address line ("📍123 Main St, Bali") is left untouched.
+    private func pinnedVenueStemBeforeRegionTail(in line: String) -> String? {
+        guard let pinned = firstCapture(in: line, pattern: #"📍\s*([^@\n\r]{2,80})"#) else { return nil }
+        let segments = pinned
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard segments.count >= 2 else { return nil }
+        let head = SocialPlaceEvidenceScorer.cleanCandidateName(segments[0])
+        let tail = segments.dropFirst().joined(separator: ", ")
+        // Tail must read as a travel region, and the head must NOT itself look
+        // like a street address (so "📍No.49-3 Jiwodu, Yangshuo" is not split).
+        guard tail.range(of: #"(?i)\b(Bali|Indonesia|Tabanan)\b"#, options: .regularExpression) != nil,
+              !SocialPlaceEvidenceScorer.looksLikeAddressLine(head),
+              looksLikeStandaloneMarkedVenueName(head),
+              SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(head) else {
+            return nil
+        }
+        return head
+    }
+
     private func candidateNameFromCaptionLine(_ line: String) -> String? {
+        // "📍Ulaman, Bali, Indonesia": the pin marks a venue stem ("Ulaman")
+        // followed by its region/country tail. The whole line reads as an
+        // address (Bali/Indonesia), so the plain pinned-name branch below
+        // (gated on !looksLikeAddressLine) skips it and the stem is lost into an
+        // address-only clue. Split the head segment off the first comma and keep
+        // it as the venue name when it is a short, standalone Latin/CJK token.
+        if let stem = pinnedVenueStemBeforeRegionTail(in: line) {
+            return stem
+        }
+
         if !SocialPlaceEvidenceScorer.looksLikeAddressLine(line),
            let pinnedName = firstCapture(in: line, pattern: #"📍\s*([^@\n\r]{2,80})(?:\s+@[A-Za-z0-9._]{3,30})?"#) {
             let cleaned = cleanDisplayName(pinnedName)
@@ -2489,6 +2546,14 @@ struct SocialPlaceParser {
             #"洛杉[矶磯]"#,
             #"(?i)\bOrange County\b"#,
             #"(?i)\bOC\b"#,
+            // International travel regions that anchor a place-bearing caption
+            // ("📍Ulaman, Bali, Indonesia", "#bali"). Bali/Indonesia carry no
+            // street tokens, so without this the source loses its region clue
+            // and never reaches the place-bearing recovery path.
+            #"(?i)\bBali\b"#,
+            #"(?i)\bIndonesia\b"#,
+            #"(?i)\bTabanan\b"#,
+            #"(?i)#(bali|indonesia|tabanan)\b"#,
             #"(?i)#(losangeles|lacoffee|orangecounty|ocfood|tokyo|taipei|seoul|paris|london|newyork)\b"#,
             #"(北京|上海|廣州|广州|深圳|杭州|南京|成都|重慶|重庆|武漢|武汉|西安|青島|青岛|廈門|厦门|長沙|长沙)(?=[^\n\r]{0,20}(?:攻略|推薦|推荐|必吃|美食|餐廳|餐厅|小吃|咖啡|甜點|甜品|店))"#,
             #"(士林|西門|大安|信義|萬華|中山|松山|內湖|板橋|新莊|蘆洲)(?=[📍\s·・:：-]{0,4}[^\n\r]{0,40}(?:壽喜燒|寿喜烧|漢堡排|日本料理|日式料理|餐廳|餐厅|美食|咖啡|甜點|甜品|小吃))"#,

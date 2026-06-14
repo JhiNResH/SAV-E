@@ -722,6 +722,14 @@ final class SocialLinkReviewCandidateService {
                 if diagnosed.address.isEmpty {
                     diagnosed.missingInfo = appendUnique(diagnosed.missingInfo, ["Confirm address"])
                 }
+                // A bare caption-pin venue stem (e.g. "📍Ulaman, Bali, Indonesia"
+                // → "Ulaman") has no address/coordinates and is only a stem, not a
+                // confirmed venue. Flag it unresolved so public-search recovery
+                // runs to surface the official name ("Ulaman Eco Luxury Resort")
+                // — instead of short-circuiting on the thin local stem.
+                if diagnosed.isCaptionPinVenueStem {
+                    diagnosed.reviewState = "unresolved_place_candidate"
+                }
                 return diagnosed
             }
 
@@ -2082,6 +2090,18 @@ final class SocialLinkReviewCandidateService {
             let topic = analysis.topic
             let phrase = meaningfulPlacePhrase(from: evidenceText)
             let recoveredNameHint = sourceRecoveryVenueNameHint(phrase: phrase, topic: topic, evidenceText: evidenceText)
+            // A caption-pin venue stem ("📍Ulaman, Bali, Indonesia" → "Ulaman")
+            // is the strongest recovery seed: search the stem + region + category
+            // so the official venue name ("Ulaman Eco Luxury Resort") surfaces and
+            // outranks generic hashtags (#avatar/#pandora/beautiful destinations).
+            if let stem = recoverableVenueStem(from: analysis) {
+                if let region {
+                    queries.append("\(stem) \(region) \(keyword)")
+                } else {
+                    queries.append("\(stem) \(keyword)")
+                }
+                queries.append("\(stem) official site")
+            }
             if let recoveredNameHint, let region {
                 queries.append("\(recoveredNameHint) \(region) 地址")
             }
@@ -2338,6 +2358,21 @@ final class SocialLinkReviewCandidateService {
             if cleaned.count >= 8, cleaned.count <= 120 {
                 return cleaned
             }
+        }
+        return nil
+    }
+
+    /// The best place-name stem the local parser already isolated from the
+    /// caption (e.g. the "Ulaman" pin stem). Used to seed recovery search so the
+    /// official venue name is surfaced. Rejects generic labels / the address-only
+    /// placeholder so a thin source never seeds a search with noise.
+    private func recoverableVenueStem(from analysis: SocialPlaceAgentAnalysis) -> String? {
+        for draft in analysis.placesFound {
+            let name = draft.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard name != "Address-only place clue",
+                  isUsableCandidateName(name),
+                  !looksLikeMarketingLine(name) else { continue }
+            return name
         }
         return nil
     }

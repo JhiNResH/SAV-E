@@ -1,0 +1,41 @@
+{
+  "note": "Instagram reel about Ulaman Eco Luxury Resort (Bali). Unlike the age-restricted LS Hotel case (DZHn7sKSwOE), the caption here IS publicly available and fetched into evidence: travel prose about Bali + bamboo/organic architecture, hashtags, and a place-bearing location marker line '📍Ulaman, Bali, Indonesia'. SAV-E must parse the 📍 marker + #ulaman as a place-bearing venue stem (NOT source-only), rank the official resort name above generic labels (Bali / Avatar / Pandora / beautiful destinations), and produce a Review Candidate — NOT an auto Map Stamp (no provider place id / coordinate provenance yet).",
+  "sourceUrl": "https://www.instagram.com/reel/DZh_Ch4A0w9/",
+  "shortcode": "DZh_Ch4A0w9",
+  "creatorHandle": "butnomatter.theroadislife",
+  "captionEvidenceText": "butnomatter.theroadislife on Instagram: \"Hidden deep in the Bali jungle, this is the closest thing to stepping into another world. Every villa is built with striking bamboo structures and organic architecture that blends into the rainforest — jungle views in every direction.\n📍Ulaman, Bali, Indonesia\n#bali #avatar #pandora #ulaman #beautifuldestinations\"",
+  "publicSearchResults": [
+    {
+      "title": "Ulaman Eco Luxury Resort | Ulaman Bali",
+      "url": "https://ulamanbali.com/",
+      "snippet": "Ulaman Eco Luxury Resort is an award-winning eco-luxury resort in Tabanan / Kaba-Kaba, Bali. Built with striking bamboo structures and organic architecture, featuring the Avatar Tree House room overlooking the jungle."
+    },
+    {
+      "title": "Ulaman Bali - Award-winning eco luxury resort",
+      "url": "https://www.instagram.com/ulaman.bali/",
+      "snippet": "📍Ulaman Eco Luxury Resort, Kaba-Kaba, Tabanan, Bali, Indonesia 🇮🇩 Bamboo eco-resort with jungle views."
+    },
+    {
+      "title": "beautiful destinations in Bali — jungle views",
+      "url": "https://example.com/bali-jungle-views",
+      "snippet": "A roundup of beautiful destinations and jungle views across Bali, including Avatar and Pandora-themed photo spots."
+    }
+  ],
+  "expected": {
+    "sourceShape": "instagram_reel_eco_resort_travel",
+    "creator": "butnomatter.theroadislife",
+    "candidateName": "Ulaman Eco Luxury Resort",
+    "candidateNameAlias": ["Ulaman Bali", "Ulaman"],
+    "area": "Bali, Indonesia",
+    "likelyRegion": "Tabanan / Kaba-Kaba",
+    "category": "stay",
+    "possibleAddress": "Kaba-Kaba, Tabanan, Bali, Indonesia",
+    "confidence": "review_candidate_not_verified_map_stamp",
+    "rejectedNames": ["Bali", "Avatar", "Pandora", "beautiful destinations", "jungle views"],
+    "missing": [
+      "provider place id / map match",
+      "coordinate provenance",
+      "exact address / branch confirmation"
+    ]
+  }
+}

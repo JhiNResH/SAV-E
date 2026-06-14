@@ -883,6 +883,154 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified coordinates") == true)
     }
 
+    private struct UlamanFixture: Decodable {
+        struct Result: Decodable {
+            var title: String
+            var url: String
+            var snippet: String
+        }
+        var sourceUrl: String
+        var shortcode: String
+        var creatorHandle: String
+        var captionEvidenceText: String
+        var publicSearchResults: [Result]
+    }
+
+    private func loadUlamanFixture() throws -> UlamanFixture {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = repoRoot
+            .appendingPathComponent("fixtures/social-osint", isDirectory: true)
+            .appendingPathComponent("DZh_Ch4A0w9_ulaman_bali.json")
+        return try JSONDecoder().decode(UlamanFixture.self, from: try Data(contentsOf: url))
+    }
+
+    /// Fixture-backed fake mirroring the LS Hotel fake: the corroborating resort
+    /// identity only surfaces through public web search. To prove recovery keys
+    /// off the venue stem (`Ulaman`/`#ulaman`) + region (`Bali`) rather than the
+    /// generic hashtags, results are returned ONLY for queries that mention the
+    /// venue stem or the creator handle — a query built purely from `avatar`,
+    /// `pandora`, or `beautiful destinations` returns nothing.
+    private final class UlamanSearchFake: PublicSourceSearchServiceProtocol {
+        let results: [PublicSourceSearchResult]
+        let handle: String
+        var queries: [String] = []
+
+        init(results: [PublicSourceSearchResult], handle: String) {
+            self.results = results
+            self.handle = handle
+        }
+
+        func search(query: String) async throws -> [PublicSourceSearchResult] {
+            queries.append(query)
+            if query.localizedCaseInsensitiveContains("ulaman") || query.localizedCaseInsensitiveContains(handle) {
+                return results
+            }
+            return []
+        }
+    }
+
+    /// STEP 1 repro + STEP 4 acceptance. Instagram reel about Ulaman Eco Luxury
+    /// Resort (Bali). The caption IS publicly available (unlike the age-restricted
+    /// LS Hotel case): travel prose + hashtags + a place-bearing location marker
+    /// `📍Ulaman, Bali, Indonesia`. SAV-E must (1) treat the 📍 marker + #ulaman as
+    /// place-bearing (NOT source-only), (2) rank the official resort name over
+    /// generic labels (Bali / Avatar / Pandora / beautiful destinations), and
+    /// (3) produce a Review Candidate — never an auto Map Stamp (no provider place
+    /// id / coordinate provenance yet).
+    func testInstagramUlamanBaliReelRecoversResortAsReviewCandidateRankedOverGenericLabels() async throws {
+        let fixture = try loadUlamanFixture()
+        let search = UlamanSearchFake(
+            results: fixture.publicSearchResults.map {
+                PublicSourceSearchResult(title: $0.title, url: $0.url, snippet: $0.snippet)
+            },
+            handle: fixture.creatorHandle
+        )
+        // EmptyGooglePlacesService + no place resolver => no coordinates can be
+        // fabricated; the candidate is forced to stay a Review Candidate.
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: search
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: fixture.captionEvidenceText,
+            sourceURL: fixture.sourceUrl
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+
+        // (1) NOT source-only (the bug): the 📍 marker + #ulaman is place-bearing,
+        // so recovery ran and produced a real candidate.
+        XCTAssertFalse(candidate.isSourceOnly,
+                       "📍Ulaman, Bali, Indonesia + #ulaman is place-bearing; must recover via public search, not degrade to source-only")
+        // Recovery queries are built from the Ulaman venue stem (and region).
+        XCTAssertTrue(search.queries.contains { $0.localizedCaseInsensitiveContains("ulaman") },
+                      "Recovery queries should be built from the Ulaman venue stem, got: \(search.queries)")
+
+        // (2) candidateName mentions Ulaman (ideally Resort/Eco), ranked above noise.
+        XCTAssertTrue(candidate.candidateName.localizedCaseInsensitiveContains("Ulaman"),
+                      "Expected recovered name to mention Ulaman, got: \(candidate.candidateName)")
+        XCTAssertTrue(candidate.candidateName.localizedCaseInsensitiveContains("Resort")
+                        || candidate.candidateName.localizedCaseInsensitiveContains("Eco"),
+                      "Expected the official resort name, got: \(candidate.candidateName)")
+        // (5) Generic labels must NOT become the candidate name.
+        for rejected in ["Bali", "Avatar", "Pandora", "beautiful destinations", "jungle views"] {
+            XCTAssertNotEqual(candidate.candidateName.lowercased(), rejected.lowercased(),
+                              "Generic label \(rejected) must not become the candidate name")
+        }
+        // area mentions Bali/Indonesia.
+        let areaText = "\(candidate.address) \(candidate.evidence.joined(separator: " "))"
+        XCTAssertTrue(areaText.localizedCaseInsensitiveContains("Bali") || areaText.localizedCaseInsensitiveContains("Indonesia"),
+                      "Expected area to mention Bali/Indonesia, got address=\(candidate.address)")
+        // category = stay (canonical category for resorts/hotels).
+        XCTAssertEqual(candidate.category, "stay",
+                       "Eco resort / hotel should classify as the canonical stay category, got: \(candidate.category)")
+
+        // (4) GUARDRAIL: Review Candidate, NOT a Map Stamp. No fabricated coords.
+        XCTAssertFalse(candidate.hasReliableCoordinates,
+                       "No provider place id / coordinate provenance yet; must stay a Review Candidate, not a Map Stamp")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertNotEqual(candidate.reviewState, "map_match_ready",
+                          "Must not be promoted to a map-ready Map Stamp without confirmed coordinates")
+        XCTAssertFalse(candidate.missingInfo.isEmpty)
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"),
+                      "missingInfo must flag coordinate provenance, got: \(candidate.missingInfo)")
+    }
+
+    /// Guardrail: without the corroborating public search results, SAV-E must not
+    /// fabricate a resort. The 📍 marker keeps it place-bearing (so recovery runs),
+    /// but with no usable search hit the candidate must NOT invent coordinates and
+    /// must NOT promote a generic hashtag (avatar/pandora/bali) into a venue name.
+    func testInstagramUlamanBaliReelWithoutSearchConfirmationDoesNotFabricateResort() async throws {
+        let fixture = try loadUlamanFixture()
+        let emptySearch = StubPublicSourceSearchService() // returns [] for Ulaman queries
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: emptySearch
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: fixture.captionEvidenceText,
+            sourceURL: fixture.sourceUrl
+        )
+        let candidate = try XCTUnwrap(candidates.first)
+
+        // No fabricated coordinates / Map Stamp.
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertFalse(candidate.hasReliableCoordinates)
+        XCTAssertNotEqual(candidate.reviewState, "map_match_ready")
+        // Generic hashtags must never become the resolved venue name.
+        for rejected in ["Bali", "Avatar", "Pandora", "beautiful destinations", "jungle views"] {
+            XCTAssertNotEqual(candidate.candidateName.lowercased(), rejected.lowercased(),
+                              "Generic label \(rejected) must not be fabricated as a venue name")
+        }
+    }
+
     func testAmapRefinementPromotesChinaRestaurantCandidateToMapReady() async {
         let resolver = StubPlaceResolverService()
         let service = SocialLinkReviewCandidateService(
