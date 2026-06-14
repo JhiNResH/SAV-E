@@ -43,6 +43,8 @@ import {
   recommendationAnalysisReceiptPayloadMaxBytes,
 } from "./receiptEnvelope.js";
 import { readSourceRecoveryConfigStatus } from "./sourceRecoveryConfig.js";
+import { parseInbound, runInbound } from "./channels.js";
+import { issueBuyerSession, placeOrder, myOrders, type SllrBuyer } from "./sllrCommerce.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -63,6 +65,19 @@ const pool = new Pool({
 });
 
 let verificationKeyPromise: Promise<KeyLike> | undefined;
+
+// SAV-E messaging channel state: dedupe inbound by message_handle; cache one
+// SLL-R buyer session per SAV-E user (so orders/receipts accrue to a stable id).
+const channelSeen = new Set<string>();
+const sllrBuyerByUser = new Map<string, SllrBuyer>();
+async function sllrBuyerFor(userId: string): Promise<SllrBuyer> {
+  let buyer = sllrBuyerByUser.get(userId);
+  if (!buyer) {
+    buyer = await issueBuyerSession(`SAV-E ${userId}`);
+    sllrBuyerByUser.set(userId, buyer);
+  }
+  return buyer;
+}
 
 const placeFields = [
   "id",
@@ -384,6 +399,34 @@ createServer(async (request, response) => {
     }
     if (isV0 && request.method === "POST" && resource === "guest-sessions" && !id) {
       return sendJson(response, createGuestSession(guestSessionSecret), 201);
+    }
+
+    // SAV-E messaging channel (webhook-authed, not user-authed) — phone → SAV-E.
+    if (request.method === "POST" && resource === "channels" && id === "imessage") {
+      const body = await readJson(request);
+      const msg = parseInbound(body);
+      const reply = await runInbound(msg, {
+        resolveUser: async () => {
+          // v0: a single configured test user (no user_channels table yet, #4).
+          const testUser = process.env.SAVE_TEST_USER_ID?.trim();
+          if (!testUser) return null;
+          await ensureProfile(testUser);
+          return { userId: testUser, buyer: await sllrBuyerFor(testUser) };
+        },
+        saveMemory: async (userId, text) => {
+          const title = text.split("\n")[0].slice(0, 80);
+          await pool.query(
+            "insert into captures (user_id, source_type, raw_text, title, status) values ($1, 'note', $2, $3, 'review')",
+            [userId, text, title],
+          );
+          return { title };
+        },
+        placeOrder: (merchantId, intent, buyer) => placeOrder(merchantId, intent, buyer, { customerLabel: "SAV-E" }),
+        listOrders: (buyer) => myOrders(buyer),
+        defaultMerchantId: process.env.SLLR_DEFAULT_MERCHANT?.trim() || "raposa-coffee",
+        seen: channelSeen,
+      });
+      return sendJson(response, { reply }, 200);
     }
 
     const userId = await resolveUserId(request);
