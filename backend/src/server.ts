@@ -17,7 +17,12 @@ import {
 } from "./placeClaims.js";
 import { enrichMaatPlaceAnalysisWithPublicWeb } from "./maatPublicWebAnalysis.js";
 import { runSourceSearchRecovery, type SourceSearchCandidate } from "./sourceSearchWorker.js";
-import { defaultGeminiText, processSendblueInbound, SendblueClient } from "./sendblueBot.js";
+import {
+  defaultGeminiText,
+  defaultPlacesSearch,
+  processSendblueInbound,
+  SendblueClient,
+} from "./sendblueBot.js";
 import {
   PgSendbluePlaceStore,
   sendblueSavedPlacesTableSql,
@@ -493,6 +498,7 @@ async function handleSendblueWebhook(
         client,
         store: sendbluePlaceStore,
         gemini: defaultGeminiText,
+        placesSearch: defaultPlacesSearch,
       });
       console.log(
         `[sendblue] done replied=${result.replied}` +

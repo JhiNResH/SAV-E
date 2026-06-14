@@ -532,50 +532,189 @@ function parseReplyJson(text: string): { reply?: unknown } | null {
   return match ? tryParse(match[0]) : null;
 }
 
+/** A place found via Google Places discovery (NOT one the user saved). */
+export type DiscoveredPlace = {
+  name: string;
+  address?: string;
+  rating?: number;
+  category?: string;
+};
+
+/** Injectable Google Places text search (so tests don't hit the network). */
+export type PlacesSearch = (query: string) => Promise<DiscoveredPlace[]>;
+
 /**
- * Agentic recall: instead of keyword-matching the message against fixed intents,
- * hand the user's text AND their saved places to the LLM and let it answer
- * naturally — list, recommend, or answer a free-form question ("the cafe my
- * friend sent?", "somewhere for tonight", "anything in Tokyo?"). The model is
- * GROUNDED: it must only reference places in the supplied list, never invent one.
- * Returns null when there's nothing to ground on or the model is unavailable /
- * yields no usable reply, so the caller can fall back to deterministic intents.
+ * Google Places text search. `query` is a natural phrase like "coffee in Santa
+ * Monica". Uses GOOGLE_PLACES_API_KEY (already provisioned on the backend).
  */
-export async function answerOverSavedPlaces(
+export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlace[]> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) throw new Error("Missing GOOGLE_PLACES_API_KEY");
+  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask":
+        "places.displayName,places.formattedAddress,places.rating,places.primaryType",
+    },
+    body: JSON.stringify({ textQuery: query, maxResultCount: 8 }),
+  });
+  if (!response.ok) throw new Error(`Places searchText failed: ${response.status}`);
+  const body = (await response.json()) as {
+    places?: {
+      displayName?: { text?: string };
+      formattedAddress?: string;
+      rating?: number;
+      primaryType?: string;
+    }[];
+  };
+  return (body.places ?? [])
+    .map((p) => ({
+      name: p.displayName?.text ?? "",
+      address: p.formattedAddress,
+      rating: typeof p.rating === "number" ? p.rating : undefined,
+      category: p.primaryType?.replace(/_/g, " "),
+    }))
+    .filter((p) => p.name.length > 0);
+}
+
+/**
+ * The agentic decision for a no-URL message: either answer from the user's saved
+ * places ("reply"), or go DISCOVER new places near a location via Google
+ * ("search"). `area` is null when the user wants nearby but gave no location.
+ */
+export type RecallDecision =
+  | { kind: "reply"; reply: string }
+  | { kind: "search"; query: string; area: string | null };
+
+/**
+ * Agentic router: hand the user's message + their saved places to the LLM and
+ * let it decide whether it can answer from what they've saved (grounded, never
+ * inventing one) OR whether it should search Google for NEW nearby places.
+ * Returns null when there's nothing to work with or the model is unavailable.
+ */
+export async function decideRecall(
   text: string,
   places: SavedPlace[],
   gemini: GeminiCaller = defaultGeminiText,
   chinese = false,
-): Promise<string | null> {
-  if (places.length === 0) return null;
-  const context = places
-    .slice(0, 50)
-    .map((p, i) => {
-      const bits = [p.name];
-      if (p.area) bits.push(`area: ${p.area}`);
-      if (p.category) bits.push(p.category);
-      return `${i + 1}. ${bits.join(" — ")}`;
-    })
-    .join("\n");
+): Promise<RecallDecision | null> {
+  const context =
+    places.length > 0
+      ? places
+          .slice(0, 50)
+          .map((p, i) => {
+            const bits = [p.name];
+            if (p.area) bits.push(`area: ${p.area}`);
+            if (p.category) bits.push(p.category);
+            return `${i + 1}. ${bits.join(" — ")}`;
+          })
+          .join("\n")
+      : "(none saved yet)";
   const lang = chinese ? "繁體中文" : "the same language the user wrote in";
-  const prompt = `You are SAV-E, a friend who remembers places the user saved from Instagram/TikTok. Answer ONLY using the saved places listed below. NEVER invent a place that is not in the list. If nothing in the list fits what they asked, say so in one short sentence and suggest they send a new link. Keep it to 1-3 short sentences — this is a text message. Reply in ${lang}. At most one emoji.
+  const prompt = `You are SAV-E, a friend who remembers places the user saved from Instagram/TikTok and can also find NEW places nearby. Decide EXACTLY ONE action:
+
+1. Answer from their saved places (list them, recommend one of them, or answer a question about them). Use ONLY the saved list — NEVER invent a saved place. Return {"reply":"<message>"}.
+2. Find NEW places nearby — when they want a recommendation for somewhere they have NOT saved (e.g. "somewhere nearby", "anywhere else", "that one's too far", "find me a coffee place", "推薦附近的"), AND a location is given or clearly known. Return {"search":{"query":"<2-4 word search like 'coffee' or 'ramen'>","area":"<the location, e.g. 'Santa Monica'>"}}.
+3. They want something nearby but gave NO location. Return {"reply":"<briefly ask where they are right now>"}.
+
+Keep any reply to 1-3 short sentences (a text message), in ${lang}, at most one emoji.
 
 The user's saved places:
 ${context}
 
 The user just texted: "${text}"
 
-Return STRICT JSON only, no markdown: {"reply": string}`;
+Return STRICT JSON only, no markdown.`;
   let raw: string;
   try {
     raw = await gemini(prompt);
   } catch (error) {
-    console.error("[sendblue] agentic answer gemini error", error);
+    console.error("[sendblue] decideRecall gemini error", error);
     return null;
   }
-  const parsed = parseReplyJson(raw);
-  const reply = parsed && typeof parsed.reply === "string" ? parsed.reply.trim() : "";
-  return reply.length > 0 ? reply : null;
+  const parsed = parseRecallJson(raw);
+  if (!parsed) return null;
+  if (parsed.search && typeof parsed.search.query === "string" && parsed.search.query.trim()) {
+    const area =
+      typeof parsed.search.area === "string" && parsed.search.area.trim()
+        ? parsed.search.area.trim()
+        : null;
+    return { kind: "search", query: parsed.search.query.trim(), area };
+  }
+  if (typeof parsed.reply === "string" && parsed.reply.trim()) {
+    return { kind: "reply", reply: parsed.reply.trim() };
+  }
+  return null;
+}
+
+function parseRecallJson(
+  text: string,
+): { reply?: unknown; search?: { query?: unknown; area?: unknown } } | null {
+  const obj = parseReplyJson(text) as
+    | { reply?: unknown; search?: { query?: unknown; area?: unknown } }
+    | null;
+  if (!obj) return null;
+  if (obj.search && typeof obj.search === "object") return obj;
+  if (typeof obj.reply === "string") return obj;
+  return obj;
+}
+
+const askLocationReplyEn =
+  "Where are you right now? Drop me an area or address and I'll find a spot nearby 📍";
+const askLocationReplyZh = "你現在在哪?給我一個地區或地址,我幫你找附近的 📍";
+
+function askLocationReply(chinese: boolean): string {
+  return chinese ? askLocationReplyZh : askLocationReplyEn;
+}
+
+function noDiscoveryReply(area: string, chinese: boolean): string {
+  return chinese
+    ? `我在 ${area} 附近沒找到適合的,換個地區或描述試試?`
+    : `Couldn't find a good match near ${area} — try another area or be more specific?`;
+}
+
+/**
+ * Phrase a discovery result naturally: pass the REAL Google results back to the
+ * LLM to pick + recommend one in the user's voice. Falls back to a deterministic
+ * template (top result) when the model is unavailable, so discovery never fails
+ * just because phrasing did. Grounded in the actual search results, not invented.
+ */
+export async function phraseDiscovery(
+  query: string,
+  area: string,
+  found: DiscoveredPlace[],
+  gemini: GeminiCaller = defaultGeminiText,
+  chinese = false,
+): Promise<string> {
+  const top = found.slice(0, 5);
+  const template = (): string => {
+    const best = top[0];
+    const stars = best.rating ? ` ${best.rating}★` : "";
+    return chinese
+      ? `${area}附近可以試試 ${best.name}${stars} 📍${best.address ? `\n${best.address}` : ""}`
+      : `Near ${area}, try ${best.name}${stars} 📍${best.address ? `\n${best.address}` : ""}`;
+  };
+  const lang = chinese ? "繁體中文" : "the same language the user wrote in";
+  const list = top
+    .map((p, i) => `${i + 1}. ${p.name}${p.rating ? ` (${p.rating}★)` : ""}${p.address ? ` — ${p.address}` : ""}`)
+    .join("\n");
+  const prompt = `Recommend ONE place to the user from these REAL Google results for "${query}" near ${area}. Pick the best (consider rating). Use ONLY these results — do not invent. 1-2 short sentences, ${lang}, at most one emoji.
+
+Results:
+${list}
+
+Return STRICT JSON only: {"reply": string}`;
+  try {
+    const raw = await gemini(prompt);
+    const parsed = parseReplyJson(raw);
+    const reply = parsed && typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+    return reply.length > 0 ? reply : template();
+  } catch (error) {
+    console.error("[sendblue] phraseDiscovery gemini error", error);
+    return template();
+  }
 }
 
 // Defensive field extraction: Sendblue inbound payloads vary, so accept several
@@ -618,6 +757,8 @@ export type ProcessResult = {
 export type ProcessDeps = {
   fetchText?: FetchText;
   gemini?: GeminiCaller;
+  /** Google Places search for nearby DISCOVERY. Defaults to defaultPlacesSearch. */
+  placesSearch?: PlacesSearch;
   client: Pick<SendblueClient, "sendMessage" | "markRead" | "sendTypingIndicator">;
   store: SendbluePlaceStore;
 };
@@ -728,27 +869,42 @@ export async function processSendblueInbound(
         reply = noVenueReply;
       }
     } else if (deps.gemini) {
-      // No URL + an LLM is available: AGENTIC recall. Hand the message + the
-      // user's saved places to the model and let it answer naturally (list /
-      // recommend / free-form question), grounded only in what they've saved.
-      // Falls back to deterministic keyword intents if the model yields nothing.
+      // No URL + an LLM is available: AGENTIC router. The model decides whether
+      // to answer from the user's saved places (grounded, never invents one) OR
+      // to DISCOVER new places nearby via Google Places. Falls back to
+      // deterministic keyword intents if the model yields nothing usable.
       let places: SavedPlace[] = [];
       try {
         places = await deps.store.list(from, { limit: 50 });
       } catch (storeError) {
         console.error("[sendblue] store.list error", storeError);
       }
-      if (places.length === 0) {
-        reply = emptyListReply;
+      const decision = await decideRecall(text, places, deps.gemini, chinese);
+      if (!decision) {
+        console.log(`[sendblue] agentic empty → keyword fallback for ${from}`);
+        reply = await keywordRecallReply(text, from, chinese, deps.store);
+      } else if (decision.kind === "reply") {
+        console.log(`[sendblue] agentic reply for ${from} placeCount=${places.length}`);
+        reply = decision.reply;
+      } else if (!decision.area) {
+        // Wants nearby but gave no location → ask where they are.
+        console.log(`[sendblue] discovery wants location from ${from}`);
+        reply = askLocationReply(chinese);
       } else {
-        const agentic = await answerOverSavedPlaces(text, places, deps.gemini, chinese);
-        if (agentic) {
-          console.log(`[sendblue] agentic answer for ${from} placeCount=${places.length}`);
-          reply = agentic;
-        } else {
-          console.log(`[sendblue] agentic empty → keyword fallback for ${from}`);
-          reply = await keywordRecallReply(text, from, chinese, deps.store);
+        // Discovery: search Google for NEW places near the given area.
+        const search = deps.placesSearch ?? defaultPlacesSearch;
+        let found: DiscoveredPlace[] = [];
+        try {
+          found = await search(`${decision.query} in ${decision.area}`);
+        } catch (searchError) {
+          console.error("[sendblue] places search error", searchError);
         }
+        console.log(
+          `[sendblue] discovery query="${decision.query}" area="${decision.area}" results=${found.length}`,
+        );
+        reply = found.length
+          ? await phraseDiscovery(decision.query, decision.area, found, deps.gemini, chinese)
+          : noDiscoveryReply(decision.area, chinese);
       }
     } else {
       // No LLM injected (e.g. tests): deterministic keyword recall.

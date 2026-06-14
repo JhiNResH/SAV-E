@@ -10,8 +10,10 @@ import {
   detectArea,
   looksChinese,
   processSendblueInbound,
-  answerOverSavedPlaces,
+  decideRecall,
+  phraseDiscovery,
   type GeminiCaller,
+  type DiscoveredPlace,
 } from "./sendblueBot.js";
 import type { ExtractedVenue } from "./sendblueBot.js";
 import type { ListOpts, SavedPlace, SendbluePlaceStore } from "./sendbluePlaceStore.js";
@@ -261,7 +263,7 @@ test("webhook flow: Chinese list intent replies in 中文", async () => {
   assert.match(content, /鼎泰豐/);
 });
 
-test("answerOverSavedPlaces grounds a free-form question in the saved list", async () => {
+test("decideRecall: grounded reply from saved places", async () => {
   const places: SavedPlace[] = [
     { name: "Cafe Leon Dore", area: "West Hollywood", category: "cafe" },
     { name: "Aquarela", area: "Cabo", category: "restaurant" },
@@ -269,28 +271,57 @@ test("answerOverSavedPlaces grounds a free-form question in the saved list", asy
   let seenPrompt = "";
   const gemini: GeminiCaller = async (prompt) => {
     seenPrompt = prompt;
-    return JSON.stringify({ reply: "Cafe Leon Dore in West Hollywood is your coffee spot ☕" });
+    return JSON.stringify({ reply: "Cafe Leon Dore in West Hollywood ☕" });
   };
-  const reply = await answerOverSavedPlaces("where can I get coffee tonight?", places, gemini, false);
-  assert.equal(reply, "Cafe Leon Dore in West Hollywood is your coffee spot ☕");
-  // The model is grounded: both saved places are in the prompt context.
+  const decision = await decideRecall("which cafe did I save?", places, gemini, false);
+  assert.deepEqual(decision, { kind: "reply", reply: "Cafe Leon Dore in West Hollywood ☕" });
+  // Grounded: both saved places appear in the prompt context.
   assert.match(seenPrompt, /Cafe Leon Dore/);
   assert.match(seenPrompt, /Aquarela/);
 });
 
-test("answerOverSavedPlaces returns null on empty list or unusable model output", async () => {
+test("decideRecall: search decision when user wants something new nearby", async () => {
+  const gemini: GeminiCaller = async () =>
+    JSON.stringify({ search: { query: "coffee", area: "Santa Monica" } });
+  const decision = await decideRecall(
+    "that one's too far, anything in Santa Monica?",
+    [{ name: "Cafe Leon Dore", area: "West Hollywood" }],
+    gemini,
+    false,
+  );
+  assert.deepEqual(decision, { kind: "search", query: "coffee", area: "Santa Monica" });
+});
+
+test("decideRecall: search with no location → area null", async () => {
+  const gemini: GeminiCaller = async () =>
+    JSON.stringify({ search: { query: "ramen", area: null } });
+  const decision = await decideRecall("find me ramen nearby", [], gemini, false);
+  assert.deepEqual(decision, { kind: "search", query: "ramen", area: null });
+});
+
+test("decideRecall: null on unusable / thrown model output", async () => {
   const places: SavedPlace[] = [{ name: "Tartine", area: "San Francisco" }];
-  assert.equal(await answerOverSavedPlaces("hi", [], fakeGemini({ reply: "x" }), false), null);
-  assert.equal(await answerOverSavedPlaces("hi", places, async () => "not json", false), null);
+  assert.equal(await decideRecall("hi", places, async () => "not json", false), null);
   assert.equal(
-    await answerOverSavedPlaces("hi", places, async () => {
+    await decideRecall("hi", places, async () => {
       throw new Error("boom");
     }, false),
     null,
   );
 });
 
-test("webhook flow: agentic answer used when a gemini is injected", async () => {
+test("phraseDiscovery falls back to a template when the model fails", async () => {
+  const found: DiscoveredPlace[] = [
+    { name: "Maru Coffee", address: "1936 Hillhurst Ave", rating: 4.6 },
+  ];
+  const reply = await phraseDiscovery("coffee", "Los Feliz", found, async () => {
+    throw new Error("down");
+  }, false);
+  assert.match(reply, /Maru Coffee/);
+  assert.match(reply, /Los Feliz/);
+});
+
+test("webhook flow: agentic reply used when a gemini is injected", async () => {
   const client = new FakeSendblueClient();
   const store = new FakeStore();
   await store.save("+15557778888", { name: "Cafe Leon Dore", area: "West Hollywood", category: "cafe" });
@@ -303,6 +334,47 @@ test("webhook flow: agentic answer used when a gemini is injected", async () => 
   );
   assert.equal(result.replied, true);
   assert.equal(client.calls[0]?.content, "Go grab coffee at Cafe Leon Dore ☕");
+});
+
+test("webhook flow: discovery searches Google when the model asks for it", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  await store.save("+15551112222", { name: "Cafe Leon Dore", area: "West Hollywood" });
+  let searchedQuery = "";
+  const placesSearch = async (query: string): Promise<DiscoveredPlace[]> => {
+    searchedQuery = query;
+    return [{ name: "Maru Coffee", address: "Los Feliz", rating: 4.6 }];
+  };
+  // 1st gemini call = decision (search); 2nd = phrasing.
+  let call = 0;
+  const gemini: GeminiCaller = async () => {
+    call += 1;
+    return call === 1
+      ? JSON.stringify({ search: { query: "coffee", area: "Los Feliz" } })
+      : JSON.stringify({ reply: "Try Maru Coffee in Los Feliz ☕" });
+  };
+
+  const result = await processSendblueInbound(
+    { from_number: "+15551112222", content: "that's too far, coffee in Los Feliz?" },
+    { client, store, gemini, placesSearch },
+  );
+  assert.equal(result.replied, true);
+  assert.match(searchedQuery, /coffee in Los Feliz/);
+  assert.equal(client.calls[0]?.content, "Try Maru Coffee in Los Feliz ☕");
+});
+
+test("webhook flow: discovery with no location asks where you are", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const gemini: GeminiCaller = async () =>
+    JSON.stringify({ search: { query: "coffee", area: null } });
+
+  const result = await processSendblueInbound(
+    { from_number: "+15553334444", content: "find me a coffee place nearby" },
+    { client, store, gemini },
+  );
+  assert.equal(result.replied, true);
+  assert.match(client.calls[0]?.content ?? "", /Where are you|你現在在哪/);
 });
 
 test("webhook flow: agentic falls back to keyword list when model yields nothing", async () => {
