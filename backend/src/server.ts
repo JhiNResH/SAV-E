@@ -451,16 +451,30 @@ async function handleSendblueWebhook(
   request: IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
+  let body: Record<string, unknown>;
   try {
-    const body = await readJson(request);
-    const client = new SendblueClient();
-    await processSendblueInbound(body, { client });
+    body = await readJson(request);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("sendblue webhook error", message);
+    console.error("[sendblue] readJson failed", error);
+    return sendJson(response, { ok: true }, 200);
   }
-  // Always 200, regardless of internal outcome.
-  return sendJson(response, { ok: true }, 200);
+
+  // Respond 200 IMMEDIATELY so Sendblue's webhook never times out on a slow
+  // link fetch / Gemini call; process + reply in the background (fire-and-forget).
+  sendJson(response, { ok: true }, 200);
+
+  void (async () => {
+    try {
+      const client = new SendblueClient();
+      const result = await processSendblueInbound(body, { client });
+      console.log(
+        `[sendblue] done replied=${result.replied}` +
+          (result.reply ? ` reply=${JSON.stringify(result.reply)}` : ""),
+      );
+    } catch (error) {
+      console.error("[sendblue] background processing error", error);
+    }
+  })();
 }
 
 async function handlePlaces(

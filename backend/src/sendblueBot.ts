@@ -342,29 +342,40 @@ export async function processSendblueInbound(
   body: Record<string, unknown>,
   deps: ProcessDeps,
 ): Promise<ProcessResult> {
-  if (!isInboundMessage(body)) return { replied: false };
+  if (!isInboundMessage(body)) {
+    console.log("[sendblue] ignored non-inbound event", JSON.stringify(body).slice(0, 160));
+    return { replied: false };
+  }
 
   const from = inboundFrom(body);
   const text = inboundText(body);
-  if (!from || !text) return { replied: false };
+  if (!from || !text) {
+    console.log(`[sendblue] inbound missing from/text from=${from ?? "?"} text=${(text ?? "").slice(0, 60)}`);
+    return { replied: false };
+  }
+  console.log(`[sendblue] inbound from=${from} text=${text.slice(0, 120)}`);
 
   let reply: string;
   try {
     const url = firstUrlInText(text);
     if (!url) {
+      console.log("[sendblue] no URL in message → hint");
       reply = noUrlReply;
     } else {
       const { caption } = await fetchLinkCaption(url, deps.fetchText);
+      console.log(`[sendblue] url=${url} captionLen=${caption.length}`);
       const venue = caption ? await extractVenueFromCaption(caption, deps.gemini) : null;
+      console.log(`[sendblue] venue=${venue ? JSON.stringify(venue) : "(none)"}`);
       reply = venue ? formatVenueReply(venue) : noVenueReply;
     }
   } catch (error) {
     // Spike: degrade gracefully, never bubble up to the webhook.
-    console.error("sendblue inbound processing error", error);
+    console.error("[sendblue] inbound processing error", error);
     reply = noVenueReply;
   }
 
   await deps.client.sendMessage(from, reply);
+  console.log(`[sendblue] sent to ${from}`);
   return { replied: true, reply };
 }
 
