@@ -23,8 +23,9 @@ function fakeGemini(json: object): GeminiCaller {
 
 class FakeSendblueClient {
   public calls: { to: string; content: string }[] = [];
-  async sendMessage(to: string, content: string): Promise<void> {
+  async sendMessage(to: string, content: string): Promise<string> {
     this.calls.push({ to, content });
+    return "";
   }
 }
 

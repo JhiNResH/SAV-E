@@ -59,7 +59,12 @@ if (sendTo) {
   if (!venue) {
     console.log("\n(no venue → not sending)");
   } else {
-    await new SendblueClient().sendMessage(sendTo, reply);
-    console.log("\n✅ sent to", sendTo);
+    try {
+      const sbResponse = await new SendblueClient().sendMessage(sendTo, reply);
+      console.log("\n✅ Sendblue accepted. Raw response:\n" + sbResponse.slice(0, 600));
+      console.log("\nIf no blue bubble arrives: on the Sandbox plan Sendblue only delivers to VERIFIED contacts — add", sendTo, "as a verified contact in the Sendblue dashboard.");
+    } catch (err) {
+      console.log("\n❌ Sendblue send FAILED:\n" + (err instanceof Error ? err.message : String(err)));
+    }
   }
 }

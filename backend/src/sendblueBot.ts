@@ -222,7 +222,7 @@ export class SendblueClient {
     this.endpoint = options?.endpoint ?? "https://api.sendblue.co/api/send-message";
   }
 
-  async sendMessage(toNumber: string, content: string): Promise<void> {
+  async sendMessage(toNumber: string, content: string): Promise<string> {
     const response = await this.fetchImpl(this.endpoint, {
       method: "POST",
       headers: {
@@ -232,9 +232,11 @@ export class SendblueClient {
       },
       body: JSON.stringify({ number: toNumber, content }),
     });
+    const body = await response.text().catch(() => "");
     if (!response.ok) {
-      throw new Error(`Sendblue send-message failed: ${response.status}`);
+      throw new Error(`Sendblue send-message failed: ${response.status} ${body.slice(0, 400)}`);
     }
+    return body;
   }
 }
 
