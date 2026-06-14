@@ -207,7 +207,7 @@ export type SendblueFetch = typeof fetch;
 export class SendblueClient {
   private readonly apiKeyId: string;
   private readonly apiSecret: string;
-  private readonly fromNumber: string;
+  private readonly fromNumber: string | undefined;
   private readonly fetchImpl: SendblueFetch;
   private readonly endpoint: string;
 
@@ -220,13 +220,17 @@ export class SendblueClient {
   }) {
     this.apiKeyId = options?.apiKeyId ?? requireEnv("SENDBLUE_API_KEY_ID");
     this.apiSecret = options?.apiSecret ?? requireEnv("SENDBLUE_API_SECRET");
-    // The Sendblue line the bot sends FROM (your provisioned Sendblue number).
-    this.fromNumber = options?.fromNumber ?? requireEnv("SENDBLUE_FROM_NUMBER");
+    // OPTIONAL: the Sendblue line to send FROM. Replying to an inbound message
+    // doesn't need it (Sendblue infers the line); only cold outbound sends do.
+    // Include it only when set so a missing env never breaks the reply path.
+    this.fromNumber = options?.fromNumber ?? process.env.SENDBLUE_FROM_NUMBER ?? undefined;
     this.fetchImpl = options?.fetchImpl ?? fetch;
     this.endpoint = options?.endpoint ?? "https://api.sendblue.co/api/send-message";
   }
 
   async sendMessage(toNumber: string, content: string): Promise<string> {
+    const payload: Record<string, string> = { number: toNumber, content };
+    if (this.fromNumber) payload.from_number = this.fromNumber;
     const response = await this.fetchImpl(this.endpoint, {
       method: "POST",
       headers: {
@@ -234,7 +238,7 @@ export class SendblueClient {
         "sb-api-key-id": this.apiKeyId,
         "sb-api-secret-key": this.apiSecret,
       },
-      body: JSON.stringify({ number: toNumber, from_number: this.fromNumber, content }),
+      body: JSON.stringify(payload),
     });
     const body = await response.text().catch(() => "");
     if (!response.ok) {
