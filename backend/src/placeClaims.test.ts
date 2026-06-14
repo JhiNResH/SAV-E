@@ -361,7 +361,7 @@ test("enrichMaatPlaceAnalysisWithPublicWeb is env-gated and keeps deterministic 
 test("publicWebConfigFromEnv enables requested Ma'at web analysis unless explicitly disabled", () => {
   const config = publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key", GOOGLE_PLACES_API_KEY: "places-key", YELP_API_KEY: "yelp-key" });
   assert.equal(config.enabled, true);
-  assert.equal(config.model, "gemini-3.5-flash");
+  assert.equal(config.model, "gemini-2.5-flash");
   assert.equal(config.googlePlacesApiKey, "places-key");
   assert.equal(config.yelpApiKey, "yelp-key");
   assert.equal(publicWebConfigFromEnv({ GEMINI_API_KEY: "test-key", SAVE_ENABLE_MAAT_PUBLIC_WEB: "false" }).enabled, false);
