@@ -43,6 +43,33 @@ enum PlaceBusinessEnricher {
         return updated
     }
 
+    /// Fetches Google Places business photo URLs for an unsaved map candidate.
+    /// The candidate is a lightweight value type (no `Place`), so this resolves
+    /// photos by best-match search on name + coordinates. Returns `nil` if no
+    /// new photos were found. Never throws — safe for fire-and-forget `.task`.
+    static func candidatePhotoURLs(
+        for candidate: SaveMapCandidate,
+        service: GooglePlacesServiceProtocol = GooglePlacesService.shared
+    ) async -> [String]? {
+        let coordinate = CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude)
+        guard let match = await bestGoogleMatch(
+            name: candidate.title,
+            address: candidate.subtitle,
+            coordinate: coordinate,
+            service: service
+        ) else { return nil }
+
+        let details = try? await service.getPlaceDetails(placeId: match.id)
+        let photoReferences = details?.photoReferences?.isEmpty == false
+            ? details?.photoReferences ?? []
+            : [match.photoReference].compactMap { $0 }
+        let photoURLs = photoReferences
+            .prefix(6)
+            .compactMap { service.photoURL(reference: $0, maxWidth: 900) }
+            .map(\.absoluteString)
+        return photoURLs.isEmpty ? nil : photoURLs
+    }
+
     private static func businessDetails(
         for place: Place,
         service: GooglePlacesServiceProtocol
@@ -53,7 +80,13 @@ enum PlaceBusinessEnricher {
             details = try? await service.getPlaceDetails(placeId: googlePlaceId)
             fallbackMatch = nil
         } else {
-            guard let match = await bestGoogleMatch(for: place, service: service) else { return nil }
+            guard let match = await bestGoogleMatch(
+                name: place.name,
+                alternateName: place.businessLookupName,
+                address: place.address,
+                coordinate: place.coordinate,
+                service: service
+            ) else { return nil }
             details = try? await service.getPlaceDetails(placeId: match.id)
             fallbackMatch = match
         }
@@ -81,20 +114,31 @@ enum PlaceBusinessEnricher {
     }
 
     private static func bestGoogleMatch(
-        for place: Place,
+        name: String,
+        alternateName: String? = nil,
+        address: String,
+        coordinate: CLLocationCoordinate2D,
         service: GooglePlacesServiceProtocol
     ) async -> GooglePlaceMatch? {
         do {
             let matches = try await service.searchPlace(
-                query: "\(place.name) \(place.address)",
-                near: place.coordinate
+                query: "\(name) \(address)",
+                near: coordinate
             )
-            let placeLocation = CLLocation(latitude: place.latitude, longitude: place.longitude)
+            // Match against the visible name AND any alternate lookup name (e.g.
+            // a customized place keeps its original business name) so every
+            // surface resolves the same Google Place.
+            let lookupNames = [name, alternateName]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            let targetLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
             return matches.first { match in
                 let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
-                let sameArea = placeLocation.distance(from: matchLocation) < 250
-                let sameName = match.name.localizedCaseInsensitiveContains(place.name) ||
-                    place.name.localizedCaseInsensitiveContains(match.name)
+                let sameArea = targetLocation.distance(from: matchLocation) < 250
+                let sameName = lookupNames.contains { lookupName in
+                    match.name.localizedCaseInsensitiveContains(lookupName) ||
+                        lookupName.localizedCaseInsensitiveContains(match.name)
+                }
                 return sameArea || sameName
             }
         } catch {
