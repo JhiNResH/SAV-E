@@ -28,12 +28,29 @@ console.log("→ URL:", url);
 const { caption } = await fetchLinkCaption(url);
 console.log("\n→ CAPTION (first 400):\n" + (caption ? caption.slice(0, 400) : "(empty — thin/age-restricted?)"));
 
-if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GEMINI_API_KEY) {
-  console.log("\n⚠️  No GEMINI_API_KEY set — caption fetched but extraction skipped.");
-  process.exit(0);
+// Run extraction through the PRODUCTION backend proxy (which holds a working
+// Gemini key) so the local tester needs no valid GEMINI_API_KEY of its own.
+// Override with PROXY_BASE=... or set GEMINI_DIRECT=1 to use the direct API key.
+const proxyBase = process.env.PROXY_BASE ?? "https://wanderly-api-production.up.railway.app";
+async function geminiViaProxy(prompt: string): Promise<string> {
+  const gs = await fetch(`${proxyBase}/v0/guest-sessions`, { method: "POST", headers: { "content-type": "application/json" } });
+  const guest = ((await gs.json()) as { guest_token?: string }).guest_token ?? "";
+  const r = await fetch(`${proxyBase}/v0/llm/gemini-generate-content`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-save-guest-token": guest },
+    body: JSON.stringify({
+      model: "gemini-3.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    }),
+  });
+  if (!r.ok) throw new Error(`proxy gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const body = (await r.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  return body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("\n").trim() ?? "";
 }
 
-const venue = await extractVenueFromCaption(caption);
+const useDirect = process.env.GEMINI_DIRECT === "1";
+const venue = await extractVenueFromCaption(caption, useDirect ? undefined : geminiViaProxy);
 console.log("\n→ VENUE:", venue ?? "(none)");
 const reply = venue ? formatVenueReply(venue) : "Couldn't find a clear place in that one.";
 console.log("\n→ REPLY:\n" + reply);
