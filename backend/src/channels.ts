@@ -15,6 +15,7 @@ export type InboundMessage = {
   text: string;
   isOutbound: boolean;
   messageHandle: string;
+  sendblueNumber: string; // the SAV-E line it arrived on — reply FROM this
 };
 
 // Sendblue inbound webhook shape (verified live in the sllr-agent work).
@@ -24,6 +25,9 @@ export function parseInbound(body: Record<string, unknown>): InboundMessage {
     text: typeof body.content === "string" ? body.content : "",
     isOutbound: body.is_outbound === true,
     messageHandle: typeof body.message_handle === "string" ? body.message_handle : "",
+    sendblueNumber: typeof body.sendblue_number === "string" && body.sendblue_number
+      ? body.sendblue_number
+      : (typeof body.to_number === "string" ? body.to_number : ""),
   };
 }
 

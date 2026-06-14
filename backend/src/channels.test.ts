@@ -21,7 +21,7 @@ test("save/order intents carry the payload", () => {
 
 test("parseInbound maps the Sendblue shape", () => {
   const m = parseInbound({ from_number: "+1555", content: "save X", is_outbound: false, message_handle: "h1" });
-  assert.deepEqual(m, { fromNumber: "+1555", text: "save X", isOutbound: false, messageHandle: "h1" });
+  assert.deepEqual(m, { fromNumber: "+1555", text: "save X", isOutbound: false, messageHandle: "h1", sendblueNumber: "" });
 });
 
 function deps(over: Partial<ChannelDeps> = {}): ChannelDeps {
@@ -77,6 +77,6 @@ test("runInbound: unlinked number gets onboarding hint", async () => {
 });
 
 test("runInbound: ignores outbound echo", async () => {
-  const r = await runInbound({ fromNumber: "+1", text: "hi", isOutbound: true, messageHandle: "f" }, deps());
+  const r = await runInbound({ fromNumber: "+1", text: "hi", isOutbound: true, messageHandle: "f", sendblueNumber: "" }, deps());
   assert.equal(r, null);
 });

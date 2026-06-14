@@ -45,6 +45,7 @@ import {
 import { readSourceRecoveryConfigStatus } from "./sourceRecoveryConfig.js";
 import { parseInbound, runInbound } from "./channels.js";
 import { issueBuyerSession, placeOrder, myOrders, type SllrBuyer } from "./sllrCommerce.js";
+import { sendblueConfig, verifyWebhookSecret, sendMessage as sendblueSend } from "./sendblue.js";
 
 type JsonBody = Record<string, unknown>;
 type QueryValue = string | number | boolean | Date | string[] | JsonBody | JsonBody[] | null;
@@ -403,7 +404,11 @@ createServer(async (request, response) => {
 
     // SAV-E messaging channel (webhook-authed, not user-authed) — phone → SAV-E.
     if (request.method === "POST" && resource === "channels" && id === "imessage") {
+      const sbCfg = sendblueConfig();
       const body = await readJson(request);
+      if (sbCfg && !verifyWebhookSecret(sbCfg, request.headers, url, body)) {
+        return sendJson(response, { error: "Invalid webhook secret" }, 401);
+      }
       const msg = parseInbound(body);
       const reply = await runInbound(msg, {
         resolveUser: async () => {
@@ -426,6 +431,12 @@ createServer(async (request, response) => {
         defaultMerchantId: process.env.SLLR_DEFAULT_MERCHANT?.trim() || "raposa-coffee",
         seen: channelSeen,
       });
+      if (sbCfg && reply && msg.fromNumber) {
+        // Fire-and-forget: text the reply back on SAV-E's line.
+        sendblueSend(sbCfg, msg.fromNumber, reply, msg.sendblueNumber).catch((error) =>
+          console.error("[sendblue] reply failed:", error instanceof Error ? error.message : error),
+        );
+      }
       return sendJson(response, { reply }, 200);
     }
 
