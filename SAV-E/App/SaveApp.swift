@@ -31,6 +31,11 @@ struct SaveApp: App {
         if ProcessInfo.processInfo.arguments.contains("--uitest-reset-onboarding") {
             UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
         }
+        // Keep the first-run map coachmark tour out of UI tests / smoke runs so
+        // it never traps focus over the map under test.
+        if ProcessInfo.processInfo.arguments.contains("--skip-map-tour") {
+            UserDefaults.standard.set(true, forKey: "hasSeenMapTour")
+        }
 #endif
     }
 

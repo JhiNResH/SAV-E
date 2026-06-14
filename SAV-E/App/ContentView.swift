@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var drawerVM = AIDrawerViewModel()
     @Environment(\.appLanguageSettings) private var languageSettings
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("hasSeenMapTour") private var hasSeenMapTour = false
     @State private var drawerDetent: PresentationDetent = .fraction(0.34)
     @State private var mapDetailDrawerItem: MapDetailDrawerItem?
 
@@ -142,6 +143,23 @@ struct ContentView: View {
                 drawerVM.mapCandidates = mapVM.mapCandidates
                 await mapVM.loadPlaces()
             }
+            .fullScreenCover(isPresented: shouldShowMapTour) {
+                MapCoachmarkTour {
+                    hasSeenMapTour = true
+                }
+                .environment(\.appLanguageSettings, languageSettings)
+                .presentationBackground(.clear)
+            }
+    }
+
+    /// First-run gate: the guided tour shows once, the first time the user is
+    /// actually on the map (this view only renders post-auth). Setting
+    /// `hasSeenMapTour` true on dismissal keeps it from ever showing again.
+    private var shouldShowMapTour: Binding<Bool> {
+        Binding(
+            get: { !hasSeenMapTour },
+            set: { if !$0 { hasSeenMapTour = true } }
+        )
     }
 
     private func refreshSelectedMapDetailPlace(from places: [Place]) {
