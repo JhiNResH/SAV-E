@@ -16,7 +16,8 @@ import {
   phraseDiscovery,
   type GeminiCaller,
   type DiscoveredPlace,
-  type PendingStore,
+  type ConversationStore,
+  type ConversationState,
 } from "./sendblueBot.js";
 import type { ExtractedVenue } from "./sendblueBot.js";
 import type { ListOpts, SavedPlace, SendbluePlaceStore } from "./sendbluePlaceStore.js";
@@ -383,23 +384,49 @@ test("webhook flow: discovery with no location asks where you are", async () => 
 test("decideRecall: a bare location resumes the pending discovery query", async () => {
   let sawContext = false;
   const gemini: GeminiCaller = async (prompt) => {
-    sawContext = prompt.includes("CONVERSATION CONTEXT");
+    sawContext = prompt.includes("LOCATION FOLLOW-UP");
     return JSON.stringify({ search: { query: "coffee", area: "Tustin" } });
   };
-  const decision = await decideRecall("Tustin", [], gemini, false, "coffee");
+  const decision = await decideRecall("Tustin", [], gemini, false, { pendingQuery: "coffee" });
   assert.equal(sawContext, true);
   assert.deepEqual(decision, { kind: "search", query: "coffee", area: "Tustin" });
 });
 
+test("decideRecall: a follow-up about a recommended place is grounded in its data", async () => {
+  let sawRecent = false;
+  const gemini: GeminiCaller = async (prompt) => {
+    sawRecent = prompt.includes("RECENTLY RECOMMENDED") && prompt.includes("Ayer Coffee");
+    return JSON.stringify({
+      reply: "I don't have Ayer Coffee's menu, but it's rated 4.8★ — want me to save it?",
+    });
+  };
+  const decision = await decideRecall("what's their best coffee", [], gemini, false, {
+    lastPlaces: [{ name: "Ayer Coffee", rating: 4.8, address: "Tustin" }],
+  });
+  assert.equal(sawRecent, true);
+  assert.equal(decision?.kind, "reply");
+});
+
+// Minimal in-memory ConversationStore for webhook tests.
+function fakeConversation(): { store: ConversationStore; map: Map<string, ConversationState> } {
+  const map = new Map<string, ConversationState>();
+  const get = (p: string) => map.get(p);
+  const store: ConversationStore = {
+    get,
+    setPending: (p, q) => map.set(p, { ...(get(p) ?? { at: 0 }), pendingQuery: q, at: 0 }),
+    setPlaces: (p, places) => map.set(p, { ...(get(p) ?? { at: 0 }), lastPlaces: places.slice(0, 5), at: 0 }),
+    clearPending: (p) => {
+      const v = get(p);
+      if (v) map.set(p, { ...v, pendingQuery: undefined, at: 0 });
+    },
+  };
+  return { store, map };
+}
+
 test("webhook flow: ask location → bare place name resumes search (conversation memory)", async () => {
   const client = new FakeSendblueClient();
   const store = new FakeStore();
-  const m = new Map<string, { query: string; at: number }>();
-  const pending: PendingStore = {
-    get: (p) => m.get(p),
-    set: (p, q) => void m.set(p, { query: q, at: 0 }),
-    clear: (p) => void m.delete(p),
-  };
+  const { store: conversation, map } = fakeConversation();
   let searched = "";
   const placesSearch = async (q: string): Promise<DiscoveredPlace[]> => {
     searched = q;
@@ -407,26 +434,46 @@ test("webhook flow: ask location → bare place name resumes search (conversatio
   };
   const gemini: GeminiCaller = async (prompt) => {
     if (prompt.includes("Results:")) return JSON.stringify({ reply: "Try Kean Coffee in Tustin ☕" });
-    if (prompt.includes("CONVERSATION CONTEXT")) return JSON.stringify({ search: { query: "coffee", area: "Tustin" } });
+    if (prompt.includes("LOCATION FOLLOW-UP")) return JSON.stringify({ search: { query: "coffee", area: "Tustin" } });
     return JSON.stringify({ search: { query: "coffee", area: null } });
   };
 
   // Turn 1: "find coffee nearby" → asks for location, sets pending.
   const t1 = await processSendblueInbound(
     { from_number: "+15557779999", content: "find me coffee nearby" },
-    { client, store, gemini, placesSearch, pending },
+    { client, store, gemini, placesSearch, conversation },
   );
   assert.match(t1.reply ?? "", /Where are you|你現在在哪/);
-  assert.equal(m.get("+15557779999")?.query, "coffee");
+  assert.equal(map.get("+15557779999")?.pendingQuery, "coffee");
 
-  // Turn 2: bare "Tustin" → resumes the pending coffee search.
+  // Turn 2: bare "Tustin" → resumes the pending coffee search + remembers the result.
   const t2 = await processSendblueInbound(
     { from_number: "+15557779999", content: "Tustin" },
-    { client, store, gemini, placesSearch, pending },
+    { client, store, gemini, placesSearch, conversation },
   );
   assert.match(searched, /coffee in Tustin/);
   assert.equal(t2.reply, "Try Kean Coffee in Tustin ☕");
-  assert.equal(m.get("+15557779999"), undefined); // cleared after resume
+  assert.equal(map.get("+15557779999")?.pendingQuery, undefined); // pending cleared
+  assert.equal(map.get("+15557779999")?.lastPlaces?.[0]?.name, "Kean Coffee"); // remembered
+});
+
+test("webhook flow: follow-up about the recommended place is answered (not 'not saved')", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  // Seed: the bot already recommended Maru Coffee to this number.
+  conversation.setPlaces("+15551230000", [{ name: "Maru Coffee", rating: 4.7, address: "Los Feliz" }]);
+  const gemini: GeminiCaller = async (prompt) => {
+    assert.ok(prompt.includes("Maru Coffee"), "recommended place must be in the prompt context");
+    return JSON.stringify({ reply: "Maru Coffee is rated 4.7★ in Los Feliz — I don't have their menu though." });
+  };
+
+  const result = await processSendblueInbound(
+    { from_number: "+15551230000", content: "what's their best coffee" },
+    { client, store, gemini, conversation },
+  );
+  assert.equal(result.replied, true);
+  assert.match(client.calls.at(-1)?.content ?? "", /Maru Coffee/);
 });
 
 test("webhook flow: agentic falls back to keyword list when model yields nothing", async () => {

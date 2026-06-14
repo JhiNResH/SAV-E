@@ -606,41 +606,57 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
 }
 
 /**
- * Per-phone conversation memory for the one multi-turn flow we have: "find
- * something nearby" -> "where are you?" -> "<location>". When we ask for a
- * location we remember the pending search query so the next message (a bare
- * place name) resumes it instead of being read as a fresh, locationless ask.
+ * Per-phone conversation memory. Two things:
+ *  - `pendingQuery`: when we ask "where are you?", the search we'll resume once
+ *    they reply with a location (so a bare "Tustin" continues the right search).
+ *  - `lastPlaces`: the places we most recently recommended/discovered, so a
+ *    follow-up ("what's their best coffee?", "address?", "save it") can be
+ *    answered about the place we just named instead of falling back to saved.
  */
-export type PendingDiscovery = { query: string; at: number };
-export interface PendingStore {
-  get(phone: string): PendingDiscovery | undefined;
-  set(phone: string, query: string): void;
-  clear(phone: string): void;
+export type ConversationState = {
+  pendingQuery?: string;
+  lastPlaces?: DiscoveredPlace[];
+  at: number;
+};
+export interface ConversationStore {
+  get(phone: string): ConversationState | undefined;
+  setPending(phone: string, query: string): void;
+  setPlaces(phone: string, places: DiscoveredPlace[]): void;
+  /** Clear the pending location only; keep lastPlaces for follow-ups. */
+  clearPending(phone: string): void;
 }
 
-const PENDING_TTL_MS = 10 * 60 * 1000;
+const CONVERSATION_TTL_MS = 10 * 60 * 1000;
 
-class InMemoryPendingStore implements PendingStore {
-  private readonly map = new Map<string, PendingDiscovery>();
-  get(phone: string): PendingDiscovery | undefined {
+class InMemoryConversationStore implements ConversationStore {
+  private readonly map = new Map<string, ConversationState>();
+  get(phone: string): ConversationState | undefined {
     const v = this.map.get(phone);
     if (!v) return undefined;
-    if (Date.now() - v.at > PENDING_TTL_MS) {
+    if (Date.now() - v.at > CONVERSATION_TTL_MS) {
       this.map.delete(phone);
       return undefined;
     }
     return v;
   }
-  set(phone: string, query: string): void {
-    this.map.set(phone, { query, at: Date.now() });
+  private merge(phone: string, patch: Partial<ConversationState>): void {
+    const prev = this.get(phone) ?? { at: Date.now() };
+    this.map.set(phone, { ...prev, ...patch, at: Date.now() });
   }
-  clear(phone: string): void {
-    this.map.delete(phone);
+  setPending(phone: string, query: string): void {
+    this.merge(phone, { pendingQuery: query });
+  }
+  setPlaces(phone: string, places: DiscoveredPlace[]): void {
+    this.merge(phone, { lastPlaces: places.slice(0, 5) });
+  }
+  clearPending(phone: string): void {
+    const prev = this.get(phone);
+    if (prev) this.map.set(phone, { ...prev, pendingQuery: undefined, at: Date.now() });
   }
 }
 
-/** Process-wide pending-discovery memory (single Railway instance, 10-min TTL). */
-export const defaultPendingStore: PendingStore = new InMemoryPendingStore();
+/** Process-wide conversation memory (single Railway instance, 10-min TTL). */
+export const defaultConversationStore: ConversationStore = new InMemoryConversationStore();
 
 /**
  * The agentic decision for a no-URL message: either answer from the user's saved
@@ -662,8 +678,10 @@ export async function decideRecall(
   places: SavedPlace[],
   gemini: GeminiCaller = defaultGeminiText,
   chinese = false,
-  pendingQuery?: string,
+  convo?: { pendingQuery?: string; lastPlaces?: DiscoveredPlace[] },
 ): Promise<RecallDecision | null> {
+  const pendingQuery = convo?.pendingQuery;
+  const lastPlaces = convo?.lastPlaces ?? [];
   const context =
     places.length > 0
       ? places
@@ -681,14 +699,25 @@ export async function decideRecall(
   // pending discovery), a bare "Tustin" / "92782" / "i'm in Culver City" reply
   // must RESUME that search, not be treated as a fresh, locationless message.
   const pendingBlock = pendingQuery
-    ? `\nCONVERSATION CONTEXT: You just asked the user where they are, because they want to find: "${pendingQuery}". If their message below is a location (city, neighborhood, ZIP code, or address) — even just a bare place name — return {"search":{"query":"${pendingQuery}","area":"<that location>"}}. Only ignore this if they clearly changed the subject.\n`
+    ? `\nLOCATION FOLLOW-UP: You just asked the user where they are, because they want to find: "${pendingQuery}". If their message below is a location (city, neighborhood, ZIP code, or address) — even just a bare place name — return {"search":{"query":"${pendingQuery}","area":"<that location>"}}. Only ignore this if they clearly changed the subject.\n`
     : "";
+  const recentBlock =
+    lastPlaces.length > 0
+      ? `\nRECENTLY RECOMMENDED to this user (you may answer follow-ups about these — "it", "their", "that place" refer here):\n${lastPlaces
+          .map((p, i) => {
+            const bits = [p.name];
+            if (typeof p.rating === "number") bits.push(`${p.rating}★`);
+            if (p.address) bits.push(p.address);
+            return `${i + 1}. ${bits.join(" — ")}`;
+          })
+          .join("\n")}\nWhen they ask about one of these, answer with {"reply"} using ONLY this known data (name/rating/address). If they ask something you do NOT have (e.g. menu items, "best coffee", prices), say honestly you don't have that detail, then offer what you do have (rating/address) or to save it. NEVER make up menu/details.\n`
+      : "";
   const prompt = `You are SAV-E, a friend who remembers places the user saved from Instagram/TikTok and can also find NEW places nearby. Decide EXACTLY ONE action:
 
-1. Answer from their saved places (list them, recommend one of them, or answer a question about them). Use ONLY the saved list — NEVER invent a saved place. Return {"reply":"<message>"}.
-2. Find NEW places nearby — when they want a recommendation for somewhere they have NOT saved (e.g. "somewhere nearby", "anywhere else", "that one's too far", "find me a coffee place", "推薦附近的") AND a location is given or clearly known. Return {"search":{"query":"<2-4 word search like 'coffee' or 'ramen'>","area":"<the location, e.g. 'Santa Monica'>"}}.
+1. Answer from their saved places OR about a place you recently recommended (see below). Use ONLY known data — NEVER invent a place, menu, or detail. Return {"reply":"<message>"}.
+2. Find NEW places nearby — when they want a recommendation for somewhere not yet known (e.g. "somewhere nearby", "anywhere else", "that one's too far", "find me a coffee place", "推薦附近的") AND a location is given or clearly known. Return {"search":{"query":"<2-4 word search like 'coffee' or 'ramen'>","area":"<the location, e.g. 'Santa Monica'>"}}.
 3. They want something nearby but gave NO location yet. Return {"search":{"query":"<2-4 word search>","area":null}} — a null area signals we still need their location. Do NOT phrase this as a reply.
-${pendingBlock}
+${pendingBlock}${recentBlock}
 Keep any reply to 1-3 short sentences (a text message), in ${lang}, at most one emoji.
 
 The user's saved places:
@@ -829,8 +858,8 @@ export type ProcessDeps = {
   gemini?: GeminiCaller;
   /** Google Places search for nearby DISCOVERY. Defaults to defaultPlacesSearch. */
   placesSearch?: PlacesSearch;
-  /** Pending-discovery memory for the ask-location multi-turn. Defaults to the module singleton. */
-  pending?: PendingStore;
+  /** Conversation memory (pending location + last recommended places). Defaults to the module singleton. */
+  conversation?: ConversationStore;
   client: Pick<SendblueClient, "sendMessage" | "markRead" | "sendTypingIndicator">;
   store: SendbluePlaceStore;
   /** Place an SLL-R order for this number; returns the reply, or null to fall
@@ -964,27 +993,33 @@ export async function processSendblueInbound(
       } catch (storeError) {
         console.error("[sendblue] store.list error", storeError);
       }
-      // Conversation memory: if we previously asked this number for a location,
-      // pass the pending search query so a bare "Tustin" / "92782" resumes it.
-      const pendingStore = deps.pending ?? defaultPendingStore;
-      const pending = pendingStore.get(from);
-      const decision = await decideRecall(text, places, deps.gemini, chinese, pending?.query);
+      // Conversation memory: pass the pending location query (so a bare "Tustin"
+      // resumes the right search) AND the last places we recommended (so a
+      // follow-up like "what's their best coffee?" is answered about that place).
+      const convoStore = deps.conversation ?? defaultConversationStore;
+      const convo = convoStore.get(from);
+      const decision = await decideRecall(text, places, deps.gemini, chinese, {
+        pendingQuery: convo?.pendingQuery,
+        lastPlaces: convo?.lastPlaces,
+      });
       if (!decision) {
-        pendingStore.clear(from);
+        convoStore.clearPending(from);
         console.log(`[sendblue] agentic empty → keyword fallback for ${from}`);
         reply = await keywordRecallReply(text, from, chinese, deps.store);
       } else if (decision.kind === "reply") {
-        pendingStore.clear(from);
-        console.log(`[sendblue] agentic reply for ${from} placeCount=${places.length}`);
+        convoStore.clearPending(from);
+        console.log(
+          `[sendblue] agentic reply for ${from} placeCount=${places.length} recentPlaces=${convo?.lastPlaces?.length ?? 0}`,
+        );
         reply = decision.reply;
       } else if (!decision.area) {
         // Wants nearby but gave no location → remember the query and ask where.
-        pendingStore.set(from, decision.query);
+        convoStore.setPending(from, decision.query);
         console.log(`[sendblue] discovery wants location from ${from} (pending="${decision.query}")`);
         reply = askLocationReply(chinese);
       } else {
         // Discovery: search Google for NEW places near the given area.
-        pendingStore.clear(from);
+        convoStore.clearPending(from);
         const search = deps.placesSearch ?? defaultPlacesSearch;
         let found: DiscoveredPlace[] = [];
         try {
@@ -994,11 +1029,15 @@ export async function processSendblueInbound(
         }
         console.log(
           `[sendblue] discovery query="${decision.query}" area="${decision.area}" results=${found.length}` +
-            (pending ? ` (resumed pending)` : ""),
+            (convo?.pendingQuery ? ` (resumed pending)` : ""),
         );
-        reply = found.length
-          ? await phraseDiscovery(decision.query, decision.area, found, deps.gemini, chinese)
-          : noDiscoveryReply(decision.area, chinese);
+        if (found.length) {
+          // Remember what we recommended so follow-ups can ask about it.
+          convoStore.setPlaces(from, found);
+          reply = await phraseDiscovery(decision.query, decision.area, found, deps.gemini, chinese);
+        } else {
+          reply = noDiscoveryReply(decision.area, chinese);
+        }
       }
     } else {
       // No LLM injected (e.g. tests): deterministic keyword recall.
