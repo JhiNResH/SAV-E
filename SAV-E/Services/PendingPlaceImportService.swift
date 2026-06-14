@@ -315,6 +315,14 @@ struct PendingReviewCandidate: Codable {
     var isPlaceBearingSource: Bool {
         reviewState == "place_bearing_source"
     }
+
+    /// A thin venue stem split off a caption location pin ("📍Ulaman, Bali,
+    /// Indonesia" → "Ulaman"): a real place anchor, but only a stem with no
+    /// address/coordinates, so it should trigger public-search recovery for the
+    /// official name rather than being treated as a confirmed venue.
+    var isCaptionPinVenueStem: Bool {
+        missingInfo.contains("Venue stem from caption pin; confirm exact name/address before saving")
+    }
 }
 
 struct PlaceReviewCandidate: Identifiable, Codable, Hashable {
