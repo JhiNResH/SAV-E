@@ -712,3 +712,18 @@ create trigger update_work_orders_updated_at before update on work_orders
 drop trigger if exists update_workflow_runs_updated_at on workflow_runs;
 create trigger update_workflow_runs_updated_at before update on workflow_runs
     for each row execute procedure update_updated_at();
+
+-- Messaging channel bindings: phone/handle -> SAV-E user. Lets an inbound
+-- message (SAV-E iMessage line) resolve to the right account.
+create table if not exists user_channels (
+    id uuid primary key default gen_random_uuid(),
+    user_id text references profiles(id) on delete cascade not null,
+    channel_type text not null default 'imessage',
+    channel_id text not null,
+    verified boolean not null default true,
+    created_at timestamptz not null default now(),
+    constraint user_channels_type_check check (channel_type in ('imessage', 'sms', 'whatsapp')),
+    unique (channel_type, channel_id)
+);
+
+create index if not exists idx_user_channels_user on user_channels(user_id);

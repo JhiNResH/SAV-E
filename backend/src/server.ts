@@ -411,12 +411,16 @@ createServer(async (request, response) => {
       }
       const msg = parseInbound(body);
       const reply = await runInbound(msg, {
-        resolveUser: async () => {
-          // v0: a single configured test user (no user_channels table yet, #4).
-          const testUser = process.env.SAVE_TEST_USER_ID?.trim();
-          if (!testUser) return null;
-          await ensureProfile(testUser);
-          return { userId: testUser, buyer: await sllrBuyerFor(testUser) };
+        resolveUser: async (fromNumber) => {
+          // Real phone -> user via user_channels; SAVE_TEST_USER_ID is a dev fallback.
+          const { rows } = await pool.query(
+            "select user_id from user_channels where channel_type = 'imessage' and channel_id = $1 and verified = true limit 1",
+            [fromNumber],
+          );
+          const userId = (rows[0]?.user_id as string | undefined) ?? process.env.SAVE_TEST_USER_ID?.trim();
+          if (!userId) return null;
+          await ensureProfile(userId);
+          return { userId, buyer: await sllrBuyerFor(userId) };
         },
         saveMemory: async (userId, text) => {
           const title = text.split("\n")[0].slice(0, 80);
@@ -479,6 +483,20 @@ createServer(async (request, response) => {
     }
     if (resource === "agents") {
       return await handleAgents(request, response, segments.slice(1), url, userId);
+    }
+    // Link the signed-in user's phone to their account (so SAV-E iMessage maps to
+    // them). The app calls this; the inbound webhook then resolves via user_channels.
+    if (request.method === "POST" && resource === "channels" && id === "link") {
+      const linkBody = await readJson(request);
+      const channelId = String(linkBody.channel_id ?? linkBody.phone ?? "").trim();
+      if (!channelId) return sendJson(response, { error: "channel_id (phone) required" }, 400);
+      const channelType = String(linkBody.channel_type ?? "imessage");
+      await pool.query(
+        `insert into user_channels (user_id, channel_type, channel_id, verified) values ($1, $2, $3, true)
+         on conflict (channel_type, channel_id) do update set user_id = excluded.user_id, verified = true`,
+        [userId, channelType, channelId],
+      );
+      return sendJson(response, { product: "SAV-E channel link", linked: { channel_type: channelType, channel_id: channelId } }, 201);
     }
 
     return sendJson(response, { error: "Not found" }, 404);
