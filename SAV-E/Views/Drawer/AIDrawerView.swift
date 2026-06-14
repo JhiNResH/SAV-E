@@ -2347,30 +2347,12 @@ private struct SavedMapDetailDrawerContent: View {
     @State private var editName = ""
     @State private var editAddress = ""
     @State private var editError: String?
-    @State private var maatAnalysis: MaatPlaceAnalysisResponse?
-    @State private var maatAnalysisPlaceId: UUID?
-    @State private var maatAnalysisError: String?
-    @State private var loadingMaatAnalysisPlaceId: UUID?
 
     private var detailPlace: Place {
         if let enrichedPlace, enrichedPlace.id == place.id {
             return enrichedPlace
         }
         return place
-    }
-
-    private var currentMaatAnalysis: MaatPlaceAnalysisResponse? {
-        guard maatAnalysis?.placeId == detailPlace.id else { return nil }
-        return maatAnalysis
-    }
-
-    private var currentMaatAnalysisError: String? {
-        guard maatAnalysisPlaceId == detailPlace.id else { return nil }
-        return maatAnalysisError
-    }
-
-    private var isLoadingMaatAnalysis: Bool {
-        loadingMaatAnalysisPlaceId == detailPlace.id
     }
 
     var body: some View {
@@ -2392,16 +2374,6 @@ private struct SavedMapDetailDrawerContent: View {
 
             PlaceBasicInfoPanel(place: detailPlace)
             PlaceInsightSummaryPanel(place: detailPlace, fallbackSummary: memorySummary)
-            SavePlaceInsightsPanel(
-                place: detailPlace,
-                analysis: currentMaatAnalysis,
-                isLoading: isLoadingMaatAnalysis,
-                error: currentMaatAnalysisError,
-                languageSettings: languageSettings
-            ) {
-                Task { await loadMaatAnalysis(force: true) }
-            }
-            PlaceSourceEvidencePanel(place: detailPlace)
             if isEditingPlace {
                 placeEditor
             }
@@ -2481,51 +2453,12 @@ private struct SavedMapDetailDrawerContent: View {
             Text(languageSettings.localized(english: "This removes the Map Stamp from SAV-E.", traditionalChinese: "這會從 SAV-E 移除這個地圖章。"))
         }
         .task(id: place.id) {
-            resetMaatAnalysis(for: place.id)
             await enrichBusinessDetails()
-            await loadMaatAnalysis()
         }
     }
 
     private var memorySummary: String {
         detailPlace.memorySummary(language: languageSettings.language)
-    }
-
-    private func resetMaatAnalysis(for placeId: UUID) {
-        guard maatAnalysisPlaceId != placeId else { return }
-        maatAnalysis = nil
-        maatAnalysisError = nil
-        maatAnalysisPlaceId = placeId
-        loadingMaatAnalysisPlaceId = nil
-    }
-
-    private func loadMaatAnalysis(force: Bool = false) async {
-        let placeId = detailPlace.id
-        resetMaatAnalysis(for: placeId)
-        guard force || maatAnalysis?.placeId != placeId else { return }
-        loadingMaatAnalysisPlaceId = placeId
-        maatAnalysisError = nil
-        defer {
-            if loadingMaatAnalysisPlaceId == placeId {
-                loadingMaatAnalysisPlaceId = nil
-            }
-        }
-
-        do {
-            let analysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
-                for: placeId,
-                includePrivateEvidence: false,
-                includePublicWeb: true
-            )
-            guard maatAnalysisPlaceId == placeId, analysis.placeId == placeId else { return }
-            maatAnalysis = analysis
-        } catch SupabaseError.notConfigured {
-            guard maatAnalysisPlaceId == placeId else { return }
-            maatAnalysis = nil
-        } catch {
-            guard maatAnalysisPlaceId == placeId else { return }
-            maatAnalysisError = error.localizedDescription
-        }
     }
 
     private func enrichBusinessDetails() async {
@@ -2702,85 +2635,6 @@ private struct SavedMapDetailDrawerContent: View {
             try await onDeletePlace()
         } catch {
             deleteError = error.localizedDescription
-        }
-    }
-}
-
-private struct PlaceSourceEvidencePanel: View {
-    @Environment(\.appLanguageSettings) private var languageSettings
-    @Environment(\.openURL) private var openURL
-    let place: Place
-
-    private var sourceURL: URL? {
-        place.primarySourceURL
-    }
-
-    private var sourcePlatform: SourcePlatform {
-        SourcePlatform.from(urlString: sourceURL?.absoluteString)
-    }
-
-    private var sourceTitle: String {
-        switch sourcePlatform {
-        case .instagram:
-            return languageSettings.localized(english: "Instagram Reel or post", traditionalChinese: "Instagram Reel 或貼文")
-        case .googleMaps:
-            return languageSettings.localized(english: "Google Maps source", traditionalChinese: "Google Maps 來源")
-        case .threads:
-            return "Threads"
-        case .xiaohongshu:
-            return "Xiaohongshu"
-        case .douyin:
-            return "Douyin"
-        case .dianping:
-            return "Dianping"
-        case .amap:
-            return "Amap"
-        case .baidu:
-            return "Baidu Maps"
-        case .other:
-            return languageSettings.localized(english: "Original source", traditionalChinese: "原始來源")
-        }
-    }
-
-    private var sourceSubtitle: String {
-        if let handle = place.savedSourceHandle?.trimmingCharacters(in: .whitespacesAndNewlines), !handle.isEmpty {
-            return handle.hasPrefix("@") ? handle : "@\(handle)"
-        }
-        return languageSettings.localized(
-            english: "Open the public source attached to this Map Stamp.",
-            traditionalChinese: "打開這個地圖章附上的公開來源。"
-        )
-    }
-
-    var body: some View {
-        if let sourceURL {
-            Button {
-                openURL(sourceURL)
-            } label: {
-                HStack(spacing: 10) {
-                    SaveMemoryBadge(state: .clue, size: 36)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(sourceTitle)
-                            .font(.subheadline.weight(.black))
-                            .foregroundColor(.saveInk)
-                        Text(sourceSubtitle)
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.saveCocoa.opacity(0.72))
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Image(systemName: sourcePlatform == .instagram ? "play.rectangle.fill" : "arrow.up.right")
-                        .font(.subheadline.weight(.black))
-                        .foregroundColor(.saveCocoa)
-                }
-                .padding(10)
-                .background(Color.saveSky.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.saveNotebookLine.opacity(0.42), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
         }
     }
 }
@@ -4168,6 +4022,16 @@ private struct UnsavedMapCandidateCard: View {
     var candidate: SaveMapCandidate
     var isWorking: Bool
     var onSave: () -> Void
+    @State private var enrichedPhotoURLStrings: [String]?
+
+    /// Photos shown by the carousel: prefers freshly enriched Google Places
+    /// photos, otherwise falls back to whatever the candidate already carries.
+    private var displayPhotoURLStrings: [String] {
+        if let enrichedPhotoURLStrings, !enrichedPhotoURLStrings.isEmpty {
+            return enrichedPhotoURLStrings
+        }
+        return candidate.businessPhotoURLStrings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -4204,7 +4068,7 @@ private struct UnsavedMapCandidateCard: View {
             }
             .padding(.vertical, 2)
 
-            PlaceBusinessPhotoCarousel(imageURLs: candidate.businessPhotoURLStrings)
+            PlaceBusinessPhotoCarousel(imageURLs: displayPhotoURLStrings)
 
             UnsavedCandidateGlassSection(title: languageSettings.localized(english: "Basic info", traditionalChinese: "基本資訊"), systemImage: "info.circle.fill") {
                 VStack(spacing: 8) {
@@ -4239,6 +4103,21 @@ private struct UnsavedMapCandidateCard: View {
         }
         .padding(.horizontal, 2)
         .opacity(isWorking ? 0.65 : 1)
+        .task(id: candidate.id) {
+            await enrichCandidatePhotos()
+        }
+    }
+
+    /// Fire-and-forget photo enrichment so unsaved candidates show business
+    /// photos too. Never blocks the card; the carousel shows its "Finding
+    /// business photo" placeholder until URLs arrive, and stays graceful on
+    /// failure (we simply keep whatever the candidate already had).
+    private func enrichCandidatePhotos() async {
+        guard candidate.businessPhotoURLStrings.count < 2 else { return }
+        let candidateID = candidate.id
+        guard let urls = await PlaceBusinessEnricher.candidatePhotoURLs(for: candidate) else { return }
+        guard candidate.id == candidateID else { return }
+        enrichedPhotoURLStrings = urls
     }
 
     private var ratingText: String {

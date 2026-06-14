@@ -10,10 +10,6 @@ struct PlaceBottomSheet: View {
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
     @State private var deleteError: String?
-    @State private var maatAnalysis: MaatPlaceAnalysisResponse?
-    @State private var maatAnalysisPlaceId: UUID?
-    @State private var maatAnalysisError: String?
-    @State private var isLoadingMaatAnalysis = false
     @State private var enrichedPlace: Place?
 
     /// Place rendered by the sheet: prefers the background-enriched copy so
@@ -85,15 +81,6 @@ struct PlaceBottomSheet: View {
 
             PlaceBasicInfoPanel(place: displayPlace)
             PlaceInsightSummaryPanel(place: displayPlace, fallbackSummary: memorySummary)
-            SavePlaceInsightsPanel(
-                place: displayPlace,
-                analysis: maatAnalysis,
-                isLoading: isLoadingMaatAnalysis,
-                error: maatAnalysisError,
-                languageSettings: languageSettings
-            ) {
-                Task { await loadMaatAnalysis(force: true) }
-            }
             PlaceProofPlaceholderCard()
 
             FlowLayout(spacing: 8) {
@@ -164,9 +151,6 @@ struct PlaceBottomSheet: View {
         .padding()
         .background(PlaceDetailGlassBackground(colorScheme: colorScheme))
         .task(id: place.id) {
-            await loadMaatAnalysis()
-        }
-        .task(id: place.id) {
             await enrichBusinessDetails()
         }
         .confirmationDialog(
@@ -180,48 +164,6 @@ struct PlaceBottomSheet: View {
             Button(languageSettings.text(.cancel), role: .cancel) {}
         } message: {
             Text(languageSettings.localized(english: "This removes the Map Stamp from SAV-E.", traditionalChinese: "這會從 SAV-E 移除這個地圖章。"))
-        }
-    }
-
-    private func loadMaatAnalysis(force: Bool = false) async {
-        let placeId = place.id
-
-        if maatAnalysisPlaceId != placeId {
-            maatAnalysis = nil
-            maatAnalysisError = nil
-            // Render last-known analysis from disk instantly while we refresh.
-            if let cached = MaatAnalysisCache.shared.analysis(for: placeId) {
-                maatAnalysis = cached
-            }
-        }
-
-        // Never block the panel on the network once we already have a value
-        // (either from this session or the disk cache) unless forced.
-        guard force || maatAnalysisPlaceId != placeId || maatAnalysis == nil else { return }
-
-        // Only show the spinner when there's nothing to display yet.
-        isLoadingMaatAnalysis = maatAnalysis == nil
-        maatAnalysisError = nil
-        defer { isLoadingMaatAnalysis = false }
-
-        do {
-            let analysis = try await SupabaseService.shared.fetchPlaceMaatAnalysis(
-                for: placeId,
-                includePrivateEvidence: false,
-                includePublicWeb: true
-            )
-            maatAnalysis = analysis
-            maatAnalysisPlaceId = placeId
-            MaatAnalysisCache.shared.store(analysis, for: placeId)
-        } catch SupabaseError.notConfigured {
-            maatAnalysisPlaceId = placeId
-        } catch {
-            // Keep any cached analysis visible; only surface the error when we
-            // have nothing else to show.
-            if maatAnalysis == nil {
-                maatAnalysisError = error.localizedDescription
-            }
-            maatAnalysisPlaceId = placeId
         }
     }
 
