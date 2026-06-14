@@ -1,0 +1,39 @@
+{
+  "note": "Age-restricted Instagram reel. The IG page itself is login-walled and returns thin/empty og metadata (only the creator handle is visible). The caption + corroborating venue identity surface ONLY through public web search, not the IG page. SAV-E must run public-search recovery off the shortcode + creator handle and produce a Review Candidate (NOT an auto Map Stamp: there is no provider place id / coordinate provenance yet).",
+  "sourceUrl": "https://www.instagram.com/reel/DZHn7sKSwOE/",
+  "shortcode": "DZHn7sKSwOE",
+  "creatorHandle": "jessmelu",
+  "thinEvidenceText": "@jessmelu on Instagram",
+  "publicSearchResults": [
+    {
+      "title": "桂林阳朔良宿 / LS Hotel Liangsu Yangshuo / LS Hotel (Guilin Liangsu)",
+      "url": "https://ls-guilin-liangsu.hotel-yangshuo.com/",
+      "snippet": "POV: You wake up to a million-dollar view in the heart of Yangshuo… floor-to-ceiling windows, an infinity pool overlooking the karst peaks… No wonder LS Hotel is one of the most iconic 5-star stays in the Ten Mile Gallery district, Yangshuo, Guilin."
+    },
+    {
+      "title": "桂林阳朔良宿 LS Hotel Liangsu Yangshuo - Trivago",
+      "url": "https://www.trivago.com/ls-hotel-liangsu-yangshuo",
+      "snippet": "桂林阳朔良宿 LS Hotel Liangsu Yangshuo is located at No.49-3, Jiwodu Village, Yangshuo, China."
+    },
+    {
+      "title": "LS Hotel, Liangsu Yangshuo (@ls.hotel.guilin.china) • Instagram",
+      "url": "https://www.instagram.com/ls.hotel.guilin.china/",
+      "snippet": "📍桂林阳朔良宿 LS Hotel, Liangsu Yangshuo 🇨🇳"
+    }
+  ],
+  "expected": {
+    "sourceShape": "instagram_reel_hotel_travel",
+    "creator": "jessmelu",
+    "candidateName": "LS Hotel Liangsu Yangshuo",
+    "candidateNameLocal": "桂林阳朔良宿",
+    "area": "Yangshuo, Guilin, Guangxi, China",
+    "category": "stay",
+    "possibleAddress": "No.49-3, Jiwodu Village, Yangshuo, China",
+    "confidence": "review_candidate_not_verified_map_stamp",
+    "missing": [
+      "provider place id / map match",
+      "coordinate provenance",
+      "exact branch confirmation"
+    ]
+  }
+}

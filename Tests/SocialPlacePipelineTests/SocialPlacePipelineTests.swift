@@ -767,6 +767,122 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified place name") == true)
     }
 
+    private struct LSHotelFixture: Decodable {
+        struct Result: Decodable {
+            var title: String
+            var url: String
+            var snippet: String
+        }
+        var sourceUrl: String
+        var shortcode: String
+        var creatorHandle: String
+        var thinEvidenceText: String
+        var publicSearchResults: [Result]
+    }
+
+    private func loadLSHotelFixture() throws -> LSHotelFixture {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = repoRoot
+            .appendingPathComponent("fixtures/social-osint", isDirectory: true)
+            .appendingPathComponent("DZHn7sKSwOE_jessmelu_ls_hotel_yangshuo.json")
+        return try JSONDecoder().decode(LSHotelFixture.self, from: try Data(contentsOf: url))
+    }
+
+    /// Fixture-backed fake: returns the public-search snippets exactly as the
+    /// user supplied them, but ONLY for queries built from the shortcode or the
+    /// creator handle — proving recovery keyed off those thin-source signals.
+    private final class LSHotelSearchFake: PublicSourceSearchServiceProtocol {
+        let results: [PublicSourceSearchResult]
+        let shortcode: String
+        let handle: String
+        var queries: [String] = []
+
+        init(results: [PublicSourceSearchResult], shortcode: String, handle: String) {
+            self.results = results
+            self.shortcode = shortcode
+            self.handle = handle
+        }
+
+        func search(query: String) async throws -> [PublicSourceSearchResult] {
+            queries.append(query)
+            if query.contains(shortcode) || query.localizedCaseInsensitiveContains(handle) {
+                return results
+            }
+            return []
+        }
+    }
+
+    /// STEP 1 repro + STEP 4 acceptance. Age-restricted Instagram reel: the IG
+    /// page is login-walled and returns thin/empty metadata (only the creator
+    /// handle is visible). Before the fix this degraded to source-only with NO
+    /// public search ever running. SAV-E must instead run public-search recovery
+    /// off the shortcode + creator handle and recover the venue as a Review
+    /// Candidate — never an auto Map Stamp (no provider place id / coordinate
+    /// provenance yet).
+    func testAgeRestrictedInstagramReelRecoversHotelAsReviewCandidateFromShortcodeAndHandle() async throws {
+        let fixture = try loadLSHotelFixture()
+        let search = LSHotelSearchFake(
+            results: fixture.publicSearchResults.map {
+                PublicSourceSearchResult(title: $0.title, url: $0.url, snippet: $0.snippet)
+            },
+            shortcode: fixture.shortcode,
+            handle: fixture.creatorHandle
+        )
+        // EmptyGooglePlacesService + no place resolver => no coordinates can be
+        // fabricated; the candidate is forced to stay a Review Candidate.
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: search
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: fixture.thinEvidenceText,
+            sourceURL: fixture.sourceUrl
+        )
+
+        let candidate = try XCTUnwrap(candidates.first)
+
+        // NOT source-only (the bug): recovery ran and produced a real candidate.
+        XCTAssertFalse(candidate.isSourceOnly,
+                       "Thin/age-restricted IG metadata with a handle + shortcode must still recover via public search, not degrade to source-only")
+        // Recovery keyed off the shortcode and/or creator handle.
+        XCTAssertTrue(search.queries.contains { $0.contains(fixture.shortcode) || $0.localizedCaseInsensitiveContains(fixture.creatorHandle) },
+                      "Recovery queries should be built from the shortcode and/or creator handle, got: \(search.queries)")
+
+        // candidateName contains "LS Hotel" (or "Liangsu").
+        XCTAssertTrue(candidate.candidateName.contains("LS Hotel") || candidate.candidateName.contains("Liangsu"),
+                      "Expected recovered name to mention LS Hotel / Liangsu, got: \(candidate.candidateName)")
+        // candidateNameLocal contains 桂林阳朔良宿 / 良宿 (preserved in name or evidence).
+        let nameAndEvidence = "\(candidate.candidateName) \(candidate.evidence.joined(separator: " "))"
+        XCTAssertTrue(nameAndEvidence.contains("桂林阳朔良宿") || nameAndEvidence.contains("良宿"),
+                      "Expected local name 桂林阳朔良宿/良宿 to be preserved, got: \(candidate.candidateName)")
+        // area mentions Yangshuo/Guilin.
+        let areaText = "\(candidate.address) \(candidate.evidence.joined(separator: " "))"
+        XCTAssertTrue(areaText.localizedCaseInsensitiveContains("Yangshuo") || areaText.localizedCaseInsensitiveContains("Guilin"),
+                      "Expected area to mention Yangshuo/Guilin, got address=\(candidate.address)")
+        // category hotel (canonical category for stays in this codebase is "stay").
+        XCTAssertEqual(candidate.category, "stay",
+                       "Hotel/stay should classify as the canonical stay category, got: \(candidate.category)")
+        // possibleAddress recovered from the Trivago-style snippet.
+        XCTAssertTrue(candidate.address.contains("Jiwodu") || candidate.address.contains("Yangshuo"),
+                      "Expected possible address from snippet, got: \(candidate.address)")
+
+        // GUARDRAIL: Review Candidate, NOT a Map Stamp. No fabricated coordinates.
+        XCTAssertFalse(candidate.hasReliableCoordinates,
+                       "No provider place id / coordinate provenance yet; must stay a Review Candidate, not a Map Stamp")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertNotEqual(candidate.reviewState, "map_match_ready",
+                          "Must not be promoted to a map-ready Map Stamp without confirmed coordinates")
+        XCTAssertFalse(candidate.missingInfo.isEmpty)
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"),
+                      "missingInfo must flag coordinate provenance, got: \(candidate.missingInfo)")
+        XCTAssertTrue(candidate.evidenceDiagnostic?.missingFields.contains("Verified coordinates") == true)
+    }
+
     func testAmapRefinementPromotesChinaRestaurantCandidateToMapReady() async {
         let resolver = StubPlaceResolverService()
         let service = SocialLinkReviewCandidateService(

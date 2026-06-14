@@ -300,7 +300,17 @@ final class SocialLinkReviewCandidateService {
 
         let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
         let hasUnresolvedInitialCandidate = initial.contains { $0.reviewState == "unresolved_place_candidate" }
-        guard analysis.isPlaceBearing || analysis.resolverDecision.shouldRunPublicSearch || hasUnresolvedInitialCandidate else { return initial }
+        // Age-restricted / login-walled social posts (e.g. an Instagram reel that
+        // only returns a logged-out shell) carry no place-bearing caption, so the
+        // analysis above stays non-place-bearing and would otherwise bail to
+        // source-only. But a recognizable post shortcode plus a creator handle is
+        // enough to run public-search recovery off the public web, where the
+        // caption/venue is mirrored. Treat that as a recoverable thin source.
+        let isRecoverableThinSocialSource = hasRecoverableThinSocialSource(evidenceText: evidenceText, sourceURL: sourceURL)
+        guard analysis.isPlaceBearing
+            || analysis.resolverDecision.shouldRunPublicSearch
+            || hasUnresolvedInitialCandidate
+            || isRecoverableThinSocialSource else { return initial }
 
         let queries = sourceRecoverySearchQueries(evidenceText: evidenceText, sourceURL: sourceURL, analysis: analysis)
         let searchResults = await publicSearchResults(for: queries)
@@ -315,6 +325,24 @@ final class SocialLinkReviewCandidateService {
         if !mapReady.isEmpty { return rankedCandidates(mapReady) }
         if !refinedRecovered.isEmpty { return rankedCandidates(refinedRecovered) }
         return initial
+    }
+
+    /// A thin/age-restricted social post (login-walled Instagram reel, etc.) that
+    /// exposes no caption still carries two deterministic recovery signals: the
+    /// post shortcode (from the URL) and the visible creator handle. With both we
+    /// can search the public web — where the caption/venue is mirrored — instead
+    /// of degrading straight to a source-only receipt.
+    private func hasRecoverableThinSocialSource(evidenceText: String, sourceURL: String) -> Bool {
+        guard let descriptor = socialPostDescriptor(in: URL(string: sourceURL)),
+              !descriptor.id.isEmpty else {
+            return false
+        }
+        // Xiaohongshu short links only carry an opaque slug, not a real note id,
+        // so they intentionally stay source-only (see existing short-link path).
+        if xiaohongshuLinkContext(sourceURL: sourceURL)?.isShortLink == true {
+            return false
+        }
+        return firstSocialHandle(in: evidenceText) != nil
     }
 
     func refineCandidate(_ candidate: PendingReviewCandidate, evidenceText: String? = nil) async -> PendingReviewCandidate {
@@ -525,10 +553,19 @@ final class SocialLinkReviewCandidateService {
                     result.url.isEmpty ? "" : "Public web search URL: \(result.url)"
                 ]
             )
+            // For a thin/non-place-bearing source the intent-based category is a
+            // generic "attraction"; the recovered snippet (e.g. "5-star hotel")
+            // is a stronger signal, so prefer a text-derived category when the
+            // intent did not already classify the place.
+            let intentCategory = category(for: analysis.sourceIntent)
+            let textCategory = category(from: "\(name) \(combinedText)")
+            let resolvedCategory = intentCategory == "attraction" && textCategory != "attraction"
+                ? textCategory
+                : intentCategory
             return PendingReviewCandidate(
                 candidateName: name,
                 address: address,
-                category: category(for: analysis.sourceIntent),
+                category: resolvedCategory,
                 sourceURL: sourceURL,
                 sourceText: combinedText,
                 evidence: evidence,
@@ -581,12 +618,18 @@ final class SocialLinkReviewCandidateService {
     private func recoveredVenueNameFromSearchTitle(_ title: String) -> String? {
         let cleanedTitle = cleanHTMLText(title)
         let candidates = cleanedTitle
-            .components(separatedBy: CharacterSet(charactersIn: "|｜-–—"))
+            .components(separatedBy: CharacterSet(charactersIn: "|｜-–—/／·"))
             .map(cleanRecoveredVenueName)
-        for candidate in candidates where isUsableCandidateName(candidate) && !looksLikeMarketingLine(candidate) {
-            return candidate
+            .filter { isUsableCandidateName($0) && !looksLikeMarketingLine($0) }
+        // Prefer a Latin-named segment (e.g. "LS Hotel Liangsu Yangshuo") over a
+        // CJK-only segment so the candidate title is the international venue name;
+        // the local-language name is still preserved in the recovery evidence.
+        if let latinName = candidates.first(where: { segment in
+            segment.range(of: #"[A-Za-z]{3,}"#, options: .regularExpression) != nil
+        }) {
+            return latinName
         }
-        return nil
+        return candidates.first
     }
 
     private func sourceRecoveryAddress(from result: PublicSourceSearchResult) -> String? {
@@ -594,7 +637,12 @@ final class SocialLinkReviewCandidateService {
         let patterns = [
             #"((?:台灣)?(?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)市[^\n\r，,。；;]{0,40}\d{1,6}\s*(?:號|号)?(?:B\d|[0-9一二三四五六七八九十]+樓)?)"#,
             #"((?:台南|臺南|台北|臺北|台中|臺中|高雄|新北|桃園)市[^\n\r，,。；;]{0,50})"#,
-            #"(\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy)\b(?:,\s*[A-Za-z .'-]{2,40})?)"#
+            #"(\b\d{1,6}\s+[A-Za-z0-9 .'-]{2,80}\b(?:Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Highway|Hwy\.?|Coast Hwy)\b(?:,\s*[A-Za-z .'-]{2,40})?)"#,
+            // "... is located at No.49-3, Jiwodu Village, Yangshuo, China." —
+            // explicit address lead-in (common on hotel/booking mirrors).
+            #"(?i)(?:is\s+located\s+at|located\s+at|address\s*[:：]?)\s+([A-Za-z0-9][A-Za-z0-9 .,'\-#／/]{6,90}?(?:China|中国|中國))"#,
+            // Bare international "No.X, …, City, China" address form.
+            #"((?:No\.?\s*)?\d{1,5}[\dA-Za-z\-]*,\s*[A-Za-z .'-]{2,40}(?:,\s*[A-Za-z .'-]{2,40}){0,3},\s*(?:China|中国|中國))"#
         ]
         for pattern in patterns {
             guard let match = firstCapture(in: text, pattern: pattern) else { continue }
