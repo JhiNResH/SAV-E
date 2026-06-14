@@ -3164,6 +3164,219 @@ final class SocialPlacePipelineTests: XCTestCase {
         XCTAssertNotNil(json["candidates"])
     }
 
+    // MARK: - LLM caption -> venue extraction fallback (prose-only long tail)
+
+    private struct CaptionVenueFixture: Decodable {
+        var sourceUrl: String
+        var captionEvidenceText: String
+        var expectedName: String
+        var expectedArea: String?
+        var expectedCategory: String?
+        var expectedConfidence: Double
+    }
+
+    private func loadCaptionVenueFixture(_ fileName: String) throws -> CaptionVenueFixture {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = repoRoot
+            .appendingPathComponent("fixtures/social-osint", isDirectory: true)
+            .appendingPathComponent(fileName)
+        return try JSONDecoder().decode(CaptionVenueFixture.self, from: try Data(contentsOf: url))
+    }
+
+    /// Fake LLM extractor (no network). Returns a fixed `ExtractedVenue` only
+    /// when the caption contains the matching trigger substring; otherwise nil —
+    /// mirroring "the LLM named no venue".
+    private final class FakeCaptionVenueExtractor: SocialCaptionVenueExtractor {
+        let trigger: String
+        let venue: ExtractedVenue?
+        private(set) var captions: [String] = []
+
+        init(trigger: String, venue: ExtractedVenue?) {
+            self.trigger = trigger
+            self.venue = venue
+        }
+
+        func extractVenue(caption: String, sourceURL: String) async -> ExtractedVenue? {
+            captions.append(caption)
+            guard caption.localizedCaseInsensitiveContains(trigger) else { return nil }
+            return venue
+        }
+    }
+
+    /// FIXTURE 1: English prose caption naming "Aquarela Coffee" with no 📍/👉
+    /// marker. The deterministic marker parser rejects prose, so without the LLM
+    /// fallback this stays source-only. With the fake extractor it must produce a
+    /// Review Candidate (NOT source-only, NO coordinates, NOT a Map Stamp).
+    func testLLMCaptionFallbackRecoversAquarelaCoffeeAsReviewCandidate() async throws {
+        let fixture = try loadCaptionVenueFixture("DXzN9wsBFRw_aquarela_coffee_la.json")
+        let extractor = FakeCaptionVenueExtractor(
+            trigger: "Aquarela Coffee",
+            venue: ExtractedVenue(
+                name: fixture.expectedName,
+                area: fixture.expectedArea,
+                category: fixture.expectedCategory,
+                confidence: fixture.expectedConfidence
+            )
+        )
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: StubPublicSourceSearchService(),
+            captionVenueExtractor: extractor
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: fixture.captionEvidenceText,
+            sourceURL: fixture.sourceUrl
+        )
+        let candidate = try XCTUnwrap(candidates.first)
+
+        XCTAssertFalse(candidate.isSourceOnly,
+                       "Prose caption naming a venue must become a Review Candidate, not source-only")
+        XCTAssertTrue(candidate.candidateName.localizedCaseInsensitiveContains("Aquarela Coffee"),
+                      "Expected the LLM-extracted name, got: \(candidate.candidateName)")
+        let areaText = "\(candidate.address) \(candidate.evidence.joined(separator: " "))"
+        XCTAssertTrue(areaText.localizedCaseInsensitiveContains("Los Angeles") || areaText.localizedCaseInsensitiveContains("LA"),
+                      "Expected area to mention LA, got: \(areaText)")
+        XCTAssertEqual(candidate.category, "cafe")
+        XCTAssertTrue(candidate.evidence.contains { $0.contains("Extracted by SAV-E from caption") },
+                      "Evidence must carry the caption-extraction provenance chip")
+
+        // GUARDRAIL: Review Candidate only — no coords, no Map Stamp.
+        XCTAssertFalse(candidate.hasReliableCoordinates)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertNotEqual(candidate.reviewState, "map_match_ready")
+        XCTAssertFalse(candidate.missingInfo.isEmpty)
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
+    }
+
+    /// FIXTURE 2: Spanish prose caption naming "Tec de Monterrey" (a mirador).
+    /// Proves the multilingual path — the deterministic parser finds no marker,
+    /// the (fake) LLM reads the Spanish prose natively and returns the venue.
+    func testLLMCaptionFallbackRecoversSpanishTecMonterreyAsReviewCandidate() async throws {
+        let fixture = try loadCaptionVenueFixture("DYaCPkAxxip_tec_monterrey.json")
+        let extractor = FakeCaptionVenueExtractor(
+            trigger: "Tec de Monterrey",
+            venue: ExtractedVenue(
+                name: fixture.expectedName,
+                area: fixture.expectedArea,
+                category: fixture.expectedCategory,
+                confidence: fixture.expectedConfidence
+            )
+        )
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: StubPublicSourceSearchService(),
+            captionVenueExtractor: extractor
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: fixture.captionEvidenceText,
+            sourceURL: fixture.sourceUrl
+        )
+        let candidate = try XCTUnwrap(candidates.first)
+
+        XCTAssertFalse(candidate.isSourceOnly)
+        XCTAssertTrue(candidate.candidateName.localizedCaseInsensitiveContains("Tec de Monterrey"),
+                      "Expected the LLM-extracted name, got: \(candidate.candidateName)")
+        let areaText = "\(candidate.address) \(candidate.evidence.joined(separator: " "))"
+        XCTAssertTrue(areaText.localizedCaseInsensitiveContains("Monterrey"),
+                      "Expected area to mention Monterrey, got: \(areaText)")
+        XCTAssertEqual(candidate.category, "attraction")
+        XCTAssertFalse(candidate.hasReliableCoordinates)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertNotEqual(candidate.reviewState, "map_match_ready")
+    }
+
+    /// HALLUCINATION GUARD: the fake extractor returns a name that is NOT present
+    /// in the caption. The anti-hallucination guardrail must discard it and the
+    /// pipeline must stay source-only — no fabricated candidate.
+    func testLLMCaptionFallbackDiscardsHallucinatedNameNotInCaption() async throws {
+        // Generic prose with no marker/structured venue the deterministic parser
+        // can latch onto. The (fake) LLM "hallucinates" a specific venue name that
+        // does NOT appear anywhere in this caption.
+        let caption = "Such a magical little spot, the cozy vibes here are unmatched and the views are unreal ✨ #weekendvibes #hiddengems"
+        let extractor = FakeCaptionVenueExtractor(
+            trigger: "magical",
+            venue: ExtractedVenue(name: "Blue Bottle Coffee", area: "Los Angeles", category: "cafe", confidence: 0.9)
+        )
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: StubPublicSourceSearchService(),
+            captionVenueExtractor: extractor
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: caption,
+            sourceURL: "https://www.instagram.com/reel/DHallucination/"
+        )
+        let candidate = try XCTUnwrap(candidates.first)
+
+        XCTAssertTrue(candidate.isSourceOnly,
+                      "A name not present in the caption must be discarded, leaving a source-only receipt")
+        XCTAssertFalse(candidate.candidateName.localizedCaseInsensitiveContains("Blue Bottle"),
+                       "Hallucinated venue name must never become the candidate")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+    }
+
+    /// NO-VENUE GUARD: a caption with only generic vibes/hashtags and a fake
+    /// extractor that returns nil (the LLM named no venue) must stay source-only.
+    func testLLMCaptionFallbackStaysSourceOnlyWhenNoVenueNamed() async throws {
+        let caption = "Living my best life this weekend ✨ such good vibes #weekendmood #blessed #views"
+        let extractor = FakeCaptionVenueExtractor(trigger: "Aquarela", venue: nil) // never triggers -> nil
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: StubPublicSourceSearchService(),
+            captionVenueExtractor: extractor
+        )
+
+        let candidates = try await service.recoverReviewCandidates(
+            fromEvidenceText: caption,
+            sourceURL: "https://www.instagram.com/reel/DNoVenue/"
+        )
+        let candidate = try XCTUnwrap(candidates.first)
+
+        XCTAssertTrue(candidate.isSourceOnly,
+                      "Generic vibes/hashtags with no named venue must stay source-only")
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+    }
+
+    /// DETERMINISTIC-FIRST GUARD: when the deterministic parser already extracts a
+    /// venue (marker-driven), the LLM extractor must NOT be consulted — no cost on
+    /// the easy/structured cases and no regression to the existing IG recovery.
+    func testLLMCaptionFallbackNotCalledWhenDeterministicParserFindsVenue() async throws {
+        let extractor = FakeCaptionVenueExtractor(
+            trigger: "anything",
+            venue: ExtractedVenue(name: "Should Not Appear", area: nil, category: nil, confidence: 0.9)
+        )
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: StubGooglePlacesService(),
+            publicSourceSearchService: search,
+            captionVenueExtractor: extractor
+        )
+
+        // The Shilin sukiyaki caption is deterministically recoverable (📍 marker
+        // + public search), so the LLM fallback must never run.
+        _ = try await service.recoverReviewCandidates(
+            fromEvidenceText: """
+            俊²的美食日記 📙台北美食 (@jim.foodie.tw) • Instagram Reel
+            俊²的美食日記 📙台北美食在 Instagram: "士林📍日本人老闆開業8年的關西壽喜燒
+            #台北美食 #台北餐廳 #士林美食 #壽喜燒 #漢堡排"
+            """,
+            sourceURL: "https://www.instagram.com/reel/DVqC21VkxPv/?igsh=tracking"
+        )
+
+        XCTAssertTrue(extractor.captions.isEmpty,
+                      "Deterministic recovery succeeded; the LLM caption extractor must not be called")
+    }
+
 }
 
 private final class StubGeminiURLProtocol: URLProtocol {
