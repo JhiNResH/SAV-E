@@ -4113,10 +4113,14 @@ private struct UnsavedMapCandidateCard: View {
     /// business photo" placeholder until URLs arrive, and stays graceful on
     /// failure (we simply keep whatever the candidate already had).
     private func enrichCandidatePhotos() async {
+        // Clear any photos carried over from a previously reused card so candidate
+        // B never keeps showing candidate A's enriched photos.
+        enrichedPhotoURLStrings = nil
         guard candidate.businessPhotoURLStrings.count < 2 else { return }
-        let candidateID = candidate.id
         guard let urls = await PlaceBusinessEnricher.candidatePhotoURLs(for: candidate) else { return }
-        guard candidate.id == candidateID else { return }
+        // The .task is cancelled when candidate.id changes, so this guards against
+        // writing a stale result after the card was reused.
+        guard !Task.isCancelled else { return }
         enrichedPhotoURLStrings = urls
     }
 

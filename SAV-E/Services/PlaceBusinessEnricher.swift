@@ -82,6 +82,7 @@ enum PlaceBusinessEnricher {
         } else {
             guard let match = await bestGoogleMatch(
                 name: place.name,
+                alternateName: place.businessLookupName,
                 address: place.address,
                 coordinate: place.coordinate,
                 service: service
@@ -114,6 +115,7 @@ enum PlaceBusinessEnricher {
 
     private static func bestGoogleMatch(
         name: String,
+        alternateName: String? = nil,
         address: String,
         coordinate: CLLocationCoordinate2D,
         service: GooglePlacesServiceProtocol
@@ -123,12 +125,20 @@ enum PlaceBusinessEnricher {
                 query: "\(name) \(address)",
                 near: coordinate
             )
+            // Match against the visible name AND any alternate lookup name (e.g.
+            // a customized place keeps its original business name) so every
+            // surface resolves the same Google Place.
+            let lookupNames = [name, alternateName]
+                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
             let targetLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
             return matches.first { match in
                 let matchLocation = CLLocation(latitude: match.latitude, longitude: match.longitude)
                 let sameArea = targetLocation.distance(from: matchLocation) < 250
-                let sameName = match.name.localizedCaseInsensitiveContains(name) ||
-                    name.localizedCaseInsensitiveContains(match.name)
+                let sameName = lookupNames.contains { lookupName in
+                    match.name.localizedCaseInsensitiveContains(lookupName) ||
+                        lookupName.localizedCaseInsensitiveContains(match.name)
+                }
                 return sameArea || sameName
             }
         } catch {
