@@ -27,7 +27,7 @@ import {
 import type { SavedPlace, SendbluePlaceStore } from "./sendbluePlaceStore.js";
 
 const geminiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/models";
-const defaultGeminiModel = "gemini-3.5-flash";
+const defaultGeminiModel = "gemini-2.5-flash";
 const maxCaptionChars = 4_000;
 
 export type FetchText = (url: string) => Promise<string>;
