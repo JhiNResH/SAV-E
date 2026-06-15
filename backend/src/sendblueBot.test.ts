@@ -18,6 +18,7 @@ import {
   phrasePlaceRec,
   pickBestPlace,
   looksLikeReceipt,
+  isReceiptLink,
   extractReceipt,
   type GeminiCaller,
   type DiscoveredPlace,
@@ -1131,4 +1132,61 @@ test("pickBestPlace excludes known places and applies a category boost", () => {
   // Known excluded; with a "cafe" taste, New Cafe (4.5+0.3) edges New Diner (4.6).
   const picked = pickBestPlace(found, ["Known Cafe"], ["cafe"]);
   assert.equal(picked?.name, "New Cafe");
+});
+
+// --- Receipt LINKS (Toast/Square) → verified visit, not a saved place -----
+
+test("isReceiptLink detects POS receipt links, not social links", () => {
+  assert.equal(isReceiptLink("https://www.toasttab.com/receipts/abc123"), true);
+  assert.equal(isReceiptLink("https://squareup.com/receipt/xyz"), true);
+  assert.equal(isReceiptLink("https://order.clover.com/r/12"), true);
+  assert.equal(isReceiptLink("https://www.instagram.com/reel/ABC/"), false);
+  assert.equal(isReceiptLink("not a url"), false);
+});
+
+test("webhook flow: a forwarded Toast receipt link logs a verified visit (not a saved place)", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new FakeReceiptStore();
+  // The Toast receipt page's OG metadata names the merchant.
+  const fetchText = async () => htmlWithOG("Total $14.36", "Your Receipt for Mendocino Farms");
+  const gemini: GeminiCaller = async (prompt) =>
+    prompt.includes("is_receipt")
+      ? JSON.stringify({ is_receipt: true, merchant: "Mendocino Farms", total: "$14.36", date: null })
+      : JSON.stringify({ reply: "x" });
+
+  const result = await processSendblueInbound(
+    { from_number: "+15551112233", content: "https://www.toasttab.com/receipts/abc" },
+    { client, store, gemini, fetchText, receiptStore },
+  );
+  assert.equal(result.replied, true);
+  assert.match(client.calls.at(-1)?.content ?? "", /verified visit/i);
+  assert.match(client.calls.at(-1)?.content ?? "", /Mendocino Farms/);
+  // It was logged as a VISIT, and NOT saved as a place.
+  assert.equal(receiptStore.byPhone.get("+15551112233")?.[0]?.merchant, "Mendocino Farms");
+  assert.equal(store.byPhone.get("+15551112233"), undefined);
+});
+
+test("webhook flow: same merchant forwarded twice within 10 min is not double-counted", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new FakeReceiptStore();
+  const gemini: GeminiCaller = async (prompt) =>
+    prompt.includes("is_receipt")
+      ? JSON.stringify({ is_receipt: true, merchant: "Mendocino Farms", total: "$14.36", date: null })
+      : JSON.stringify({ reply: "x" });
+  const deps = { client, store, gemini, receiptStore };
+
+  // Msg 1: order header text.
+  await processSendblueInbound(
+    { from_number: "+15554445566", content: "Review Order #214 at Mendocino Farms" },
+    deps,
+  );
+  // Msg 2: the receipt link (same merchant, seconds later).
+  await processSendblueInbound(
+    { from_number: "+15554445566", content: "Your Receipt for Mendocino Farms — order #214" },
+    deps,
+  );
+  // Only ONE verified visit recorded (dedup), not two.
+  assert.equal(receiptStore.byPhone.get("+15554445566")?.length, 1);
 });

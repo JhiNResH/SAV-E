@@ -194,6 +194,22 @@ export function looksLikeReceipt(text: string): boolean {
   return receiptSignals.test(text);
 }
 
+// Known receipt / point-of-sale providers. A forwarded link from one of these is
+// a RECEIPT, not a social place link — fetch + extract it as a verified visit
+// instead of saving the venue. (Toast, Square, Clover, etc.)
+const receiptLinkHosts =
+  /(^|\.)(toasttab\.com|squareup\.com|square\.com|clover\.com|stripe\.com|paypal\.com|venmo\.com|grubhub\.com|doordash\.com|ubereats\.com|seamless\.com|olo\.com|chownow\.com)$/i;
+
+export function isReceiptLink(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    if (receiptLinkHosts.test(host)) return true;
+  } catch {
+    // not a parseable URL
+  }
+  return /\/receipts?\//i.test(url);
+}
+
 /**
  * Confirm + extract a receipt via Gemini. Returns null when the text is not a
  * receipt (a normal message, a place name, a question) or the model is
@@ -203,10 +219,10 @@ export async function extractReceipt(
   text: string,
   gemini: GeminiCaller = defaultGeminiText,
 ): Promise<ExtractedReceipt | null> {
-  const prompt = `Decide if this text message is a PURCHASE RECEIPT or an order / payment confirmation (from a restaurant, cafe, bar, shop, etc.). A normal chat message, a question, or a bare place name is NOT a receipt.
+  const prompt = `Decide if this text is a PURCHASE RECEIPT, an order confirmation, or a receipt page (from a restaurant, cafe, bar, shop, etc.). Signals: "receipt", "order #", "your receipt for X", a merchant + total, or text fetched from a receipt link (Toast/Square/etc.). A normal chat message, a question, or a bare place name is NOT a receipt.
 
-If it IS a receipt, extract:
-- "merchant": the business/venue name on the receipt (keep its original language).
+If it IS a receipt/order, extract (a TOTAL is OPTIONAL — an order confirmation that names the merchant still counts):
+- "merchant": the business/venue name (keep its original language). REQUIRED.
 - "total": the total amount with currency if shown (e.g. "$24.50"), else null.
 - "date": the purchase date if shown, else null.
 
@@ -1254,22 +1270,49 @@ export async function processSendblueInbound(
     // Receipt → verified visit (proof-of-visit). Checked FIRST: a receipt's
     // "thank you for your order" text must not be mistaken for an order intent.
     // Cheap heuristic gate, then the LLM confirms; only fires when wired in.
-    if (deps.receiptStore && deps.gemini && looksLikeReceipt(text)) {
-      const receipt = await extractReceipt(text, deps.gemini);
+    const receiptLink = url ? isReceiptLink(url) : false;
+    if (deps.receiptStore && deps.gemini && (receiptLink || looksLikeReceipt(text))) {
+      // A receipt can be plain text OR a link from a POS provider (Toast/Square/
+      // etc.). For a link, fetch the receipt page so its merchant/total feed the
+      // extractor — otherwise a bare receipt URL would fall through to the social
+      // place-save path and get saved as a place instead of a verified visit.
+      let receiptText = text;
+      if (receiptLink && url) {
+        try {
+          const { caption } = await fetchLinkCaption(url, deps.fetchText);
+          receiptText = `${text}\n${caption}`.trim();
+          console.log(`[sendblue] receipt link ${url} captionLen=${caption.length}`);
+        } catch (fetchErr) {
+          console.error("[sendblue] receipt link fetch error", fetchErr);
+        }
+      }
+      const receipt = await extractReceipt(receiptText, deps.gemini);
       if (receipt) {
         let count = 0;
+        let dup = false;
         try {
-          count = await deps.receiptStore.save(memoryKey, {
-            merchant: receipt.merchant,
-            total: receipt.total,
-            visitDate: receipt.date,
-            raw: text,
-          });
+          // Light dedup: the same receipt is often forwarded as two messages (an
+          // order header + the link). If the most recent visit is the SAME
+          // merchant within 10 minutes, don't double-count it.
+          const recent = await deps.receiptStore.list(memoryKey, 1);
+          const last = recent[0];
+          const freshMs = last?.createdAt ? Date.now() - last.createdAt.getTime() : Infinity;
+          if (last && freshMs < 10 * 60 * 1000 && last.merchant.toLowerCase() === receipt.merchant.toLowerCase()) {
+            dup = true;
+            count = (await deps.receiptStore.list(memoryKey, 1000)).length;
+          } else {
+            count = await deps.receiptStore.save(memoryKey, {
+              merchant: receipt.merchant,
+              total: receipt.total,
+              visitDate: receipt.date,
+              raw: receiptText,
+            });
+          }
         } catch (storeError) {
           console.error("[sendblue] receipt save error", storeError);
         }
         console.log(
-          `[sendblue] receipt merchant="${receipt.merchant}" total="${receipt.total ?? ""}" count=${count}`,
+          `[sendblue] receipt merchant="${receipt.merchant}" total="${receipt.total ?? ""}" count=${count} dup=${dup} link=${receiptLink}`,
         );
         // Arm a receipt-gated review: the next message is read as a review of
         // this exact (verified) merchant.
