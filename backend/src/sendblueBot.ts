@@ -864,7 +864,7 @@ export async function decideRecall(
 4. The message is ONLY a location (a bare address, city, neighborhood, or ZIP) with no request, AND there is no pending search to resume. Return {"location":{"area":"<that location>"}} — never just acknowledge it in a reply; this records where they are for next time.
 ${pendingBlock}${recentBlock}${
     lastArea
-      ? `\nLAST KNOWN LOCATION: the user is near "${lastArea}". For a follow-up like "something else", "anything closer", "still too far", or "what else" — reuse this location and return a search there. Do NOT ask for their location again unless they say they moved or give a new place.\n`
+      ? `\nLAST KNOWN LOCATION: the user is already near "${lastArea}". For ANY nearby request — "recommend a boba place", "find me coffee", "something else", "anything closer", "what else" — REUSE this location: return {"search":{"query":"<what they want>","area":"${lastArea}"}}. Do NOT ask where they are again (do NOT return a null area) unless they give a new place or say they moved.\n`
       : ""
   }
 Keep any reply to 1-3 short sentences (a text message), in ${lang}, at most one emoji.
