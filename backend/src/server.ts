@@ -121,12 +121,25 @@ create index if not exists user_channels_profile_idx
 // buyer (the cross-merchant receipt graph). Persisted so a phone keeps the same
 // buyerId (and saved card / recurring) across restarts.
 const sllrBuyers = new SllrBuyerStore(pool);
+// Serialize buyer creation per fromNumber so two concurrent requests can't both
+// miss get(), both issueBuyerSession(), and split buyer identity via overwriting set().
+const sllrBuyerCreations = new Map<string, Promise<SllrBuyer>>();
 async function getOrCreateSllrBuyer(fromNumber: string): Promise<SllrBuyer> {
   const existing = await sllrBuyers.get(fromNumber);
   if (existing) return existing;
-  const buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
-  await sllrBuyers.set(fromNumber, buyer);
-  return buyer;
+  const inFlight = sllrBuyerCreations.get(fromNumber);
+  if (inFlight) return inFlight;
+  const creation = (async () => {
+    const buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
+    await sllrBuyers.set(fromNumber, buyer);
+    return buyer;
+  })();
+  sllrBuyerCreations.set(fromNumber, creation);
+  try {
+    return await creation;
+  } finally {
+    sllrBuyerCreations.delete(fromNumber);
+  }
 }
 // Place an SLL-R order for an inbound number. Returned to the bot as deps.order.
 async function placeSllrOrder(query: string, fromNumber: string, location?: StoredLocation): Promise<string> {
@@ -212,6 +225,8 @@ async function confirmSllrRecurring(fromNumber: string): Promise<string> {
 // polls each known buyer and iMessages the prompt once per run (atomic dedup via
 // markNotified). The buyer replies "confirm my usual" → confirmSllrRecurring.
 const SLLR_NOTIFY_INTERVAL_MS = Number(process.env.SLLR_NOTIFY_INTERVAL_MS ?? 300_000);
+// Guard so a slow sweep doesn't overlap with the next interval tick.
+let sllrNotifySweepInFlight = false;
 async function sllrNotifySweep(): Promise<number> {
   let buyers: NumberBuyer[];
   try {
@@ -232,19 +247,17 @@ async function sllrNotifySweep(): Promise<number> {
       continue;
     }
     for (const run of runs) {
-      let fresh = false;
-      try {
-        fresh = await sllrBuyers.markNotified(run.id);
-      } catch (error) {
-        console.error("[sendblue] sllr notify: markNotified failed", error);
-        continue;
-      }
-      if (!fresh) continue; // already prompted this run
       try {
         await client.sendMessage(number, `🔁 ${run.summary} — order now? Reply "confirm my usual".`);
-        sent++;
       } catch (error) {
         console.error("[sendblue] sllr notify: send failed", number, error);
+        continue; // don't mark notified — let the next sweep retry
+      }
+      try {
+        const fresh = await sllrBuyers.markNotified(run.id);
+        if (fresh) sent++; // freshly prompted this run
+      } catch (error) {
+        console.error("[sendblue] sllr notify: markNotified failed", error);
       }
     }
   }
@@ -651,7 +664,13 @@ createServer(async (request, response) => {
   // Recurring confirm-prompt notifier (in-process v0). Set SLLR_NOTIFY_INTERVAL_MS=0
   // to disable (e.g. when an external cron drives it instead).
   if (SLLR_NOTIFY_INTERVAL_MS > 0) {
-    const timer = setInterval(() => void sllrNotifySweep(), SLLR_NOTIFY_INTERVAL_MS);
+    const timer = setInterval(() => {
+      if (sllrNotifySweepInFlight) return; // previous sweep still running
+      sllrNotifySweepInFlight = true;
+      void sllrNotifySweep().finally(() => {
+        sllrNotifySweepInFlight = false;
+      });
+    }, SLLR_NOTIFY_INTERVAL_MS);
     timer.unref();
     console.log(`[sendblue] sllr recurring notifier every ${Math.round(SLLR_NOTIFY_INTERVAL_MS / 1000)}s`);
   }
