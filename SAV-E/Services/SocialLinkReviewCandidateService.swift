@@ -158,15 +158,21 @@ final class SocialLinkReviewCandidateService {
 
     private let placeResolverService: PlaceResolverServiceProtocol
     private let publicSourceSearchService: PublicSourceSearchServiceProtocol
+    /// LLM fallback for prose-only captions the deterministic marker parser
+    /// rejects. `nil` when no LLM path is configured — the service then keeps its
+    /// deterministic-only behavior. Injected as a fake (no network) in tests.
+    private let captionVenueExtractor: SocialCaptionVenueExtractor?
     private let thumbnailImageByteLimit = 6_000_000
 
     init(
         googlePlacesService: GooglePlacesServiceProtocol = GooglePlacesService.shared,
         publicSourceSearchService: PublicSourceSearchServiceProtocol = PublicSourceSearchService.shared,
-        placeResolverService: PlaceResolverServiceProtocol? = nil
+        placeResolverService: PlaceResolverServiceProtocol? = nil,
+        captionVenueExtractor: SocialCaptionVenueExtractor? = GeminiCaptionVenueExtractor.liveFromConfig()
     ) {
         self.placeResolverService = placeResolverService ?? PlaceResolverService(googlePlacesService: googlePlacesService)
         self.publicSourceSearchService = publicSourceSearchService
+        self.captionVenueExtractor = captionVenueExtractor
     }
 
     func resolveEvidence(_ input: SocialPlaceEvidenceResolverInput) async -> SocialPlaceEvidenceResolverResult {
@@ -295,7 +301,38 @@ final class SocialLinkReviewCandidateService {
             $0.isPlaceBearingSource || $0.isSourceOnly || $0.reviewState == "unresolved_place_candidate"
         }
         guard shouldRunRecovery else {
-            return await refineCandidates(initial, evidenceText: evidenceText)
+            // Deterministic-first: a structured/marker candidate exists. But the
+            // prose heuristics can still surface a low-confidence fragment (e.g.
+            // "shop in LA" off a prose caption) with no address/coordinates — not
+            // a real venue. When that's all we have, let the LLM read the prose
+            // for the actual venue name before settling for the fragment.
+            let refined = await refineCandidates(initial, evidenceText: evidenceText)
+            // No extractor configured (no backend/API key): keep deterministic-only
+            // behavior unchanged — never downgrade a fragment without an LLM.
+            guard captionVenueExtractor != nil,
+                  deterministicYieldedUnreliableProseFragment(refined) else {
+                return refined
+            }
+            // The only deterministic output is a weak prose fragment. Try the LLM
+            // for the real venue name; if it yields a guarded candidate, use it.
+            if let llmCandidates = await llmCaptionFallbackCandidates(
+                evidenceText: evidenceText,
+                sourceURL: sourceURL,
+                analysis: analyze(evidenceText: evidenceText, sourceURL: sourceURL)
+            ) {
+                return llmCandidates
+            }
+            // LLM named no usable venue (or hallucinated a name absent from the
+            // caption). The fragment is a false positive, so degrade to a clean
+            // source-only receipt rather than surfacing the fragment as a venue.
+            return [forcedSourceOnlyCandidate(evidenceText: evidenceText, sourceURL: sourceURL)]
+        }
+
+        // Deterministic-first: the marker/structured paths above ran and found no
+        // confirmed venue. Note this so the LLM prose fallback only fires when the
+        // deterministic parser genuinely couldn't extract a usable venue name.
+        let deterministicLacksVenue = initial.allSatisfy {
+            $0.isPlaceBearingSource || $0.isSourceOnly
         }
 
         let analysis = analyze(evidenceText: evidenceText, sourceURL: sourceURL)
@@ -324,7 +361,292 @@ final class SocialLinkReviewCandidateService {
         let mapReady = refinedRecovered.filter { $0.hasReliableCoordinates }
         if !mapReady.isEmpty { return rankedCandidates(mapReady) }
         if !refinedRecovered.isEmpty { return rankedCandidates(refinedRecovered) }
+
+        // Deterministic recovery (markers + public-search off thin signals) found
+        // nothing usable. Last resort: ask the LLM to read the prose caption for a
+        // venue name the marker parser deliberately rejects. Evidence-bound and
+        // Review-Candidate only — see `llmCaptionFallbackCandidates`. Fires when the
+        // deterministic result is source-only/place-bearing OR only an unreliable
+        // prose fragment (e.g. "shop in LA") — never when a structured venue exists.
+        let deterministicYieldedFragment = deterministicYieldedUnreliableProseFragment(initial)
+        let deterministicHasNoReliableVenue = deterministicLacksVenue || deterministicYieldedFragment
+        if deterministicHasNoReliableVenue {
+            if let llmCandidates = await llmCaptionFallbackCandidates(
+                evidenceText: evidenceText,
+                sourceURL: sourceURL,
+                analysis: analysis
+            ) {
+                return llmCandidates
+            }
+            // Only a prose fragment remained and the LLM produced nothing usable:
+            // drop the fragment for a clean source-only receipt. Gated on an
+            // extractor being present so deterministic-only behavior (no backend)
+            // is unchanged. When the deterministic result was already
+            // source-only/place-bearing, `initial` is returned unchanged below.
+            if deterministicYieldedFragment, captionVenueExtractor != nil {
+                return [forcedSourceOnlyCandidate(evidenceText: evidenceText, sourceURL: sourceURL)]
+            }
+        }
         return initial
+    }
+
+    /// True when the only deterministic output is a weak prose-fragment candidate
+    /// with no address, no coordinates, and no structured recovery state — i.e.
+    /// the heuristics grabbed a fragment off prose ("shop in LA") rather than a
+    /// real venue. Structured candidates (recovered/map-ready/unresolved place
+    /// stems like LS Hotel / Ulaman) are NOT unreliable and must never trigger the
+    /// LLM fallback, preserving deterministic-first behavior.
+    private func deterministicYieldedUnreliableProseFragment(_ candidates: [PendingReviewCandidate]) -> Bool {
+        // A recovered/map-ready candidate is a confirmed-enough venue and must
+        // never be second-guessed by the LLM. An `unresolved_place_candidate` is
+        // only a *stem*, though — and when that stem is itself prose noise
+        // ("shop in LA") with no address/coordinates, it's an unreliable fragment.
+        let confirmedStates: Set<String> = ["source_recovered_candidate", "map_match_ready"]
+        return !candidates.isEmpty && candidates.allSatisfy { candidate in
+            // A real venue stem off a caption pin ("📍Ulaman" → "Ulaman") is a
+            // legitimate place anchor, not prose noise — never treat it as a
+            // fragment, so the no-search Ulaman/LS Hotel guards stay unchanged.
+            guard !candidate.isCaptionPinVenueStem else { return false }
+            return !candidate.hasReliableCoordinates
+                && candidate.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !(candidate.reviewState.map(confirmedStates.contains) ?? false)
+                && looksLikeProseFragmentName(candidate.candidateName)
+        }
+    }
+
+    /// A deterministic candidate *name* that reads like a prose fragment rather
+    /// than a proper venue name — e.g. "shop in LA", "spot to grab coffee". These
+    /// slip through the heuristic extractor off prose captions. Proper names
+    /// ("Ulaman", "Aquarela Coffee", "牛喜壽喜燒") start with a capital/CJK token and
+    /// carry no prose connector, so they are NOT flagged.
+    private func looksLikeProseFragmentName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        if isProseFragmentCandidate(trimmed) { return true }
+        if !isUsableCandidateName(trimmed) { return true }
+        // A leading lowercase Latin word is a common noun / sentence fragment,
+        // never a proper venue name ("shop in LA", "place near me").
+        if let first = trimmed.unicodeScalars.first,
+           CharacterSet.lowercaseLetters.contains(first) {
+            return true
+        }
+        // "<word> in/near/by/at <place>" prepositional prose ("shop in LA").
+        if trimmed.range(of: #"(?i)\b(?:in|near|by|at|around|next to)\s+[A-Za-z]"#, options: .regularExpression) != nil,
+           trimmed.range(of: #"(?i)\b(?:restaurant|cafe|coffee|bar|hotel|resort|villa|inn|museum|gallery|park|market|kitchen|bakery|bistro|club|studio|house)\b"#, options: .regularExpression) == nil {
+            return true
+        }
+        // A multi-clause sentence ("Such a magical little spot, the cozy vibes…")
+        // is prose, not a venue name: a proper venue rarely runs past ~6 words and
+        // never strings clauses with mid-sentence punctuation.
+        let wordCount = trimmed.split { $0 == " " || $0 == "\u{3000}" }.count
+        if wordCount > 6 { return true }
+        if trimmed.range(of: #"[,;.!?]\s+\S"#, options: .regularExpression) != nil { return true }
+        return false
+    }
+
+    /// LLM prose-caption fallback. Fires only when the deterministic parser AND
+    /// public-search recovery both failed to produce a usable venue. The LLM
+    /// supplies *only* a name (the deterministic parser already owns markers); the
+    /// name is then verified against the caption (anti-hallucination) and, if it
+    /// survives, runs back through public search exactly like the LS Hotel/Ulaman
+    /// path so the extracted name becomes the search stem.
+    ///
+    /// Returns `nil` (→ caller keeps the deterministic source-only receipt) when
+    /// no extractor is configured, the LLM names no venue, the name is not
+    /// present in the caption, or the name is a rejected generic/marketing label.
+    /// Never produces coordinates or a Map Stamp.
+    private func llmCaptionFallbackCandidates(
+        evidenceText: String,
+        sourceURL: String,
+        analysis: SocialPlaceAgentAnalysis
+    ) async -> [PendingReviewCandidate]? {
+        guard let captionVenueExtractor else { return nil }
+        let caption = evidenceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !caption.isEmpty else { return nil }
+
+        guard let extracted = await captionVenueExtractor.extractVenue(caption: caption, sourceURL: sourceURL) else {
+            return nil
+        }
+
+        let name = cleanCandidateName(extracted.name)
+        // GUARDRAIL 0: never accept a bare @handle or #hashtag as a venue name —
+        // they search poorly and read as noise. Deterministic backstop in case the
+        // model returns one despite the prompt.
+        let firstChar = name.trimmingCharacters(in: .whitespaces).first
+        guard firstChar != "@", firstChar != "#" else { return nil }
+        // GUARDRAIL 1 (anti-hallucination): the extracted name MUST literally
+        // appear in the caption (case/diacritic-insensitive). A name the LLM
+        // invented or paraphrased is discarded → deterministic source-only.
+        guard !name.isEmpty, captionContains(name, in: caption) else { return nil }
+        // GUARDRAIL 2: reject generic labels / marketing lines / hashtags /
+        // prose fragments — reuse the same rejection the deterministic path uses.
+        guard isUsableCandidateName(name),
+              !looksLikeMarketingLine(name),
+              !SocialPlaceEvidenceScorer.isRejectedTitle(name),
+              !isProseFragmentCandidate(name) else { return nil }
+
+        let llmCandidate = llmCaptionVenueCandidate(
+            name: name,
+            extracted: extracted,
+            evidenceText: evidenceText,
+            sourceURL: sourceURL
+        )
+
+        // Let public-search recovery try to upgrade the LLM name (search
+        // "<name> <area>" → provider match), exactly like the LS Hotel/Ulaman
+        // path: the extracted name becomes the search stem.
+        let upgradeQueries = appendUnique(
+            [extracted.area.map { "\(name) \($0)" } ?? name],
+            [name]
+        )
+        let upgradeResults = await publicSearchResults(for: upgradeQueries)
+        if !upgradeResults.isEmpty {
+            let upgradeAnalysis = analyze(evidenceText: "\(name) \(evidenceText)", sourceURL: sourceURL)
+            let recovered = sourceRecoveryCandidates(
+                from: upgradeResults,
+                analysis: upgradeAnalysis,
+                evidenceText: "\(name)\n\(evidenceText)",
+                sourceURL: sourceURL
+            )
+            let refined = await refineCandidates(
+                recovered,
+                evidenceText: sourceRecoveryEvidenceText(evidenceText: "\(name)\n\(evidenceText)", results: upgradeResults)
+            )
+            let mapReady = refined.filter { $0.hasReliableCoordinates }
+            if !mapReady.isEmpty { return rankedCandidates(mapReady) }
+            if !refined.isEmpty { return rankedCandidates(refined) }
+        }
+
+        // Search found nothing — keep the LLM Review Candidate. Still useful: the
+        // user gets a real venue name to confirm instead of a bare source link.
+        return [llmCandidate]
+    }
+
+    /// Builds the Review Candidate for an LLM-extracted prose venue name. No
+    /// coordinates, `hasReliableCoordinates == false`, a source_recovered-style
+    /// `reviewState`, and `missingInfo` flagging provider/coordinate/user
+    /// confirmation — so it can never be auto-saved as a Map Stamp.
+    private func llmCaptionVenueCandidate(
+        name: String,
+        extracted: ExtractedVenue,
+        evidenceText: String,
+        sourceURL: String
+    ) -> PendingReviewCandidate {
+        let area = extracted.area?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let category = canonicalCaptionCategory(extracted.category, name: name, evidenceText: evidenceText)
+        let captionSnippet = String(evidenceText.trimmingCharacters(in: .whitespacesAndNewlines).prefix(220))
+        // Cap LLM confidence: this is an unverified prose extraction, not a
+        // provider match. Stays below the refined/map-ready tiers.
+        let confidence = min(max(extracted.confidence, 0), 0.6)
+        let missingInfo = [
+            "Google Places match required",
+            "Verified coordinates",
+            "User confirmation required"
+        ]
+        let evidence = appendUnique(
+            [],
+            [
+                "Source URL: \(sourceURL)",
+                "Evidence tier: \(SocialPlaceEvidenceTier.weakCandidate.rawValue)",
+                "Extracted by SAV-E from caption: \(name)",
+                area.map { "Caption area clue: \($0)" } ?? "",
+                captionSnippet.isEmpty ? "" : "Caption snippet: \(captionSnippet)"
+            ]
+        )
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: appendUnique(
+                [],
+                [
+                    "Source URL: \(sourceURL)",
+                    "Extracted by SAV-E from caption: \(name)",
+                    area.map { "Caption area clue: \($0)" } ?? ""
+                ]
+            ),
+            attempts: appendUnique(
+                analysisMethodAttempts(evidenceText: evidenceText, sourceURL: sourceURL),
+                [
+                    "Deterministic marker parser found no venue in prose caption",
+                    "Ran public web search recovery (no confirming match)",
+                    "Extracted venue name from caption via SAV-E LLM fallback",
+                    "Verified the extracted name appears literally in the caption",
+                    "Did not use logged-in social scraping"
+                ]
+            ),
+            missingFields: ["Verified address", "Verified coordinates"],
+            nextBestClue: "Confirm this caption-extracted venue and its address before saving it as a Map Stamp."
+        )
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: area ?? "",
+            category: category,
+            latitude: nil,
+            longitude: nil,
+            sourceURL: sourceURL,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: evidence,
+            confidence: confidence,
+            missingInfo: missingInfo,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            reviewState: "source_recovered_candidate"
+        )
+    }
+
+    /// A guaranteed source-only receipt (`isSourceOnly == true`), bypassing the
+    /// `unresolved_place_candidate` promotion in `sourceOnlyCandidate`. Used when a
+    /// deterministic prose *fragment* must be dropped: re-running the normal
+    /// source-only path would just re-promote the same prose noise to an
+    /// unresolved candidate, so we force a clean clue receipt instead.
+    private func forcedSourceOnlyCandidate(evidenceText: String, sourceURL: String) -> PendingReviewCandidate {
+        let diagnostic = sourceOnlyDiagnostic(evidenceText: evidenceText, sourceURL: sourceURL)
+        return PendingReviewCandidate(
+            candidateName: sourceOnlyDisplayName(for: sourceURL),
+            address: "",
+            category: "attraction",
+            latitude: nil,
+            longitude: nil,
+            sourceURL: sourceURL,
+            sourceText: evidenceText.isEmpty ? nil : evidenceText,
+            evidence: diagnostic.found + diagnostic.attempts + diagnosticSearchEvidence(diagnostic),
+            confidence: 0,
+            missingInfo: diagnostic.missingFields,
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            isSourceOnly: true
+        )
+    }
+
+    /// Case/diacritic-insensitive substring check: does the extracted venue name
+    /// literally appear in the caption? The anti-hallucination guardrail.
+    private func captionContains(_ name: String, in caption: String) -> Bool {
+        let foldedName = name.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !foldedName.isEmpty else { return false }
+        let foldedCaption = caption.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: .current)
+        return foldedCaption.contains(foldedName)
+    }
+
+    /// Maps the LLM's loose category hint to a canonical `PlaceCategory`-style
+    /// string, falling back to the text-derived category when the hint is missing
+    /// or unrecognized.
+    private func canonicalCaptionCategory(_ hint: String?, name: String, evidenceText: String) -> String {
+        let lowered = (hint ?? "").lowercased()
+        switch lowered {
+        case "cafe", "coffee":
+            return "cafe"
+        case "food", "restaurant", "eat":
+            return "food"
+        case "bar", "drinks", "pub":
+            return "bar"
+        case "hotel", "stay", "resort", "villa", "lodging", "accommodation":
+            return "stay"
+        case "shopping", "shop", "store", "market":
+            return "shopping"
+        case "attraction", "sight", "landmark", "viewpoint", "mirador", "park", "museum":
+            return "attraction"
+        default:
+            return category(from: "\(name) \(evidenceText)")
+        }
     }
 
     /// A thin/age-restricted social post (login-walled Instagram reel, etc.) that
