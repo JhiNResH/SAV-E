@@ -26,6 +26,7 @@ import {
 } from "./sourceSearchWorker.js";
 import type { SavedPlace, SendbluePlaceStore, StoredLocation } from "./sendbluePlaceStore.js";
 import type { VerifiedVisitStore } from "./sendblueReceiptStore.js";
+import type { ReviewStore } from "./sendblueReviewStore.js";
 
 const geminiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/models";
 const defaultGeminiModel = "gemini-2.5-flash";
@@ -238,8 +239,101 @@ ${text}`;
 export function formatReceiptReply(receipt: ExtractedReceipt, count: number, chinese: boolean): string {
   const amount = receipt.total ? (chinese ? `（${receipt.total}）` : ` (${receipt.total})`) : "";
   return chinese
-    ? `✓ 已記錄你在 ${receipt.merchant}${amount} 的訪問 — 這是一筆驗證訪問,你目前有 ${count} 筆。要留評論嗎?`
-    : `✓ Logged your visit to ${receipt.merchant}${amount} — that's a verified visit. You have ${count} now. Want to leave a review?`;
+    ? `✓ 已記錄你在 ${receipt.merchant}${amount} 的訪問 — 這是一筆驗證訪問,你目前有 ${count} 筆。要留個評論嗎?(回覆 1-5 星 + 一句話)`
+    : `✓ Logged your visit to ${receipt.merchant}${amount} — that's a verified visit. You have ${count} now. Want to leave a review? (reply 1-5 stars + a line)`;
+}
+
+// --- Receipt-gated reviews -------------------------------------------------
+// After a receipt is logged the bot asks "want to review?"; the user's next
+// message is read here as a rating + optional text for that exact merchant.
+
+export type ExtractedReview = { rating?: number; text?: string };
+
+/**
+ * Read the user's reply to "want to review {merchant}?" as a review. Returns
+ * null when they're NOT reviewing (declining or changing the subject) so the
+ * caller falls through to the normal flow. The review is receipt-gated by
+ * construction: we only ask after logging a verified visit.
+ */
+export async function extractReview(
+  text: string,
+  merchant: string,
+  gemini: GeminiCaller = defaultGeminiText,
+): Promise<ExtractedReview | null> {
+  const prompt = `The user was just asked to review "${merchant}" (a place they have a receipt for). Read their message below.
+
+If it IS a review (a rating and/or an opinion about ${merchant}), extract:
+- "rating": 1-5 integer if they gave/implied one (5=loved it, 1=terrible), else null.
+- "text": their own words about the place, else null.
+If they are declining or changing the subject (e.g. "no", "later", "recommend something else"), it is NOT a review.
+
+Return STRICT JSON only: {"is_review": boolean, "rating": number|null, "text": string|null}
+
+Message:
+${text}`;
+  let raw: string;
+  try {
+    raw = await gemini(prompt);
+  } catch (error) {
+    console.error("[sendblue] extractReview gemini error", error);
+    return null;
+  }
+  const parsed = parseReplyJson(raw) as {
+    is_review?: unknown;
+    rating?: unknown;
+    text?: unknown;
+  } | null;
+  if (!parsed || parsed.is_review !== true) return null;
+  const rating =
+    typeof parsed.rating === "number" && parsed.rating >= 1 && parsed.rating <= 5
+      ? Math.round(parsed.rating)
+      : undefined;
+  const reviewText = typeof parsed.text === "string" && parsed.text.trim() ? parsed.text.trim() : undefined;
+  if (rating === undefined && !reviewText) return null; // nothing usable
+  return { rating, text: reviewText };
+}
+
+export function formatReviewReply(
+  merchant: string,
+  review: ExtractedReview,
+  count: number,
+  chinese: boolean,
+): string {
+  const stars = review.rating ? (chinese ? `${review.rating}★ ` : `${review.rating}★ `) : "";
+  return chinese
+    ? `✅ 已存你對 ${merchant} 的評論 ${stars}— 收據驗證過的真實評論,你累積 ${count} 則了。`
+    : `✅ Saved your ${stars}review of ${merchant} — receipt-verified, that's ${count} now.`;
+}
+
+// --- Taste profile (personalized ranking) ----------------------------------
+// Lightweight per-person taste signal from what they've engaged with: places
+// they SAVED + merchants they VISITED (receipts). Used to (a) not re-recommend
+// places they already know, and (b) nudge ranking toward their categories.
+
+export type TasteProfile = {
+  /** lower-cased names of places the user already saved or visited. */
+  knownNames: string[];
+  /** category keywords the user engages with most (e.g. "cafe", "ramen"). */
+  preferredCategories: string[];
+};
+
+export function buildTasteProfile(saved: SavedPlace[], visitedMerchants: string[]): TasteProfile {
+  const knownNames = [
+    ...saved.map((p) => p.name),
+    ...visitedMerchants,
+  ]
+    .map((n) => n.trim().toLowerCase())
+    .filter((n) => n.length > 0);
+  const counts = new Map<string, number>();
+  for (const p of saved) {
+    const c = p.category?.trim().toLowerCase();
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  const preferredCategories = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([c]) => c);
+  return { knownNames: [...new Set(knownNames)], preferredCategories };
 }
 
 export async function defaultGeminiText(prompt: string): Promise<string> {
@@ -727,6 +821,8 @@ export type ConversationState = {
   lastArea?: string;
   /** Names already recommended this conversation — excluded so "something else" varies. */
   shownNames?: string[];
+  /** A merchant we just invited a review for (receipt-gated) — next msg is the review. */
+  pendingReview?: string;
   at: number;
 };
 export interface ConversationStore {
@@ -739,6 +835,10 @@ export interface ConversationStore {
   setArea(phone: string, area: string): void;
   /** Append a recommended place name (so we don't repeat it next time). */
   addShown(phone: string, name: string): void;
+  /** Arm a receipt-gated review prompt for a merchant; next message is the review. */
+  setReview(phone: string, merchant: string): void;
+  /** Clear an armed review prompt. */
+  clearReview(phone: string): void;
   /** Clear the pending location only; keep lastPlaces/lastArea for follow-ups. */
   clearPending(phone: string): void;
 }
@@ -776,6 +876,13 @@ class InMemoryConversationStore implements ConversationStore {
     const prev = this.get(phone);
     const shownNames = [...(prev?.shownNames ?? []), name].slice(-20);
     this.merge(phone, { shownNames });
+  }
+  setReview(phone: string, merchant: string): void {
+    this.merge(phone, { pendingReview: merchant });
+  }
+  clearReview(phone: string): void {
+    const prev = this.get(phone);
+    if (prev) this.map.set(phone, { ...prev, pendingReview: undefined, at: Date.now() });
   }
   clearPending(phone: string): void {
     const prev = this.get(phone);
@@ -933,13 +1040,23 @@ function noDiscoveryReply(area: string, chinese: boolean): string {
 export function pickBestPlace(
   found: DiscoveredPlace[],
   exclude: string[] = [],
+  preferredCategories: string[] = [],
 ): DiscoveredPlace | undefined {
   if (found.length === 0) return undefined;
   const seen = new Set(exclude.map((n) => n.toLowerCase()));
-  const byRating = (a: DiscoveredPlace, b: DiscoveredPlace) => (b.rating ?? 0) - (a.rating ?? 0);
-  const fresh = found.filter((p) => !seen.has(p.name.toLowerCase())).sort(byRating);
+  // Taste-aware score: Google rating, plus a small boost when the place's
+  // category matches one the user engages with — so personalization nudges the
+  // pick without overriding a clearly higher-rated spot.
+  const score = (p: DiscoveredPlace): number => {
+    const base = p.rating ?? 0;
+    const cat = p.category?.toLowerCase() ?? "";
+    const match = cat && preferredCategories.some((c) => cat.includes(c) || c.includes(cat));
+    return base + (match ? 0.3 : 0);
+  };
+  const byScore = (a: DiscoveredPlace, b: DiscoveredPlace) => score(b) - score(a);
+  const fresh = found.filter((p) => !seen.has(p.name.toLowerCase())).sort(byScore);
   if (fresh.length > 0) return fresh[0];
-  return [...found].sort(byRating)[0];
+  return [...found].sort(byScore)[0];
 }
 
 /**
@@ -1022,6 +1139,8 @@ export type ProcessDeps = {
   conversation?: ConversationStore;
   /** Verified-visit memory: forwarded receipts → proof-of-visit. Omitted = receipts disabled. */
   receiptStore?: VerifiedVisitStore;
+  /** Receipt-gated review memory. Omitted = reviews disabled. */
+  reviewStore?: ReviewStore;
   client: Pick<SendblueClient, "sendMessage" | "markRead" | "sendTypingIndicator">;
   store: SendbluePlaceStore;
   /** Place an SLL-R order for this number; returns the reply, or null to fall
@@ -1111,6 +1230,10 @@ export async function processSendblueInbound(
   void deps.client.sendTypingIndicator(from);
 
   const chinese = looksChinese(text);
+  // Conversation memory is loaded up front so the receipt/review branches and the
+  // agentic branch all share one snapshot (pending location, last places, pending review).
+  const convoStore = deps.conversation ?? defaultConversationStore;
+  const convo = convoStore.get(from);
   let reply: string;
   try {
     const url = firstUrlInText(text);
@@ -1134,10 +1257,40 @@ export async function processSendblueInbound(
         console.log(
           `[sendblue] receipt merchant="${receipt.merchant}" total="${receipt.total ?? ""}" count=${count}`,
         );
+        // Arm a receipt-gated review: the next message is read as a review of
+        // this exact (verified) merchant.
+        if (deps.reviewStore) convoStore.setReview(from, receipt.merchant);
         reply = formatReceiptReply(receipt, count, chinese);
         await deps.client.sendMessage(from, reply);
         return { replied: true, reply };
       }
+    }
+    // Pending review: the previous turn logged a receipt and asked "want to
+    // review?" — read this message as the rating/text for that merchant. Not a
+    // review (declining / new topic) → clear it and fall through to normal flow.
+    if (deps.reviewStore && deps.gemini && convo?.pendingReview && !url) {
+      const merchant = convo.pendingReview;
+      const review = await extractReview(text, merchant, deps.gemini);
+      convoStore.clearReview(from);
+      if (review) {
+        let count = 0;
+        try {
+          count = await deps.reviewStore.save(from, {
+            merchant,
+            rating: review.rating,
+            text: review.text,
+          });
+        } catch (storeError) {
+          console.error("[sendblue] review save error", storeError);
+        }
+        console.log(
+          `[sendblue] review merchant="${merchant}" rating=${review.rating ?? ""} count=${count}`,
+        );
+        reply = formatReviewReply(merchant, review, count, chinese);
+        await deps.client.sendMessage(from, reply);
+        return { replied: true, reply };
+      }
+      console.log(`[sendblue] pending review for "${merchant}" not a review → falling through`);
     }
     if (deps.geocode && !url && isLocationIntent(text)) {
       // Location set: "I'm in X" → geocode → remember per number for nearby orders.
@@ -1200,11 +1353,18 @@ export async function processSendblueInbound(
       } catch (storeError) {
         console.error("[sendblue] store.list error", storeError);
       }
-      // Conversation memory: pass the pending location query (so a bare "Tustin"
-      // resumes the right search) AND the last places we recommended (so a
-      // follow-up like "what's their best coffee?" is answered about that place).
-      const convoStore = deps.conversation ?? defaultConversationStore;
-      const convo = convoStore.get(from);
+      // Personalization: build a taste profile from saved places + visited
+      // merchants (receipts), to skip places they already know and nudge ranking.
+      let visitedMerchants: string[] = [];
+      if (deps.receiptStore) {
+        try {
+          visitedMerchants = (await deps.receiptStore.list(from, 50)).map((v) => v.merchant);
+        } catch (storeError) {
+          console.error("[sendblue] receiptStore.list error", storeError);
+        }
+      }
+      const taste = buildTasteProfile(places, visitedMerchants);
+      // (convoStore/convo are loaded once at the top of the handler.)
       const decision = await decideRecall(text, places, deps.gemini, chinese, {
         pendingQuery: convo?.pendingQuery,
         lastPlaces: convo?.lastPlaces,
@@ -1246,11 +1406,12 @@ export async function processSendblueInbound(
         } catch (searchError) {
           console.error("[sendblue] places search error", searchError);
         }
-        // Skip places we've already recommended this conversation so a
-        // "something else" actually returns something else.
-        const picked = pickBestPlace(found, convo?.shownNames ?? []);
+        // Personalized pick: skip places already recommended this conversation
+        // AND places the user already knows (saved/visited), then taste-rank.
+        const exclude = [...(convo?.shownNames ?? []), ...taste.knownNames];
+        const picked = pickBestPlace(found, exclude, taste.preferredCategories);
         console.log(
-          `[sendblue] discovery query="${decision.query}" area="${area}" results=${found.length} picked="${picked?.name ?? "(none)"}"` +
+          `[sendblue] discovery query="${decision.query}" area="${area}" results=${found.length} picked="${picked?.name ?? "(none)"}" known=${taste.knownNames.length} cats=[${taste.preferredCategories.join(",")}]` +
             (convo?.pendingQuery ? " (resumed pending)" : "") +
             (!decision.area && convo?.lastArea ? " (reused area)" : ""),
         );

@@ -444,6 +444,11 @@ function fakeConversation(): { store: ConversationStore; map: Map<string, Conver
     setArea: (p, area) => map.set(p, { ...(get(p) ?? { at: 0 }), lastArea: area, at: 0 }),
     addShown: (p, name) =>
       map.set(p, { ...(get(p) ?? { at: 0 }), shownNames: [...(get(p)?.shownNames ?? []), name], at: 0 }),
+    setReview: (p, merchant) => map.set(p, { ...(get(p) ?? { at: 0 }), pendingReview: merchant, at: 0 }),
+    clearReview: (p) => {
+      const v = get(p);
+      if (v) map.set(p, { ...v, pendingReview: undefined, at: 0 });
+    },
     clearPending: (p) => {
       const v = get(p);
       if (v) map.set(p, { ...v, pendingQuery: undefined, at: 0 });
@@ -1009,4 +1014,91 @@ test("webhook flow: known location is reused even when the model returns a null 
   assert.doesNotMatch(client.calls.at(-1)?.content ?? "", /Where are you|你現在在哪/);
   assert.match(client.calls.at(-1)?.content ?? "", /Jam Jam Tea Lab/);
   assert.equal(result.replied, true);
+});
+
+// --- Receipt-gated reviews + personalization -----------------------------
+
+import { extractReview, buildTasteProfile } from "./sendblueBot.js";
+import type { StoredReview } from "./sendblueReviewStore.js";
+
+class FakeReviewStore {
+  public byPhone = new Map<string, StoredReview[]>();
+  async save(phone: string, review: StoredReview): Promise<number> {
+    const list = this.byPhone.get(phone) ?? [];
+    list.unshift(review);
+    this.byPhone.set(phone, list);
+    return list.length;
+  }
+  async list(phone: string, limit = 15): Promise<StoredReview[]> {
+    return (this.byPhone.get(phone) ?? []).slice(0, limit);
+  }
+}
+
+test("extractReview reads a rating + text, and rejects a non-review", async () => {
+  const yes: GeminiCaller = async () =>
+    JSON.stringify({ is_review: true, rating: 5, text: "amazing matcha" });
+  assert.deepEqual(await extractReview("5 stars, amazing matcha", "Jam Jam", yes), {
+    rating: 5,
+    text: "amazing matcha",
+  });
+  const no: GeminiCaller = async () => JSON.stringify({ is_review: false, rating: null, text: null });
+  assert.equal(await extractReview("recommend something else", "Jam Jam", no), null);
+});
+
+test("webhook flow: receipt arms a review, next message is saved as a receipt-gated review", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new (class {
+    async save() { return 1; }
+    async list() { return []; }
+  })() as any;
+  const reviewStore = new FakeReviewStore();
+  const { store: conversation, map } = fakeConversation();
+  const gemini: GeminiCaller = async (prompt) => {
+    if (prompt.includes("is_receipt")) return JSON.stringify({ is_receipt: true, merchant: "Jam Jam Tea Lab", total: "$6", date: null });
+    if (prompt.includes("is_review")) return JSON.stringify({ is_review: true, rating: 5, text: "best boba" });
+    return JSON.stringify({ reply: "hi" });
+  };
+
+  // Turn 1: forward a receipt → logged + review armed.
+  await processSendblueInbound(
+    { from_number: "+15551239999", content: "Thanks for your order at Jam Jam Tea Lab! Total $6" },
+    { client, store, gemini, receiptStore, reviewStore, conversation },
+  );
+  assert.match(client.calls.at(-1)?.content ?? "", /verified visit/i);
+  assert.equal(map.get("+15551239999")?.pendingReview, "Jam Jam Tea Lab");
+
+  // Turn 2: "5 stars best boba" → saved as a review of Jam Jam.
+  await processSendblueInbound(
+    { from_number: "+15551239999", content: "5 stars best boba" },
+    { client, store, gemini, receiptStore, reviewStore, conversation },
+  );
+  assert.match(client.calls.at(-1)?.content ?? "", /Saved your.*review of Jam Jam Tea Lab/i);
+  assert.equal(reviewStore.byPhone.get("+15551239999")?.[0]?.rating, 5);
+  assert.equal(map.get("+15551239999")?.pendingReview, undefined); // cleared
+});
+
+test("buildTasteProfile derives known names + preferred categories", () => {
+  const taste = buildTasteProfile(
+    [
+      { name: "Cafe Leon Dore", category: "cafe" },
+      { name: "Blue Bottle", category: "cafe" },
+      { name: "Tartine", category: "bakery" },
+    ],
+    ["Jam Jam Tea Lab"],
+  );
+  assert.deepEqual(taste.preferredCategories[0], "cafe"); // most common
+  assert.ok(taste.knownNames.includes("cafe leon dore"));
+  assert.ok(taste.knownNames.includes("jam jam tea lab")); // visited merchant
+});
+
+test("pickBestPlace excludes known places and applies a category boost", () => {
+  const found: DiscoveredPlace[] = [
+    { name: "Known Cafe", rating: 4.9, category: "cafe" }, // excluded (known)
+    { name: "New Diner", rating: 4.6, category: "diner" },
+    { name: "New Cafe", rating: 4.5, category: "cafe" }, // lower rating but taste-matched
+  ];
+  // Known excluded; with a "cafe" taste, New Cafe (4.5+0.3) edges New Diner (4.6).
+  const picked = pickBestPlace(found, ["Known Cafe"], ["cafe"]);
+  assert.equal(picked?.name, "New Cafe");
 });
