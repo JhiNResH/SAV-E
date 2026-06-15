@@ -1295,6 +1295,11 @@ Return STRICT JSON only: {"reply": string}`;
   }
 }
 
+const menuPriceIntentPattern = /\b(menu|serve|food|dish|dishes|what do they have|price|prices|cost|how much|expensive|cheap)\b|菜單|菜单|吃什麼|吃什么|有什麼|有什么|價格|价钱|價位|價錢|多少錢/i;
+export function isMenuPriceIntent(text: string): boolean {
+  return menuPriceIntentPattern.test(text);
+}
+
 const bookingIntentPattern = /\b(book|booking|reserve|reservation|table)\b|訂位|訂桌|預約|预约/i;
 export function isBookingIntent(text: string): boolean {
   return bookingIntentPattern.test(text);
@@ -1337,6 +1342,31 @@ export function formatBookingReply(place: DiscoveredPlace | undefined, chinese: 
   }
   const next = actions.length ? actions.join("\n") : "I don't have a phone or reservation link for it yet.";
   return `I can't complete the reservation inside iMessage yet, but here's the next step for ${place.name}:\n${next}`;
+}
+
+export function formatMenuPriceReply(place: DiscoveredPlace | undefined, chinese: boolean): string {
+  if (!place) {
+    return chinese
+      ? "你想看哪一間的菜單/價格？先傳店名，或讓我先推薦附近選項。"
+      : "Which place do you mean? Ask me after a recommendation and I can share the menu/price links I know.";
+  }
+  const facts: string[] = [];
+  if (place.category) facts.push(chinese ? `類型：${place.category}` : `type: ${place.category}`);
+  if (place.priceLevel) facts.push(chinese ? `Google 價位：${place.priceLevel}` : `Google price level: ${place.priceLevel}`);
+  if (typeof place.rating === "number") facts.push(chinese ? `評分：${place.rating}★` : `rating: ${place.rating}★`);
+  const links: string[] = [];
+  if (place.websiteUri) links.push(chinese ? `網站/菜單：${place.websiteUri}` : `menu/site: ${place.websiteUri}`);
+  if (place.googleMapsUri) links.push(chinese ? `Google Maps：${place.googleMapsUri}` : `Google Maps: ${place.googleMapsUri}`);
+  if (place.nationalPhoneNumber) links.push(chinese ? `電話：${place.nationalPhoneNumber}` : `phone: ${place.nationalPhoneNumber}`);
+  const known = [...facts, ...links];
+  if (chinese) {
+    return known.length
+      ? `${place.name} 我目前不會編逐項菜單或精準價格；我知道的是：\n${known.join("\n")}`
+      : `${place.name} 我目前沒有菜單或價格資料，也不會亂編。要不要我幫你找另一間資訊更完整的？`;
+  }
+  return known.length
+    ? `I don't have item-by-item menu prices for ${place.name}, and I won't make them up. What I do know:\n${known.join("\n")}`
+    : `I don't have menu or price details for ${place.name}, and I won't make them up. Want another option with better public info?`;
 }
 
 function formatPlaceCompareLine(place: DiscoveredPlace): string {
@@ -1685,6 +1715,13 @@ export async function processSendblueInbound(
         console.log(`[sendblue] order reply for ${from} near ${loc.label}`);
         return { replied: true, reply: orderReply };
       }
+    }
+    if (!url && isMenuPriceIntent(text)) {
+      const recent = uniqueRecentPlaces(convo);
+      reply = formatMenuPriceReply(recent[0], chinese);
+      console.log(`[sendblue] menu/price intent for ${from} target="${recent[0]?.name ?? "(none)"}"`);
+      await deps.client.sendMessage(from, reply);
+      return { replied: true, reply };
     }
     if (!url && isBookingIntent(text)) {
       const recent = uniqueRecentPlaces(convo);

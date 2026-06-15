@@ -7,9 +7,11 @@ import {
   formatVenueReply,
   isListIntent,
   isRecommendIntent,
+  isMenuPriceIntent,
   isBookingIntent,
   isCompareIntent,
   formatBookingReply,
+  formatMenuPriceReply,
   formatCompareReply,
   isOrderIntent,
   orderQuery,
@@ -547,6 +549,33 @@ test("webhook flow: follow-up about the recommended place is answered (not 'not 
   assert.match(client.calls.at(-1)?.content ?? "", /Maru Coffee/);
 });
 
+test("webhook flow: menu/price follow-up gives grounded links instead of dead-ending", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+155****1234", {
+    name: "Wagyu Factory Tustin | Limitless Shabu",
+    rating: 4.9,
+    category: "shabu shabu",
+    address: "2415 Park Ave, Tustin, CA 92782",
+    priceLevel: "moderate",
+    websiteUri: "https://example.com/menu",
+    googleMapsUri: "https://maps.google.com/?cid=123",
+  });
+
+  const result = await processSendblueInbound(
+    { from_number: "+155****1234", content: "What do they have and what the price" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(result.replied, true);
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /menu\/site: https:\/\/example\.com\/menu/);
+  assert.match(out, /Google price level: moderate/);
+  assert.match(out, /won't make them up/);
+});
+
 test("webhook flow: booking follow-up gives actionable reservation next step", async () => {
   const client = new FakeSendblueClient();
   const store = new FakeStore();
@@ -602,10 +631,13 @@ test("webhook flow: comparison follow-up explains recent options instead of dead
 });
 
 test("booking and comparison intent detectors match screenshot follow-ups", () => {
+  assert.equal(isMenuPriceIntent("What do they have and what the price"), true);
+  assert.equal(isMenuPriceIntent("菜單多少錢"), true);
   assert.equal(isBookingIntent("Can you book a table for me?"), true);
   assert.equal(isBookingIntent("訂位"), true);
   assert.equal(isCompareIntent("What's the difference between those"), true);
   assert.equal(isCompareIntent("比較這兩間"), true);
+  assert.match(formatMenuPriceReply({ name: "A", websiteUri: "https://a.example" }, false), /https:\/\/a\.example/);
   assert.match(formatBookingReply({ name: "A", address: "123 Main" }, false), /A/);
   assert.match(formatCompareReply([{ name: "A", rating: 4.1 }, { name: "B", rating: 4.8 }], false), /B/);
 });
