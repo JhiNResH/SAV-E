@@ -838,6 +838,16 @@ export type DiscoveredPlace = {
   address?: string;
   rating?: number;
   category?: string;
+  /** Google Maps place URL, when available from Places API. */
+  googleMapsUri?: string;
+  /** Website / reservation URL, when available from Places API. */
+  websiteUri?: string;
+  /** Human-callable phone number, when available from Places API. */
+  nationalPhoneNumber?: string;
+  /** Coarse price level from Places API (PRICE_LEVEL_MODERATE, etc.). */
+  priceLevel?: string;
+  /** Number of Google ratings, useful for confidence when comparing. */
+  userRatingCount?: number;
 };
 
 /** Injectable Google Places text search (so tests don't hit the network). */
@@ -856,7 +866,7 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       "content-type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.displayName,places.formattedAddress,places.rating,places.primaryType",
+        "places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.primaryType,places.googleMapsUri,places.websiteUri,places.nationalPhoneNumber,places.priceLevel",
     },
     body: JSON.stringify({ textQuery: query, maxResultCount: 8 }),
   });
@@ -866,7 +876,12 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       displayName?: { text?: string };
       formattedAddress?: string;
       rating?: number;
+      userRatingCount?: number;
       primaryType?: string;
+      googleMapsUri?: string;
+      websiteUri?: string;
+      nationalPhoneNumber?: string;
+      priceLevel?: string;
     }[];
   };
   return (body.places ?? [])
@@ -874,7 +889,12 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       name: p.displayName?.text ?? "",
       address: p.formattedAddress,
       rating: typeof p.rating === "number" ? p.rating : undefined,
+      userRatingCount: typeof p.userRatingCount === "number" ? p.userRatingCount : undefined,
       category: p.primaryType?.replace(/_/g, " "),
+      googleMapsUri: p.googleMapsUri,
+      websiteUri: p.websiteUri,
+      nationalPhoneNumber: p.nationalPhoneNumber,
+      priceLevel: p.priceLevel?.replace(/PRICE_LEVEL_/g, "").toLowerCase(),
     }))
     .filter((p) => p.name.length > 0);
 }
@@ -1258,7 +1278,7 @@ export async function phrasePlaceRec(
       ? `${area}附近可以試試 ${place.name}${stars} 📍${place.address ? `\n${place.address}` : ""}`
       : `Near ${area}, try ${place.name}${stars} 📍${place.address ? `\n${place.address}` : ""}`;
   const lang = chinese ? "繁體中文" : "the same language the user wrote in";
-  const facts = `${place.name}${place.rating ? ` (${place.rating}★)` : ""}${place.address ? ` — ${place.address}` : ""}`;
+  const facts = `${place.name}${place.rating ? ` (${place.rating}★)` : ""}${place.address ? ` — ${place.address}` : ""}${place.nationalPhoneNumber ? ` — phone: ${place.nationalPhoneNumber}` : ""}${place.websiteUri ? ` — website: ${place.websiteUri}` : ""}${place.googleMapsUri ? ` — maps: ${place.googleMapsUri}` : ""}`;
   const prompt = `Recommend this ONE place to the user near ${area}, warmly, in ${lang}, 1-2 short sentences, at most one emoji. Use ONLY these facts — do not invent anything (no menu, no hours):
 
 ${facts}
@@ -1273,6 +1293,82 @@ Return STRICT JSON only: {"reply": string}`;
     console.error("[sendblue] phrasePlaceRec gemini error", error);
     return template();
   }
+}
+
+const bookingIntentPattern = /\b(book|booking|reserve|reservation|table)\b|訂位|訂桌|預約|预约/i;
+export function isBookingIntent(text: string): boolean {
+  return bookingIntentPattern.test(text);
+}
+
+const compareIntentPattern = /\b(compare|difference|different|which one|which should|those|between them|between those)\b|差別|比較|哪個|哪个/i;
+export function isCompareIntent(text: string): boolean {
+  return compareIntentPattern.test(text);
+}
+
+function uniqueRecentPlaces(convo?: ConversationState): DiscoveredPlace[] {
+  const out: DiscoveredPlace[] = [];
+  const seen = new Set<string>();
+  const add = (place?: DiscoveredPlace) => {
+    if (!place?.name) return;
+    const key = place.name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(place);
+  };
+  add(convo?.lastRecommended);
+  for (const place of convo?.lastPlaces ?? []) add(place);
+  return out;
+}
+
+export function formatBookingReply(place: DiscoveredPlace | undefined, chinese: boolean): string {
+  if (!place) {
+    return chinese
+      ? "你想訂哪一間？先傳店名，或讓我先幫你找附近選項。"
+      : "Which place do you want to book? Send the name, or ask me for nearby options first.";
+  }
+  const actions: string[] = [];
+  if (place.nationalPhoneNumber) actions.push(chinese ? `打電話：${place.nationalPhoneNumber}` : `call ${place.nationalPhoneNumber}`);
+  if (place.websiteUri) actions.push(chinese ? `開網站：${place.websiteUri}` : `open ${place.websiteUri}`);
+  if (place.googleMapsUri) actions.push(chinese ? `Google Maps：${place.googleMapsUri}` : `Google Maps: ${place.googleMapsUri}`);
+  if (place.address && actions.length === 0) actions.push(chinese ? `地址：${place.address}` : `address: ${place.address}`);
+  if (chinese) {
+    const next = actions.length ? actions.join("\n") : "我目前沒有電話或訂位連結。";
+    return `我還不能直接替你完成訂位，但可以把 ${place.name} 的下一步給你：\n${next}`;
+  }
+  const next = actions.length ? actions.join("\n") : "I don't have a phone or reservation link for it yet.";
+  return `I can't complete the reservation inside iMessage yet, but here's the next step for ${place.name}:\n${next}`;
+}
+
+function formatPlaceCompareLine(place: DiscoveredPlace): string {
+  const bits = [place.name];
+  if (typeof place.rating === "number") bits.push(`${place.rating}★`);
+  if (place.category) bits.push(place.category);
+  if (place.priceLevel) bits.push(place.priceLevel);
+  if (place.address) bits.push(place.address);
+  return bits.join(" — ");
+}
+
+export function formatCompareReply(places: DiscoveredPlace[], chinese: boolean): string {
+  const unique = places.filter((p, i, arr) => arr.findIndex((x) => x.name.toLowerCase() === p.name.toLowerCase()) === i).slice(0, 3);
+  if (unique.length < 2) {
+    return chinese
+      ? "我需要至少兩個剛剛提到的地點才能比較。"
+      : "I need at least two recent places to compare — ask me for another option first.";
+  }
+  const sortedByRating = unique.filter((p) => typeof p.rating === "number").sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const pick = sortedByRating[0];
+  const lines = unique.map((p, i) => `${i + 1}. ${formatPlaceCompareLine(p)}`);
+  const caveat = chinese
+    ? "我目前只知道評分、類型、地址/連結，不會編菜單或營業時間。"
+    : "I only know rating/category/address/link so far — I won't make up menu, hours, or vibe.";
+  const suggestion = pick
+    ? chinese
+      ? `如果只看評分，先選 ${pick.name}。`
+      : `If you're choosing by rating, I'd pick ${pick.name}.`
+    : chinese
+      ? "如果你要，我可以再找一個更接近/評分更高的選項。"
+      : "If you want, I can find one that's closer or higher-rated.";
+  return `${chinese ? "目前差別：" : "Here's the useful difference:"}\n${lines.join("\n")}\n${suggestion}\n${caveat}`;
 }
 
 // Defensive field extraction: Sendblue inbound payloads vary, so accept several
@@ -1588,6 +1684,22 @@ export async function processSendblueInbound(
         await deps.client.sendMessage(from, orderReply);
         console.log(`[sendblue] order reply for ${from} near ${loc.label}`);
         return { replied: true, reply: orderReply };
+      }
+    }
+    if (!url && isBookingIntent(text)) {
+      const recent = uniqueRecentPlaces(convo);
+      reply = formatBookingReply(recent[0], chinese);
+      console.log(`[sendblue] booking intent for ${from} target="${recent[0]?.name ?? "(none)"}"`);
+      await deps.client.sendMessage(from, reply);
+      return { replied: true, reply };
+    }
+    if (!url && isCompareIntent(text)) {
+      const recent = uniqueRecentPlaces(convo);
+      if (recent.length >= 2) {
+        reply = formatCompareReply(recent, chinese);
+        console.log(`[sendblue] compare intent for ${from} places=${recent.map((p) => p.name).join("|")}`);
+        await deps.client.sendMessage(from, reply);
+        return { replied: true, reply };
       }
     }
     if (url) {

@@ -7,6 +7,10 @@ import {
   formatVenueReply,
   isListIntent,
   isRecommendIntent,
+  isBookingIntent,
+  isCompareIntent,
+  formatBookingReply,
+  formatCompareReply,
   isOrderIntent,
   orderQuery,
   isLocationIntent,
@@ -529,18 +533,81 @@ test("webhook flow: follow-up about the recommended place is answered (not 'not 
   const store = new FakeStore();
   const { store: conversation } = fakeConversation();
   // Seed: the bot already recommended Maru Coffee to this number.
-  conversation.setPlaces("+15551230000", [{ name: "Maru Coffee", rating: 4.7, address: "Los Feliz" }]);
+  conversation.setPlaces("+155****0000", [{ name: "Maru Coffee", rating: 4.7, address: "Los Feliz" }]);
   const gemini: GeminiCaller = async (prompt) => {
     assert.ok(prompt.includes("Maru Coffee"), "recommended place must be in the prompt context");
     return JSON.stringify({ reply: "Maru Coffee is rated 4.7★ in Los Feliz — I don't have their menu though." });
   };
 
   const result = await processSendblueInbound(
-    { from_number: "+15551230000", content: "what's their best coffee" },
+    { from_number: "+155****0000", content: "what's their best coffee" },
     { client, store, gemini, conversation },
   );
   assert.equal(result.replied, true);
   assert.match(client.calls.at(-1)?.content ?? "", /Maru Coffee/);
+});
+
+test("webhook flow: booking follow-up gives actionable reservation next step", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+155****1234", {
+    name: "Wagyu Factory Tustin | Limitless Shabu",
+    rating: 4.4,
+    address: "2415 Park Ave, Tustin, CA 92782",
+    nationalPhoneNumber: "(714) 555-0101",
+    websiteUri: "https://example.com/reserve",
+    googleMapsUri: "https://maps.google.com/?cid=123",
+  });
+
+  const result = await processSendblueInbound(
+    { from_number: "+155****1234", content: "Can you book a table for me?" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(result.replied, true);
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /call \(714\) 555-0101/);
+  assert.match(out, /example\.com\/reserve/);
+});
+
+test("webhook flow: comparison follow-up explains recent options instead of dead-ending", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+155****1234", {
+    name: "Show Hotpot 75",
+    rating: 4.6,
+    category: "hot pot restaurant",
+    address: "2540 Main St Ste L, Irvine, CA 92614",
+  });
+  conversation.setPlaces("+155****1234", [
+    { name: "Wagyu Factory Tustin | Limitless Shabu", rating: 4.4, category: "shabu shabu", address: "2415 Park Ave, Tustin, CA 92782" },
+    { name: "Show Hotpot 75", rating: 4.6, category: "hot pot restaurant", address: "2540 Main St Ste L, Irvine, CA 92614" },
+  ]);
+
+  const result = await processSendblueInbound(
+    { from_number: "+155****1234", content: "What's the difference between those" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(result.replied, true);
+  assert.match(out, /Show Hotpot 75/);
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /4\.6★/);
+  assert.match(out, /4\.4★/);
+  assert.match(out, /won't make up menu/);
+});
+
+test("booking and comparison intent detectors match screenshot follow-ups", () => {
+  assert.equal(isBookingIntent("Can you book a table for me?"), true);
+  assert.equal(isBookingIntent("訂位"), true);
+  assert.equal(isCompareIntent("What's the difference between those"), true);
+  assert.equal(isCompareIntent("比較這兩間"), true);
+  assert.match(formatBookingReply({ name: "A", address: "123 Main" }, false), /A/);
+  assert.match(formatCompareReply([{ name: "A", rating: 4.1 }, { name: "B", rating: 4.8 }], false), /B/);
 });
 
 test("webhook flow: 'something else' reuses last location and returns a DIFFERENT place", async () => {
