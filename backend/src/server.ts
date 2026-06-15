@@ -26,6 +26,7 @@ import {
 import { issueBuyerSession, placeOrder, nearby, createRecurring, pendingRuns, confirmRecurringRun, type SllrBuyer } from "./sllrCommerce.js";
 import { defaultGeocode, parseRecurringSchedule, recurringQuery } from "./sendblueBot.js";
 import type { StoredLocation } from "./sendbluePlaceStore.js";
+import { SllrBuyerStore, sllrBuyerTableSql, type NumberBuyer } from "./sllrBuyerStore.js";
 import {
   PgSendbluePlaceStore,
   sendblueSavedPlacesTableSql,
@@ -117,15 +118,19 @@ create index if not exists user_channels_profile_idx
 `;
 
 // One SLL-R buyer session per phone number, so orders/receipts accrue to a stable
-// buyer (the cross-merchant receipt graph). In-memory v0; persist later.
-const sllrBuyerByNumber = new Map<string, SllrBuyer>();
+// buyer (the cross-merchant receipt graph). Persisted so a phone keeps the same
+// buyerId (and saved card / recurring) across restarts.
+const sllrBuyers = new SllrBuyerStore(pool);
+async function getOrCreateSllrBuyer(fromNumber: string): Promise<SllrBuyer> {
+  const existing = await sllrBuyers.get(fromNumber);
+  if (existing) return existing;
+  const buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
+  await sllrBuyers.set(fromNumber, buyer);
+  return buyer;
+}
 // Place an SLL-R order for an inbound number. Returned to the bot as deps.order.
 async function placeSllrOrder(query: string, fromNumber: string, location?: StoredLocation): Promise<string> {
-  let buyer = sllrBuyerByNumber.get(fromNumber);
-  if (!buyer) {
-    buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
-    sllrBuyerByNumber.set(fromNumber, buyer);
-  }
+  const buyer = await getOrCreateSllrBuyer(fromNumber);
   // Pick the nearest merchant to the user's area; fall back to the default.
   let merchantId = process.env.SLLR_DEFAULT_MERCHANT?.trim() || "raposa-coffee";
   if (location) {
@@ -155,11 +160,7 @@ const SLLR_RECURRING_MAX_USD = process.env.SLLR_RECURRING_MAX_USD?.trim() || "20
 
 // Set up a recurring order from a phrase like "每天早上 8點 cold brew". deps.setRecurring.
 async function setSllrRecurring(text: string, fromNumber: string, location?: StoredLocation): Promise<string> {
-  let buyer = sllrBuyerByNumber.get(fromNumber);
-  if (!buyer) {
-    buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
-    sllrBuyerByNumber.set(fromNumber, buyer);
-  }
+  const buyer = await getOrCreateSllrBuyer(fromNumber);
   let merchantId = process.env.SLLR_DEFAULT_MERCHANT?.trim() || "raposa-coffee";
   if (location) {
     try {
@@ -187,7 +188,7 @@ async function setSllrRecurring(text: string, fromNumber: string, location?: Sto
 
 // Confirm the buyer's pending recurring run → SLL-R charges the saved card. deps.confirmRecurring.
 async function confirmSllrRecurring(fromNumber: string): Promise<string> {
-  const buyer = sllrBuyerByNumber.get(fromNumber);
+  const buyer = await sllrBuyers.get(fromNumber);
   if (!buyer) return "I don't have a recurring order set up for you yet.";
   try {
     const runs = await pendingRuns(buyer);
@@ -207,11 +208,56 @@ async function confirmSllrRecurring(fromNumber: string): Promise<string> {
   }
 }
 
+// Recurring notifier: SLL-R's cron opens confirm prompts (pending runs); SAV-E
+// polls each known buyer and iMessages the prompt once per run (atomic dedup via
+// markNotified). The buyer replies "confirm my usual" → confirmSllrRecurring.
+const SLLR_NOTIFY_INTERVAL_MS = Number(process.env.SLLR_NOTIFY_INTERVAL_MS ?? 300_000);
+async function sllrNotifySweep(): Promise<number> {
+  let buyers: NumberBuyer[];
+  try {
+    buyers = await sllrBuyers.all();
+  } catch (error) {
+    console.error("[sendblue] sllr notify: list buyers failed", error);
+    return 0;
+  }
+  if (!buyers.length) return 0;
+  const client = new SendblueClient();
+  let sent = 0;
+  for (const { number, buyer } of buyers) {
+    let runs;
+    try {
+      runs = await pendingRuns(buyer);
+    } catch (error) {
+      console.error("[sendblue] sllr notify: pendingRuns failed", number, error);
+      continue;
+    }
+    for (const run of runs) {
+      let fresh = false;
+      try {
+        fresh = await sllrBuyers.markNotified(run.id);
+      } catch (error) {
+        console.error("[sendblue] sllr notify: markNotified failed", error);
+        continue;
+      }
+      if (!fresh) continue; // already prompted this run
+      try {
+        await client.sendMessage(number, `🔁 ${run.summary} — order now? Reply "confirm my usual".`);
+        sent++;
+      } catch (error) {
+        console.error("[sendblue] sllr notify: send failed", number, error);
+      }
+    }
+  }
+  if (sent) console.log(`[sendblue] sllr notify: sent ${sent} recurring prompt(s)`);
+  return sent;
+}
+
 // Idempotent create-if-not-exists; awaited at startup. Failure is logged, not
 // fatal — the webhook still 200s and the save path degrades gracefully.
 async function ensureSendblueTable(): Promise<void> {
   try {
     await pool.query(sendblueSavedPlacesTableSql);
+    await pool.query(sllrBuyerTableSql);
     await pool.query(verifiedVisitsTableSql);
     await pool.query(reviewsTableSql);
     await pool.query(userChannelsTableSql);
@@ -602,6 +648,13 @@ createServer(async (request, response) => {
 }).listen(Number(process.env.PORT ?? 3000), () => {
   console.log(`SAV-E backend listening on ${process.env.PORT ?? 3000}`);
   void ensureSendblueTable();
+  // Recurring confirm-prompt notifier (in-process v0). Set SLLR_NOTIFY_INTERVAL_MS=0
+  // to disable (e.g. when an external cron drives it instead).
+  if (SLLR_NOTIFY_INTERVAL_MS > 0) {
+    const timer = setInterval(() => void sllrNotifySweep(), SLLR_NOTIFY_INTERVAL_MS);
+    timer.unref();
+    console.log(`[sendblue] sllr recurring notifier every ${Math.round(SLLR_NOTIFY_INTERVAL_MS / 1000)}s`);
+  }
 });
 
 async function resolveSendblueMemoryKey(fromNumber: string): Promise<string> {
