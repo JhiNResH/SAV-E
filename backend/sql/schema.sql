@@ -26,7 +26,7 @@ create table if not exists user_channels (
     channel text not null,
     channel_user_id text not null,
     phone_e164 text,
-    verified_at timestamptz not null default now(),
+    verified_at timestamptz,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     constraint user_channels_channel_check check (channel in ('imessage', 'sms', 'line', 'whatsapp', 'sendblue'))

@@ -105,7 +105,7 @@ create table if not exists user_channels (
   channel text not null,
   channel_user_id text not null,
   phone_e164 text,
-  verified_at timestamptz not null default now(),
+  verified_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint user_channels_channel_check check (channel in ('imessage', 'sms', 'line', 'whatsapp', 'sendblue'))
@@ -549,7 +549,8 @@ async function resolveSendblueMemoryKey(fromNumber: string): Promise<string> {
     `select profile_id
      from user_channels
      where channel in ('sendblue', 'imessage', 'sms')
-       and channel_user_id = $1
+       and verified_at is not null
+       and (channel_user_id = $1 or phone_e164 = $1)
      order by case channel when 'sendblue' then 0 when 'imessage' then 1 else 2 end
      limit 1`,
     [normalized],
@@ -581,24 +582,25 @@ async function handleUserChannels(
   if (request.method === "POST" && !channelId) {
     const body = await readJson(request);
     const channelRaw = typeof body.channel === "string" ? body.channel.trim().toLowerCase() : "sendblue";
-    const channel = channelRaw === "imessage" || channelRaw === "sms" || channelRaw === "line" ||
-      channelRaw === "whatsapp" || channelRaw === "sendblue"
-      ? channelRaw
-      : "sendblue";
+    const supportedChannels = new Set(["imessage", "sms", "line", "whatsapp", "sendblue"]);
+    if (!supportedChannels.has(channelRaw)) {
+      return sendJson(response, { error: "Unsupported channel" }, 400);
+    }
+    const channel = channelRaw;
     const channelUserId = normalizeChannelUserId(body.channel_user_id ?? body.phone ?? body.phone_e164);
     if (!channelUserId) return sendJson(response, { error: "channel_user_id or phone is required" }, 400);
     const phone = normalizeChannelUserId(body.phone_e164 ?? body.phone) || null;
     const { rows } = await pool.query(
       `insert into user_channels (profile_id, channel, channel_user_id, phone_e164, verified_at, updated_at)
-       values ($1, $2, $3, $4, now(), now())
+       values ($1, $2, $3, $4, null, now())
        on conflict (channel, channel_user_id) do update
-         set profile_id = excluded.profile_id,
-             phone_e164 = coalesce(excluded.phone_e164, user_channels.phone_e164),
-             verified_at = now(),
+         set phone_e164 = coalesce(excluded.phone_e164, user_channels.phone_e164),
              updated_at = now()
+       where user_channels.profile_id = excluded.profile_id
        returning id, profile_id, channel, channel_user_id, phone_e164, verified_at, created_at, updated_at`,
       [userId, channel, channelUserId, phone],
     );
+    if (!rows[0]) return sendJson(response, { error: "Channel is already linked to another profile" }, 409);
     return sendJson(response, formatDates(rows[0]), 201);
   }
 

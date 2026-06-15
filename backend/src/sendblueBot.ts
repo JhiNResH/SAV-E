@@ -1234,7 +1234,7 @@ export async function processSendblueInbound(
       console.error("[sendblue] resolveMemoryKey error", error);
     }
   }
-  if (memoryKey !== from) console.log(`[sendblue] resolved ${from} → SAV-E profile ${memoryKey}`);
+  if (memoryKey !== from) console.log("[sendblue] resolved inbound channel to SAV-E profile");
 
   // Best-effort: show the user a blue read receipt + typing indicator while we
   // fetch + extract. Fire-and-forget (not awaited) so two Sendblue round-trips
@@ -1326,7 +1326,7 @@ export async function processSendblueInbound(
         await deps.client.sendMessage(from, reply);
         return { replied: true, reply };
       }
-      const orderReply = await deps.order(orderQuery(text), memoryKey, loc);
+      const orderReply = await deps.order(orderQuery(text), from, loc);
       if (orderReply) {
         await deps.client.sendMessage(from, orderReply);
         console.log(`[sendblue] order reply for ${from} near ${loc.label}`);
