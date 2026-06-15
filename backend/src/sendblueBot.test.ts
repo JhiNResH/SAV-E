@@ -19,6 +19,7 @@ import {
   pickBestPlace,
   looksLikeReceipt,
   isReceiptLink,
+  looksLikeReview,
   extractReceipt,
   type GeminiCaller,
   type DiscoveredPlace,
@@ -1189,4 +1190,54 @@ test("webhook flow: same merchant forwarded twice within 10 min is not double-co
   );
   // Only ONE verified visit recorded (dedup), not two.
   assert.equal(receiptStore.byPhone.get("+15554445566")?.length, 1);
+});
+
+// --- Review survives a process restart (in-memory pendingReview lost) ------
+
+test("looksLikeReview gates review-ish replies, ignores normal requests", () => {
+  assert.equal(looksLikeReview("5, the best sandwich in the world"), true);
+  assert.equal(looksLikeReview("amazing matcha, would go again"), true);
+  assert.equal(looksLikeReview("4/5 solid"), true);
+  assert.equal(looksLikeReview("recommend coffee nearby"), false);
+  assert.equal(looksLikeReview("my places"), false);
+});
+
+test("webhook flow: a review lands even when in-memory pendingReview was lost (uses recent visit)", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new FakeReceiptStore();
+  const reviewStore = new FakeReviewStore();
+  // Simulate: the visit was logged earlier (still in DB), but the process
+  // restarted so there is NO in-memory pendingReview. Seed only the visit.
+  receiptStore.byPhone.set("+15557778888", [
+    { merchant: "Mendocino Farms", total: "$14.36", createdAt: new Date() },
+  ]);
+  const { store: conversation } = fakeConversation(); // empty — no pendingReview
+  const gemini: GeminiCaller = async (prompt) =>
+    prompt.includes("is_review")
+      ? JSON.stringify({ is_review: true, rating: 5, text: "best sandwich in the world" })
+      : JSON.stringify({ reply: "x" });
+
+  const result = await processSendblueInbound(
+    { from_number: "+15557778888", content: "5, the best sandwich in the world you can have" },
+    { client, store, gemini, receiptStore, reviewStore, conversation },
+  );
+  assert.equal(result.replied, true);
+  assert.match(client.calls.at(-1)?.content ?? "", /review of Mendocino Farms/i);
+  assert.equal(reviewStore.byPhone.get("+15557778888")?.[0]?.rating, 5);
+});
+
+test("webhook flow: a review-ish reply with NO recent visit is not logged as a review", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new FakeReceiptStore(); // no visits
+  const reviewStore = new FakeReviewStore();
+  const { store: conversation } = fakeConversation();
+  const gemini: GeminiCaller = async () => JSON.stringify({ reply: "I don't have that saved." });
+
+  await processSendblueInbound(
+    { from_number: "+15550009998", content: "5 stars great" },
+    { client, store, gemini, receiptStore, reviewStore, conversation },
+  );
+  assert.equal(reviewStore.byPhone.get("+15550009998"), undefined); // nothing logged
 });
