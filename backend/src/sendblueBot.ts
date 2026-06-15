@@ -188,7 +188,7 @@ export type ExtractedReceipt = { merchant: string; total?: string; date?: string
 // Cheap pre-filter so we don't spend an LLM call on every message — only text
 // that smells like a receipt/order/payment is sent on to the model to confirm.
 const receiptSignals =
-  /\b(receipt|invoice|subtotal|order\s*#?\d|order\s+confirmation|thank you for your (order|purchase|visit)|amount\s+(due|paid)|paid|tip|tax|grand\s+total|total)\b|收據|發票|訂單|消費明細|帳單|\$\s?\d|\d+\.\d{2}\b|NT\$|US\$/i;
+  /\breceipt\b|\binvoice\b|\bsubtotal\b|\border\s*#?\s*\d+|\border\s+confirmation\b|thank you for your (order|purchase|visit)|\bamount\s+(due|paid)\b|\bpaid\b|\bgrand\s+total\b|\btotal\b|收據|發票|訂單|消費明細|帳單|\$\s?\d|\d+\.\d{2}\b|NT\$|US\$/i;
 
 export function looksLikeReceipt(text: string): boolean {
   return receiptSignals.test(text);
@@ -963,10 +963,117 @@ class InMemoryConversationStore implements ConversationStore {
     const prev = this.get(phone);
     if (prev) this.map.set(phone, { ...prev, pendingQuery: undefined, at: Date.now() });
   }
+  /** Seed an entry verbatim (used to hydrate from a durable backing store). */
+  restore(phone: string, state: ConversationState): void {
+    this.map.set(phone, state);
+  }
 }
 
 /** Process-wide conversation memory (single Railway instance, 10-min TTL). */
 export const defaultConversationStore: ConversationStore = new InMemoryConversationStore();
+
+export const conversationStateTableSql = `
+create table if not exists sendblue_conversation_state (
+  memory_key text primary key,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+create index if not exists sendblue_conversation_state_updated_idx
+  on sendblue_conversation_state (updated_at);
+`;
+
+/**
+ * Durable conversation memory: an in-memory store (fast, synchronous — so the
+ * ConversationStore interface stays sync and call sites don't change) that
+ * WRITES THROUGH to Postgres on every mutation and HYDRATES from Postgres at
+ * boot. This makes the multi-turn state (pending location, last recommended
+ * place, armed review, …) survive deploys/restarts — the "bot forgot what I just
+ * said" class of bugs. Single Railway instance, so the in-memory layer is the
+ * source of truth at runtime and the DB is the durable mirror.
+ */
+export class PgBackedConversationStore implements ConversationStore {
+  private readonly mem = new InMemoryConversationStore();
+  constructor(private readonly db: ConversationQueryable) {}
+
+  /** Load recent (non-stale) state into memory. Call once at startup. */
+  async hydrate(): Promise<void> {
+    try {
+      const { rows } = await this.db.query(
+        `select memory_key, state, (extract(epoch from updated_at) * 1000)::bigint as at
+         from sendblue_conversation_state
+         where updated_at > now() - interval '${Math.round(CONVERSATION_TTL_MS / 60000)} minutes'`,
+      );
+      for (const row of rows) {
+        const raw = typeof row.state === "string" ? JSON.parse(row.state) : row.state;
+        this.mem.restore(String(row.memory_key), { ...(raw as object), at: Number(row.at) } as ConversationState);
+      }
+      console.log(`[sendblue] hydrated ${rows.length} conversation states`);
+    } catch (error) {
+      console.error("[sendblue] conversation hydrate failed", error);
+    }
+  }
+
+  private persist(phone: string): void {
+    const state = this.mem.get(phone);
+    if (!state) {
+      // Cleared/expired → drop the durable row too (best-effort).
+      void this.db
+        .query(`delete from sendblue_conversation_state where memory_key = $1`, [phone])
+        .catch((error) => console.error("[sendblue] conversation delete failed", error));
+      return;
+    }
+    const { at: _at, ...rest } = state;
+    void this.db
+      .query(
+        `insert into sendblue_conversation_state (memory_key, state, updated_at)
+         values ($1, $2::jsonb, now())
+         on conflict (memory_key) do update set state = excluded.state, updated_at = now()`,
+        [phone, JSON.stringify(rest)],
+      )
+      .catch((error) => console.error("[sendblue] conversation persist failed", error));
+  }
+
+  get(phone: string): ConversationState | undefined {
+    return this.mem.get(phone);
+  }
+  setPending(phone: string, query: string): void {
+    this.mem.setPending(phone, query);
+    this.persist(phone);
+  }
+  setPlaces(phone: string, places: DiscoveredPlace[]): void {
+    this.mem.setPlaces(phone, places);
+    this.persist(phone);
+  }
+  setRecommended(phone: string, place: DiscoveredPlace): void {
+    this.mem.setRecommended(phone, place);
+    this.persist(phone);
+  }
+  setArea(phone: string, area: string): void {
+    this.mem.setArea(phone, area);
+    this.persist(phone);
+  }
+  addShown(phone: string, name: string): void {
+    this.mem.addShown(phone, name);
+    this.persist(phone);
+  }
+  setReview(phone: string, merchant: string): void {
+    this.mem.setReview(phone, merchant);
+    this.persist(phone);
+  }
+  clearReview(phone: string): void {
+    this.mem.clearReview(phone);
+    this.persist(phone);
+  }
+  clearPending(phone: string): void {
+    this.mem.clearPending(phone);
+    this.persist(phone);
+  }
+}
+
+/** Minimal pg-pool-like surface for the conversation store. */
+export type ConversationQueryable = {
+  query: (sql: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+};
 
 /**
  * The agentic decision for a no-URL message: either answer from the user's saved
@@ -1425,6 +1532,18 @@ export async function processSendblueInbound(
         return { replied: true, reply };
       }
       console.log(`[sendblue] pending review for "${merchant}" not a review → falling through`);
+    }
+    // Receipt-ish text we could NOT parse as a receipt (e.g. an order header like
+    // "Review Order #214 at X" that precedes the receipt link). Don't let it fall
+    // through to the place-recall path and answer "I don't have a place called X"
+    // — ack softly and ask for the receipt instead.
+    if (!url && looksLikeReceipt(text)) {
+      console.log(`[sendblue] receipt-ish unparsed → soft ack for ${from}`);
+      reply = chinese
+        ? "📩 看起來像收據 — 把收據連結或完整內容傳給我,我就幫你記成驗證訪問。"
+        : "📩 Looks like a receipt — forward the receipt link or full text and I'll log it as a verified visit.";
+      await deps.client.sendMessage(from, reply);
+      return { replied: true, reply };
     }
     if (deps.geocode && !url && isLocationIntent(text)) {
       // Location set: "I'm in X" → geocode → remember per number for nearby orders.

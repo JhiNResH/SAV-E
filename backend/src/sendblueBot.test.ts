@@ -25,6 +25,7 @@ import {
   type DiscoveredPlace,
   type ConversationStore,
   type ConversationState,
+  PgBackedConversationStore,
 } from "./sendblueBot.js";
 import type { ExtractedVenue } from "./sendblueBot.js";
 import type { ListOpts, SavedPlace, SendbluePlaceStore, StoredLocation } from "./sendbluePlaceStore.js";
@@ -892,7 +893,8 @@ class FakeReceiptStore implements VerifiedVisitStore {
   public byPhone = new Map<string, VerifiedVisit[]>();
   async save(phone: string, visit: VerifiedVisit): Promise<number> {
     const list = this.byPhone.get(phone) ?? [];
-    list.unshift(visit);
+    // Mirror the pg store: created_at defaults to now() on insert.
+    list.unshift({ createdAt: new Date(), ...visit });
     this.byPhone.set(phone, list);
     return list.length;
   }
@@ -1240,4 +1242,77 @@ test("webhook flow: a review-ish reply with NO recent visit is not logged as a r
     { client, store, gemini, receiptStore, reviewStore, conversation },
   );
   assert.equal(reviewStore.byPhone.get("+15550009998"), undefined); // nothing logged
+});
+
+// --- Durable conversation memory + receipt-ish soft-ack -------------------
+
+// Tiny in-memory Postgres double for the JSONB conversation-state table.
+function fakeConvoDb() {
+  const rows = new Map<string, { state: string; at: number }>();
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const query = async (sql: string, values: unknown[] = []) => {
+    if (/^\s*insert into sendblue_conversation_state/i.test(sql)) {
+      rows.set(String(values[0]), { state: String(values[1]), at: Date.now() });
+      return { rows: [] };
+    }
+    if (/^\s*delete from sendblue_conversation_state/i.test(sql)) {
+      rows.delete(String(values[0]));
+      return { rows: [] };
+    }
+    if (/^\s*select memory_key, state/i.test(sql)) {
+      return {
+        rows: [...rows.entries()].map(([memory_key, v]) => ({ memory_key, state: v.state, at: v.at })),
+      };
+    }
+    return { rows: [] };
+  };
+  return { query, flush, rows };
+}
+
+test("PgBackedConversationStore write-through persists and hydrate restores state", async () => {
+  const db = fakeConvoDb();
+  const store1 = new PgBackedConversationStore(db);
+  store1.setArea("profile-1", "Tustin");
+  store1.setReview("profile-1", "Mendocino Farms");
+  store1.setRecommended("profile-1", { name: "Jam Jam", rating: 4.7 });
+  await db.flush(); // let the fire-and-forget writes land
+
+  // Simulate a restart: a brand-new store hydrates from the same DB.
+  const store2 = new PgBackedConversationStore(db);
+  await store2.hydrate();
+  const convo = store2.get("profile-1");
+  assert.equal(convo?.lastArea, "Tustin");
+  assert.equal(convo?.pendingReview, "Mendocino Farms");
+  assert.equal(convo?.lastRecommended?.name, "Jam Jam");
+});
+
+test("PgBackedConversationStore clearing a field removes it durably", async () => {
+  const db = fakeConvoDb();
+  const store1 = new PgBackedConversationStore(db);
+  store1.setPending("p", "coffee");
+  store1.clearPending("p");
+  await db.flush();
+  const store2 = new PgBackedConversationStore(db);
+  await store2.hydrate();
+  assert.equal(store2.get("p")?.pendingQuery, undefined);
+});
+
+test("webhook flow: an unparsed receipt-ish header gets a soft ack, not 'I don't have that place'", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const receiptStore = new FakeReceiptStore(); // no recent visit
+  const gemini: GeminiCaller = async (prompt) => {
+    if (prompt.includes("is_receipt")) return JSON.stringify({ is_receipt: false, merchant: null });
+    // If we ever reached the agentic path, it would say this — we must NOT see it.
+    return JSON.stringify({ reply: "I don't have a place called Order saved." });
+  };
+
+  const result = await processSendblueInbound(
+    { from_number: "+15551239000", content: "Review Order #214 at Mendocino Farms - 14 - Tustin:" },
+    { client, store, gemini, receiptStore },
+  );
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /Looks like a receipt|看起來像收據/);
+  assert.doesNotMatch(out, /don't have a place/i);
+  assert.equal(result.replied, true);
 });

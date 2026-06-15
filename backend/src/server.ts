@@ -21,6 +21,8 @@ import {
   defaultGeminiText,
   defaultPlacesSearch,
   processSendblueInbound,
+  PgBackedConversationStore,
+  conversationStateTableSql,
   SendblueClient,
 } from "./sendblueBot.js";
 import { issueBuyerSession, placeOrder, nearby, createRecurring, pendingRuns, confirmRecurringRun, type SllrBuyer } from "./sllrCommerce.js";
@@ -96,6 +98,12 @@ const sendblueReceiptStore = new PgVerifiedVisitStore({
 
 // Per-number receipt-gated reviews.
 const sendblueReviewStore = new PgReviewStore({
+  query: (sql, values) => pool.query(sql, values as QueryValue[]),
+});
+
+// Durable conversation memory: in-memory speed, write-through to Postgres, and
+// hydrated at boot so multi-turn state survives deploys/restarts.
+const sendblueConversationStore = new PgBackedConversationStore({
   query: (sql, values) => pool.query(sql, values as QueryValue[]),
 });
 
@@ -274,6 +282,9 @@ async function ensureSendblueTable(): Promise<void> {
     await pool.query(verifiedVisitsTableSql);
     await pool.query(reviewsTableSql);
     await pool.query(userChannelsTableSql);
+    await pool.query(conversationStateTableSql);
+    // Hydrate durable conversation memory into the in-memory layer.
+    await sendblueConversationStore.hydrate();
   } catch (error) {
     console.error("[sendblue] ensureSendblueTable failed", error);
   }
@@ -784,6 +795,7 @@ async function handleSendblueWebhook(
         store: sendbluePlaceStore,
         receiptStore: sendblueReceiptStore,
         reviewStore: sendblueReviewStore,
+        conversation: sendblueConversationStore,
         gemini: defaultGeminiText,
         placesSearch: defaultPlacesSearch,
         order: placeSllrOrder,
