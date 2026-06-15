@@ -67,6 +67,8 @@ export type SllrOrder = {
   merchantId?: string;
   merchantName?: string;
 };
+// "SLL-R asks": the hint to offer the buyer a recurring version of this order.
+export type SllrRecurringSuggestion = { eligible: boolean; prompt?: string };
 // Place an order bound to a SAV-E buyer. Pass the buyer session so the order +
 // its receipt accrue to that buyerId (the cross-merchant taste/receipt graph).
 export async function placeOrder(
@@ -74,8 +76,8 @@ export async function placeOrder(
   userIntent: string,
   buyer: SllrBuyer,
   opts: { deadlineMinutes?: number; customerLabel?: string } = {},
-): Promise<SllrOrder> {
-  const r = await sllrFetch<{ order: SllrOrder }>(
+): Promise<SllrOrder & { suggestRecurring?: SllrRecurringSuggestion }> {
+  const r = await sllrFetch<{ order: SllrOrder; suggestRecurring?: SllrRecurringSuggestion }>(
     `/merchants/${encodeURIComponent(merchantId)}/orders`,
     {
       method: "POST",
@@ -83,7 +85,7 @@ export async function placeOrder(
       body: JSON.stringify({ userIntent, ...opts }),
     },
   );
-  return r.order;
+  return { ...r.order, suggestRecurring: r.suggestRecurring };
 }
 
 export type SllrPaymentOption = { rail: string; type?: string; url?: string; pickupCode?: string };
@@ -119,4 +121,49 @@ export async function myOrders(buyer: SllrBuyer): Promise<SllrOrder[]> {
     headers: { authorization: `Bearer ${buyer.token}` },
   });
   return r.orders ?? [];
+}
+
+// --- Recurring orders (confirm-each) ----------------------------------------
+// SLL-R owns the schedule + the saved-card charge; SAV-E sets up the "usual" and
+// relays the per-run confirm. The buyer must have a saved card (first checkout)
+// before a run can actually charge.
+
+export type SllrSchedule = { daysOfWeek: number[]; hour: number; minute: number; tz: string };
+export type SllrSubscription = { id: string; merchantId: string; merchantName?: string; nextRunAt?: string };
+export type SllrRun = { id: string; subscriptionId: string; summary: string; dueAt?: string };
+
+// Create a recurring subscription ("usual" + weekly schedule). maxPerRunUsd caps
+// each charge — SLL-R refuses a run above it.
+export async function createRecurring(
+  buyer: SllrBuyer,
+  merchantId: string,
+  userIntent: string,
+  schedule: SllrSchedule,
+  maxPerRunUsd: string,
+  opts: { deadlineMinutes?: number } = {},
+): Promise<{ subscription: SllrSubscription; cardOnFile: boolean }> {
+  return sllrFetch<{ subscription: SllrSubscription; cardOnFile: boolean }>("/buyer/recurring", {
+    method: "POST",
+    headers: { authorization: `Bearer ${buyer.token}` },
+    body: JSON.stringify({ merchantId, template: { userIntent, ...opts }, schedule, maxPerRunUsd }),
+  });
+}
+
+// Runs awaiting the buyer's confirmation (the "order your usual now?" prompts).
+export async function pendingRuns(buyer: SllrBuyer): Promise<SllrRun[]> {
+  const r = await sllrFetch<{ runs?: SllrRun[] }>("/buyer/recurring/runs", {
+    method: "GET",
+    headers: { authorization: `Bearer ${buyer.token}` },
+  });
+  return r.runs ?? [];
+}
+
+// Confirm a pending run → SLL-R creates the order + charges the saved card.
+export type SllrConfirmResult = { status: string; order?: SllrOrder };
+export async function confirmRecurringRun(buyer: SllrBuyer, runId: string): Promise<SllrConfirmResult> {
+  return sllrFetch<SllrConfirmResult>("/buyer/recurring/confirm", {
+    method: "POST",
+    headers: { authorization: `Bearer ${buyer.token}` },
+    body: JSON.stringify({ runId }),
+  });
 }

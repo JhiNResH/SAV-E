@@ -597,6 +597,55 @@ export function orderQuery(text: string): string {
   return stripped || text.trim();
 }
 
+// "Make this recurring" intents. Checked BEFORE isOrderIntent so "每天幫我點一杯"
+// sets a subscription instead of a one-off order.
+const recurringIntentPhrases = ["每天", "每日", "每週", "每周", "固定", "定期", "recurring", "every day", "every morning", "every week", "daily", "weekly", "set recurring", "subscribe"];
+export function isRecurringIntent(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (!lower) return false;
+  return recurringIntentPhrases.some((phrase) => lower.includes(phrase));
+}
+
+// Confirm the pending recurring run (the "order your usual now?" reply).
+const recurringConfirmPhrases = ["確認定期", "confirm recurring", "confirm my usual", "order my usual", "送出定期"];
+export function isRecurringConfirmIntent(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return recurringConfirmPhrases.some((phrase) => lower.includes(phrase));
+}
+
+// Parse a coarse weekly schedule. Defaults: every day at 08:00. Recognizes
+// 平日/weekday (Mon-Fri), 週末/weekend, and an hour (8點 / 8am / 08:00). tz is a
+// fixed default — SAV-E has no per-user tz yet.
+export function parseRecurringSchedule(text: string, tz: string): { daysOfWeek: number[]; hour: number; minute: number; tz: string } {
+  const lower = text.toLowerCase();
+  let daysOfWeek = [0, 1, 2, 3, 4, 5, 6];
+  if (/(平日|weekday|工作日|週一到週五|周一到周五|mon-fri)/i.test(lower)) daysOfWeek = [1, 2, 3, 4, 5];
+  else if (/(週末|周末|weekend)/i.test(lower)) daysOfWeek = [0, 6];
+  let hour = 8;
+  let minute = 0;
+  const hm = lower.match(/(\d{1,2})\s*[:點点]\s*(\d{2})/) || lower.match(/(\d{1,2})\s*(am|pm)/);
+  if (hm) {
+    hour = Number(hm[1]);
+    if (/pm/.test(hm[0]) && hour < 12) hour += 12;
+    if (/am/.test(hm[0]) && hour === 12) hour = 0;
+    minute = hm[2] && /^\d{2}$/.test(hm[2]) ? Number(hm[2]) : 0;
+    if (hour > 23) hour = 8;
+  }
+  return { daysOfWeek, hour, minute, tz };
+}
+
+// Strip recurring + order + time keywords → the "usual" item intent.
+export function recurringQuery(text: string): string {
+  return orderQuery(
+    text
+      .trim()
+      .replace(/(每天|每日|每週|每周|平日|週末|周末|固定|定期|recurring|every day|every morning|every week|daily|weekly|set recurring|subscribe)/gi, " ")
+      .replace(/(\d{1,2}\s*[:點点]\s*\d{2}|\d{1,2}\s*(am|pm)|早上|上午|下午|晚上|morning|afternoon|evening)/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
 // "I'm in <area>" — sets the per-number location used for nearby orders.
 const locationIntentPhrases = ["i'm in ", "i am in ", "im in ", "area:", "set area", "my area", "我在", "我人在"];
 export function isLocationIntent(text: string): boolean {
@@ -1162,6 +1211,10 @@ export type ProcessDeps = {
   /** Place an SLL-R order for this number; returns the reply, or null to fall
    *  through to the normal save/recall flow. Omitted in tests / when SLL-R is off. */
   order?: (query: string, fromNumber: string, location?: StoredLocation) => Promise<string | null>;
+  /** Set up a recurring order ("每天早上一杯…"); returns the reply. Omitted = off. */
+  setRecurring?: (text: string, fromNumber: string, location?: StoredLocation) => Promise<string | null>;
+  /** Confirm the buyer's pending recurring run(s) → charge saved card. Omitted = off. */
+  confirmRecurring?: (fromNumber: string) => Promise<string | null>;
   /** Geocode an area the user texts ("I'm in X") → coordinates, stored per number. */
   geocode?: Geocoder;
   /**
@@ -1360,6 +1413,24 @@ export async function processSendblueInbound(
       }
       await deps.client.sendMessage(from, reply);
       return { replied: true, reply };
+    }
+    // Confirm a pending recurring run ("confirm my usual") → charge saved card.
+    if (deps.confirmRecurring && !url && isRecurringConfirmIntent(text)) {
+      const confirmReply = await deps.confirmRecurring(from);
+      if (confirmReply) {
+        await deps.client.sendMessage(from, confirmReply);
+        return { replied: true, reply: confirmReply };
+      }
+    }
+    // Set up a recurring order ("每天早上一杯…"). Checked before isOrderIntent so a
+    // recurring phrase doesn't fall through to a one-off order.
+    if (deps.setRecurring && !url && isRecurringIntent(text)) {
+      const loc = await deps.store.getLocation(memoryKey);
+      const recurringReply = await deps.setRecurring(text, from, loc ?? undefined);
+      if (recurringReply) {
+        await deps.client.sendMessage(from, recurringReply);
+        return { replied: true, reply: recurringReply };
+      }
     }
     if (deps.order && !url && isOrderIntent(text)) {
       // Order flow: needs the user's area to pick the nearest merchant.

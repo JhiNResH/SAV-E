@@ -23,8 +23,8 @@ import {
   processSendblueInbound,
   SendblueClient,
 } from "./sendblueBot.js";
-import { issueBuyerSession, placeOrder, nearby, type SllrBuyer } from "./sllrCommerce.js";
-import { defaultGeocode } from "./sendblueBot.js";
+import { issueBuyerSession, placeOrder, nearby, createRecurring, pendingRuns, confirmRecurringRun, type SllrBuyer } from "./sllrCommerce.js";
+import { defaultGeocode, parseRecurringSchedule, recurringQuery } from "./sendblueBot.js";
 import type { StoredLocation } from "./sendbluePlaceStore.js";
 import {
   PgSendbluePlaceStore,
@@ -138,10 +138,72 @@ async function placeSllrOrder(query: string, fromNumber: string, location?: Stor
   }
   try {
     const order = await placeOrder(merchantId, query, buyer, { customerLabel: "SAV-E" });
-    return `✅ Ordered ${order.item.name} ($${order.item.subtotalUsd}) at ${order.merchantName ?? "the merchant"}. I'll text you when it's confirmed.`;
+    let reply = `✅ Ordered ${order.item.name} ($${order.item.subtotalUsd}) at ${order.merchantName ?? "the merchant"}. I'll text you when it's confirmed.`;
+    // "SLL-R asks": offer to make this a recurring order.
+    if (order.suggestRecurring?.eligible) {
+      reply += `\n\n🔁 Want this regularly? Text e.g. "每天早上 8點 ${order.item.name}" and I'll ask before each one.`;
+    }
+    return reply;
   } catch (error) {
     console.error("[sendblue] SLL-R order failed", error);
     return "Sorry — I couldn't place that order right now. Try again in a moment.";
+  }
+}
+
+const SLLR_TZ = process.env.SLLR_DEFAULT_TZ?.trim() || "America/Los_Angeles";
+const SLLR_RECURRING_MAX_USD = process.env.SLLR_RECURRING_MAX_USD?.trim() || "20.00";
+
+// Set up a recurring order from a phrase like "每天早上 8點 cold brew". deps.setRecurring.
+async function setSllrRecurring(text: string, fromNumber: string, location?: StoredLocation): Promise<string> {
+  let buyer = sllrBuyerByNumber.get(fromNumber);
+  if (!buyer) {
+    buyer = await issueBuyerSession(`SAV-E ${fromNumber}`);
+    sllrBuyerByNumber.set(fromNumber, buyer);
+  }
+  let merchantId = process.env.SLLR_DEFAULT_MERCHANT?.trim() || "raposa-coffee";
+  if (location) {
+    try {
+      const near = await nearby(location.lat, location.lng, { limit: 1 });
+      if (near[0]) merchantId = near[0].id;
+    } catch (error) {
+      console.error("[sendblue] nearby lookup failed for recurring, using default", error);
+    }
+  }
+  const schedule = parseRecurringSchedule(text, SLLR_TZ);
+  const usual = recurringQuery(text);
+  try {
+    const { subscription, cardOnFile } = await createRecurring(buyer, merchantId, usual, schedule, SLLR_RECURRING_MAX_USD);
+    void subscription;
+    const days = schedule.daysOfWeek.length === 7 ? "every day" : schedule.daysOfWeek.length === 5 ? "weekdays" : `${schedule.daysOfWeek.length} days/week`;
+    const time = `${String(schedule.hour).padStart(2, "0")}:${String(schedule.minute).padStart(2, "0")}`;
+    let reply = `🔁 Set! I'll ask before ordering "${usual}" ${days} at ${time}. Reply "confirm my usual" when I check in.`;
+    if (!cardOnFile) reply += `\n\n💳 Heads up: no saved card yet — pay your next order with the Stripe link once and it'll be remembered for recurring.`;
+    return reply;
+  } catch (error) {
+    console.error("[sendblue] SLL-R recurring setup failed", error);
+    return "Sorry — I couldn't set that up right now. Try again in a moment.";
+  }
+}
+
+// Confirm the buyer's pending recurring run → SLL-R charges the saved card. deps.confirmRecurring.
+async function confirmSllrRecurring(fromNumber: string): Promise<string> {
+  const buyer = sllrBuyerByNumber.get(fromNumber);
+  if (!buyer) return "I don't have a recurring order set up for you yet.";
+  try {
+    const runs = await pendingRuns(buyer);
+    if (!runs.length) return "Nothing to confirm right now — no recurring order is pending.";
+    const result = await confirmRecurringRun(buyer, runs[0].id);
+    if (result.status === "charged" && result.order) {
+      return `✅ Done — ordered ${result.order.item.name} ($${result.order.item.subtotalUsd}). Receipt on the way.`;
+    }
+    if (result.status === "no_card") return "I don't have a saved card yet — pay an order with the Stripe link once and I'll remember it.";
+    if (result.status === "over_cap") return "That order is over your per-run limit, so I didn't charge it.";
+    if (result.status === "declined") return "Your card was declined — please update it and try again.";
+    if (result.status === "requires_action") return "Your bank needs an extra confirmation — I'll send a payment link instead.";
+    return `Couldn't complete that (${result.status}).`;
+  } catch (error) {
+    console.error("[sendblue] SLL-R recurring confirm failed", error);
+    return "Sorry — I couldn't confirm that right now. Try again in a moment.";
   }
 }
 
@@ -653,6 +715,8 @@ async function handleSendblueWebhook(
         gemini: defaultGeminiText,
         placesSearch: defaultPlacesSearch,
         order: placeSllrOrder,
+        setRecurring: setSllrRecurring,
+        confirmRecurring: confirmSllrRecurring,
         geocode: defaultGeocode,
         resolveMemoryKey: resolveSendblueMemoryKey,
       });
