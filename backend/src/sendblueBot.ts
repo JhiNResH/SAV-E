@@ -200,6 +200,16 @@ export function looksLikeReceipt(text: string): boolean {
 const receiptLinkHosts =
   /(^|\.)(toasttab\.com|squareup\.com|square\.com|clover\.com|stripe\.com|paypal\.com|venmo\.com|grubhub\.com|doordash\.com|ubereats\.com|seamless\.com|olo\.com|chownow\.com)$/i;
 
+// Cheap gate for the "reply to a review prompt" fallback: a leading 1-5 rating,
+// a star mention, or clear sentiment. Avoids an LLM call on every message in the
+// 30-min window after a visit.
+const reviewSignals =
+  /^\s*[1-5]\b|\b[1-5]\s*(?:stars?|\/\s*5)\b|\bstars?\b|\b(amazing|great|good|bad|terrible|loved|love it|delicious|awful|meh|solid|fire|mid|best|worst|tasty|overrated|underrated)\b|好吃|難吃|推|雷|星/i;
+
+export function looksLikeReview(text: string): boolean {
+  return reviewSignals.test(text);
+}
+
 export function isReceiptLink(url: string): boolean {
   try {
     const host = new URL(url).hostname;
@@ -1378,8 +1388,22 @@ export async function processSendblueInbound(
     // Pending review: the previous turn logged a receipt and asked "want to
     // review?" — read this message as the rating/text for that merchant. Not a
     // review (declining / new topic) → clear it and fall through to normal flow.
-    if (deps.reviewStore && deps.gemini && convo?.pendingReview && !url) {
-      const merchant = convo.pendingReview;
+    // Which merchant a review reply targets: the in-memory armed merchant, OR —
+    // robust to process restarts (in-memory state is ephemeral) — the most recent
+    // verified visit within 30 min, gated by a cheap review-ish heuristic.
+    let reviewMerchant = convo?.pendingReview;
+    if (!reviewMerchant && !url && deps.reviewStore && deps.receiptStore && looksLikeReview(text)) {
+      try {
+        const recent = await deps.receiptStore.list(memoryKey, 1);
+        const last = recent[0];
+        const freshMs = last?.createdAt ? Date.now() - last.createdAt.getTime() : Infinity;
+        if (last && freshMs < 30 * 60 * 1000) reviewMerchant = last.merchant;
+      } catch (storeError) {
+        console.error("[sendblue] recent visit lookup error", storeError);
+      }
+    }
+    if (deps.reviewStore && deps.gemini && reviewMerchant && !url) {
+      const merchant = reviewMerchant;
       const review = await extractReview(text, merchant, deps.gemini);
       convoStore.clearReview(memoryKey);
       if (review) {
