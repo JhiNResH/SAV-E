@@ -838,6 +838,7 @@ export type DiscoveredPlace = {
   address?: string;
   rating?: number;
   category?: string;
+  mapsUri?: string;
 };
 
 /** Injectable Google Places text search (so tests don't hit the network). */
@@ -856,7 +857,7 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       "content-type": "application/json",
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask":
-        "places.displayName,places.formattedAddress,places.rating,places.primaryType",
+        "places.displayName,places.formattedAddress,places.rating,places.primaryType,places.googleMapsUri",
     },
     body: JSON.stringify({ textQuery: query, maxResultCount: 8 }),
   });
@@ -867,6 +868,7 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       formattedAddress?: string;
       rating?: number;
       primaryType?: string;
+      googleMapsUri?: string;
     }[];
   };
   return (body.places ?? [])
@@ -875,6 +877,7 @@ export async function defaultPlacesSearch(query: string): Promise<DiscoveredPlac
       address: p.formattedAddress,
       rating: typeof p.rating === "number" ? p.rating : undefined,
       category: p.primaryType?.replace(/_/g, " "),
+      mapsUri: p.googleMapsUri,
     }))
     .filter((p) => p.name.length > 0);
 }
@@ -1084,7 +1087,9 @@ export type RecallDecision =
   | { kind: "reply"; reply: string }
   | { kind: "search"; query: string; area: string | null }
   // The user stated WHERE they are with no specific request — remember it.
-  | { kind: "location"; area: string };
+  | { kind: "location"; area: string }
+  // The user wants the address / map / "card" of a specific place — look it up.
+  | { kind: "details"; placeName: string };
 
 /**
  * Agentic router: hand the user's message + their saved places to the LLM and
@@ -1151,6 +1156,7 @@ export async function decideRecall(
 2. Find NEW places nearby — when they want a recommendation for somewhere not yet known (e.g. "somewhere nearby", "anywhere else", "that one's too far", "find me a coffee place", "推薦附近的") AND a location is given or clearly known. Return {"search":{"query":"<2-4 word search like 'coffee' or 'ramen'>","area":"<the location, e.g. 'Santa Monica'>"}}.
 3. They want something nearby but gave NO location yet. Return {"search":{"query":"<2-4 word search>","area":null}} — a null area signals we still need their location. Do NOT phrase this as a reply.
 4. The message is ONLY a location (a bare address, city, neighborhood, or ZIP) with no request, AND there is no pending search to resume. Return {"location":{"area":"<that location>"}} — never just acknowledge it in a reply; this records where they are for next time.
+5. The user wants the ADDRESS, exact location, map link, or "card" of a SPECIFIC place — either named (e.g. "where is 菊乃井's address", "give me X's card") or referenced ("it", "他", "that place" = the place you recently recommended/discussed above). Return {"details":{"placeName":"<the place's name>"}}. Do NOT answer the address from memory — this triggers a real lookup. Resolve pronouns to the recommended/last place above.
 ${pendingBlock}${recentBlock}${
     lastArea
       ? `\nLAST KNOWN LOCATION: the user is already near "${lastArea}". For ANY nearby request — "recommend a boba place", "find me coffee", "something else", "anything closer", "what else" — REUSE this location: return {"search":{"query":"<what they want>","area":"${lastArea}"}}. Do NOT ask where they are again (do NOT return a null area) unless they give a new place or say they moved.\n`
@@ -1183,6 +1189,9 @@ Return STRICT JSON only, no markdown.`;
   if (parsed.location && typeof parsed.location.area === "string" && parsed.location.area.trim()) {
     return { kind: "location", area: parsed.location.area.trim() };
   }
+  if (parsed.details && typeof parsed.details.placeName === "string" && parsed.details.placeName.trim()) {
+    return { kind: "details", placeName: parsed.details.placeName.trim() };
+  }
   if (typeof parsed.reply === "string" && parsed.reply.trim()) {
     return { kind: "reply", reply: parsed.reply.trim() };
   }
@@ -1193,6 +1202,7 @@ type ParsedRecall = {
   reply?: unknown;
   search?: { query?: unknown; area?: unknown };
   location?: { area?: unknown };
+  details?: { placeName?: unknown };
 };
 
 function parseRecallJson(text: string): ParsedRecall | null {
@@ -1246,6 +1256,17 @@ export function pickBestPlace(
  * data), with a deterministic template fallback so a recommendation never fails
  * just because phrasing did.
  */
+/** A compact place "card": name, rating, real address, Google Maps link. */
+export function formatPlaceCard(place: DiscoveredPlace, chinese: boolean): string {
+  const lines = [place.name + (place.rating ? ` — ${place.rating}★` : "")];
+  if (place.address) lines.push(`📍 ${place.address}`);
+  if (place.mapsUri) lines.push(place.mapsUri);
+  if (lines.length === 1) {
+    lines.push(chinese ? "(只查到名字,沒有更多資料)" : "(only the name — no further details found)");
+  }
+  return lines.join("\n");
+}
+
 export async function phrasePlaceRec(
   place: DiscoveredPlace,
   area: string,
@@ -1672,6 +1693,26 @@ export async function processSendblueInbound(
         convoStore.clearPending(memoryKey);
         console.log(`[sendblue] agentic empty → keyword fallback for ${from}`);
         reply = await keywordRecallReply(text, memoryKey, chinese, deps.store);
+      } else if (decision.kind === "details") {
+        // The user wants a specific place's address / map / "card" → look it up
+        // live (Google Places) instead of answering "it's in <city>" from memory.
+        const search = deps.placesSearch ?? defaultPlacesSearch;
+        let found: DiscoveredPlace[] = [];
+        try {
+          found = await search(decision.placeName);
+        } catch (searchError) {
+          console.error("[sendblue] details lookup error", searchError);
+        }
+        const place = found[0];
+        console.log(`[sendblue] details "${decision.placeName}" → ${place?.name ?? "(none)"}`);
+        if (place) {
+          convoStore.setRecommended(memoryKey, place); // make it the conversation focus
+          reply = formatPlaceCard(place, chinese);
+        } else {
+          reply = chinese
+            ? `我查不到「${decision.placeName}」的地點資料 — 名字再給我精確一點?`
+            : `I couldn't find details for "${decision.placeName}" — got a more exact name?`;
+        }
       } else if (decision.kind === "location") {
         // Pure location, nothing pending → store it and ask what they want,
         // instead of a hollow "I'll remember" that loses the area.
