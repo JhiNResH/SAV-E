@@ -1254,6 +1254,21 @@ function noDiscoveryReply(area: string, chinese: boolean): string {
 }
 
 /**
+ * True when a Places result is really just the searched location (a street
+ * address echoed back as a "place"), not a business: its name equals the area,
+ * or its name is a digit-bearing fragment of the area with no rating. Used to
+ * avoid recommending the user's own address back to them.
+ */
+export function isSearchedAddress(place: DiscoveredPlace, area: string): boolean {
+  const name = foldText(place.name);
+  const a = foldText(area);
+  if (!name) return true;
+  if (name === a) return true;
+  if (place.rating === undefined && /\d/.test(place.name) && a.includes(name)) return true;
+  return false;
+}
+
+/**
  * Pick the best discovery result the user hasn't already been shown: highest
  * rating among names not in `exclude` (case-insensitive). Falls back to the
  * highest-rated overall if everything was already shown (better to repeat than
@@ -1840,10 +1855,14 @@ export async function processSendblueInbound(
         } catch (searchError) {
           console.error("[sendblue] places search error", searchError);
         }
+        // A specific street address can make Google return the address ITSELF as
+        // a "place" (a geocode/premise, no rating). Never recommend the user's own
+        // location back to them — drop any result that is just the searched area.
+        const businesses = found.filter((p) => !isSearchedAddress(p, area));
         // Personalized pick: skip places already recommended this conversation
         // AND places the user already knows (saved/visited), then taste-rank.
         const exclude = [...(convo?.shownNames ?? []), ...taste.knownNames];
-        const picked = pickBestPlace(found, exclude, taste.preferredCategories);
+        const picked = pickBestPlace(businesses, exclude, taste.preferredCategories);
         console.log(
           `[sendblue] discovery query="${decision.query}" area="${area}" results=${found.length} picked="${picked?.name ?? "(none)"}" known=${taste.knownNames.length} cats=[${taste.preferredCategories.join(",")}]` +
             (convo?.pendingQuery ? " (resumed pending)" : "") +
