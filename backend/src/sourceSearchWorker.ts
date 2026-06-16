@@ -908,6 +908,33 @@ export async function defaultFetchText(url: string): Promise<string> {
   }
 }
 
+export async function defaultFetchMetadataHTML(
+  url: string,
+  maxBytes = 512_000,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const parsed = safeURL(url);
+  if (!parsed || !(await isSafePublicHTTPURL(parsed))) throw new Error("Blocked non-public URL");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetchImpl(parsed.toString(), {
+      headers: {
+        "User-Agent": "SAV-E social metadata fetcher/1.0",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (isRedirectResponse(response)) throw new Error("Blocked redirect response");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await boundedHeadResponseText(response, maxBytes);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchSourceMetadata(
   sourceUrl: string | null | undefined,
   fetchText: FetchText,
@@ -1207,6 +1234,36 @@ async function boundedResponseText(response: Response, maxBytes: number): Promis
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(data);
+}
+
+async function boundedHeadResponseText(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let byteLength = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    byteLength += value.byteLength;
+    text += decoder.decode(value, { stream: true });
+
+    const headEnd = text.match(/<\/head\s*>/i);
+    if (headEnd?.index !== undefined) {
+      await reader.cancel();
+      return text.slice(0, headEnd.index + headEnd[0].length);
+    }
+
+    if (byteLength >= maxBytes) {
+      await reader.cancel();
+      return text.slice(0, maxBytes);
+    }
+  }
+
+  return text + decoder.decode();
 }
 
 function sha256(data: Uint8Array): string {

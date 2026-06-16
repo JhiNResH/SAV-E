@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildSourceRecoveryQueries,
   candidatesFromSearchResults,
+  defaultFetchMetadataHTML,
   parseDuckDuckGoResults,
   runSourceSearchRecovery,
 } from "./sourceSearchWorker.js";
@@ -39,6 +40,25 @@ test("buildSourceRecoveryQueries does not promote generic city creator handle cl
   });
 
   assert.ok(!queries.some((query) => query.includes("那間店") && query.includes("地址")));
+});
+
+test("defaultFetchMetadataHTML reads social metadata without failing on large pages", async () => {
+  const html = `<!doctype html><html><head>
+    <meta name="description" content="287 likes - google.foodie: &quot;&lt;樂葵法式鐵板燒-微風南山店&gt; 📍台北101&quot;">
+    <meta name="twitter:image" content="https://example.com/thumb.jpg">
+  </head><body>${"x".repeat(1_500_000)}</body></html>`;
+  const fetcher = async () =>
+    new Response(html, {
+      status: 200,
+      headers: {
+        "content-length": String(html.length),
+        "content-type": "text/html; charset=utf-8",
+      },
+    });
+
+  const head = await defaultFetchMetadataHTML("https://93.184.216.34/p/DZpDN5zkrH4/", 512_000, fetcher);
+  assert.match(head, /樂葵法式鐵板燒-微風南山店/);
+  assert.doesNotMatch(head, /x{1000}/);
 });
 
 test("parseDuckDuckGoResults extracts titles snippets and canonical target URLs", () => {
