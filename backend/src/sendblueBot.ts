@@ -764,6 +764,11 @@ export function formatPlaceList(places: SavedPlace[], chinese: boolean, cap = 15
   return body;
 }
 
+export function appendMySavesLink(reply: string, url: string | null | undefined, chinese: boolean): string {
+  if (!url) return reply;
+  return chinese ? `${reply}\n\n打開你的 SAV-E：${url}` : `${reply}\n\nOpen your SAV-E: ${url}`;
+}
+
 /**
  * Warm one-place recommendation, localized. Drops the "from a … clip" tail when
  * category/source are missing. Area is included when known.
@@ -1582,6 +1587,8 @@ export type ProcessDeps = {
   confirmRecurring?: (fromNumber: string) => Promise<string | null>;
   /** Geocode an area the user texts ("I'm in X") → coordinates, stored per number. */
   geocode?: Geocoder;
+  /** Private tokenized web page for the sender's saved places/visits/reviews. */
+  mySavesUrl?: (memoryKey: string) => string | null | undefined;
   /**
    * Resolve the inbound phone/provider id to the canonical SAV-E vault key.
    * Unlinked numbers fall back to the phone so the public bot still works.
@@ -1599,6 +1606,7 @@ async function keywordRecallReply(
   from: string,
   chinese: boolean,
   store: SendbluePlaceStore,
+  mySavesUrl?: (memoryKey: string) => string | null | undefined,
 ): Promise<string> {
   let savedAreas: string[] = [];
   try {
@@ -1632,7 +1640,8 @@ async function keywordRecallReply(
       places = [];
     }
     console.log(`[sendblue] list intent for ${from} area=${area ?? "(any)"} count=${places.length}`);
-    return area ? formatAreaList(places, area, chinese) : formatPlaceList(places, chinese);
+    const reply = area ? formatAreaList(places, area, chinese) : formatPlaceList(places, chinese);
+    return appendMySavesLink(reply, mySavesUrl?.(from), chinese);
   }
 
   console.log("[sendblue] no URL / no recommend / no list intent → hint");
@@ -1838,7 +1847,9 @@ export async function processSendblueInbound(
         return { replied: true, reply: orderReply };
       }
     }
-    if (url) {
+    if (!url && isListIntent(text)) {
+      reply = await keywordRecallReply(text, memoryKey, chinese, deps.store, deps.mySavesUrl);
+    } else if (url) {
       // Save flow: link → caption → venue → remember it for this number.
       const { caption } = await fetchLinkCaption(url, deps.fetchText);
       console.log(`[sendblue] url=${url} captionLen=${caption.length}`);
@@ -1919,7 +1930,7 @@ export async function processSendblueInbound(
       if (!decision) {
         convoStore.clearPending(memoryKey);
         console.log(`[sendblue] agentic empty → keyword fallback for ${from}`);
-        reply = await keywordRecallReply(text, memoryKey, chinese, deps.store);
+        reply = await keywordRecallReply(text, memoryKey, chinese, deps.store, deps.mySavesUrl);
       } else if (decision.kind === "details") {
         // The user wants a specific place's address / map / "card" → look it up
         // live (Google Places) instead of answering "it's in <city>" from memory.
@@ -2048,7 +2059,7 @@ export async function processSendblueInbound(
       }
      } else {
       // No LLM injected (e.g. tests): deterministic keyword recall.
-      reply = await keywordRecallReply(text, memoryKey, chinese, deps.store);
+      reply = await keywordRecallReply(text, memoryKey, chinese, deps.store, deps.mySavesUrl);
     }
   } catch (error) {
     // Spike: degrade gracefully, never bubble up to the webhook.
