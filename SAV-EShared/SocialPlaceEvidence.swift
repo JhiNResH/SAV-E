@@ -48,7 +48,8 @@ enum SocialPlaceEvidenceScorer {
               !lowered.contains("instagram"),
               !lowered.contains("reel"),
               !lowered.contains("comment"),
-              !lowered.contains("like") else {
+              !lowered.contains("like"),
+              !looksLikeContactLine(value) else {
             return false
         }
         return !isRejectedTitle(value)
@@ -60,6 +61,7 @@ enum SocialPlaceEvidenceScorer {
         guard !looksLikeAddressLine(value),
               !looksLikeTransitAccessLine(value),
               !looksLikeOperatingHoursLine(value),
+              !looksLikeContactLine(value),
               !looksLikeReviewMetricLine(value),
               !looksLikeMenuOrPriceLine(value),
               !looksLikeMarketingLine(value),
@@ -87,6 +89,7 @@ enum SocialPlaceEvidenceScorer {
         looksLikeAddressLine(value) ||
             looksLikeTransitAccessLine(value) ||
             looksLikeOperatingHoursLine(value) ||
+            looksLikeContactLine(value) ||
             looksLikeReviewMetricLine(value) ||
             looksLikeMenuOrPriceLine(value) ||
             looksLikeMarketingLine(value) ||
@@ -170,6 +173,24 @@ enum SocialPlaceEvidenceScorer {
             of: #"(?i)(營業|营业|hours?|open|closed|週[一二三四五六日天]|周[一二三四五六日天]|星期|[一二三四五六日天]\s*[～~\-–—至]\s*[一二三四五六日天]|\b\d{1,2}:\d{2}\s*[-–—~～至]\s*\d{1,2}:\d{2})"#,
             options: [.regularExpression]
         ) != nil
+    }
+
+    static func looksLikeContactLine(_ value: String) -> Bool {
+        let cleaned = cleanText(value)
+        let contactLabelPattern = #"(?i)(?:電話|电话|聯絡|联系|預約|预约|訂位|订位|客服|phone|tel\.?|telephone|contact|reservation|booking|call)\s*[:：]?"#
+        let phoneNumberPattern = #"(?:\+?\d[\d\s().\-－]{6,}\d)"#
+
+        if cleaned.range(of: contactLabelPattern, options: [.regularExpression]) != nil,
+           cleaned.range(of: phoneNumberPattern, options: [.regularExpression]) != nil {
+            return true
+        }
+        if cleaned.range(of: #"(?i)(?:https?://|www\.)\S+"#, options: .regularExpression) != nil {
+            return true
+        }
+        if cleaned.range(of: #"(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b"#, options: .regularExpression) != nil {
+            return true
+        }
+        return cleaned.range(of: #"^\s*\+?[\d\s().\-－]{7,}\s*$"#, options: .regularExpression) != nil
     }
 
     static func looksLikeReviewMetricLine(_ value: String) -> Bool {

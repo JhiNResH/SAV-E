@@ -80,6 +80,8 @@ enum SocialOCRCandidateHeuristics {
     }
 
     private static func isUsableLine(_ value: String) -> Bool {
-        value.count >= 2 && value.count <= 60
+        value.count >= 2 &&
+            value.count <= 60 &&
+            !SocialPlaceEvidenceScorer.looksLikeContactLine(value)
     }
 }

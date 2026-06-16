@@ -2873,7 +2873,35 @@ final class SocialPlacePipelineTests: XCTestCase {
             sourceURL: "https://www.instagram.com/reel/address-only/"
         )
         XCTAssertTrue(addressOnly.isEmpty)
+
+        let phoneLabelAddressOnly = service.reviewCandidates(
+            fromEvidenceText: """
+            #GIRLSTALK美食 日本超人氣漢堡排名店
+            電話：02-2321-2111
+            臺北市中正區南福里羅斯福路二段66巷10號
+            """,
+            sourceURL: "https://www.instagram.com/reel/DZpGkJ-tK5n/"
+        )
+        XCTAssertFalse(phoneLabelAddressOnly.contains { $0.candidateName.contains("電話") })
+        XCTAssertFalse(phoneLabelAddressOnly.contains { $0.candidateName.contains("02-") })
+        XCTAssertTrue(
+            phoneLabelAddressOnly.isEmpty || phoneLabelAddressOnly.allSatisfy { $0.isSourceOnly },
+            "Phone/address-only evidence must not become a confirmable place candidate"
+        )
     }
+
+    func testPhoneContactLinesAreNeverPlaceNames() {
+        XCTAssertFalse(SocialPlaceEvidenceScorer.isUsableCandidateName("電話：02-2321-2111"))
+        XCTAssertFalse(SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName("電話：02-2321-2111"))
+        XCTAssertTrue(SocialPlaceEvidenceScorer.looksLikeContactLine("電話：02-2321-2111"))
+
+        let ocrResult = SocialOCRCandidateHeuristics.candidate(from: [
+            "電話：02-2321-2111",
+            "臺北市中正區南福里羅斯福路二段66巷10號"
+        ])
+        XCTAssertNil(ocrResult)
+    }
+
     func testInstagramReelCaptionKeepsVenueMarkerBeforeAddress() {
         let caption = """
         真蓁 挖寶美食💅 on Instagram: "這是我此生吃過最扯的吃到飽…….
