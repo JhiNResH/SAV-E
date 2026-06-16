@@ -89,8 +89,8 @@ struct ClipContentView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         sectionHeading("Saved places")
-                        ForEach(payload.places) { place in
-                            mySavedPlaceRow(place)
+                        ForEach(Array(payload.places.enumerated()), id: \.element.id) { index, place in
+                            mySavedPlaceRow(place, index: index)
                         }
                     }
                     .padding(.horizontal)
@@ -187,12 +187,12 @@ struct ClipContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func mySavedPlaceRow(_ place: SharedMySavesData.SavedPlace) -> some View {
+    private func mySavedPlaceRow(_ place: SharedMySavesData.SavedPlace, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(Color.saveCoral)
+                Text("\(index + 1).")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundColor(Color.saveInk)
                     .frame(width: 34, height: 34)
                     .background(Color.saveCream)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -243,6 +243,8 @@ struct ClipContentView: View {
                 .stroke(Color.saveNotebookLine, lineWidth: 2)
         )
         .shadow(color: Color.saveNotebookLine.opacity(0.16), radius: 0, x: 3, y: 3)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Saved place \(index + 1), \(place.name)")
     }
 
     private func myVisitRow(_ visit: SharedMySavesData.VerifiedVisit) -> some View {
