@@ -1164,6 +1164,17 @@ struct ShareExtensionView: View {
                 sharedText: sharedText,
                 sourceURLString: parseContent
             )
+            if let captionCandidate = await socialCaptionVenueReviewCandidate(
+                from: metadata,
+                sharedTitle: sharedTitle,
+                sharedText: sharedText,
+                sourceURLString: parseContent
+            ), candidates.isEmpty || candidates.allSatisfy({ $0.isSourceOnly || $0.isPlaceBearingSource || $0.isUnresolvedPlaceCandidate }) {
+                reviewCandidates = [captionCandidate]
+                selectedCategory = captionCandidate.category
+                isParsing = false
+                return
+            }
             if !candidates.isEmpty {
                 reviewCandidates = candidates
                 selectedCategory = reviewCandidates.first?.category ?? "stay"
@@ -1208,10 +1219,6 @@ struct ShareExtensionView: View {
     // MARK: - Gemini Parsing
 
     private func parseWithGemini(content: String, sourceURLString: String) async throws -> ParsedPlace {
-        guard let apiKey = geminiAPIKey(), !apiKey.isEmpty else {
-            throw NSError(domain: "save", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gemini direct fallback is disabled"])
-        }
-
         let prompt = """
         Extract place information from this shared content. Respond ONLY with a valid JSON object, no markdown.
 
@@ -1241,9 +1248,42 @@ struct ShareExtensionView: View {
         - category must be one of: food, cafe, bar, attraction, stay, shopping
         """
 
+        let text = try await generateGeminiText(prompt: prompt, temperature: 0.2, maxOutputTokens: 512)
+
+        // Parse JSON from response
+        var jsonString = text
+        if let start = text.range(of: "{"),
+           let end = text.range(of: "}", options: .backwards),
+           start.lowerBound < end.upperBound {
+            jsonString = String(text[start.lowerBound..<end.upperBound])
+        }
+        guard let jsonData = jsonString.data(using: .utf8),
+              let dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            throw NSError(domain: "save", code: 3, userInfo: [NSLocalizedDescriptionKey: "Couldn't parse AI response"])
+        }
+
+        let place = ParsedPlace(
+            name: dict["name"] as? String ?? "Unknown Place",
+            address: dict["address"] as? String ?? "",
+            category: dict["category"] as? String ?? "food",
+            iconName: iconForCategory(dict["category"] as? String ?? "food"),
+            latitude: dict["latitude"] as? Double,
+            longitude: dict["longitude"] as? Double,
+            dishes: dict["dishes"] as? [String] ?? [],
+            priceRange: dict["priceRange"] as? String
+        )
+        try validateAIPlace(place, against: content, sourceURLString: sourceURLString)
+        return place
+    }
+
+    private func generateGeminiText(prompt: String, temperature: Double, maxOutputTokens: Int) async throws -> String {
+        guard let apiKey = geminiAPIKey(), !apiKey.isEmpty else {
+            throw NSError(domain: "save", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gemini direct fallback is disabled"])
+        }
+
         let body: [String: Any] = [
             "contents": [["parts": [["text": prompt]]]],
-            "generationConfig": ["temperature": 0.2, "maxOutputTokens": 512]
+            "generationConfig": ["temperature": temperature, "maxOutputTokens": maxOutputTokens]
         ]
 
         let requestBody = try JSONSerialization.data(withJSONObject: body)
@@ -1280,31 +1320,7 @@ struct ShareExtensionView: View {
               let text = parts.first?["text"] as? String else {
             throw NSError(domain: "save", code: 2, userInfo: [NSLocalizedDescriptionKey: "Empty AI response"])
         }
-
-        // Parse JSON from response
-        var jsonString = text
-        if let start = text.range(of: "{"),
-           let end = text.range(of: "}", options: .backwards),
-           start.lowerBound < end.upperBound {
-            jsonString = String(text[start.lowerBound..<end.upperBound])
-        }
-        guard let jsonData = jsonString.data(using: .utf8),
-              let dict = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            throw NSError(domain: "save", code: 3, userInfo: [NSLocalizedDescriptionKey: "Couldn't parse AI response"])
-        }
-
-        let place = ParsedPlace(
-            name: dict["name"] as? String ?? "Unknown Place",
-            address: dict["address"] as? String ?? "",
-            category: dict["category"] as? String ?? "food",
-            iconName: iconForCategory(dict["category"] as? String ?? "food"),
-            latitude: dict["latitude"] as? Double,
-            longitude: dict["longitude"] as? Double,
-            dishes: dict["dishes"] as? [String] ?? [],
-            priceRange: dict["priceRange"] as? String
-        )
-        try validateAIPlace(place, against: content, sourceURLString: sourceURLString)
-        return place
+        return text
     }
 
     private func shareMetadata(from urlString: String) async -> ShareMetadata {
@@ -2040,6 +2056,76 @@ struct ShareExtensionView: View {
             return [placeBearingSourceReviewCandidate(from: ocrAnalysis, sourceURLString: sourceURLString, evidenceText: evidenceText)]
         }
         return rankedSocialAnalysisCandidates(candidates.map(markAsSocialAnalysisCandidate))
+    }
+
+    private func socialCaptionVenueReviewCandidate(
+        from metadata: ShareMetadata,
+        sharedTitle: String,
+        sharedText: String,
+        sourceURLString: String
+    ) async -> PendingReviewCandidate? {
+        let caption = publicMetadataEvidence(from: metadata, sharedTitle: sharedTitle, sharedText: sharedText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !caption.isEmpty else { return nil }
+
+        let boundedCaption = String(caption.prefix(1_200))
+        let prompt = SocialCaptionVenueExtractionPolicy.prompt(caption: boundedCaption)
+        guard let text = try? await generateGeminiText(prompt: prompt, temperature: 0, maxOutputTokens: 256),
+              let extraction = SocialCaptionVenueExtractionPolicy.parseExtraction(from: text) else {
+            return nil
+        }
+
+        let name = cleanPlaceName(extraction.name)
+        guard SocialCaptionVenueExtractionPolicy.isAcceptedVenueName(name, in: boundedCaption) else {
+            return nil
+        }
+
+        let area = extraction.area?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let category = fallbackCategory(from: [extraction.category, name, boundedCaption].compactMap { $0 }.joined(separator: " "))
+        let confidence = min(max(extraction.confidence, 0), 0.6)
+        let captionSnippet = String(boundedCaption.prefix(220))
+        let evidence = appendUniqueEvidence(
+            [],
+            [
+                "Source URL: \(sourceURLString)",
+                "Evidence tier: \(SocialPlaceEvidenceTier.weakCandidate.rawValue)",
+                "Extracted by SAV-E from caption: \(name)",
+                area.map { "Caption area clue: \($0)" } ?? "",
+                captionSnippet.isEmpty ? "" : "Caption snippet: \(captionSnippet)"
+            ]
+        )
+        let diagnostic = SocialPlaceEvidenceDiagnostic(
+            found: appendUniqueEvidence(
+                [],
+                [
+                    "Source URL: \(sourceURLString)",
+                    "Extracted by SAV-E from caption: \(name)",
+                    area.map { "Caption area clue: \($0)" } ?? ""
+                ]
+            ),
+            attempts: [
+                "Checked public metadata/caption/OCR text for place-bearing intent",
+                "Ran Sendblue-style caption venue extraction in the share extension",
+                "Verified the extracted name appears literally in the caption",
+                "Kept this in Review instead of saving a map pin",
+                "Did not use logged-in Instagram scraping"
+            ],
+            missingFields: ["Verified address", "Verified coordinates"],
+            nextBestClue: "Confirm this caption-extracted venue and its exact address before saving it as a Map Stamp."
+        )
+        return PendingReviewCandidate(
+            candidateName: name,
+            address: area ?? "",
+            category: category,
+            sourceURL: sourceURLString,
+            sourceText: boundedCaption,
+            evidence: evidence,
+            confidence: confidence,
+            missingInfo: ["Google Places match required", "Verified coordinates", "User confirmation required"],
+            savedAt: Date(),
+            evidenceDiagnostic: diagnostic,
+            reviewState: "source_recovered_candidate"
+        )
     }
 
     private func placeBearingSourceReviewCandidate(
