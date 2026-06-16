@@ -1610,6 +1610,32 @@ export async function processSendblueInbound(
         }
         console.log(`[sendblue] saved place for ${from} count=${count}`);
         reply = formatSaveReply(venue, count, chinese);
+        // Make the just-saved place the conversation's focus so a follow-up
+        // ("where is it?", "京都哪裡?") resolves to THIS place instead of
+        // "which place do you mean?". Enrich it with a Google Places lookup for a
+        // real address — social captions rarely include one.
+        let focus: DiscoveredPlace = {
+          name: venue.name,
+          address: venue.area,
+          category: venue.category,
+        };
+        if (deps.placesSearch) {
+          try {
+            const hit = (await deps.placesSearch(`${venue.name} ${venue.area ?? ""}`.trim()))[0];
+            if (hit) {
+              focus = {
+                name: venue.name,
+                address: hit.address ?? venue.area,
+                rating: hit.rating,
+                category: venue.category ?? hit.category,
+              };
+              console.log(`[sendblue] save enrich → "${hit.name}" ${hit.address ?? "(no addr)"}`);
+            }
+          } catch (enrichError) {
+            console.error("[sendblue] save enrich error", enrichError);
+          }
+        }
+        convoStore.setRecommended(memoryKey, focus);
       } else {
         reply = noVenueReply;
       }
