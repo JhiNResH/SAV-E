@@ -42,9 +42,10 @@ export type LinkCaption = {
 };
 
 /**
- * Fetch a social/web link and return its public caption (og:description ??
- * og:title, HTML-unescaped). SSRF-safe: reuses defaultFetchText which blocks
- * non-public / redirecting URLs. fetchText is injectable for tests.
+ * Fetch a social/web link and return its public caption. Prefer descriptions,
+ * but fall back to title when a platform ships a generic marketing description.
+ * SSRF-safe: reuses defaultFetchText which blocks non-public URLs. fetchText is
+ * injectable for tests.
  */
 export async function fetchLinkCaption(
   url: string,
@@ -52,13 +53,23 @@ export async function fetchLinkCaption(
 ): Promise<LinkCaption> {
   const html = await fetchText(url);
   const metadata = sourceMetadataFromHTML(html, url);
-  const rawCaption = metadata.description ?? metadata.title ?? "";
+  const rawCaption = captionTextFromMetadata(metadata.description, metadata.title);
   const caption = decodeHTML(rawCaption).replace(/\s+/g, " ").trim().slice(0, maxCaptionChars);
   return {
     caption,
     imageURL: metadata.imageURL,
     resolvedURL: metadata.resolvedURL,
   };
+}
+
+function captionTextFromMetadata(description?: string, title?: string): string {
+  if (description && !isGenericSocialDescription(description)) return description;
+  return title ?? description ?? "";
+}
+
+function isGenericSocialDescription(value: string): boolean {
+  const normalized = decodeHTML(value).replace(/\s+/g, " ").trim();
+  return normalized.length <= 80 && normalized.includes("生活经验，都在小红书");
 }
 
 export type ExtractedVenue = {

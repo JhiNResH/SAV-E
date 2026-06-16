@@ -50,8 +50,8 @@ function htmlWithOG(description: string, title = "Some Reel"): string {
 
 function htmlWithXHSMetadata(): string {
   return `<!doctype html><html><head>
-    <meta name="description" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく 位于京都先斗町的人气和牛寿喜烧名店。＜餐厅信息＞ 地址：京都府京都市中京区先斗町通四条上る柏屋町169-2">
-    <meta name="og:title" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく - 小红书">
+    <meta name="description" content="3 亿人的生活经验，都在小红书">
+    <meta name="og:title" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく 位于京都先斗町的人气和牛寿喜烧名店。＜餐厅信息＞ 地址：京都府京都市中京区先斗町通四条上る柏屋町169-2 - 小红书">
     <meta name="og:image" content="https://example.com/xhs.jpg">
   </head><body></body></html>`;
 }
