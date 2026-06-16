@@ -19,6 +19,7 @@ import {
   pickBestPlace,
   looksLikeReceipt,
   isReceiptLink,
+  formatPlaceCard,
   looksLikeReview,
   extractReceipt,
   type GeminiCaller,
@@ -1341,4 +1342,64 @@ test("webhook flow: saving a link sets the saved place as conversation focus wit
   const focus = map.get("+15557000111")?.lastRecommended;
   assert.equal(focus?.name, "菊乃井 無碍山房");
   assert.match(focus?.address ?? "", /京都市東山区/);
+});
+
+// --- Place "card" / address details (live Google Places lookup) -----------
+
+test("formatPlaceCard shows name, rating, address, and a maps link", () => {
+  const card = formatPlaceCard(
+    { name: "菊乃井 無碍山房", rating: 4.5, address: "京都市東山区下河原通", mapsUri: "https://maps.google.com/?cid=1" },
+    true,
+  );
+  assert.match(card, /菊乃井 無碍山房/);
+  assert.match(card, /4\.5★/);
+  assert.match(card, /京都市東山区下河原通/);
+  assert.match(card, /maps\.google\.com/);
+});
+
+test("decideRecall: asking a place's address returns a details decision", async () => {
+  const gemini: GeminiCaller = async () =>
+    JSON.stringify({ details: { placeName: "菊乃井 無碍山房" } });
+  const decision = await decideRecall("菊乃井 無碍山房地址在哪", [], gemini, true, {});
+  assert.deepEqual(decision, { kind: "details", placeName: "菊乃井 無碍山房" });
+});
+
+test("webhook flow: 'where is X's address' returns a real address card (not just the city)", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation, map } = fakeConversation();
+  const placesSearch = async (): Promise<DiscoveredPlace[]> => [
+    {
+      name: "菊乃井 無碍山房",
+      rating: 4.5,
+      address: "京都市東山区下河原通",
+      mapsUri: "https://maps.google.com/?cid=9",
+    },
+  ];
+  const gemini: GeminiCaller = async () =>
+    JSON.stringify({ details: { placeName: "菊乃井 無碍山房" } });
+
+  const result = await processSendblueInbound(
+    { from_number: "+15558123456", content: "菊乃井 無碍山房地址在哪" },
+    { client, store, gemini, placesSearch, conversation },
+  );
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /京都市東山区下河原通/); // real street address, not just "京都"
+  assert.match(out, /maps\.google\.com/);
+  // The looked-up place becomes the conversation focus.
+  assert.equal(map.get("+15558123456")?.lastRecommended?.name, "菊乃井 無碍山房");
+  assert.equal(result.replied, true);
+});
+
+test("webhook flow: a details lookup that finds nothing asks for a more exact name", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const placesSearch = async (): Promise<DiscoveredPlace[]> => [];
+  const gemini: GeminiCaller = async () => JSON.stringify({ details: { placeName: "ghoststore" } });
+
+  await processSendblueInbound(
+    { from_number: "+15559001234", content: "where is ghoststore's address" },
+    { client, store, gemini, placesSearch },
+  );
+  assert.match(client.calls.at(-1)?.content ?? "", /couldn't find|查不到/);
 });
