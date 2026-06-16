@@ -109,6 +109,7 @@ type EvidenceRubricVerdict = {
 const defaultMaxQueries = 4;
 const maxResultsPerQuery = 5;
 const maxTextFetchBytes = 1_000_000;
+const maxMetadataRedirects = 3;
 
 export async function runSourceSearchRecovery(
   input: SourceSearchInput,
@@ -913,20 +914,31 @@ export async function defaultFetchMetadataHTML(
   maxBytes = 512_000,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
-  const parsed = safeURL(url);
+  let parsed = safeURL(url);
   if (!parsed || !(await isSafePublicHTTPURL(parsed))) throw new Error("Blocked non-public URL");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
-    const response = await fetchImpl(parsed.toString(), {
-      headers: {
-        "User-Agent": "SAV-E social metadata fetcher/1.0",
-        "Accept": "text/html,application/xhtml+xml",
-      },
-      redirect: "manual",
-      signal: controller.signal,
-    });
+    let response: Response | undefined;
+    for (let redirectCount = 0; redirectCount <= maxMetadataRedirects; redirectCount += 1) {
+      response = await fetchImpl(parsed.toString(), {
+        headers: {
+          "User-Agent": "SAV-E social metadata fetcher/1.0",
+          "Accept": "text/html,application/xhtml+xml",
+        },
+        redirect: "manual",
+        signal: controller.signal,
+      });
+      if (!isRedirectResponse(response)) break;
+
+      const location = response.headers.get("location");
+      if (!location || redirectCount === maxMetadataRedirects) throw new Error("Blocked redirect response");
+      parsed = safeURL(new URL(location, parsed).toString());
+      if (!parsed || !(await isSafePublicHTTPURL(parsed))) throw new Error("Blocked non-public URL");
+    }
+
+    if (!response) throw new Error("No response");
     if (isRedirectResponse(response)) throw new Error("Blocked redirect response");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await boundedHeadResponseText(response, maxBytes);

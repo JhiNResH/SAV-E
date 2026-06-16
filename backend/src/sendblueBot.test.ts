@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractVenueFromCaption,
+  extractVenuesFromCaption,
   fetchLinkCaption,
   firstUrlInText,
   formatVenueReply,
@@ -44,6 +45,14 @@ function htmlWithOG(description: string, title = "Some Reel"): string {
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     <meta property="og:image" content="https://example.com/thumb.jpg" />
+  </head><body></body></html>`;
+}
+
+function htmlWithXHSMetadata(): string {
+  return `<!doctype html><html><head>
+    <meta name="description" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく 位于京都先斗町的人气和牛寿喜烧名店。＜餐厅信息＞ 地址：京都府京都市中京区先斗町通四条上る柏屋町169-2">
+    <meta name="og:title" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく - 小红书">
+    <meta name="og:image" content="https://example.com/xhs.jpg">
   </head><body></body></html>`;
 }
 
@@ -122,6 +131,14 @@ test("fetchLinkCaption falls back to og:title when no description", async () => 
   assert.equal(result.caption, "Cafe Bola at Roma Norte");
 });
 
+test("fetchLinkCaption parses XHS metadata description and image", async () => {
+  const fetchText = async () => htmlWithXHSMetadata();
+  const result = await fetchLinkCaption("http://xhslink.com/m/66nsbd6V2We", fetchText);
+  assert.match(result.caption, /先斗町しゃぶしゃぶすき焼き きらく/);
+  assert.match(result.caption, /京都府京都市中京区先斗町通四条上る柏屋町169-2/);
+  assert.equal(result.imageURL, "https://example.com/xhs.jpg");
+});
+
 test("extractVenueFromCaption returns venue for an English Aquarela caption", async () => {
   const caption = "Best sunset dinner in Cabo — go to Aquarela in San Jose del Cabo.";
   const gemini = fakeGemini({
@@ -135,6 +152,25 @@ test("extractVenueFromCaption returns venue for an English Aquarela caption", as
   assert.equal(venue?.name, "Aquarela");
   assert.equal(venue?.area, "San Jose del Cabo");
   assert.equal(venue?.category, "restaurant");
+});
+
+test("extractVenuesFromCaption returns multiple literal venues from a list caption", async () => {
+  const caption = "SHANGHAI Must Try Gelato: Giolitti near People Square, Luneurs on Anfu Road, and Bonus Gelato.";
+  const gemini = fakeGemini({
+    venues: [
+      { name: "Giolitti", area: "Shanghai", category: "gelato", confidence: 0.92 },
+      { name: "Luneurs", area: "Anfu Road", category: "gelato", confidence: 0.9 },
+      { name: "Imaginary Gelato", area: "Shanghai", category: "gelato", confidence: 0.99 },
+      { name: "Giolitti", area: "Shanghai", category: "gelato", confidence: 0.8 },
+    ],
+  });
+
+  const venues = await extractVenuesFromCaption(caption, gemini);
+
+  assert.deepEqual(
+    venues.map((venue) => venue.name),
+    ["Giolitti", "Luneurs"],
+  );
 });
 
 test("extractVenueFromCaption handles a Spanish caption (Tec de Monterrey)", async () => {
@@ -194,6 +230,20 @@ test("extractVenueFromCaption matches case- and diacritic-insensitively", async 
   assert.equal(venue?.name, "cafe regis");
 });
 
+test("extractVenueFromCaption handles mixed Chinese Japanese XHS captions", async () => {
+  const caption = "【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく 位于京都先斗町的人气和牛寿喜烧名店。地址：京都府京都市中京区先斗町通四条上る柏屋町169-2";
+  const gemini = fakeGemini({
+    name: "先斗町しゃぶしゃぶすき焼き きらく",
+    area: "京都 先斗町",
+    category: "restaurant",
+    confidence: 0.9,
+  });
+  const venue = await extractVenueFromCaption(caption, gemini);
+  assert.ok(venue);
+  assert.equal(venue?.name, "先斗町しゃぶしゃぶすき焼き きらく");
+  assert.equal(venue?.area, "京都 先斗町");
+});
+
 test("firstUrlInText extracts the first http(s) URL and trims trailing punctuation", () => {
   assert.equal(
     firstUrlInText("check this https://www.instagram.com/reel/ABC123/!"),
@@ -235,6 +285,32 @@ test("webhook flow: inbound IG link saves the place and confirms with a count", 
   assert.match(client.calls[0]?.content ?? "", /saved 1 place\b/);
   // The place is now remembered for this number.
   assert.equal((await store.list("+15551234567")).length, 1);
+});
+
+test("webhook flow: inbound XHS short link saves the place from metadata", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const fetchText = async () => htmlWithXHSMetadata();
+  const gemini = fakeGemini({
+    name: "先斗町しゃぶしゃぶすき焼き きらく",
+    area: "京都 先斗町",
+    category: "restaurant",
+    confidence: 0.9,
+  });
+
+  const result = await processSendblueInbound(
+    {
+      from_number: "+15551234567",
+      content: "save this http://xhslink.com/m/66nsbd6V2We",
+    },
+    { client, store, fetchText, gemini },
+  );
+
+  assert.equal(result.replied, true);
+  assert.match(client.calls[0]?.content ?? "", /Saved 先斗町しゃぶしゃぶすき焼き きらく/);
+  const saved = await store.list("+15551234567");
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0]?.sourceUrl, "http://xhslink.com/m/66nsbd6V2We");
 });
 
 
@@ -725,6 +801,39 @@ test("webhook flow: Chinese save confirmation localizes", async () => {
   const content = client.calls[0]?.content ?? "";
   assert.match(content, /已存 鼎泰豐/);
   assert.match(content, /你已存 1 個地點/);
+});
+
+test("webhook flow: list post saves multiple venues from one social link", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation, map } = fakeConversation();
+  const fetchText = async () =>
+    htmlWithOG("SHANGHAI Must Try Gelato: Giolitti near People Square, Luneurs on Anfu Road, and Bonus Gelato.");
+  const gemini = fakeGemini({
+    venues: [
+      { name: "Giolitti", area: "Shanghai", category: "gelato", confidence: 0.92 },
+      { name: "Luneurs", area: "Anfu Road", category: "gelato", confidence: 0.9 },
+      { name: "Bonus Gelato", area: "Shanghai", category: "gelato", confidence: 0.88 },
+    ],
+  });
+
+  const result = await processSendblueInbound(
+    { from_number: "+15550101010", content: "save https://www.instagram.com/p/GELATO/" },
+    { client, store, fetchText, gemini, conversation },
+  );
+
+  assert.equal(result.replied, true);
+  const saved = await store.list("+15550101010", 10);
+  assert.deepEqual(
+    saved.map((place) => place.name),
+    ["Bonus Gelato", "Luneurs", "Giolitti"],
+  );
+  const content = client.calls[0]?.content ?? "";
+  assert.match(content, /Saved 3 places from this post/);
+  assert.match(content, /Giolitti/);
+  assert.match(content, /Luneurs/);
+  assert.match(content, /Bonus Gelato/);
+  assert.equal(map.get("+15550101010")?.lastRecommended?.name, "Giolitti");
 });
 
 test("webhook flow: outbound/status event produces NO reply", async () => {

@@ -31,6 +31,7 @@ import type { ReviewStore } from "./sendblueReviewStore.js";
 const geminiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/models";
 const defaultGeminiModel = "gemini-2.5-flash";
 const maxCaptionChars = 4_000;
+const maxVenuesPerCaption = 10;
 
 export type FetchText = (url: string) => Promise<string>;
 
@@ -82,27 +83,50 @@ export async function extractVenueFromCaption(
   caption: string,
   gemini: GeminiCaller = defaultGeminiText,
 ): Promise<ExtractedVenue | null> {
-  const trimmed = caption.trim();
-  if (!trimmed) return null;
+  return (await extractVenuesFromCaption(caption, gemini))[0] ?? null;
+}
 
-  const prompt = venueExtractionPrompt(trimmed);
+export async function extractVenuesFromCaption(
+  caption: string,
+  gemini: GeminiCaller = defaultGeminiText,
+): Promise<ExtractedVenue[]> {
+  const trimmed = caption.trim();
+  if (!trimmed) return [];
+
+  const prompt = venuesExtractionPrompt(trimmed);
   let raw: string;
   try {
     raw = await gemini(prompt);
   } catch {
-    return null;
+    return [];
   }
 
-  const parsed = parseVenueJson(raw);
-  if (!parsed) return null;
+  const parsed = parseVenuesJson(raw);
+  if (parsed.length === 0) return [];
 
+  const venues: ExtractedVenue[] = [];
+  const seen = new Set<string>();
+  for (const candidate of parsed) {
+    const venue = normalizeExtractedVenue(candidate, trimmed);
+    if (!venue) continue;
+    const key = compactPlaceText(venue.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    venues.push(venue);
+    if (venues.length >= maxVenuesPerCaption) break;
+  }
+
+  return venues;
+}
+
+function normalizeExtractedVenue(parsed: ParsedVenue, caption: string): ExtractedVenue | null {
   const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
   if (!name) return null;
   // Guard: never surface a @handle or #hashtag as the venue name.
   if (name.startsWith("@") || name.startsWith("#")) return null;
   // Guard: the name must literally appear in the caption (hallucination guard),
   // case- and diacritic-insensitive.
-  if (!captionContains(trimmed, name)) return null;
+  if (!captionContains(caption, name)) return null;
 
   const area = typeof parsed.area === "string" ? parsed.area.trim() : undefined;
   const category = typeof parsed.category === "string" ? parsed.category.trim() : undefined;
@@ -116,21 +140,23 @@ export async function extractVenueFromCaption(
   };
 }
 
-function venueExtractionPrompt(caption: string): string {
-  return `You extract the single real-world venue (restaurant, cafe, bar, shop, hotel, attraction) mentioned in a social media caption for a travel app.
+function venuesExtractionPrompt(caption: string): string {
+  return `You extract real-world venues (restaurants, cafes, bars, shops, hotels, attractions) mentioned in a social media caption for a travel app.
 
 Rules:
 - The venue "name" MUST be a substring that literally appears in the caption. Do not translate, normalize, or invent it.
 - NEVER return a @handle or #hashtag as the name. Those are accounts/tags, not venues.
 - Prefer the specific place over a larger campus or chain (e.g. a specific cafe inside a mall, not the mall).
+- If the caption is a list post ("10 spots", "must try places", "places to visit"), extract each clear venue named in the caption.
+- Keep the caption order. Return at most ${maxVenuesPerCaption} venues.
 - Captions may be in any language (English, Spanish, Chinese, etc.). Keep the name in its original language.
 - "area" is the city / neighborhood / region if stated; otherwise null.
 - "category" is a short label like "restaurant", "cafe", "rooftop bar", "hotel".
 - "confidence" is 0.0-1.0.
-- If there is no clear single venue, set name to null.
+- If there is no clear venue, return an empty venues array.
 
 Return STRICT JSON only, no markdown, in this exact shape:
-{"name": string|null, "area": string|null, "category": string|null, "confidence": number}
+{"venues":[{"name": string, "area": string|null, "category": string|null, "confidence": number}]}
 
 Caption:
 ${caption}`;
@@ -143,22 +169,35 @@ type ParsedVenue = {
   confidence?: unknown;
 };
 
-function parseVenueJson(text: string): ParsedVenue | null {
-  const tryParse = (value: string): ParsedVenue | null => {
+function parseVenuesJson(text: string): ParsedVenue[] {
+  const toVenues = (parsed: unknown): ParsedVenue[] => {
+    if (Array.isArray(parsed)) return parsed.filter(isParsedVenue);
+    if (!parsed || typeof parsed !== "object") return [];
+    const record = parsed as Record<string, unknown>;
+    if (Array.isArray(record.venues)) return record.venues.filter(isParsedVenue);
+    if (Array.isArray(record.places)) return record.places.filter(isParsedVenue);
+    return isParsedVenue(record) ? [record] : [];
+  };
+
+  const tryParse = (value: string): ParsedVenue[] => {
     try {
       const parsed = JSON.parse(value) as unknown;
-      if (parsed && typeof parsed === "object") return parsed as ParsedVenue;
+      return toVenues(parsed);
     } catch {
       // fall through
     }
-    return null;
+    return [];
   };
 
   const direct = tryParse(text.trim());
-  if (direct) return direct;
-  const match = text.match(/\{[\s\S]*\}/);
+  if (direct.length > 0) return direct;
+  const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
   if (match) return tryParse(match[0]);
-  return null;
+  return [];
+}
+
+function isParsedVenue(value: unknown): value is ParsedVenue {
+  return Boolean(value && typeof value === "object");
 }
 
 /**
@@ -793,6 +832,22 @@ export function formatSaveReply(venue: ExtractedVenue, count: number, chinese: b
   const where = venue.area ? `${venue.name} in ${venue.area}` : venue.name;
   const plural = count === 1 ? "" : "s";
   return `Saved ${where} ✓\nYou've saved ${count} place${plural} — text "my places" to see them.`;
+}
+
+export function formatMultiSaveReply(venues: ExtractedVenue[], count: number, chinese: boolean): string {
+  if (venues.length === 1) return formatSaveReply(venues[0], count, chinese);
+  const shown = venues.slice(0, 5).map((venue, index) => {
+    const where = venue.area ? `${venue.name} — ${venue.area}` : venue.name;
+    return `${index + 1}. ${where}`;
+  });
+  const more = venues.length > shown.length ? venues.length - shown.length : 0;
+  if (chinese) {
+    const moreLine = more > 0 ? `\n…還有 ${more} 個` : "";
+    return `已從這則貼文存下 ${venues.length} 個地點 ✓\n${shown.join("\n")}${moreLine}\n你已存 ${count} 個地點，傳「我存了哪些」查看。`;
+  }
+  const moreLine = more > 0 ? `\n…and ${more} more` : "";
+  const plural = count === 1 ? "" : "s";
+  return `Saved ${venues.length} places from this post ✓\n${shown.join("\n")}${moreLine}\nYou've saved ${count} place${plural} — text "my places" to see them.`;
 }
 
 /** Short numbered list of saved places, capped, localized. */
@@ -1960,44 +2015,47 @@ export async function processSendblueInbound(
     if (!url && isListIntent(text)) {
       reply = await keywordRecallReply(text, memoryKey, chinese, deps.store, deps.mySavesUrl);
     } else if (url) {
-      // Save flow: link → caption → venue → remember it for this number.
+      // Save flow: link → caption → venue(s) → remember them for this number.
       const { caption } = await fetchLinkCaption(url, deps.fetchText);
       console.log(`[sendblue] url=${url} captionLen=${caption.length}`);
-      const venue = caption ? await extractVenueFromCaption(caption, deps.gemini) : null;
-      console.log(`[sendblue] venue=${venue ? JSON.stringify(venue) : "(none)"}`);
-      if (venue) {
-        let count: number;
+      const venues = caption ? await extractVenuesFromCaption(caption, deps.gemini) : [];
+      console.log(`[sendblue] venues=${venues.length > 0 ? JSON.stringify(venues) : "(none)"}`);
+      if (venues.length > 0) {
+        let count = 0;
         try {
-          count = await deps.store.save(memoryKey, venue, url);
+          for (const venue of venues) {
+            count = await deps.store.save(memoryKey, venue, url);
+          }
         } catch (storeError) {
           // Degrade gracefully: still confirm the find even if persistence fails.
           console.error("[sendblue] store.save error", storeError);
-          reply = formatVenueReply(venue);
+          reply = formatVenueReply(venues[0]);
           await deps.client.sendMessage(from, reply);
           console.log(`[sendblue] sent to ${from} (save failed, no count)`);
           return { replied: true, reply };
         }
         console.log(`[sendblue] saved place for ${from} count=${count}`);
-        reply = formatSaveReply(venue, count, chinese);
-        // Make the just-saved place the conversation's focus so a follow-up
+        reply = formatMultiSaveReply(venues, count, chinese);
+        // Make the first just-saved place the conversation's focus so a follow-up
         // ("where is it?", "京都哪裡?") resolves to THIS place instead of
         // "which place do you mean?". Enrich it with a Google Places lookup for a
         // real address — social captions rarely include one.
+        const primaryVenue = venues[0];
         let focus: DiscoveredPlace = {
-          name: venue.name,
-          address: venue.area,
-          category: venue.category,
+          name: primaryVenue.name,
+          address: primaryVenue.area,
+          category: primaryVenue.category,
         };
         if (deps.placesSearch) {
           try {
-            const hit = (await deps.placesSearch(`${venue.name} ${venue.area ?? ""}`.trim()))[0];
+            const hit = (await deps.placesSearch(`${primaryVenue.name} ${primaryVenue.area ?? ""}`.trim()))[0];
             if (hit) {
               focus = {
-                name: venue.name,
-                address: hit.address ?? venue.area,
+                name: primaryVenue.name,
+                address: hit.address ?? primaryVenue.area,
                 rating: hit.rating,
                 priceRange: hit.priceRange,
-                category: venue.category ?? hit.category,
+                category: primaryVenue.category ?? hit.category,
               };
               console.log(`[sendblue] save enrich → "${hit.name}" ${hit.address ?? "(no addr)"}`);
             }
