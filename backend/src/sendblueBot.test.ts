@@ -17,6 +17,7 @@ import {
   decideRecall,
   phrasePlaceRec,
   pickBestPlace,
+  isSearchedAddress,
   looksLikeReceipt,
   isReceiptLink,
   formatPlaceCard,
@@ -1468,4 +1469,38 @@ test("webhook flow: 'what to order' for an unsaved place admits it has no post t
     { client, store, gemini },
   );
   assert.match(client.calls.at(-1)?.content ?? "", /haven't saved|沒有它的貼文|沒存過/);
+});
+
+// --- Never recommend the user's own address back -------------------------
+
+test("isSearchedAddress flags the searched address echoed as a place, keeps real businesses", () => {
+  const area = "16267 Stella Cir, Tustin, CA 92782";
+  assert.equal(isSearchedAddress({ name: "16267 Stella Cir, Tustin, CA 92782" }, area), true); // exact echo
+  assert.equal(isSearchedAddress({ name: "16267 Stella Cir" }, area), true); // digit fragment, no rating
+  assert.equal(isSearchedAddress({ name: "Chaplus Modern Tea Room", rating: 4.5 }, area), false); // real biz
+  assert.equal(isSearchedAddress({ name: "Kean Coffee", rating: 4.6 }, "Tustin"), false);
+});
+
+test("webhook flow: 'boba' near a street address never recommends the address itself", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setArea("+15551239876", "16267 Stella Cir, Tustin");
+  // Google returns the address itself first, then a real boba shop.
+  const placesSearch = async (): Promise<DiscoveredPlace[]> => [
+    { name: "16267 Stella Cir, Tustin" }, // the address echoed back (no rating)
+    { name: "Tea Lab", rating: 4.6, address: "Tustin" },
+  ];
+  const gemini: GeminiCaller = async (p) =>
+    p.includes("Recommend this ONE place")
+      ? JSON.stringify({ reply: "Try Tea Lab in Tustin 🧋" })
+      : JSON.stringify({ search: { query: "boba", area: "16267 Stella Cir, Tustin" } });
+
+  await processSendblueInbound(
+    { from_number: "+15551239876", content: "boba" },
+    { client, store, gemini, placesSearch, conversation },
+  );
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /Tea Lab/); // a real business
+  assert.doesNotMatch(out, /16267 Stella Cir/); // never the user's own address
 });
