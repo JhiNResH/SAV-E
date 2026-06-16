@@ -1316,3 +1316,29 @@ test("webhook flow: an unparsed receipt-ish header gets a soft ack, not 'I don't
   assert.doesNotMatch(out, /don't have a place/i);
   assert.equal(result.replied, true);
 });
+
+test("webhook flow: saving a link sets the saved place as conversation focus with an enriched address", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation, map } = fakeConversation();
+  const fetchText = async () => htmlWithOG("京都第一抹茶甜點就是這家 菊乃井 無碍山房", "城市記憶");
+  const placesSearch = async (): Promise<DiscoveredPlace[]> => [
+    { name: "菊乃井 無碍山房", address: "京都市東山区下河原通", rating: 4.5 },
+  ];
+  const gemini: GeminiCaller = fakeGemini({
+    name: "菊乃井 無碍山房",
+    area: "京都",
+    category: "cafe",
+    confidence: 0.9,
+  });
+
+  await processSendblueInbound(
+    { from_number: "+15557000111", content: "存這個 https://www.instagram.com/p/ABC/" },
+    { client, store, gemini, fetchText, placesSearch, conversation },
+  );
+  // The just-saved place becomes the conversation focus so a "where is it?"
+  // follow-up resolves to it — with a real address, not just the city.
+  const focus = map.get("+15557000111")?.lastRecommended;
+  assert.equal(focus?.name, "菊乃井 無碍山房");
+  assert.match(focus?.address ?? "", /京都市東山区/);
+});
