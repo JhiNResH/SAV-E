@@ -40,6 +40,7 @@ import {
   verifiedVisitsTableSql,
 } from "./sendblueReceiptStore.js";
 import { PgReviewStore, reviewsTableSql } from "./sendblueReviewStore.js";
+import { renderMySavesPage, type MySavesPayload } from "./mySavesPage.js";
 import { buildClearingBlockDraft } from "./clearingBlocks.js";
 import {
   formatSharedPlaceLink,
@@ -613,6 +614,10 @@ createServer(async (request, response) => {
     const segments = isV0 ? rawSegments.slice(1) : rawSegments;
     const [resource, id] = segments;
 
+    if (!isV0 && request.method === "GET" && resource === "my" && id) {
+      return await handleMySavesPage(response, id);
+    }
+
     if (request.method === "GET" && resource === "referrals") {
       return await handleReferrals(request, response, id, url);
     }
@@ -783,21 +788,37 @@ function verifyMyToken(token: string): string | null {
 async function handleMySaves(response: ServerResponse, token: string): Promise<void> {
   const phone = verifyMyToken(token);
   if (!phone) return sendJson(response, { error: "Invalid or expired link" }, 403);
+  return sendJson(response, await readMySavesPayload(phone), 200);
+}
+
+async function readMySavesPayload(phone: string): Promise<MySavesPayload> {
   const [places, visits, reviews] = await Promise.all([
     sendbluePlaceStore.list(phone, 100).catch(() => []),
     sendblueReceiptStore.list(phone, 100).catch(() => []),
     sendblueReviewStore.list(phone, 100).catch(() => []),
   ]);
-  return sendJson(
-    response,
-    {
-      places,
-      visits,
-      reviews,
-      counts: { places: places.length, visits: visits.length, reviews: reviews.length },
-    },
-    200,
-  );
+  return {
+    places,
+    visits,
+    reviews,
+    counts: { places: places.length, visits: visits.length, reviews: reviews.length },
+  };
+}
+
+async function handleMySavesPage(response: ServerResponse, token: string): Promise<void> {
+  const phone = verifyMyToken(token);
+  if (!phone) {
+    return sendHtml(response, "<!doctype html><title>Invalid SAV-E link</title><p>Invalid or expired SAV-E link.</p>", 403);
+  }
+  return sendHtml(response, renderMySavesPage(await readMySavesPayload(phone)), 200);
+}
+
+function mySavesLink(phone: string): string {
+  const configuredBase =
+    process.env.SAVE_MY_SAVES_BASE_URL?.trim() ||
+    process.env.SAVE_API_URL?.trim() ||
+    "https://wanderly-api-production.up.railway.app";
+  return `${configuredBase.replace(/\/+$/, "")}/my/${signMyToken(phone)}`;
 }
 
 async function handleUserChannels(
@@ -897,6 +918,7 @@ async function handleSendblueWebhook(
         confirmRecurring: confirmSllrRecurring,
         geocode: defaultGeocode,
         resolveMemoryKey: resolveSendblueMemoryKey,
+        mySavesUrl: mySavesLink,
       });
       console.log(
         `[sendblue] done replied=${result.replied}` +
@@ -3064,6 +3086,15 @@ function sendJson(response: ServerResponse, body: unknown, status = 200): void {
     "Content-Type": "application/json",
   });
   response.end(status === 204 ? undefined : JSON.stringify(body));
+}
+
+function sendHtml(response: ServerResponse, body: string, status = 200): void {
+  response.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "private, no-store",
+    "X-Robots-Tag": "noindex, nofollow",
+  });
+  response.end(body);
 }
 
 function formatPlace(row: JsonBody): JsonBody {

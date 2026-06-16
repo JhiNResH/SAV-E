@@ -37,6 +37,7 @@ import {
 import type { ExtractedVenue } from "./sendblueBot.js";
 import type { ListOpts, SavedPlace, SendbluePlaceStore, StoredLocation } from "./sendbluePlaceStore.js";
 import type { VerifiedVisit, VerifiedVisitStore } from "./sendblueReceiptStore.js";
+import { renderMySavesPage } from "./mySavesPage.js";
 
 function htmlWithOG(description: string, title = "Some Reel"): string {
   return `<!doctype html><html><head>
@@ -303,6 +304,54 @@ test("webhook flow: 'my places' lists saved places", async () => {
   const content = client.calls[0]?.content ?? "";
   assert.match(content, /Aquarela — Cabo/);
   assert.match(content, /Cafe Leon Dore — West Hollywood/);
+});
+
+test("webhook flow: 'my places' includes the private web page link", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  await store.save("+15552223333", { name: "Cafe Leon Dore", area: "West Hollywood" });
+
+  await processSendblueInbound(
+    { from_number: "+15552223333", content: "my places" },
+    { client, store, mySavesUrl: (phone) => `https://save.example/my/token-for-${phone}` },
+  );
+
+  const content = client.calls[0]?.content ?? "";
+  assert.match(content, /Cafe Leon Dore/);
+  assert.match(content, /Open your SAV-E: https:\/\/save\.example\/my\/token-for-\+15552223333/);
+});
+
+test("webhook flow: explicit list intent is deterministic even when Gemini is available", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  await store.save("+15552223333", { name: "Cafe Leon Dore", area: "West Hollywood" });
+  const gemini: GeminiCaller = async () => JSON.stringify({ reply: "Model should not answer this list intent." });
+
+  await processSendblueInbound(
+    { from_number: "+15552223333", content: "show me my places" },
+    { client, store, gemini, mySavesUrl: () => "https://save.example/my/private" },
+  );
+
+  const content = client.calls[0]?.content ?? "";
+  assert.match(content, /Cafe Leon Dore/);
+  assert.doesNotMatch(content, /Model should not answer/);
+  assert.match(content, /https:\/\/save\.example\/my\/private/);
+});
+
+test("renderMySavesPage escapes saved content and renders counts", () => {
+  const html = renderMySavesPage({
+    places: [{ name: "<script>alert(1)</script>", area: "Tustin", category: "cafe", sourceUrl: "javascript:alert(1)" }],
+    visits: [{ merchant: "Jam Jam Tea Lab", total: "$6.25" }],
+    reviews: [{ merchant: "Jam Jam Tea Lab", rating: 5, text: "best boba" }],
+    counts: { places: 1, visits: 1, reviews: 1 },
+  });
+
+  assert.match(html, /My SAV-E/);
+  assert.match(html, /<strong>1<\/strong><span>places<\/span>/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.doesNotMatch(html, /javascript:alert/);
+  assert.match(html, /noindex,nofollow/);
 });
 
 test("webhook flow: Chinese list intent replies in 中文", async () => {
