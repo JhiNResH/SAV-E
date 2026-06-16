@@ -21,7 +21,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   decodeHTML,
-  defaultFetchText,
+  defaultFetchMetadataHTML,
   sourceMetadataFromHTML,
 } from "./sourceSearchWorker.js";
 import type { SavedPlace, SendbluePlaceStore, StoredLocation } from "./sendbluePlaceStore.js";
@@ -31,6 +31,7 @@ import type { ReviewStore } from "./sendblueReviewStore.js";
 const geminiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/models";
 const defaultGeminiModel = "gemini-2.5-flash";
 const maxCaptionChars = 4_000;
+const maxVenuesPerCaption = 10;
 
 export type FetchText = (url: string) => Promise<string>;
 
@@ -41,23 +42,34 @@ export type LinkCaption = {
 };
 
 /**
- * Fetch a social/web link and return its public caption (og:description ??
- * og:title, HTML-unescaped). SSRF-safe: reuses defaultFetchText which blocks
- * non-public / redirecting URLs. fetchText is injectable for tests.
+ * Fetch a social/web link and return its public caption. Prefer descriptions,
+ * but fall back to title when a platform ships a generic marketing description.
+ * SSRF-safe: reuses defaultFetchText which blocks non-public URLs. fetchText is
+ * injectable for tests.
  */
 export async function fetchLinkCaption(
   url: string,
-  fetchText: FetchText = defaultFetchText,
+  fetchText: FetchText = defaultFetchMetadataHTML,
 ): Promise<LinkCaption> {
   const html = await fetchText(url);
   const metadata = sourceMetadataFromHTML(html, url);
-  const rawCaption = metadata.description ?? metadata.title ?? "";
+  const rawCaption = captionTextFromMetadata(metadata.description, metadata.title);
   const caption = decodeHTML(rawCaption).replace(/\s+/g, " ").trim().slice(0, maxCaptionChars);
   return {
     caption,
     imageURL: metadata.imageURL,
     resolvedURL: metadata.resolvedURL,
   };
+}
+
+function captionTextFromMetadata(description?: string, title?: string): string {
+  if (description && !isGenericSocialDescription(description)) return description;
+  return title ?? description ?? "";
+}
+
+function isGenericSocialDescription(value: string): boolean {
+  const normalized = decodeHTML(value).replace(/\s+/g, " ").trim();
+  return normalized.length <= 80 && normalized.includes("生活经验，都在小红书");
 }
 
 export type ExtractedVenue = {
@@ -82,27 +94,50 @@ export async function extractVenueFromCaption(
   caption: string,
   gemini: GeminiCaller = defaultGeminiText,
 ): Promise<ExtractedVenue | null> {
-  const trimmed = caption.trim();
-  if (!trimmed) return null;
+  return (await extractVenuesFromCaption(caption, gemini))[0] ?? null;
+}
 
-  const prompt = venueExtractionPrompt(trimmed);
+export async function extractVenuesFromCaption(
+  caption: string,
+  gemini: GeminiCaller = defaultGeminiText,
+): Promise<ExtractedVenue[]> {
+  const trimmed = caption.trim();
+  if (!trimmed) return [];
+
+  const prompt = venuesExtractionPrompt(trimmed);
   let raw: string;
   try {
     raw = await gemini(prompt);
   } catch {
-    return null;
+    return [];
   }
 
-  const parsed = parseVenueJson(raw);
-  if (!parsed) return null;
+  const parsed = parseVenuesJson(raw);
+  if (parsed.length === 0) return [];
 
+  const venues: ExtractedVenue[] = [];
+  const seen = new Set<string>();
+  for (const candidate of parsed) {
+    const venue = normalizeExtractedVenue(candidate, trimmed);
+    if (!venue) continue;
+    const key = compactPlaceText(venue.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    venues.push(venue);
+    if (venues.length >= maxVenuesPerCaption) break;
+  }
+
+  return venues;
+}
+
+function normalizeExtractedVenue(parsed: ParsedVenue, caption: string): ExtractedVenue | null {
   const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
   if (!name) return null;
   // Guard: never surface a @handle or #hashtag as the venue name.
   if (name.startsWith("@") || name.startsWith("#")) return null;
   // Guard: the name must literally appear in the caption (hallucination guard),
   // case- and diacritic-insensitive.
-  if (!captionContains(trimmed, name)) return null;
+  if (!captionContains(caption, name)) return null;
 
   const area = typeof parsed.area === "string" ? parsed.area.trim() : undefined;
   const category = typeof parsed.category === "string" ? parsed.category.trim() : undefined;
@@ -116,21 +151,23 @@ export async function extractVenueFromCaption(
   };
 }
 
-function venueExtractionPrompt(caption: string): string {
-  return `You extract the single real-world venue (restaurant, cafe, bar, shop, hotel, attraction) mentioned in a social media caption for a travel app.
+function venuesExtractionPrompt(caption: string): string {
+  return `You extract real-world venues (restaurants, cafes, bars, shops, hotels, attractions) mentioned in a social media caption for a travel app.
 
 Rules:
 - The venue "name" MUST be a substring that literally appears in the caption. Do not translate, normalize, or invent it.
 - NEVER return a @handle or #hashtag as the name. Those are accounts/tags, not venues.
 - Prefer the specific place over a larger campus or chain (e.g. a specific cafe inside a mall, not the mall).
+- If the caption is a list post ("10 spots", "must try places", "places to visit"), extract each clear venue named in the caption.
+- Keep the caption order. Return at most ${maxVenuesPerCaption} venues.
 - Captions may be in any language (English, Spanish, Chinese, etc.). Keep the name in its original language.
 - "area" is the city / neighborhood / region if stated; otherwise null.
 - "category" is a short label like "restaurant", "cafe", "rooftop bar", "hotel".
 - "confidence" is 0.0-1.0.
-- If there is no clear single venue, set name to null.
+- If there is no clear venue, return an empty venues array.
 
 Return STRICT JSON only, no markdown, in this exact shape:
-{"name": string|null, "area": string|null, "category": string|null, "confidence": number}
+{"venues":[{"name": string, "area": string|null, "category": string|null, "confidence": number}]}
 
 Caption:
 ${caption}`;
@@ -143,22 +180,35 @@ type ParsedVenue = {
   confidence?: unknown;
 };
 
-function parseVenueJson(text: string): ParsedVenue | null {
-  const tryParse = (value: string): ParsedVenue | null => {
+function parseVenuesJson(text: string): ParsedVenue[] {
+  const toVenues = (parsed: unknown): ParsedVenue[] => {
+    if (Array.isArray(parsed)) return parsed.filter(isParsedVenue);
+    if (!parsed || typeof parsed !== "object") return [];
+    const record = parsed as Record<string, unknown>;
+    if (Array.isArray(record.venues)) return record.venues.filter(isParsedVenue);
+    if (Array.isArray(record.places)) return record.places.filter(isParsedVenue);
+    return isParsedVenue(record) ? [record] : [];
+  };
+
+  const tryParse = (value: string): ParsedVenue[] => {
     try {
       const parsed = JSON.parse(value) as unknown;
-      if (parsed && typeof parsed === "object") return parsed as ParsedVenue;
+      return toVenues(parsed);
     } catch {
       // fall through
     }
-    return null;
+    return [];
   };
 
   const direct = tryParse(text.trim());
-  if (direct) return direct;
-  const match = text.match(/\{[\s\S]*\}/);
+  if (direct.length > 0) return direct;
+  const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
   if (match) return tryParse(match[0]);
-  return null;
+  return [];
+}
+
+function isParsedVenue(value: unknown): value is ParsedVenue {
+  return Boolean(value && typeof value === "object");
 }
 
 /**
@@ -199,21 +249,18 @@ function savedPlaceLookupQuery(place: SavedPlace): string {
 
 function savedPlaceAreaFallback(place: SavedPlace, chinese: boolean): string {
   // Google Places textSearch can miss a place (e.g. a Japanese-named shop in
-  // Taiwan), but a Google Maps SEARCH link still resolves it on tap - strictly
-  // more useful than asking the user for a map link. Add the post they saved it
-  // from when we have it.
-  const mapsSearch = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    [place.name, place.area].filter(Boolean).join(" ").trim(),
-  )}`;
+  // Taiwan). Keep the SMS compact: a raw percent-encoded Maps URL can take over
+  // the whole iMessage bubble, so send the exact search text instead.
+  const searchText = [place.name, place.area].filter(Boolean).join(" ").trim();
   const area = place.area ? (chinese ? `（${place.area}）` : ` in ${place.area}`) : "";
-  const src = place.sourceUrl
+  const sourceNote = place.sourceUrl
     ? chinese
-      ? `\n你存它的貼文：${place.sourceUrl}`
-      : `\nWhere you saved it: ${place.sourceUrl}`
+      ? "\n來源貼文已保留在 My SAV-E。"
+      : "\nSource post is saved in My SAV-E."
     : "";
   return chinese
-    ? `「${place.name}」${area}：我這邊查不到精確地址，在地圖上搜：\n${mapsSearch}${src}`
-    : `"${place.name}"${area}: I don't have an exact address; find it on the map:\n${mapsSearch}${src}`;
+    ? `我目前沒有「${place.name}」${area}的精確地址。\nGoogle Maps 搜尋：${searchText}${sourceNote}`
+    : `I don't have an exact address for "${place.name}"${area} yet.\nSearch Google Maps for: ${searchText}${sourceNote}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -581,6 +628,18 @@ export function looksChinese(text: string): boolean {
   return /[一-鿿]/.test(text);
 }
 
+function contextLooksChinese(...values: Array<string | null | undefined>): boolean {
+  return values.some((value) => (value ? looksChinese(value) : false));
+}
+
+function savedPlaceLooksChinese(place: SavedPlace | undefined): boolean {
+  return contextLooksChinese(place?.name, place?.area, place?.category);
+}
+
+function discoveredPlaceLooksChinese(place: DiscoveredPlace | undefined): boolean {
+  return contextLooksChinese(place?.name, place?.address, place?.category);
+}
+
 // "Show me my saved places" intents, English + 中文. Matched as case-insensitive
 // substrings so "show me my places" / "what have I saved?" still trigger.
 const listIntentPhrases = [
@@ -784,6 +843,22 @@ export function formatSaveReply(venue: ExtractedVenue, count: number, chinese: b
   const where = venue.area ? `${venue.name} in ${venue.area}` : venue.name;
   const plural = count === 1 ? "" : "s";
   return `Saved ${where} ✓\nYou've saved ${count} place${plural} — text "my places" to see them.`;
+}
+
+export function formatMultiSaveReply(venues: ExtractedVenue[], count: number, chinese: boolean): string {
+  if (venues.length === 1) return formatSaveReply(venues[0], count, chinese);
+  const shown = venues.slice(0, 5).map((venue, index) => {
+    const where = venue.area ? `${venue.name} — ${venue.area}` : venue.name;
+    return `${index + 1}. ${where}`;
+  });
+  const more = venues.length > shown.length ? venues.length - shown.length : 0;
+  if (chinese) {
+    const moreLine = more > 0 ? `\n…還有 ${more} 個` : "";
+    return `已從這則貼文存下 ${venues.length} 個地點 ✓\n${shown.join("\n")}${moreLine}\n你已存 ${count} 個地點，傳「我存了哪些」查看。`;
+  }
+  const moreLine = more > 0 ? `\n…and ${more} more` : "";
+  const plural = count === 1 ? "" : "s";
+  return `Saved ${venues.length} places from this post ✓\n${shown.join("\n")}${moreLine}\nYou've saved ${count} place${plural} — text "my places" to see them.`;
 }
 
 /** Short numbered list of saved places, capped, localized. */
@@ -1512,7 +1587,6 @@ function isPriceIntent(text: string): boolean {
 function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
   const known = [
     typeof place.rating === "number" ? `${place.rating}★` : "",
-    place.address ? (chinese ? "地址/card" : "address/card") : "",
   ].filter(Boolean);
   if (place.priceRange) {
     return chinese
@@ -1521,12 +1595,12 @@ function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
   }
   const knownLine = known.length
     ? chinese
-      ? `我目前只知道：${known.join("、")}。`
-      : `I only have: ${known.join(", ")}.`
+      ? `已知：${known.join("、")}。`
+      : `Known: ${known.join(", ")}.`
     : "";
   return chinese
-    ? `我還沒有 ${place.name} 的可靠菜單價格。\n${knownLine}`.trim()
-    : `I don't have menu prices for ${place.name} yet.\n${knownLine}`.trim();
+    ? `我目前沒有 ${place.name} 的可靠菜單價格。\n${knownLine}`.trim()
+    : `I don't have reliable menu prices for ${place.name} yet.\n${knownLine}`.trim();
 }
 
 /**
@@ -1899,7 +1973,8 @@ export async function processSendblueInbound(
       return { replied: true, reply };
     }
     if (!url && isPriceIntent(text) && convo?.lastRecommended) {
-      reply = formatPriceReply(convo.lastRecommended, chinese);
+      const replyChinese = chinese || discoveredPlaceLooksChinese(convo.lastRecommended);
+      reply = formatPriceReply(convo.lastRecommended, replyChinese);
       await deps.client.sendMessage(from, reply);
       return { replied: true, reply };
     }
@@ -1951,44 +2026,47 @@ export async function processSendblueInbound(
     if (!url && isListIntent(text)) {
       reply = await keywordRecallReply(text, memoryKey, chinese, deps.store, deps.mySavesUrl);
     } else if (url) {
-      // Save flow: link → caption → venue → remember it for this number.
+      // Save flow: link → caption → venue(s) → remember them for this number.
       const { caption } = await fetchLinkCaption(url, deps.fetchText);
       console.log(`[sendblue] url=${url} captionLen=${caption.length}`);
-      const venue = caption ? await extractVenueFromCaption(caption, deps.gemini) : null;
-      console.log(`[sendblue] venue=${venue ? JSON.stringify(venue) : "(none)"}`);
-      if (venue) {
-        let count: number;
+      const venues = caption ? await extractVenuesFromCaption(caption, deps.gemini) : [];
+      console.log(`[sendblue] venues=${venues.length > 0 ? JSON.stringify(venues) : "(none)"}`);
+      if (venues.length > 0) {
+        let count = 0;
         try {
-          count = await deps.store.save(memoryKey, venue, url);
+          for (const venue of venues) {
+            count = await deps.store.save(memoryKey, venue, url);
+          }
         } catch (storeError) {
           // Degrade gracefully: still confirm the find even if persistence fails.
           console.error("[sendblue] store.save error", storeError);
-          reply = formatVenueReply(venue);
+          reply = formatVenueReply(venues[0]);
           await deps.client.sendMessage(from, reply);
           console.log(`[sendblue] sent to ${from} (save failed, no count)`);
           return { replied: true, reply };
         }
         console.log(`[sendblue] saved place for ${from} count=${count}`);
-        reply = formatSaveReply(venue, count, chinese);
-        // Make the just-saved place the conversation's focus so a follow-up
+        reply = formatMultiSaveReply(venues, count, chinese);
+        // Make the first just-saved place the conversation's focus so a follow-up
         // ("where is it?", "京都哪裡?") resolves to THIS place instead of
         // "which place do you mean?". Enrich it with a Google Places lookup for a
         // real address — social captions rarely include one.
+        const primaryVenue = venues[0];
         let focus: DiscoveredPlace = {
-          name: venue.name,
-          address: venue.area,
-          category: venue.category,
+          name: primaryVenue.name,
+          address: primaryVenue.area,
+          category: primaryVenue.category,
         };
         if (deps.placesSearch) {
           try {
-            const hit = (await deps.placesSearch(`${venue.name} ${venue.area ?? ""}`.trim()))[0];
+            const hit = (await deps.placesSearch(`${primaryVenue.name} ${primaryVenue.area ?? ""}`.trim()))[0];
             if (hit) {
               focus = {
-                name: venue.name,
-                address: hit.address ?? venue.area,
+                name: primaryVenue.name,
+                address: hit.address ?? primaryVenue.area,
                 rating: hit.rating,
                 priceRange: hit.priceRange,
-                category: venue.category ?? hit.category,
+                category: primaryVenue.category ?? hit.category,
               };
               console.log(`[sendblue] save enrich → "${hit.name}" ${hit.address ?? "(no addr)"}`);
             }
@@ -2047,13 +2125,18 @@ export async function processSendblueInbound(
         }
         const place = found[0];
         console.log(`[sendblue] details "${lookupQuery}" → ${place?.name ?? "(none)"}`);
+        const replyChinese =
+          chinese ||
+          contextLooksChinese(decision.placeName) ||
+          savedPlaceLooksChinese(savedMatch) ||
+          discoveredPlaceLooksChinese(place);
         if (place) {
           convoStore.setRecommended(memoryKey, place); // make it the conversation focus
-          reply = formatPlaceCard(place, chinese);
+          reply = formatPlaceCard(place, replyChinese);
         } else if (savedMatch) {
-          reply = savedPlaceAreaFallback(savedMatch, chinese);
+          reply = savedPlaceAreaFallback(savedMatch, replyChinese);
         } else {
-          reply = chinese
+          reply = replyChinese
             ? `我查不到「${decision.placeName}」的地點資料 — 名字再給我精確一點?`
             : `I couldn't find details for "${decision.placeName}" — got a more exact name?`;
         }
@@ -2064,6 +2147,8 @@ export async function processSendblueInbound(
             p.name.toLowerCase().includes(decision.placeName.toLowerCase()) ||
             decision.placeName.toLowerCase().includes(p.name.toLowerCase()),
         );
+        const adviceChineseBase =
+          chinese || contextLooksChinese(decision.placeName) || savedPlaceLooksChinese(match);
         let advice: string | null = null;
         let source = "none";
         // 1. If they SAVED this place, ground it in the post they saved it from
@@ -2071,7 +2156,10 @@ export async function processSendblueInbound(
         if (match?.sourceUrl && deps.gemini) {
           try {
             const caption = (await fetchLinkCaption(match.sourceUrl, deps.fetchText)).caption;
-            if (caption) advice = await suggestOrderFromCaption(decision.placeName, caption, deps.gemini, chinese);
+            if (caption) {
+              const adviceChinese = adviceChineseBase || looksChinese(caption);
+              advice = await suggestOrderFromCaption(decision.placeName, caption, deps.gemini, adviceChinese);
+            }
             if (advice) source = "saved-post";
           } catch (fetchErr) {
             console.error("[sendblue] order_advice caption fetch error", fetchErr);
@@ -2083,7 +2171,12 @@ export async function processSendblueInbound(
           const reviewsFn = deps.placesReviews ?? defaultPlacesReviews;
           try {
             const evidence = await reviewsFn(decision.placeName);
-            if (evidence) advice = await suggestOrderFromReviews(decision.placeName, evidence, deps.gemini, chinese);
+            if (evidence) {
+              const adviceChinese =
+                adviceChineseBase ||
+                contextLooksChinese(evidence.name, evidence.editorial, ...evidence.reviews);
+              advice = await suggestOrderFromReviews(decision.placeName, evidence, deps.gemini, adviceChinese);
+            }
             if (advice) source = "reviews";
           } catch (reviewsErr) {
             console.error("[sendblue] order_advice reviews error", reviewsErr);
@@ -2093,9 +2186,9 @@ export async function processSendblueInbound(
         if (advice) {
           reply = advice;
         } else {
-          reply = chinese
-            ? `${decision.placeName} 我目前找不到明確的招牌餐 😅 要不要我幫你查地址/card?`
-            : `I couldn't find a clear must-order for ${decision.placeName} 😅 — want its address/card instead?`;
+          reply = adviceChineseBase
+            ? `${decision.placeName} 我目前找不到明確的招牌餐 😅 要不要我幫你查地址或地圖?`
+            : `I couldn't find a clear must-order for ${decision.placeName} 😅 — want its address or map instead?`;
         }
       } else if (decision.kind === "location") {
         // Pure location, nothing pending → store it and ask what they want,

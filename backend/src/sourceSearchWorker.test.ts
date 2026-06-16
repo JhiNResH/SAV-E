@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildSourceRecoveryQueries,
   candidatesFromSearchResults,
+  defaultFetchMetadataHTML,
   parseDuckDuckGoResults,
   runSourceSearchRecovery,
 } from "./sourceSearchWorker.js";
@@ -39,6 +40,66 @@ test("buildSourceRecoveryQueries does not promote generic city creator handle cl
   });
 
   assert.ok(!queries.some((query) => query.includes("那間店") && query.includes("地址")));
+});
+
+test("defaultFetchMetadataHTML reads social metadata without failing on large pages", async () => {
+  const html = `<!doctype html><html><head>
+    <meta name="description" content="287 likes - google.foodie: &quot;&lt;樂葵法式鐵板燒-微風南山店&gt; 📍台北101&quot;">
+    <meta name="twitter:image" content="https://example.com/thumb.jpg">
+  </head><body>${"x".repeat(1_500_000)}</body></html>`;
+  const fetcher = async () =>
+    new Response(html, {
+      status: 200,
+      headers: {
+        "content-length": String(html.length),
+        "content-type": "text/html; charset=utf-8",
+      },
+    });
+
+  const head = await defaultFetchMetadataHTML("https://93.184.216.34/p/DZpDN5zkrH4/", 512_000, fetcher);
+  assert.match(head, /樂葵法式鐵板燒-微風南山店/);
+  assert.doesNotMatch(head, /x{1000}/);
+});
+
+test("defaultFetchMetadataHTML follows safe social short-link redirects", async () => {
+  const html = `<!doctype html><html><head>
+    <meta name="description" content="【京都 先斗町】 先斗町しゃぶしゃぶすき焼き きらく 位于京都先斗町的人气和牛寿喜烧名店。地址：京都府京都市中京区先斗町通四条上る柏屋町169-2">
+  </head><body>${"x".repeat(1_000_000)}</body></html>`;
+  const seen: string[] = [];
+  const fetcher = async (url: string | URL | Request) => {
+    const value = url.toString();
+    seen.push(value);
+    if (value === "http://xhslink.com/m/66nsbd6V2We") {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "location": "https://www.xiaohongshu.com/discovery/item/6a20eacb000000000f03ac00",
+        },
+      });
+    }
+    return new Response(html, { status: 200 });
+  };
+
+  const head = await defaultFetchMetadataHTML("http://xhslink.com/m/66nsbd6V2We", 512_000, fetcher);
+  assert.deepEqual(seen, [
+    "http://xhslink.com/m/66nsbd6V2We",
+    "https://www.xiaohongshu.com/discovery/item/6a20eacb000000000f03ac00",
+  ]);
+  assert.match(head, /先斗町しゃぶしゃぶすき焼き きらく/);
+  assert.doesNotMatch(head, /x{1000}/);
+});
+
+test("defaultFetchMetadataHTML blocks redirects to private hosts", async () => {
+  const fetcher = async () =>
+    new Response(null, {
+      status: 302,
+      headers: { "location": "http://127.0.0.1/private" },
+    });
+
+  await assert.rejects(
+    defaultFetchMetadataHTML("https://example.com/short", 512_000, fetcher),
+    /Blocked non-public URL/,
+  );
 });
 
 test("parseDuckDuckGoResults extracts titles snippets and canonical target URLs", () => {
