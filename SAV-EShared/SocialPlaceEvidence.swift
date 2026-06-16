@@ -17,6 +17,108 @@ struct SocialPlaceAnalysis {
     var missingInfo: [String]
 }
 
+struct SocialCaptionVenueExtraction: Equatable {
+    var name: String
+    var area: String?
+    var category: String?
+    var confidence: Double
+}
+
+enum SocialCaptionVenueExtractionPolicy {
+    static func prompt(caption: String) -> String {
+        """
+        You extract the single real-world venue (restaurant, cafe, bar, shop, hotel, attraction) mentioned in a social media caption for a travel app.
+
+        Rules:
+        - The venue "name" MUST be a substring that literally appears in the caption. Do not translate, normalize, or invent it.
+        - NEVER return a @handle or #hashtag as the name. Those are accounts/tags, not venues.
+        - Prefer the specific place over a larger campus or chain (e.g. a specific cafe inside a mall, not the mall).
+        - Captions may be in any language (English, Spanish, Chinese, etc.). Keep the name in its original language.
+        - "area" is the city / neighborhood / region if stated; otherwise null.
+        - "category" is a short label like "restaurant", "cafe", "rooftop bar", "hotel".
+        - "confidence" is 0.0-1.0.
+        - If there is no clear single venue, set name to null.
+
+        Return STRICT JSON only, no markdown, in this exact shape:
+        {"name": string|null, "area": string|null, "category": string|null, "confidence": number}
+
+        Caption:
+        \(caption)
+        """
+    }
+
+    static func parseExtraction(from text: String) -> SocialCaptionVenueExtraction? {
+        let jsonString = extractJSONObject(from: text)
+        guard let data = jsonString.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawName = object["name"] as? String else {
+            return nil
+        }
+
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.lowercased() != "null" else { return nil }
+
+        let area = normalizedNullableString(object["area"])
+        let category = normalizedNullableString(object["category"])
+        let confidence: Double
+        if let value = object["confidence"] as? Double {
+            confidence = value
+        } else if let value = object["confidence"] as? Int {
+            confidence = Double(value)
+        } else if let value = object["confidence"] as? String, let parsed = Double(value) {
+            confidence = parsed
+        } else {
+            confidence = 0.5
+        }
+
+        return SocialCaptionVenueExtraction(
+            name: name,
+            area: area,
+            category: category,
+            confidence: min(max(confidence, 0), 1)
+        )
+    }
+
+    static func isAcceptedVenueName(_ name: String, in caption: String) -> Bool {
+        let trimmed = SocialPlaceEvidenceScorer.cleanCandidateName(name)
+        guard !trimmed.isEmpty,
+              trimmed.first != "@",
+              trimmed.first != "#",
+              captionContains(trimmed, in: caption),
+              SocialPlaceEvidenceScorer.isUsableCandidateName(trimmed),
+              SocialPlaceEvidenceScorer.isLikelyCaptionPlaceName(trimmed),
+              !SocialPlaceEvidenceScorer.isRejectedTitle(trimmed) else {
+            return false
+        }
+        return true
+    }
+
+    static func captionContains(_ name: String, in caption: String) -> Bool {
+        let foldedName = name
+            .folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !foldedName.isEmpty else { return false }
+        let foldedCaption = caption.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: .current)
+        return foldedCaption.contains(foldedName)
+    }
+
+    private static func extractJSONObject(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let start = trimmed.range(of: "{"),
+              let end = trimmed.range(of: "}", options: .backwards),
+              start.lowerBound < end.upperBound else {
+            return trimmed
+        }
+        return String(trimmed[start.lowerBound..<end.upperBound])
+    }
+
+    private static func normalizedNullableString(_ value: Any?) -> String? {
+        guard let string = value as? String else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.lowercased() == "null" ? nil : trimmed
+    }
+}
+
 enum SocialPlaceEvidenceScorer {
     static func cleanCandidateName(_ value: String) -> String {
         cleanText(value)

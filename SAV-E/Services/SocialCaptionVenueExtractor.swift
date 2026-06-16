@@ -77,7 +77,7 @@ final class GeminiCaptionVenueExtractor: SocialCaptionVenueExtractor {
         guard !trimmed.isEmpty else { return nil }
         let boundedCaption = String(trimmed.prefix(maxCaptionLength))
 
-        let prompt = Self.extractionPrompt(caption: boundedCaption)
+        let prompt = SocialCaptionVenueExtractionPolicy.prompt(caption: boundedCaption)
         do {
             let text = try await generateText(prompt: prompt, temperature: 0, maxOutputTokens: 256)
             return Self.parseExtraction(from: text)
@@ -89,62 +89,19 @@ final class GeminiCaptionVenueExtractor: SocialCaptionVenueExtractor {
     }
 
     static func extractionPrompt(caption: String) -> String {
-        """
-        From this social caption, extract the ONE primary place the post is about.
-        Respond ONLY with strict JSON. No markdown. No text outside the JSON object.
-
-        Rules:
-        - name: the venue's proper name, exactly as it literally appears in the caption.
-        - The name MUST be text that literally appears in the caption (do not translate, normalize, or invent it).
-        - NEVER return a @username/handle or a #hashtag as the name. If the only thing naming the place is a @handle, return the venue's real proper name if the caption states it, otherwise {"name": null}.
-        - Prefer the place's real name over the name of a larger campus/area it sits inside (e.g. a specific viewpoint over the whole university).
-        - area: the city, neighborhood, or country the place is in, if the caption names one; otherwise null.
-        - category: one of cafe, food, bar, hotel, attraction, shopping, stay — your best guess for this place.
-        - confidence: a number from 0 to 1 for how sure you are this is a real, specific named venue.
-        - The caption may be in any language (English, Spanish, Chinese, etc.). Read it natively.
-        - If the caption names NO specific venue (only generic vibes, feelings, or hashtags), return {"name": null}.
-
-        Output schema:
-        {"name": "string or null", "area": "string or null", "category": "string or null", "confidence": 0.0}
-
-        Caption:
-        \(caption)
-        """
+        SocialCaptionVenueExtractionPolicy.prompt(caption: caption)
     }
 
     /// Parses the strict-JSON extraction. A missing/null/empty name means "no
     /// venue" → nil. Tolerant of the LLM wrapping JSON in prose by scanning for
     /// the outermost object.
     static func parseExtraction(from text: String) -> ExtractedVenue? {
-        let jsonString = extractJSONObject(from: text)
-        guard let data = jsonString.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        guard let rawName = object["name"] as? String else { return nil }
-        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        // The model is instructed to return null/"" for no-venue; null decodes
-        // to a missing String, "" trims to empty — both mean "no venue".
-        guard !name.isEmpty, name.lowercased() != "null" else { return nil }
-
-        let area = (object["area"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let category = (object["category"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let confidence: Double
-        if let value = object["confidence"] as? Double {
-            confidence = value
-        } else if let value = object["confidence"] as? Int {
-            confidence = Double(value)
-        } else if let value = object["confidence"] as? String, let parsed = Double(value) {
-            confidence = parsed
-        } else {
-            confidence = 0.5
-        }
-
+        guard let extraction = SocialCaptionVenueExtractionPolicy.parseExtraction(from: text) else { return nil }
         return ExtractedVenue(
-            name: name,
-            area: (area?.isEmpty == false && area?.lowercased() != "null") ? area : nil,
-            category: (category?.isEmpty == false && category?.lowercased() != "null") ? category : nil,
-            confidence: min(max(confidence, 0), 1)
+            name: extraction.name,
+            area: extraction.area,
+            category: extraction.category,
+            confidence: extraction.confidence
         )
     }
 
@@ -161,14 +118,5 @@ final class GeminiCaptionVenueExtractor: SocialCaptionVenueExtractor {
             throw SAVEGeminiTransportError.emptyResponse
         }
         return text
-    }
-
-    private static func extractJSONObject(from text: String) -> String {
-        guard let start = text.range(of: "{"),
-              let end = text.range(of: "}", options: .backwards),
-              start.lowerBound < end.upperBound else {
-            return text
-        }
-        return String(text[start.lowerBound..<end.upperBound])
     }
 }

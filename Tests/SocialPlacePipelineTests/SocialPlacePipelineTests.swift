@@ -3194,6 +3194,26 @@ final class SocialPlacePipelineTests: XCTestCase {
 
     // MARK: - LLM caption -> venue extraction fallback (prose-only long tail)
 
+    func testSharedCaptionVenueExtractionPolicyMatchesSendblueContract() throws {
+        let caption = """
+        1000CC • 台北探店 on Instagram: "台北中正區最近很紅的希臘左巴-古亭店，記得先訂位。#台北美食"
+        """
+        let extraction = try XCTUnwrap(SocialCaptionVenueExtractionPolicy.parseExtraction(from: """
+        Here is JSON:
+        {"name":"希臘左巴-古亭店","area":"台北市","category":"food","confidence":0.82}
+        """))
+
+        XCTAssertEqual(extraction.name, "希臘左巴-古亭店")
+        XCTAssertEqual(extraction.area, "台北市")
+        XCTAssertEqual(extraction.category, "food")
+        XCTAssertEqual(extraction.confidence, 0.82)
+        XCTAssertTrue(SocialCaptionVenueExtractionPolicy.isAcceptedVenueName(extraction.name, in: caption))
+
+        XCTAssertFalse(SocialCaptionVenueExtractionPolicy.isAcceptedVenueName("@foodie_taipei", in: caption))
+        XCTAssertFalse(SocialCaptionVenueExtractionPolicy.isAcceptedVenueName("Blue Bottle Coffee", in: caption))
+        XCTAssertFalse(SocialCaptionVenueExtractionPolicy.isAcceptedVenueName("電話：02-2321-2111", in: "電話：02-2321-2111\n台北市中正區羅斯福路二段66巷10號"))
+    }
+
     private struct CaptionVenueFixture: Decodable {
         var sourceUrl: String
         var captionEvidenceText: String
