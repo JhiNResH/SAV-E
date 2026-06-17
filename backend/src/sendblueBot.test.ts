@@ -577,6 +577,21 @@ test("webhook flow: discovery with no location asks where you are", async () => 
   assert.match(client.calls[0]?.content ?? "", /Where are you|你現在在哪/);
 });
 
+test("webhook flow: nearby recommendation is not mistaken for a distance follow-up", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+15553334445", { name: "Old Pick", lat: 33.7, lng: -117.8 });
+  const gemini: GeminiCaller = async () => JSON.stringify({ search: { query: "hot pot", area: null } });
+
+  await processSendblueInbound(
+    { from_number: "+15553334445", content: "recommend nearby hot pot" },
+    { client, store, gemini, conversation },
+  );
+
+  assert.match(client.calls.at(-1)?.content ?? "", /Where are you|你現在在哪/);
+});
+
 test("decideRecall: a bare location resumes the pending discovery query", async () => {
   let sawContext = false;
   const gemini: GeminiCaller = async (prompt) => {
@@ -644,6 +659,73 @@ test("webhook flow: price follow-up uses Chinese when the focused place is CJK",
   assert.match(out, /我目前沒有.*可靠.*價格/);
   assert.match(out, /4\.7★/);
   assert.doesNotMatch(out, /I don't have|address\/card/i);
+});
+
+test("webhook flow: distance follow-up uses stored location and focused place coordinates", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  await store.setLocation("+15558880003", { label: "Tustin", lat: 33.7455, lng: -117.8263 });
+  conversation.setRecommended("+15558880003", {
+    name: "Wagyu Factory Tustin | Limitless Shabu",
+    rating: 4.9,
+    address: "2415 Park Ave, Tustin, CA 92782, USA",
+    lat: 33.6995,
+    lng: -117.8292,
+  });
+
+  await processSendblueInbound(
+    { from_number: "+15558880003", content: "How far is that" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /about 3\.2 mi from Tustin/);
+  assert.match(out, /2415 Park Ave/);
+});
+
+test("webhook flow: distance follow-up without a stored location declines honestly", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+15558880004", {
+    name: "Wagyu Factory Tustin | Limitless Shabu",
+    address: "2415 Park Ave, Tustin, CA 92782, USA",
+    lat: 33.6995,
+    lng: -117.8292,
+  });
+
+  await processSendblueInbound(
+    { from_number: "+15558880004", content: "How far is that" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /don't have your exact starting point/i);
+  assert.match(out, /2415 Park Ave/);
+});
+
+test("webhook flow: Chinese distance follow-up uses kilometers", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  await store.setLocation("+886900000003", { label: "台中", lat: 24.1477, lng: 120.6736 });
+  conversation.setRecommended("+886900000003", {
+    name: "挽肉と米 台中公益店",
+    address: "台中市西屯區公益路",
+    lat: 24.151,
+    lng: 120.65,
+  });
+
+  await processSendblueInbound(
+    { from_number: "+886900000003", content: "多遠" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.match(out, /大約 .* km/);
+  assert.doesNotMatch(out, / mi/);
 });
 
 // Minimal in-memory ConversationStore for webhook tests.
@@ -1028,6 +1110,7 @@ test("webhook flow: bare area mention lists that area", async () => {
 
 test("isOrderIntent + orderQuery", () => {
   assert.equal(isOrderIntent("order iced latte from raposa"), true);
+  assert.equal(isOrderIntent("Order milk tea at hotpot?"), false);
   assert.equal(isOrderIntent("下單 一杯拿鐵"), true);
   assert.equal(isOrderIntent("buy me a cold brew"), true);
   assert.equal(isOrderIntent("recommend somewhere nearby"), false);
@@ -1059,6 +1142,31 @@ test("webhook flow: order intent (with known location) routes to the SLL-R order
   assert.equal(result.replied, true);
   assert.match(client.calls[0]?.content ?? "", /Ordered Iced latte/);
   assert.equal((await store.list("+15551112222")).length, 0); // ordering ≠ saving a place
+});
+
+test("webhook flow: skeptical order question does not enter the SLL-R order lane", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  let orderCalls = 0;
+  const gemini: GeminiCaller = async () => JSON.stringify({ reply: "No, I wouldn't order milk tea at a hot pot spot." });
+
+  await processSendblueInbound(
+    { from_number: "+15550007000", content: "Order milk tea at hotpot?" },
+    {
+      client,
+      store,
+      gemini,
+      order: async () => {
+        orderCalls += 1;
+        return "ordered";
+      },
+    },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(orderCalls, 0);
+  assert.match(out, /wouldn't order milk tea/);
+  assert.doesNotMatch(out, /What area are you in/);
 });
 
 test("webhook flow: order with NO known location asks for the area", async () => {
@@ -1864,6 +1972,17 @@ test("suggestOrderFromReviews recommends from reviews/editorial, null when no it
   assert.equal(await suggestOrderFromReviews("X", { name: "X", reviews: ["nice place"] }, no, false), null);
   // No evidence at all → null without calling the model.
   assert.equal(await suggestOrderFromReviews("X", { name: "X", reviews: [] }, async () => "x", false), null);
+});
+
+test("suggestOrderFromReviews rejects beverage-only advice for hot pot restaurants", async () => {
+  const gemini: GeminiCaller = async () => JSON.stringify({ reply: "Reviewers love the milk tea. 🥛" });
+  const advice = await suggestOrderFromReviews(
+    "Wagyu Factory Tustin | Limitless Shabu",
+    { name: "Wagyu Factory Tustin | Limitless Shabu", reviews: ["great broth", "quality wagyu beef"] },
+    gemini,
+    false,
+  );
+  assert.equal(advice, null);
 });
 
 test("webhook flow: 'what to order' at a RECOMMENDED (unsaved) place uses Google reviews", async () => {
