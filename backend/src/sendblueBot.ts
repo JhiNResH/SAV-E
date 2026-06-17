@@ -691,7 +691,7 @@ const orderIntentPhrases = ["幫我點", "幫我買", "點餐", "點一", "下�
 export function isOrderIntent(text: string): boolean {
   const lower = text.toLowerCase().trim();
   if (!lower) return false;
-  if (lower.startsWith("order")) return true;
+  if (/^order\s+[^?]+$/i.test(text.trim())) return true;
   return orderIntentPhrases.some((phrase) => lower.includes(phrase));
 }
 
@@ -1584,6 +1584,40 @@ function isPriceIntent(text: string): boolean {
   return /\b(how much|price|prices|pricing|cost|costs|expensive|cheap)\b|多少錢|多少钱|價格|价钱|價錢|價位|貴嗎|贵吗/i.test(text);
 }
 
+function isDistanceIntent(text: string): boolean {
+  return /\b(how far|how close|distance|walk there|walking distance|drive there|driving distance|minutes away|miles away|km away)\b|多遠|多远|近嗎|近吗|距離|距离/i.test(text);
+}
+
+function formatDistanceReply(place: DiscoveredPlace, location: StoredLocation | null, chinese: boolean): string {
+  if (
+    location &&
+    typeof place.lat === "number" &&
+    typeof place.lng === "number"
+  ) {
+    const miles = distanceMiles(location.lat, location.lng, place.lat, place.lng);
+    const rounded = miles < 10 ? miles.toFixed(1) : Math.round(miles).toString();
+    const km = miles * 1.609344;
+    const roundedKm = km < 10 ? km.toFixed(1) : Math.round(km).toString();
+    return chinese
+      ? `${place.name} 離 ${location.label} 大約 ${roundedKm} km。\n${place.address ? `📍 ${place.address}` : appleMapsUrl(place)}`
+      : `${place.name} is about ${rounded} mi from ${location.label}.\n${place.address ? `📍 ${place.address}` : appleMapsUrl(place)}`;
+  }
+  return chinese
+    ? `我還沒有你的精確出發點,所以不能可靠算距離。\n${place.address ? `📍 ${place.address}` : `地圖: ${appleMapsUrl(place)}`}`
+    : `I don't have your exact starting point yet, so I can't calculate a reliable distance.\n${place.address ? `📍 ${place.address}` : `Map: ${appleMapsUrl(place)}`}`;
+}
+
+function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthMiles = 3958.8;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthMiles * Math.asin(Math.sqrt(a));
+}
+
 function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
   const known = [
     typeof place.rating === "number" ? `${place.rating}★` : "",
@@ -1659,11 +1693,23 @@ Return STRICT JSON only: {"reply": string|null}`;
     const raw = await gemini(prompt);
     const parsed = parseReplyJson(raw);
     const reply = parsed && typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+    if (reply && isImplausibleOrderAdvice(placeName, corpus, reply)) return null;
     return reply.length > 0 ? reply : null;
   } catch (error) {
     console.error("[sendblue] suggestOrderFromReviews gemini error", error);
     return null;
   }
+}
+
+function isImplausibleOrderAdvice(placeName: string, evidence: string, reply: string): boolean {
+  const place = placeName.toLowerCase();
+  const corpus = evidence.toLowerCase();
+  const out = reply.toLowerCase();
+  const mealRestaurant = /\b(hot\s*pot|shabu|sukiyaki|wagyu|steak|bbq|ramen|sushi)\b|火鍋|火锅|しゃぶ|すき焼き|和牛/.test(`${place}\n${corpus}`);
+  if (!mealRestaurant) return false;
+  const beverageOnly = /\b(milk tea|boba|tea|latte|coffee|drink|beverage|juice|smoothie)\b|奶茶|飲料|饮料|拿鐵|拿铁/.test(out) &&
+    !/\b(beef|wagyu|shabu|sukiyaki|hot\s*pot|steak|meat|broth|noodle|rice|set|plate|combo|pork|chicken|seafood|vegetable|dish)\b|火鍋|火锅|和牛|牛肉|套餐|鍋|锅|肉|飯|饭|麵|面|しゃぶ|すき焼き/.test(out);
+  return beverageOnly;
 }
 
 export async function phrasePlaceRec(
@@ -1975,6 +2021,13 @@ export async function processSendblueInbound(
     if (!url && isPriceIntent(text) && convo?.lastRecommended) {
       const replyChinese = chinese || discoveredPlaceLooksChinese(convo.lastRecommended);
       reply = formatPriceReply(convo.lastRecommended, replyChinese);
+      await deps.client.sendMessage(from, reply);
+      return { replied: true, reply };
+    }
+    if (!url && isDistanceIntent(text) && convo?.lastRecommended) {
+      const loc = await deps.store.getLocation(memoryKey);
+      const replyChinese = chinese || discoveredPlaceLooksChinese(convo.lastRecommended);
+      reply = formatDistanceReply(convo.lastRecommended, loc, replyChinese);
       await deps.client.sendMessage(from, reply);
       return { replied: true, reply };
     }
