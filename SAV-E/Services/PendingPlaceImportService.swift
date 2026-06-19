@@ -788,11 +788,27 @@ extension Place {
     }
 
     func matches(_ other: Place) -> Bool {
-        pendingDeduplicationKey == other.pendingDeduplicationKey || (
-            name == other.name &&
+        // Strongest signal: a shared Google Place ID is the same venue, no matter how
+        // each copy was captured (social link vs. map pin vs. confirmed candidate).
+        if let lhsID = googlePlaceId?.trimmingCharacters(in: .whitespacesAndNewlines), !lhsID.isEmpty,
+           let rhsID = other.googlePlaceId?.trimmingCharacters(in: .whitespacesAndNewlines), lhsID == rhsID {
+            return true
+        }
+        // Same source post, normalised so trailing slashes / tracking params don't split it.
+        if let lhsURL = sourceUrl?.normalizedDeduplicationURLString(),
+           let rhsURL = other.sourceUrl?.normalizedDeduplicationURLString(),
+           lhsURL == rhsURL {
+            return true
+        }
+        // Same venue by name + geographic proximity — catches a place re-saved from a
+        // different source where neither copy carries a place id or a shared URL.
+        if matchesMapFeature(title: other.name, coordinate: other.coordinate) {
+            return true
+        }
+        // Exact text fallback.
+        return name == other.name &&
             address == other.address &&
             sourceUrl == other.sourceUrl
-        )
     }
 }
 
