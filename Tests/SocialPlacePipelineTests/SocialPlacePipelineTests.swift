@@ -44,6 +44,15 @@ private final class StubPublicSourceSearchService: PublicSourceSearchServiceProt
                 )
             ]
         }
+        if query.contains("DZw2oh1AYZy") {
+            return [
+                PublicSourceSearchResult(
+                    title: "最近冰品店都陸續推出 真的愛慘 🍑 - Instagram mirror",
+                    url: "https://example.com/ig/DZw2oh1AYZy",
+                    snippet: "最近冰品店都陸續推出 真的愛慘 🍑。地址：台北市大安區麗水街7巷11號。"
+                )
+            ]
+        }
         return []
     }
 }
@@ -2480,6 +2489,32 @@ final class SocialPlacePipelineTests: XCTestCase {
             "DWmzyodgbuv restaurant venue",
             "\"https://www.instagram.com/reel/DWmzyodgbuv/\""
         ])
+    }
+
+    func testURLOnlyInstagramPostRunsPublicRecoveryLikeShareExtension() async throws {
+        let search = StubPublicSourceSearchService()
+        let service = SocialLinkReviewCandidateService(
+            googlePlacesService: EmptyGooglePlacesService(),
+            publicSourceSearchService: search,
+            captionVenueExtractor: nil
+        )
+        let sourceURL = "https://www.instagram.com/p/DZw2oh1AYZy/"
+
+        let candidates = try await service.recoverReviewCandidates(fromEvidenceText: "", sourceURL: sourceURL)
+        let candidate = try XCTUnwrap(candidates.first)
+
+        XCTAssertTrue(search.queries.contains { $0.contains("DZw2oh1AYZy") },
+                      "URL-only app imports should run recovery from the Instagram shortcode, got: \(search.queries)")
+        XCTAssertFalse(candidate.isSourceOnly,
+                       "A URL-only Instagram post with public mirrored evidence should become a Review Candidate, matching the richer iMessage/share-extension path")
+        XCTAssertEqual(candidate.candidateName, "最近冰品店都陸續推出 真的愛慘 🍑")
+        XCTAssertEqual(candidate.address, "台北市大安區麗水街7巷11號")
+        XCTAssertEqual(candidate.sourceURL, sourceURL)
+        XCTAssertNil(candidate.latitude)
+        XCTAssertNil(candidate.longitude)
+        XCTAssertEqual(candidate.reviewState, "source_recovered_candidate")
+        XCTAssertTrue(candidate.evidenceDiagnostic?.found.contains { $0.contains("Recovered venue candidate") } == true)
+        XCTAssertTrue(candidate.missingInfo.contains("Verified coordinates"))
     }
 
     func testCaptionVenueWithoutVerifiedAddressStaysReviewCandidateWithoutCoordinates() {

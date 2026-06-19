@@ -650,10 +650,13 @@ final class SocialLinkReviewCandidateService {
     }
 
     /// A thin/age-restricted social post (login-walled Instagram reel, etc.) that
-    /// exposes no caption still carries two deterministic recovery signals: the
-    /// post shortcode (from the URL) and the visible creator handle. With both we
-    /// can search the public web — where the caption/venue is mirrored — instead
-    /// of degrading straight to a source-only receipt.
+    /// exposes no caption still carries a deterministic recovery signal: the post
+    /// shortcode from the URL. If the share sheet also provides a visible creator
+    /// handle, include that signal too. Do not require the handle, though: the main
+    /// app often receives only a pasted/opened Instagram URL while the iMessage /
+    /// share-extension path receives richer metadata. Both paths should attempt
+    /// the same bounded public-search recovery instead of letting URL-only app
+    /// imports degrade straight to source-only.
     private func hasRecoverableThinSocialSource(evidenceText: String, sourceURL: String) -> Bool {
         guard let descriptor = socialPostDescriptor(in: URL(string: sourceURL)),
               !descriptor.id.isEmpty else {
@@ -664,7 +667,8 @@ final class SocialLinkReviewCandidateService {
         if xiaohongshuLinkContext(sourceURL: sourceURL)?.isShortLink == true {
             return false
         }
-        return firstSocialHandle(in: evidenceText) != nil
+        if firstSocialHandle(in: evidenceText) != nil { return true }
+        return descriptor.platformName == "instagram post" || descriptor.platformName == "instagram reel"
     }
 
     func refineCandidate(_ candidate: PendingReviewCandidate, evidenceText: String? = nil) async -> PendingReviewCandidate {
