@@ -122,6 +122,7 @@ function SaveApp() {
   const previewTrip = incomingTrip ?? decodedTrip;
   const nextStop = selectedPlaces[0];
   const importedCount = bookmarks.filter((place) => Boolean(place.sourceUrl)).length;
+  const showingIncomingShare = Boolean(incomingMySaves || incomingPlace || incomingTrip);
 
   async function hydrateInitialTripLink() {
     const initialUrl = await Linking.getInitialURL();
@@ -672,7 +673,13 @@ function SaveApp() {
           {activeTab === "share" ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                {incomingMySaves ? "My SAV-E" : incomingPlace ? "Shared place" : "Tesla handoff"}
+                {incomingMySaves
+                  ? "My SAV-E"
+                  : incomingPlace
+                    ? "Shared place"
+                    : incomingTrip
+                      ? "Shared trip"
+                      : "Tesla handoff"}
               </Text>
 
               {incomingMySaves ? (
@@ -697,35 +704,39 @@ function SaveApp() {
                 </View>
               ) : null}
 
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Share summary</Text>
-                <Text style={styles.previewHeadline}>{tripName}</Text>
-                <Text style={styles.previewSubhead}>{tripCity || "No city set"}</Text>
-                <Text style={styles.helperText}>
-                  Share the trip link with friends, then send the first stop to Tesla as a clean navigation handoff.
-                </Text>
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Next stop</Text>
-                {nextStop ? (
-                  <View style={styles.nextStopCard}>
-                    <Text style={styles.stopName}>{nextStop.name}</Text>
-                    <Text style={styles.stopMeta}>{nextStop.address}</Text>
-                    <Text style={styles.stopMeta}>
-                      {categoryLabel[nextStop.category]} · via {nextStop.sourcePlatform}
+              {!showingIncomingShare ? (
+                <>
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Share summary</Text>
+                    <Text style={styles.previewHeadline}>{tripName}</Text>
+                    <Text style={styles.previewSubhead}>{tripCity || "No city set"}</Text>
+                    <Text style={styles.helperText}>
+                      Share the trip link with friends, then send the first stop to Tesla as a clean navigation handoff.
                     </Text>
-                    <ActionButton label="Send Next Stop to Tesla" onPress={shareTeslaHandoff} />
                   </View>
-                ) : (
-                  <Text style={styles.emptyText}>Add at least one bookmark to create a Tesla handoff.</Text>
-                )}
-              </View>
 
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Decoded payload</Text>
-                {previewTrip ? <DecodedTrip trip={previewTrip} /> : <Text style={styles.emptyText}>Invalid trip link.</Text>}
-              </View>
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Next stop</Text>
+                    {nextStop ? (
+                      <View style={styles.nextStopCard}>
+                        <Text style={styles.stopName}>{nextStop.name}</Text>
+                        <Text style={styles.stopMeta}>{nextStop.address}</Text>
+                        <Text style={styles.stopMeta}>
+                          {categoryLabel[nextStop.category]} · via {nextStop.sourcePlatform}
+                        </Text>
+                        <ActionButton label="Send Next Stop to Tesla" onPress={shareTeslaHandoff} />
+                      </View>
+                    ) : (
+                      <Text style={styles.emptyText}>Add at least one bookmark to create a Tesla handoff.</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Decoded payload</Text>
+                    {previewTrip ? <DecodedTrip trip={previewTrip} /> : <Text style={styles.emptyText}>Invalid trip link.</Text>}
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : null}
         </ScrollView>

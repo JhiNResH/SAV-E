@@ -48,9 +48,13 @@ export function isSavePlaceLink(value: string): boolean {
   try {
     const url = new URL(value);
     const placeBase = new URL(placeBaseUrl);
+    const isConfiguredShareBase = url.hostname === placeBase.hostname;
+    const protocolAccepted = acceptedShareHosts.has(url.hostname)
+      ? url.protocol === "https:"
+      : isConfiguredShareBase && url.protocol === placeBase.protocol;
     return (
-      url.protocol === "https:" &&
-      (acceptedShareHosts.has(url.hostname) || url.hostname === placeBase.hostname) &&
+      protocolAccepted &&
+      (acceptedShareHosts.has(url.hostname) || isConfiguredShareBase) &&
       (url.pathname === placeBase.pathname ||
         url.pathname.startsWith(`${placeBase.pathname}/`))
     );
