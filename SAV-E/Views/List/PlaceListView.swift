@@ -356,11 +356,12 @@ private struct SaveSearchResultCard: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 6) {
-                SaveSearchChip(text: result.objectType.displayName, fill: .saveHoney)
-                SaveSearchChip(text: result.userState.displayName, fill: result.isRecommendationShell ? .saveSky : .saveMint)
-                if let category = result.category {
-                    SaveSearchChip(text: category.displayName, fill: .saveSignal)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    resultChips
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    resultChips
                 }
             }
 
@@ -418,6 +419,15 @@ private struct SaveSearchResultCard: View {
             .background(Color.saveNotebookPage)
             .overlay(Capsule().stroke(Color.saveNotebookLine, lineWidth: 1.1))
             .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var resultChips: some View {
+        SaveSearchChip(text: result.objectType.displayName, fill: .saveHoney)
+        SaveSearchChip(text: result.userState.displayName, fill: result.isRecommendationShell ? .saveSky : .saveMint)
+        if let category = result.category {
+            SaveSearchChip(text: category.displayName, fill: .saveSignal)
+        }
     }
 
     private var iconName: String {

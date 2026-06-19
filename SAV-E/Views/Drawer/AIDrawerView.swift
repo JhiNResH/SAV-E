@@ -66,6 +66,7 @@ private enum CommandDrawerTab: String, CaseIterable, Hashable {
 struct AIDrawerView: View {
     @Environment(\.appLanguageSettings) private var languageSettings
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var viewModel: AIDrawerViewModel
     @Binding var drawerDetent: PresentationDetent
     @Binding var mapDetailDrawerItem: MapDetailDrawerItem?
@@ -100,6 +101,9 @@ struct AIDrawerView: View {
     var onOpenPassport: () -> Void = {}
     var onDismissMapDetail: () -> Void = {}
     @FocusState private var searchFocused: Bool
+    @ScaledMetric(relativeTo: .body) private var commandIconDimension: CGFloat = 28
+    @ScaledMetric(relativeTo: .body) private var commandBarMinHeight: CGFloat = 52
+    @ScaledMetric(relativeTo: .body) private var commandFieldMinHeight: CGFloat = 28
     @StateObject private var voiceQuery = VoiceQueryController()
     @State private var showGoogleTakeoutImport = false
     @State private var addSpotStatus: String?
@@ -263,7 +267,7 @@ struct AIDrawerView: View {
             Image(systemName: commandBarIcon)
                 .foregroundColor(commandBarTextColor)
                 .font(.caption.weight(.black))
-                .frame(width: 28, height: 28)
+                .frame(width: commandIconDimension, height: commandIconDimension)
                 .background(commandIconFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -276,7 +280,7 @@ struct AIDrawerView: View {
                 .font(.subheadline)
                 .foregroundColor(commandBarTextColor)
                 .lineLimit(1)
-                .frame(height: 24)
+                .frame(minHeight: commandFieldMinHeight)
                 .focused($searchFocused)
                 .submitLabel(.search)
                 .onSubmit { submitSearchField() }
@@ -299,7 +303,7 @@ struct AIDrawerView: View {
             }
         }
         .padding(.horizontal, SaveTheme.Spacing.md)
-        .frame(height: 52)
+        .frame(minHeight: commandBarMinHeight)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.thinMaterial)
@@ -317,7 +321,7 @@ struct AIDrawerView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .padding(.horizontal, SaveTheme.Spacing.md)
         .padding(.vertical, SaveTheme.Spacing.sm)
-        .frame(height: 72)
+        .frame(minHeight: collapsedDrawerHeight, alignment: .center)
         .background(.clear)
     }
 
@@ -539,7 +543,7 @@ struct AIDrawerView: View {
                         try await onDeletePlace(place)
                         viewModel.removePlace(place)
                         withAnimation(SaveTheme.Motion.standardSpring) {
-                            drawerDetent = .height(72)
+                            drawerDetent = collapsedDrawerDetent
                         }
                     } onPlanAround: {
                         withAnimation { drawerDetent = .large }
@@ -741,7 +745,7 @@ struct AIDrawerView: View {
                 showReviewInbox = false
                 showLists = false
                 searchFocused = false
-                withAnimation { drawerDetent = .height(72) }
+                withAnimation { drawerDetent = collapsedDrawerDetent }
             }) {
                 SaveIconTile(
                     systemName: "xmark",
@@ -855,7 +859,7 @@ struct AIDrawerView: View {
     }
 
     private func showsContentArea(for drawerHeight: CGFloat) -> Bool {
-        let isCollapsed = drawerHeight <= 96
+        let isCollapsed = drawerHeight <= collapsedDrawerHeight + 4
         if case .idle = viewModel.drawerState, isCollapsed { return false }
         return true
     }
@@ -871,6 +875,14 @@ struct AIDrawerView: View {
 
     private var hasVisibleMapSearchResults: Bool {
         !viewModel.mapCandidates.isEmpty
+    }
+
+    private var collapsedDrawerHeight: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 160 : 104
+    }
+
+    private var collapsedDrawerDetent: PresentationDetent {
+        .height(collapsedDrawerHeight)
     }
 
     // MARK: - Idle suggestions
@@ -917,7 +929,8 @@ struct AIDrawerView: View {
                     }
                     .foregroundColor(activeCommandTab == tab ? .saveInk : .saveCocoa.opacity(0.76))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 34)
+                    .frame(minHeight: 38)
+                    .padding(.vertical, 2)
                     .background(activeCommandTab == tab ? Color.saveHoney.opacity(0.62) : Color.white.opacity(colorScheme == .dark ? 0.08 : 0.18))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
@@ -1669,7 +1682,7 @@ struct AIDrawerView: View {
         showReviewInbox = false
         showLists = false
         searchFocused = false
-        withAnimation { drawerDetent = .height(72) }
+        withAnimation { drawerDetent = collapsedDrawerDetent }
     }
 
     private func closeMapSearchResults() {
@@ -1681,14 +1694,14 @@ struct AIDrawerView: View {
         showLists = false
         searchFocused = false
         addSpotStatus = nil
-        withAnimation { drawerDetent = .height(72) }
+        withAnimation { drawerDetent = collapsedDrawerDetent }
     }
 
     private func closeMapDetail() {
         mapDetailDrawerItem = nil
         onDismissMapDetail()
         withAnimation(SaveTheme.Motion.standardSpring) {
-            drawerDetent = .height(72)
+            drawerDetent = collapsedDrawerDetent
         }
     }
 

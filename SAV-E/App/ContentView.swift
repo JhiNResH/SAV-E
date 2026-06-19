@@ -82,7 +82,7 @@ struct ContentView: View {
                     }
                 )
                     .environment(\.appLanguageSettings, languageSettings)
-                    .presentationDetents([.height(72), .height(88), .fraction(0.34), .fraction(0.38), .medium, .large], selection: $drawerDetent)
+                    .presentationDetents([.height(88), .height(104), .height(160), .fraction(0.34), .fraction(0.38), .medium, .large], selection: $drawerDetent)
                     .presentationDragIndicator(.visible)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .interactiveDismissDisabled(true)
