@@ -87,6 +87,7 @@ struct ProfileView: View {
                         }
                         .accessibilityIdentifier("profile.language")
 
+                        #if DEBUG
                         NavigationLink {
                             SaveMemoryDebugView()
                         } label: {
@@ -100,6 +101,7 @@ struct ProfileView: View {
                         .buttonStyle(.plain)
                         .simultaneousGesture(TapGesture().onEnded { SaveHaptics.tap() })
                         .accessibilityIdentifier("profile.debugMemory")
+                        #endif
 
                         SettingsRow(icon: "arrow.right.square", title: languageSettings.text(.signOut), color: .saveError) {
                             SaveHaptics.tap()
