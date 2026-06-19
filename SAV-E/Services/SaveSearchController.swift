@@ -666,7 +666,7 @@ private struct SaveSearchQuery {
         categories: Set<PlaceCategory>,
         containsPlaceSearchLanguage: Bool
     ) -> String? {
-        guard categories.isEmpty, !normalizedRaw.isEmpty else { return nil }
+        guard !normalizedRaw.isEmpty else { return nil }
         guard !containsAny(normalizedRaw, keywords: ["http://", "https://"]) else { return nil }
         guard !containsAny(normalizedRaw, keywords: ["recommend", "recommendation", "date night", "tonight", "推薦", "今晚"]) else {
             return nil
@@ -733,7 +733,7 @@ private struct SaveSearchQuery {
             guard let first = word.unicodeScalars.first else { return false }
             return CharacterSet.uppercaseLetters.contains(first)
         }
-        return words.count >= 3 && titleCasedWords.count >= 2
+        return words.count >= 2 && (titleCasedWords.count >= 1 || terms.count >= 2)
     }
 
     private static func parseCategories(from value: String) -> Set<PlaceCategory> {
