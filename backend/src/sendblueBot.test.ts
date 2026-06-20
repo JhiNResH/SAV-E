@@ -8,6 +8,12 @@ import {
   formatVenueReply,
   isListIntent,
   isRecommendIntent,
+  isPriceIntent,
+  isBookingIntent,
+  isCompareIntent,
+  formatPriceReply,
+  formatBookingReply,
+  formatCompareReply,
   isOrderIntent,
   orderQuery,
   isLocationIntent,
@@ -659,6 +665,70 @@ test("webhook flow: price follow-up uses Chinese when the focused place is CJK",
   assert.match(out, /我目前沒有.*可靠.*價格/);
   assert.match(out, /4\.7★/);
   assert.doesNotMatch(out, /I don't have|address\/card/i);
+});
+
+test("webhook flow: booking follow-up gives actionable next step from last recommendation", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+155****1234", {
+    name: "Wagyu Factory Tustin | Limitless Shabu",
+    rating: 4.4,
+    address: "2415 Park Ave, Tustin, CA 92782",
+    mapsUri: "https://maps.google.com/?cid=123",
+  });
+
+  const result = await processSendblueInbound(
+    { from_number: "+155****1234", content: "Can you book a table for me?" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(result.replied, true);
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /Google Maps: https:\/\/maps\.google\.com\/\?cid=123/);
+  assert.match(out, /2415 Park Ave/);
+});
+
+test("webhook flow: comparison follow-up explains recent options instead of dead-ending", async () => {
+  const client = new FakeSendblueClient();
+  const store = new FakeStore();
+  const { store: conversation } = fakeConversation();
+  conversation.setRecommended("+155****1234", {
+    name: "Show Hotpot 75",
+    rating: 4.6,
+    category: "hot pot restaurant",
+    address: "2540 Main St Ste L, Irvine, CA 92614",
+  });
+  conversation.setPlaces("+155****1234", [
+    { name: "Wagyu Factory Tustin | Limitless Shabu", rating: 4.4, category: "shabu shabu", address: "2415 Park Ave, Tustin, CA 92782" },
+    { name: "Show Hotpot 75", rating: 4.6, category: "hot pot restaurant", address: "2540 Main St Ste L, Irvine, CA 92614" },
+  ]);
+
+  const result = await processSendblueInbound(
+    { from_number: "+155****1234", content: "What's the difference between those" },
+    { client, store, conversation },
+  );
+
+  const out = client.calls.at(-1)?.content ?? "";
+  assert.equal(result.replied, true);
+  assert.match(out, /Show Hotpot 75/);
+  assert.match(out, /Wagyu Factory/);
+  assert.match(out, /4\.6★/);
+  assert.match(out, /4\.4★/);
+  assert.match(out, /won't make up menu/);
+});
+
+test("booking comparison and menu price intent helpers match screenshot follow-ups", () => {
+  assert.equal(isPriceIntent("What do they have and what the price"), true);
+  assert.equal(isPriceIntent("菜單多少錢"), true);
+  assert.equal(isBookingIntent("Can you book a table for me?"), true);
+  assert.equal(isBookingIntent("訂位"), true);
+  assert.equal(isCompareIntent("What's the difference between those"), true);
+  assert.equal(isCompareIntent("比較這兩間"), true);
+  assert.match(formatPriceReply({ name: "A", mapsUri: "https://maps.example/a" }, false), /https:\/\/maps\.example\/a/);
+  assert.match(formatBookingReply({ name: "A", address: "123 Main" }, false), /A/);
+  assert.match(formatCompareReply([{ name: "A", rating: 4.1 }, { name: "B", rating: 4.8 }], false), /B/);
 });
 
 test("webhook flow: distance follow-up uses stored location and focused place coordinates", async () => {

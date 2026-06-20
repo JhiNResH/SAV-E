@@ -1586,8 +1586,16 @@ export function formatPlaceCard(place: DiscoveredPlace, chinese: boolean): strin
   return lines.join("\n");
 }
 
-function isPriceIntent(text: string): boolean {
-  return /\b(how much|price|prices|pricing|cost|costs|expensive|cheap)\b|多少錢|多少钱|價格|价钱|價錢|價位|貴嗎|贵吗/i.test(text);
+export function isPriceIntent(text: string): boolean {
+  return /\b(how much|price|prices|pricing|cost|costs|expensive|cheap|menu|what do they have)\b|菜單|菜单|吃什麼|吃什么|有什麼|有什么|多少錢|多少钱|價格|价钱|價錢|價位|貴嗎|贵吗/i.test(text);
+}
+
+export function isBookingIntent(text: string): boolean {
+  return /\b(book|booking|reserve|reservation|table)\b|訂位|訂桌|預約|预约/i.test(text);
+}
+
+export function isCompareIntent(text: string): boolean {
+  return /\b(compare|difference|different|which one|which should|between them|between those)\b|差別|比較|哪個|哪个/i.test(text);
 }
 
 function isDistanceIntent(text: string): boolean {
@@ -1624,14 +1632,16 @@ function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): 
   return 2 * earthMiles * Math.asin(Math.sqrt(a));
 }
 
-function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
+export function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
   const known = [
     typeof place.rating === "number" ? `${place.rating}★` : "",
+    place.category,
+    place.mapsUri,
   ].filter(Boolean);
   if (place.priceRange) {
     return chinese
-      ? `${place.name} 的大概價位是 ${place.priceRange}。\n我還沒有可靠的單品菜單價格。`
-      : `${place.name} looks like ${place.priceRange}.\nI don't have reliable menu item prices yet.`;
+      ? `${place.name} 的大概價位是 ${place.priceRange}。\n我還沒有可靠的單品菜單價格。${place.mapsUri ? `\n${place.mapsUri}` : ""}`
+      : `${place.name} looks like ${place.priceRange}.\nI don't have reliable menu item prices yet.${place.mapsUri ? `\n${place.mapsUri}` : ""}`;
   }
   const knownLine = known.length
     ? chinese
@@ -1639,8 +1649,74 @@ function formatPriceReply(place: DiscoveredPlace, chinese: boolean): string {
       : `Known: ${known.join(", ")}.`
     : "";
   return chinese
-    ? `我目前沒有 ${place.name} 的可靠菜單價格。\n${knownLine}`.trim()
-    : `I don't have reliable menu prices for ${place.name} yet.\n${knownLine}`.trim();
+    ? `我目前沒有 ${place.name} 的可靠菜單價格，也不會亂編。\n${knownLine}`.trim()
+    : `I don't have reliable menu prices for ${place.name} yet, and I won't make them up.\n${knownLine}`.trim();
+}
+
+function uniqueRecentPlaces(convo?: ConversationState): DiscoveredPlace[] {
+  const out: DiscoveredPlace[] = [];
+  const seen = new Set<string>();
+  const add = (place?: DiscoveredPlace) => {
+    if (!place?.name) return;
+    const key = place.name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(place);
+  };
+  add(convo?.lastRecommended);
+  for (const place of convo?.lastPlaces ?? []) add(place);
+  return out;
+}
+
+export function formatBookingReply(place: DiscoveredPlace | undefined, chinese: boolean): string {
+  if (!place) {
+    return chinese
+      ? "你想訂哪一間？先傳店名，或讓我先幫你找附近選項。"
+      : "Which place do you want to book? Send the name, or ask me for nearby options first.";
+  }
+  const actions: string[] = [];
+  if (place.mapsUri) actions.push(chinese ? `Google Maps：${place.mapsUri}` : `Google Maps: ${place.mapsUri}`);
+  if (place.address) actions.push(chinese ? `地址：${place.address}` : `address: ${place.address}`);
+  if (chinese) {
+    const next = actions.length ? actions.join("\n") : "我目前沒有電話或訂位連結。";
+    return `我還不能直接替你完成訂位，但可以把 ${place.name} 的下一步給你：\n${next}`;
+  }
+  const next = actions.length ? actions.join("\n") : "I don't have a phone or reservation link for it yet.";
+  return `I can't complete the reservation inside iMessage yet, but here's the next step for ${place.name}:\n${next}`;
+}
+
+function formatPlaceCompareLine(place: DiscoveredPlace): string {
+  const bits = [place.name];
+  if (typeof place.rating === "number") bits.push(`${place.rating}★`);
+  if (place.category) bits.push(place.category);
+  if (place.priceRange) bits.push(place.priceRange);
+  if (place.address) bits.push(place.address);
+  return bits.join(" — ");
+}
+
+export function formatCompareReply(places: DiscoveredPlace[], chinese: boolean): string {
+  const unique = places
+    .filter((place, index, all) => all.findIndex((candidate) => candidate.name.toLowerCase() === place.name.toLowerCase()) === index)
+    .slice(0, 3);
+  if (unique.length < 2) {
+    return chinese
+      ? "我需要至少兩個剛剛提到的地點才能比較。"
+      : "I need at least two recent places to compare — ask me for another option first.";
+  }
+  const sortedByRating = unique.filter((place) => typeof place.rating === "number").sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const pick = sortedByRating[0];
+  const lines = unique.map((place, index) => `${index + 1}. ${formatPlaceCompareLine(place)}`);
+  const caveat = chinese
+    ? "我目前只知道評分、類型、地址/連結，不會編菜單或營業時間。"
+    : "I only know rating/category/address/link so far — I won't make up menu, hours, or vibe.";
+  const suggestion = pick
+    ? chinese
+      ? `如果只看評分，先選 ${pick.name}。`
+      : `If you're choosing by rating, I'd pick ${pick.name}.`
+    : chinese
+      ? "如果你要，我可以再找一個更接近/評分更高的選項。"
+      : "If you want, I can find one that's closer or higher-rated.";
+  return `${chinese ? "目前差別：" : "Here's the useful difference:"}\n${lines.join("\n")}\n${suggestion}\n${caveat}`;
 }
 
 /**
@@ -2021,6 +2097,22 @@ export async function processSendblueInbound(
       reply = chinese
         ? "📩 看起來像收據 — 把收據連結或完整內容傳給我,我就幫你記成驗證訪問。"
         : "📩 Looks like a receipt — forward the receipt link or full text and I'll log it as a verified visit.";
+      await deps.client.sendMessage(from, reply);
+      return { replied: true, reply };
+    }
+    if (!url && isCompareIntent(text)) {
+      const recent = uniqueRecentPlaces(convo);
+      if (recent.length >= 2) {
+        reply = formatCompareReply(recent, chinese);
+        console.log(`[sendblue] compare intent for ${from} places=${recent.map((place) => place.name).join("|")}`);
+        await deps.client.sendMessage(from, reply);
+        return { replied: true, reply };
+      }
+    }
+    if (!url && isBookingIntent(text)) {
+      const recent = uniqueRecentPlaces(convo);
+      reply = formatBookingReply(recent[0], chinese);
+      console.log(`[sendblue] booking intent for ${from} target="${recent[0]?.name ?? "(none)"}"`);
       await deps.client.sendMessage(from, reply);
       return { replied: true, reply };
     }
