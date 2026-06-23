@@ -63,7 +63,10 @@ struct PlaceListView: View {
 
                     Menu {
                         ForEach(PlaceSort.allCases, id: \.self) { sort in
-                            Button(action: { viewModel.sort = sort }) {
+                            Button {
+                                viewModel.sort = sort
+                                Task { await viewModel.refreshCurrentLocationForNearestSort() }
+                            } label: {
                                 Label(sort.title(language: languageSettings.language), systemImage: viewModel.sort == sort ? "checkmark" : "")
                             }
                         }
