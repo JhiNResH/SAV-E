@@ -52,6 +52,7 @@ final class PlaceListViewModel: ObservableObject {
     @Published private(set) var savingResultID: String?
     @Published private(set) var mapCandidates: [SaveMapCandidate] = []
     @Published private(set) var localMemoryRecords: [SaveMemoryRecord] = []
+    @Published private(set) var currentLocation: CLLocation?
 
     private let supabaseService: SupabaseServiceProtocol
     private let authService: PrivyAuthService
@@ -114,7 +115,16 @@ final class PlaceListViewModel: ObservableObject {
         switch sort {
         case .recent: result.sort { $0.createdAt > $1.createdAt }
         case .rating: result.sort { ($0.googleRating ?? 0) > ($1.googleRating ?? 0) }
-        case .nearest: break // TODO: Sort by distance from user location
+        case .nearest:
+            guard let currentLocation else { break }
+            result.sort {
+                let lhsDistance = distanceMeters(from: currentLocation, to: $0)
+                let rhsDistance = distanceMeters(from: currentLocation, to: $1)
+                if lhsDistance == rhsDistance {
+                    return $0.createdAt > $1.createdAt
+                }
+                return lhsDistance < rhsDistance
+            }
         }
 
         return result
@@ -148,6 +158,15 @@ final class PlaceListViewModel: ObservableObject {
             print("Failed to load places: \(error)")
             importPendingPlacesForLocalUse()
         }
+    }
+
+    func updateCurrentLocation(_ location: CLLocation?) {
+        currentLocation = location
+    }
+
+    func refreshCurrentLocationForNearestSort() async {
+        guard sort == .nearest else { return }
+        currentLocation = await LocationService.shared.requestCurrentLocation()
     }
 
     func importPendingPlacesForLocalUse() {
@@ -458,6 +477,10 @@ final class PlaceListViewModel: ObservableObject {
             guard self.searchText.trimmingCharacters(in: .whitespacesAndNewlines) == query else { return }
             self.mapCandidates = candidates
         }
+    }
+
+    private func distanceMeters(from location: CLLocation, to place: Place) -> CLLocationDistance {
+        location.distance(from: CLLocation(latitude: place.latitude, longitude: place.longitude))
     }
 
     private func isLikelyPublicDiscoveryKeyword(_ value: String) -> Bool {

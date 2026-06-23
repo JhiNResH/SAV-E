@@ -52,12 +52,8 @@ final class TripViewModel: ObservableObject {
         isOptimizing = true
         defer { isOptimizing = false }
 
-        // TODO: Implement route optimization
-        // 1. Call Google Directions API for waypoint optimization
-        // 2. Call Gemini API for smart scheduling based on opening hours
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // Simulate delay
-
         if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            trips[index].places = Self.normalizedTimelineStops(trips[index].places)
             trips[index].isOptimized = true
         }
     }
@@ -77,6 +73,23 @@ final class TripViewModel: ObservableObject {
         // Update orderIndex values
         for i in trips[tripIndex].places.indices {
             trips[tripIndex].places[i].orderIndex = i
+        }
+    }
+
+    static func normalizedTimelineStops(_ stops: [TripStop]) -> [TripStop] {
+        let sorted = stops.sorted {
+            if $0.day != $1.day { return $0.day < $1.day }
+            if $0.orderIndex != $1.orderIndex { return $0.orderIndex < $1.orderIndex }
+            return $0.placeName.localizedCaseInsensitiveCompare($1.placeName) == .orderedAscending
+        }
+
+        var nextIndexByDay: [Int: Int] = [:]
+        return sorted.map { stop in
+            var updated = stop
+            let nextIndex = nextIndexByDay[stop.day, default: 0]
+            updated.orderIndex = nextIndex
+            nextIndexByDay[stop.day] = nextIndex + 1
+            return updated
         }
     }
 }
