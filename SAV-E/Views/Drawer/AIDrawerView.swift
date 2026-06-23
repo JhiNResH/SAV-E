@@ -3603,16 +3603,8 @@ private struct ReviewCandidatesEmptyState: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.saveInk)
-                .frame(width: 34, height: 34)
-                .background(Color.saveSky.opacity(0.54))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.saveNotebookLine, lineWidth: 1.2)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            MemoMascotMark(size: 44)
+                .shadow(color: Color.saveInk.opacity(0.08), radius: 8, x: 0, y: 4)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(languageSettings.localized(english: "No clues waiting", traditionalChinese: "沒有等待確認的線索"))
@@ -3731,6 +3723,8 @@ private struct ReviewCandidateDetailCard: View {
                     .foregroundColor(.saveCocoa.opacity(0.82))
                     .fixedSize(horizontal: false, vertical: true)
 
+                ReviewCandidateMemoBanner(candidate: candidate)
+
                 ReviewCandidateProofPanel(candidate: candidate)
 
                 HStack(spacing: 8) {
@@ -3806,6 +3800,56 @@ private struct ReviewCandidateDetailCard: View {
         let original = candidate.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != original else { return nil }
         return trimmed
+    }
+}
+
+private struct ReviewCandidateMemoBanner: View {
+    @Environment(\.appLanguageSettings) private var languageSettings
+    var candidate: PlaceReviewCandidate
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            MemoMascotMark(size: 42, framed: false)
+                .frame(width: 44, height: 44)
+                .background(Color.saveCream.opacity(0.72))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.saveNotebookLine.opacity(0.38), lineWidth: 1)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(languageSettings.localized(english: "Memo's read", traditionalChinese: "Memo 的判斷"))
+                    .font(.caption2.weight(.black))
+                    .foregroundColor(.saveCocoa.opacity(0.72))
+                Text(message)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.saveInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(candidate.hasReliableCoordinates ? Color.saveMint.opacity(0.20) : Color.saveHoney.opacity(0.24))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.saveNotebookLine.opacity(0.30), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    private var message: String {
+        candidate.hasReliableCoordinates
+            ? languageSettings.localized(
+                english: "I found a likely match. Check the source, then stamp only if it feels right.",
+                traditionalChinese: "我找到可能符合的地點。先看來源，覺得對再蓋章。"
+            )
+            : languageSettings.localized(
+                english: "I found a useful clue, not a confirmed place yet. Find the exact place or add proof before saving.",
+                traditionalChinese: "我找到有用線索，但還不是已確認地點。先找精確地點或補證據再保存。"
+            )
     }
 }
 
