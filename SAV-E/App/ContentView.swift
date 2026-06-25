@@ -6,7 +6,7 @@ struct ContentView: View {
     @Environment(\.appLanguageSettings) private var languageSettings
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasSeenMapTour") private var hasSeenMapTour = false
-    @State private var drawerDetent: PresentationDetent = .fraction(0.34)
+    @State private var drawerDetent: PresentationDetent = .height(88)
     @State private var mapDetailDrawerItem: MapDetailDrawerItem?
 
     var body: some View {
