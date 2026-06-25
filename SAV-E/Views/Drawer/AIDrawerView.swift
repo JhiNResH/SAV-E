@@ -160,7 +160,7 @@ struct AIDrawerView: View {
             if case .error = state { SaveHaptics.warning() }
             withAnimation(SaveTheme.Motion.standardSpring) {
                 switch state {
-                case .idle:             drawerDetent = .fraction(0.34)
+                case .idle:             drawerDetent = collapsedDrawerDetent
                 case .loading:          drawerDetent = .medium
                 case .error:            drawerDetent = .medium
                 case .placeDetail:      drawerDetent = .medium
@@ -878,7 +878,7 @@ struct AIDrawerView: View {
     }
 
     private var collapsedDrawerHeight: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 160 : 104
+        dynamicTypeSize.isAccessibilitySize ? 160 : 88
     }
 
     private var collapsedDrawerDetent: PresentationDetent {

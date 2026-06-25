@@ -595,12 +595,6 @@ private struct PassportStampSection: View {
                 detail: visitedDetail
             )
             PassportStampRow(
-                icon: "checkmark.seal",
-                title: languageSettings.text(.proofBacked),
-                value: languageSettings.proofBackedCountText(stats.proofBackedCount),
-                detail: proofBackedDetail
-            )
-            PassportStampRow(
                 icon: "building.2",
                 title: languageSettings.text(.cities),
                 value: languageSettings.cityCountText(stats.citiesCount),
@@ -633,13 +627,6 @@ private struct PassportStampSection: View {
         switch languageSettings.language {
         case .english: return "Places you marked visited in SAV-E."
         case .traditionalChinese: return "你自己標記為去過的地點。"
-        }
-    }
-
-    private var proofBackedDetail: String {
-        switch languageSettings.language {
-        case .english: return "Receipt, original photo, or location proof attached by you. Coming soon."
-        case .traditionalChinese: return "你附上的收據、原始照片或定位證據。即將推出。"
         }
     }
 
@@ -739,7 +726,6 @@ private struct PassportCountingRulesPanel: View {
             VStack(alignment: .leading, spacing: SaveTheme.Spacing.sm) {
                 PassportRuleLine(icon: "building.2", text: cityRule)
                 PassportRuleLine(icon: "figure.walk", text: visitedRule)
-                PassportRuleLine(icon: "checkmark.seal", text: proofRule)
             }
         }
         .padding(SaveTheme.Spacing.md)
@@ -767,23 +753,12 @@ private struct PassportCountingRulesPanel: View {
         case .traditionalChinese: return "去過數量只計算你自己標記為去過的地點。"
         }
     }
-
-    private var proofRule: String {
-        switch languageSettings.language {
-        case .english: return "Proof-backed stays 0 until SAV-E supports user-attached receipt, original photo, or location evidence. Public map metadata and friend-saved places do not count."
-        case .traditionalChinese: return "有憑證會先維持 0，等 SAV-E 支援你附上的收據、原始照片或定位證據後才會計算。公開地圖資料和朋友存的地點不算。"
-        }
-    }
 }
 
 private struct PassportVisibilityPanel: View {
     @Environment(\.appLanguageSettings) private var languageSettings
     let places: [Place]
     let onUpdate: (Place, PlaceVisibility) async throws -> Void
-
-    private var counts: [PlaceVisibility: Int] {
-        Dictionary(grouping: places, by: \.effectiveVisibility).mapValues(\.count)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SaveTheme.Spacing.sm) {
@@ -797,15 +772,6 @@ private struct PassportVisibilityPanel: View {
                 Spacer()
             }
 
-            FlowLayout(spacing: SaveTheme.Spacing.sm) {
-                ForEach(PlaceVisibility.allCases, id: \.self) { visibility in
-                    PassportVisibilityChip(
-                        visibility: visibility,
-                        count: counts[visibility, default: 0]
-                    )
-                }
-            }
-
             if places.isEmpty {
                 Text(languageSettings.localized(
                     english: "Save places first, then choose which memories stay private or become shareable links.",
@@ -815,11 +781,11 @@ private struct PassportVisibilityPanel: View {
                     .foregroundColor(.saveCocoa.opacity(0.72))
             } else {
                 Text(languageSettings.localized(
-                    english: "These are sharing permissions, not popularity scores.",
-                    traditionalChinese: "這是每個地點的分享權限，不是熱門度或排行榜。"
+                    english: "Choose who can see each saved place.",
+                    traditionalChinese: "選擇每個已存地點誰看得到。"
                 ))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundColor(.saveCocoa.opacity(0.70))
+                    .font(SaveTheme.Typography.supporting)
+                    .foregroundColor(.saveCocoa.opacity(0.72))
 
                 VStack(spacing: SaveTheme.Spacing.sm) {
                     ForEach(places.prefix(4)) { place in
@@ -831,23 +797,6 @@ private struct PassportVisibilityPanel: View {
         .padding(SaveTheme.Spacing.md)
         .profileGlassSurface(cornerRadius: 16, tint: .saveCream, fillOpacity: 0.14, strokeOpacity: 0.24, lineWidth: 1)
         .padding(.horizontal)
-    }
-}
-
-private struct PassportVisibilityChip: View {
-    @Environment(\.appLanguageSettings) private var languageSettings
-    let visibility: PlaceVisibility
-    let count: Int
-
-    var body: some View {
-        Label("\(visibility.displayName(language: languageSettings.language)) \(count)", systemImage: visibility.systemImage)
-            .font(SaveTheme.Typography.stamp)
-            .foregroundColor(.saveInk)
-            .padding(.horizontal, SaveTheme.Spacing.sm)
-            .padding(.vertical, SaveTheme.Spacing.xs)
-            .background(Color.saveHoney.opacity(visibility == .privateMemory ? 0.18 : 0.36))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color.saveNotebookLine.opacity(0.44), lineWidth: 1))
     }
 }
 
