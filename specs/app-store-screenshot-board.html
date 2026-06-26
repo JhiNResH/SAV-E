@@ -6,23 +6,24 @@
 <title>SAV-E App Store Screenshot Board</title>
 <style>
   :root {
-    --cream: #FFF5E7;
-    --cream-deep: #FCEBD2;
-    --page: #FFF0DC;
-    --ink: #3A2415;
-    --muted: #7A5D45;
-    --honey: #FFD66B;
-    --honey-deep: #F2BE3F;
-    /* Single brand accent: decorative mint/sky/pink all resolve to honey.
-       --coral stays distinct — it is the semantic "uncertain / waiting" state. */
-    --mint: var(--honey);
-    --mint-deep: #7FBF92;
-    --sky: var(--honey);
-    --coral: #EE9C78;
-    --pink: var(--honey);
+    /* ===== v2 palette (SAVE-App-Store-Screenshot-Design-Spec §6.3) ===== */
+    --cream: #FFF8EC;        /* cream-0  · screenshot background */
+    --cream-deep: #F2E2C4;   /* deeper cream for the base gradient */
+    --page: #F7E8CC;         /* cream-1  · card / paper fill */
+    --ink: #34251A;          /* cocoa-900 · headline text */
+    --muted: #6F5642;        /* cocoa-600 · secondary copy */
+    --honey: #E2A93B;        /* honey-500 · CTA / badge accent — used sparingly */
+    --honey-deep: #C8902B;
+    /* v2 semantics: olive = trust / map / confirmation, terracotta = warning.
+       Former decorative mint/sky/pink all resolve to olive (place + map cues). */
+    --mint: #7A8B5C;         /* olive-500 */
+    --mint-deep: #5F704A;
+    --sky: #7A8B5C;          /* olive-500 */
+    --coral: #C97855;        /* terracotta-400 · warning / waiting clue */
+    --pink: #7A8B5C;         /* olive-500 · saved-place pins */
     --blue-ink: #315D76;
-    --line: rgba(58, 36, 21, .22);
-    --line-strong: rgba(58, 36, 21, .85);
+    --line: rgba(52, 37, 26, .20);
+    --line-strong: rgba(52, 37, 26, .82);
   }
 
   * { box-sizing: border-box; }
@@ -42,9 +43,9 @@
     height: 2688px;
     overflow: hidden;
     background:
-      radial-gradient(1100px 700px at 88% -6%, var(--accent-wash, rgba(255,214,107,.55)) 0%, rgba(255,214,107,0) 62%),
-      radial-gradient(900px 640px at -10% 30%, rgba(255,214,107,.18) 0%, rgba(255,214,107,0) 60%),
-      linear-gradient(180deg, #FFFAF1 0%, var(--cream) 46%, var(--cream-deep) 100%);
+      radial-gradient(1100px 700px at 88% -6%, var(--accent-wash, rgba(226,169,59,.30)) 0%, rgba(226,169,59,0) 62%),
+      radial-gradient(900px 640px at -10% 30%, rgba(122,139,92,.12) 0%, rgba(122,139,92,0) 60%),
+      linear-gradient(180deg, #FFFCF4 0%, var(--cream) 46%, var(--cream-deep) 100%);
   }
   .shot::before { /* notebook dot grid */
     content: "";
@@ -55,9 +56,9 @@
   }
   .shot[data-accent="sky"],
   .shot[data-accent="mint"],
+  .shot[data-accent="coral"],
   .shot[data-accent="pink"],
-  .shot[data-accent="honey"] { --accent-wash: rgba(255,214,107,.55); }
-  .shot[data-accent="coral"] { --accent-wash: rgba(238,156,120,.55); }
+  .shot[data-accent="honey"] { --accent-wash: rgba(226,169,59,.30); }
 
   /* ===================== MASTHEAD ===================== */
   .masthead {
@@ -69,12 +70,14 @@
   .memo-chip {
     width: 104px; height: 104px;
     border-radius: 32px;
-    background: var(--honey);
+    background: var(--cream);
     border: 4px solid var(--ink);
     display: grid; place-items: center;
-    box-shadow: 0 10px 0 rgba(58,36,21,.16);
+    box-shadow: 0 10px 0 rgba(52,37,26,.16);
+    overflow: hidden;
   }
   .memo-chip svg { width: 72px; height: 72px; }
+  .memo-img { width: 104%; height: 104%; object-fit: contain; }
   .wordmark { font-size: 52px; font-weight: 900; letter-spacing: .04em; }
   .shot-stamp {
     font-size: 28px; font-weight: 900; letter-spacing: .22em;
@@ -94,12 +97,12 @@
   .eyebrow {
     display: inline-block;
     font-size: 34px; font-weight: 900; letter-spacing: .24em;
-    color: var(--ink);
-    background: var(--eyebrow-bg, var(--honey));
-    border: 3.5px solid var(--ink);
+    color: var(--muted);
+    background: var(--eyebrow-bg, var(--page));
+    border: 3px solid var(--line);
     border-radius: 999px;
     padding: 16px 34px 14px;
-    box-shadow: 0 8px 0 rgba(58,36,21,.18);
+    box-shadow: 0 6px 0 rgba(52,37,26,.10);
     margin-bottom: 44px;
   }
   h1 {
@@ -370,8 +373,8 @@
   }
   .memo-say .face {
     flex: none; width: 86px; height: 86px; border-radius: 28px;
-    background: var(--honey); border: 4px solid var(--ink);
-    display: grid; place-items: center;
+    background: var(--cream); border: 4px solid var(--ink);
+    display: grid; place-items: center; overflow: hidden;
   }
   .memo-say .face svg { width: 58px; height: 58px; }
   .memo-say .bubble {
@@ -399,9 +402,9 @@
   .pp-hero { display: flex; align-items: center; gap: 34px; }
   .pp-hero .face {
     width: 150px; height: 150px; border-radius: 44px;
-    background: var(--honey); border: 5px solid var(--ink);
-    display: grid; place-items: center;
-    box-shadow: 0 10px 0 rgba(58,36,21,.16);
+    background: var(--cream); border: 5px solid var(--ink);
+    display: grid; place-items: center; overflow: hidden;
+    box-shadow: 0 10px 0 rgba(52,37,26,.16);
   }
   .pp-hero .face svg { width: 104px; height: 104px; }
   .pp-hero .t1 { font-size: 32px; font-weight: 900; letter-spacing: .26em; color: var(--muted); }
@@ -724,7 +727,7 @@
 <section class="shot" id="shot-01-hook" data-accent="honey">
   <header class="masthead">
     <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
+      <div class="memo-chip"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
       <div class="wordmark">SAV-E</div>
     </div>
     <div class="shot-stamp">01</div>
@@ -733,7 +736,7 @@
   <div class="head">
     <div class="eyebrow">MEET SAV-E</div>
     <h1 style="font-size: 118px;">Stop losing places<br>friends <span class="hl">send you.</span></h1>
-    <p class="sub">Reels, links, screenshots, notes — every spot lands on one private map.</p>
+    <p class="sub">Save links, screenshots, and recommendations into one private map.</p>
   </div>
 
   <div class="phone-wrap" style="--phone-top: 868px;">
@@ -783,16 +786,16 @@
 <section class="shot" id="shot-02-paste-link" data-accent="pink">
   <header class="masthead">
     <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
+      <div class="memo-chip"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
       <div class="wordmark">SAV-E</div>
     </div>
     <div class="shot-stamp">02</div>
   </header>
 
   <div class="head">
-    <div class="eyebrow" style="--eyebrow-bg: var(--pink);">THE MAGIC</div>
+    <div class="eyebrow">THE MAGIC</div>
     <h1 style="font-size: 116px;">Paste a link.<br>Get the <span class="hl">real place.</span></h1>
-    <p class="sub">Drop any Reel, TikTok or article. SAV-E finds the actual spot behind it.</p>
+    <p class="sub">SAV-E turns messy links into a place you can review.</p>
   </div>
 
   <div class="phone-wrap" style="--phone-top: 868px;">
@@ -850,16 +853,16 @@
 <section class="shot" id="shot-03-confirm" data-accent="sky">
   <header class="masthead">
     <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
+      <div class="memo-chip"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
       <div class="wordmark">SAV-E</div>
     </div>
     <div class="shot-stamp">03</div>
   </header>
 
   <div class="head">
-    <div class="eyebrow" style="--eyebrow-bg: var(--sky);">TRUST, BUILT IN</div>
-    <h1>You confirm<br>before <span class="hl" style="--mark: var(--sky);">it counts.</span></h1>
-    <p class="sub">Uncertain clues wait in Review — your map never shows a guess as a memory.</p>
+    <div class="eyebrow">TRUST, BUILT IN</div>
+    <h1>You confirm<br>before <span class="hl" style="--mark: var(--mint);">it counts.</span></h1>
+    <p class="sub">Uncertain clues stay off your map until you approve them.</p>
   </div>
 
   <div class="phone-wrap" style="--phone-top: 880px;">
@@ -904,21 +907,21 @@
 </section>
 
 <!-- ============================================================
-     SHOT 04 — ASK YOUR MAP
+     SHOT 05 — ASK YOUR MAP
 ============================================================= -->
 <section class="shot" id="shot-04-ask-your-map" data-accent="mint">
   <header class="masthead">
     <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
+      <div class="memo-chip"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
       <div class="wordmark">SAV-E</div>
     </div>
     <div class="shot-stamp">04</div>
   </header>
 
   <div class="head">
-    <div class="eyebrow" style="--eyebrow-bg: var(--mint);">PLAN IN SECONDS</div>
-    <h1>Ask your map,<br>not the <span class="hl" style="--mark: var(--mint);">internet.</span></h1>
-    <p class="sub">Dinner tonight? Memo answers from places you already saved and trust.</p>
+    <div class="eyebrow">PLAN IN SECONDS</div>
+    <h1>Ask your map,<br>not the <span class="hl">internet.</span></h1>
+    <p class="sub">Find dinner, coffee, or saved ideas from places you already trust.</p>
   </div>
 
   <div class="phone-wrap" style="--phone-top: 880px;">
@@ -939,7 +942,7 @@
           </div>
 
           <div class="memo-say">
-            <div class="face"><svg><use href="#memo"/></svg></div>
+            <div class="face"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
             <div class="bubble">3 of your saved spots are open now, within a 12-min walk:</div>
           </div>
 
@@ -965,12 +968,12 @@
 </section>
 
 <!-- ============================================================
-     SHOT 05 — PASSPORT PAYOFF
+     SHOT 06 — PASSPORT PAYOFF
 ============================================================= -->
 <section class="shot" id="shot-05-passport" data-accent="honey">
   <header class="masthead">
     <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
+      <div class="memo-chip"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
       <div class="wordmark">SAV-E</div>
     </div>
     <div class="shot-stamp">05</div>
@@ -978,8 +981,8 @@
 
   <div class="head">
     <div class="eyebrow">THE PAYOFF</div>
-    <h1>Your passport<br>of <span class="hl">places.</span></h1>
-    <p class="sub">Every confirmed spot becomes a stamp in a story only you can open.</p>
+    <h1>Build your passport<br>of <span class="hl">places.</span></h1>
+    <p class="sub">Keep private memories, cities, and saved spots in one calm place.</p>
   </div>
 
   <div class="phone-wrap" style="--phone-top: 880px;">
@@ -989,7 +992,7 @@
         <div class="passport-screen">
           <div class="pp-inner">
             <div class="pp-hero">
-              <div class="face"><svg><use href="#memo"/></svg></div>
+              <div class="face"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
               <div>
                 <div class="t1">SAV-E PASSPORT</div>
                 <h2>Jerry's Places</h2>
