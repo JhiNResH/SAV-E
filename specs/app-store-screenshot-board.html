@@ -13,11 +13,13 @@
     --muted: #7A5D45;
     --honey: #FFD66B;
     --honey-deep: #F2BE3F;
-    --mint: #C8EBCF;
+    /* Single brand accent: decorative mint/sky/pink all resolve to honey.
+       --coral stays distinct — it is the semantic "uncertain / waiting" state. */
+    --mint: var(--honey);
     --mint-deep: #7FBF92;
-    --sky: #8FCAEA;
+    --sky: var(--honey);
     --coral: #EE9C78;
-    --pink: #F6C1CB;
+    --pink: var(--honey);
     --blue-ink: #315D76;
     --line: rgba(58, 36, 21, .22);
     --line-strong: rgba(58, 36, 21, .85);
@@ -41,7 +43,7 @@
     overflow: hidden;
     background:
       radial-gradient(1100px 700px at 88% -6%, var(--accent-wash, rgba(255,214,107,.55)) 0%, rgba(255,214,107,0) 62%),
-      radial-gradient(900px 640px at -10% 30%, rgba(246,193,203,.30) 0%, rgba(246,193,203,0) 60%),
+      radial-gradient(900px 640px at -10% 30%, rgba(255,214,107,.18) 0%, rgba(255,214,107,0) 60%),
       linear-gradient(180deg, #FFFAF1 0%, var(--cream) 46%, var(--cream-deep) 100%);
   }
   .shot::before { /* notebook dot grid */
@@ -51,11 +53,11 @@
     background-size: 46px 46px;
     pointer-events: none;
   }
-  .shot[data-accent="sky"]   { --accent-wash: rgba(143,202,234,.50); }
-  .shot[data-accent="mint"]  { --accent-wash: rgba(200,235,207,.62); }
-  .shot[data-accent="coral"] { --accent-wash: rgba(238,156,120,.40); }
+  .shot[data-accent="sky"],
+  .shot[data-accent="mint"],
+  .shot[data-accent="coral"],
+  .shot[data-accent="pink"],
   .shot[data-accent="honey"] { --accent-wash: rgba(255,214,107,.55); }
-  .shot[data-accent="pink"]  { --accent-wash: rgba(246,193,203,.55); }
 
   /* ===================== MASTHEAD ===================== */
   .masthead {
@@ -502,7 +504,6 @@
   body[data-shot] .shot { display: none; }
   body[data-shot="shot-01-hook"]        #shot-01-hook,
   body[data-shot="shot-02-paste-link"]  #shot-02-paste-link,
-  body[data-shot="shot-03-on-your-map"] #shot-03-on-your-map,
   body[data-shot="shot-04-confirm"]     #shot-04-confirm,
   body[data-shot="shot-05-ask-your-map"] #shot-05-ask-your-map,
   body[data-shot="shot-06-passport"]    #shot-06-passport { display: block; }
@@ -844,61 +845,7 @@
 </section>
 
 <!-- ============================================================
-     SHOT 03 — IT LANDS ON YOUR MAP
-============================================================= -->
-<section class="shot" id="shot-03-on-your-map" data-accent="honey">
-  <header class="masthead">
-    <div class="lockup">
-      <div class="memo-chip"><svg><use href="#memo"/></svg></div>
-      <div class="wordmark">SAV-E</div>
-    </div>
-    <div class="shot-stamp">03</div>
-  </header>
-
-  <div class="head">
-    <div class="eyebrow">NO TYPING</div>
-    <h1>It lands right<br>on <span class="hl">your map.</span></h1>
-    <p class="sub">Pinned with the source attached — so you'll always know why you saved it.</p>
-  </div>
-
-  <div class="phone-wrap" style="--phone-top: 880px;">
-    <div class="phone">
-      <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
-      <div class="screen">
-        <svg class="map" viewBox="430 1180 980 2120" preserveAspectRatio="xMidYMid slice"><use href="#citymap"/></svg>
-        <div class="island"></div>
-        <div class="statusbar"><span class="time">9:41</span><svg width="120" height="32" viewBox="0 0 140 36"><use href="#sbicons"/></svg></div>
-
-        <div class="toast"><span class="dot">✓</span> Saved — Menya Kotetsu</div>
-
-        <div class="pin-pop" style="left: 50%; top: 38%;"></div>
-        <div class="stamp-pin" style="left: 50%; top: 38%;">
-          <div class="disc" style="width: 120px; height: 120px; font-size: 58px;">🍜</div>
-          <div class="tag" style="font-size: 36px;">Menya Kotetsu</div>
-        </div>
-        <div class="stamp-pin sm" style="left: 17%; top: 24%;"><div class="disc" style="--pin: var(--sky);">🍸</div><div class="tag">Bar Sora</div></div>
-        <div class="stamp-pin sm" style="left: 79%; top: 60%;"><div class="disc" style="--pin: var(--pink);">🥐</div><div class="tag">Flour Bakery</div></div>
-        <div class="me-dot" style="left: 30%; top: 70%;"></div>
-
-        <div class="drawer">
-          <div class="grab"></div>
-          <div class="card" style="margin-top: 6px; background: #fff;">
-            <span class="kicker honey">MAP STAMP</span>
-            <h3>Menya Kotetsu &#160;🍜</h3>
-            <div class="meta">Saved just now · from Mina's Reel · Old Town</div>
-            <div class="btn-row">
-              <div class="btn ghost">View source</div>
-              <div class="btn honey">Plan around this</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     SHOT 04 — TRUST: you confirm first
+     SHOT 03 — TRUST: you confirm first
 ============================================================= -->
 <section class="shot" id="shot-04-confirm" data-accent="sky">
   <header class="masthead">
@@ -906,7 +853,7 @@
       <div class="memo-chip"><svg><use href="#memo"/></svg></div>
       <div class="wordmark">SAV-E</div>
     </div>
-    <div class="shot-stamp">04</div>
+    <div class="shot-stamp">03</div>
   </header>
 
   <div class="head">
@@ -965,7 +912,7 @@
       <div class="memo-chip"><svg><use href="#memo"/></svg></div>
       <div class="wordmark">SAV-E</div>
     </div>
-    <div class="shot-stamp">05</div>
+    <div class="shot-stamp">04</div>
   </header>
 
   <div class="head">
@@ -1026,7 +973,7 @@
       <div class="memo-chip"><svg><use href="#memo"/></svg></div>
       <div class="wordmark">SAV-E</div>
     </div>
-    <div class="shot-stamp">06</div>
+    <div class="shot-stamp">05</div>
   </header>
 
   <div class="head">

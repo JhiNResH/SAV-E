@@ -16,13 +16,13 @@ const width = 1242;
 const height = 2688;
 const contactOnly = process.argv.includes("--contact-only");
 
+// Converged to 5 screenshots (one outcome each, single honey accent).
 const shots = [
   ["shot-01-hook", "01-stop-losing-places.png"],
   ["shot-02-paste-link", "02-paste-a-link-get-the-place.png"],
-  ["shot-03-on-your-map", "03-lands-on-your-map.png"],
-  ["shot-04-confirm", "04-you-confirm-before-it-counts.png"],
-  ["shot-05-ask-your-map", "05-ask-your-map.png"],
-  ["shot-06-passport", "06-your-passport-of-places.png"],
+  ["shot-04-confirm", "03-you-confirm-before-it-counts.png"],
+  ["shot-05-ask-your-map", "04-ask-your-map.png"],
+  ["shot-06-passport", "05-your-passport-of-places.png"],
 ];
 
 function run(command, args) {
