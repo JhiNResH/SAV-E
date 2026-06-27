@@ -131,6 +131,10 @@ SAV-E 為了那些你真的想記住、也真的想再找到的地方而生。
 \* Confirm exact behavior against code before answering the ASC privacy form; do not over-declare.
 
 ### Screenshots to upload
-From `specs/app-store-screenshots/v2/` (1242×2688 = 6.5"; also provide 6.9" if required):
-`01-stop-losing-places` · `02-paste-link-real-place` · `03-confirm-before-counts` · `04-ask-your-map` · `05-passport-of-places`.
-App icon: `logo-icon.png`.
+From `specs/app-store-screenshots/v3/` for iPhone portrait screenshots
+(1242×2688), and `specs/app-store-screenshots/v3-ipad-13/` for 13-inch
+iPad portrait screenshots (2048×2732):
+`01-stop-losing-friend-places` · `02-paste-link-save-place` ·
+`03-confirm-before-counts` · `04-ask-your-private-map` ·
+`05-private-place-passport`.
+App icon: `specs/app-store-screenshots/v2/logo-icon.png`.

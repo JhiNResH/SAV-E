@@ -220,7 +220,7 @@ struct SharedMySavesData: Codable {
             return token(from: url) != nil
         }
         guard url.scheme == "https",
-              ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app", "wanderly-api-production.up.railway.app"].contains(url.host ?? "") else {
+              ["sav-e-app.vercel.app", "wanderly-api-production.up.railway.app"].contains(url.host ?? "") else {
             return false
         }
         return token(from: url) != nil
@@ -291,7 +291,7 @@ struct SharedListPayload: Codable {
             return true
         }
         return url.scheme == "https" &&
-            ["sav-e-app.vercel.app", "sav-e.app", "wanderly.app"].contains(url.host ?? "") &&
+            ["sav-e-app.vercel.app"].contains(url.host ?? "") &&
             url.path == "/list"
     }
 }
