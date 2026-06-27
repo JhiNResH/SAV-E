@@ -58,6 +58,7 @@ import {
   normalizeUserDecision,
   placeRecoveryWorkflowId,
   receiptForResult,
+  analysisReceiptForResult,
 } from "./workflowContracts.js";
 import {
   buildRecommendationAnalysisReceiptDraft,
@@ -544,6 +545,10 @@ const userDecisionFields = [
 const workflowReceiptFields = [
   "run_id",
   "workflow_id",
+  "receipt_type",
+  "job_id",
+  "agent_id",
+  "model_provenance",
   "verdict",
   "settlement",
   "evaluator_summary",
@@ -585,6 +590,7 @@ const creditLedgerFields = [
 ] as const;
 
 const jsonbFields = new Set([
+  "model_provenance",
   "context",
   "evidence",
   "edited_payload",
@@ -1838,30 +1844,62 @@ async function handleWorkflows(
       : result.resultType === "confirmed_map_stamp"
         ? "completed"
         : "needs_review";
-    const { rows } = await pool.query(
-      `update workflow_runs
-       set status = $1,
-           result_type = $2,
-           confidence = $3,
-           evidence_tier = $4,
-           result_evidence_refs = $5,
-           result_candidate_refs = $6,
-           completed_at = case when $1 in ('completed', 'failed') then now() else completed_at end
-       where id = $7 and user_id = $8
-       returning *`,
-      [
-        status,
-        result.resultType,
-        result.confidence,
-        result.evidenceTier,
-        result.evidenceRefs,
-        result.candidateRefs,
-        runId,
-        userId,
-      ],
-    );
-    await syncWorkOrderStatusForRun(asObject(rows[0]), status);
-    return sendJson(response, formatDates(rows[0]));
+    const analysisReceipt = analysisReceiptForResult(result);
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const { rows } = await client.query(
+        `update workflow_runs
+         set status = $1,
+             result_type = $2,
+             confidence = $3,
+             evidence_tier = $4,
+             result_evidence_refs = $5,
+             result_candidate_refs = $6,
+             completed_at = case when $1 in ('completed', 'failed') then now() else completed_at end
+         where id = $7 and user_id = $8
+         returning *`,
+        [
+          status,
+          result.resultType,
+          result.confidence,
+          result.evidenceTier,
+          result.evidenceRefs,
+          result.candidateRefs,
+          runId,
+          userId,
+        ],
+      );
+      const updatedRun = asObject(rows[0]);
+      const receiptBody = workflowReceiptBody(runId, analysisReceipt);
+      const receiptInsert = buildInsert("workflow_receipts", receiptBody, workflowReceiptFields);
+      const { rows: receiptRows } = await client.query(`${receiptInsert.sql} returning *`, receiptInsert.values);
+      const receiptRow = asObject(receiptRows[0]);
+      const { rows: finalRows } = await client.query(
+        `update workflow_runs
+         set receipt_id = $1
+         where id = $2 and user_id = $3
+         returning *`,
+        [receiptRow.id, runId, userId],
+      );
+      const finalRun = asObject(finalRows[0] ?? updatedRun);
+      if (finalRun.work_order_id) {
+        await client.query(
+          "update work_orders set status = $1 where id = $2 and user_id = $3",
+          [status, finalRun.work_order_id, userId],
+        );
+      }
+      await client.query("commit");
+      return sendJson(response, {
+        run: formatDates(finalRun),
+        receipt: formatDates(receiptRow),
+      });
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   if (request.method === "POST" && action === "decision") {
@@ -1887,18 +1925,7 @@ async function handleWorkflows(
       }, userDecisionFields);
       await client.query(decisionInsert.sql, decisionInsert.values);
 
-      const receiptBody = {
-        run_id: runId,
-        workflow_id: placeRecoveryWorkflowId,
-        verdict: receipt.verdict,
-        settlement: receipt.settlement,
-        evaluator_summary: receipt.evaluatorSummary,
-        evidence_refs: receipt.evidenceRefs,
-        candidate_refs: receipt.candidateRefs,
-        receipt_hash: receiptHash(runId, receipt),
-        anchor_status: "offchain",
-        private_url: null,
-      };
+      const receiptBody = workflowReceiptBody(runId, receipt);
       const receiptInsert = buildInsert("workflow_receipts", receiptBody, workflowReceiptFields);
       const { rows: receiptRows } = await client.query(`${receiptInsert.sql} returning *`, receiptInsert.values);
       const receiptRow = asObject(receiptRows[0]);
@@ -2854,6 +2881,35 @@ async function uniqueShareCode(): Promise<string> {
 async function insertCreditLedger(client: PoolClient, body: JsonBody): Promise<void> {
   const insert = buildInsert("credit_ledger", body, creditLedgerFields);
   await client.query(insert.sql, insert.values);
+}
+
+function workflowReceiptBody(runId: string, receipt: {
+  receiptType: string;
+  jobId?: string;
+  agentId: string;
+  modelProvenance: JsonBody;
+  verdict: string;
+  settlement: string;
+  evaluatorSummary: string;
+  evidenceRefs: string[];
+  candidateRefs: string[];
+}): JsonBody {
+  return {
+    run_id: runId,
+    workflow_id: placeRecoveryWorkflowId,
+    receipt_type: receipt.receiptType,
+    job_id: receipt.jobId ?? null,
+    agent_id: receipt.agentId,
+    model_provenance: receipt.modelProvenance,
+    verdict: receipt.verdict,
+    settlement: receipt.settlement,
+    evaluator_summary: receipt.evaluatorSummary,
+    evidence_refs: receipt.evidenceRefs,
+    candidate_refs: receipt.candidateRefs,
+    receipt_hash: receiptHash(runId, receipt),
+    anchor_status: "offchain",
+    private_url: null,
+  };
 }
 
 function receiptHash(runId: string, receipt: unknown): string {

@@ -141,7 +141,7 @@ Guest clients create a server-issued session with `POST /v0/guest-sessions`; the
 - `POST /v0/shared-place-links` — authenticated creation of a short public place preview link from a sanitized `SharedPlaceData` payload.
 - `GET /v0/workflows/place-recovery/runs` — authenticated list of SAV-E Place Recovery Agent workflow runs.
 - `POST /v0/workflows/place-recovery/runs` — authenticated workflow run creation with internal credit reservation.
-- `POST /v0/workflows/place-recovery/runs/:id/result` — records bounded worker/classifier result type and evidence tier.
-- `POST /v0/workflows/place-recovery/runs/:id/decision` — records user confirm/edit/reject and creates an off-chain workflow receipt with credit settlement.
+- `POST /v0/workflows/place-recovery/runs/:id/result` — records bounded worker/classifier result type and evidence tier, creates an off-chain **analysis** workflow receipt (`receipt_type=analysis`) with `agent_id`, optional `job_id`, and `model_provenance`, then points `workflow_runs.receipt_id` at that receipt.
+- `POST /v0/workflows/place-recovery/runs/:id/decision` — records user confirm/edit/reject and creates an off-chain **decision** workflow receipt with credit settlement.
 
 Public collections, OpenAPI, `llms.txt`, paid/API-key access, broad reputation graph exports, external checkout, per-run on-chain receipts, and marketplace UI are intentionally out of scope for the first verified-claims/workflow-ledger slices.

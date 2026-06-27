@@ -6,6 +6,7 @@ import {
   normalizePlaceRecoveryWorkerResult,
   normalizeUserDecision,
   receiptForResult,
+  analysisReceiptForResult,
 } from "./workflowContracts.js";
 
 test("place recovery work order create canonicalizes agent clearing fields", () => {
@@ -49,6 +50,89 @@ test("weak confirmed map stamp is downgraded to review candidate", () => {
 
   assert.equal(result.resultType, "review_candidate");
   assert.equal(result.evidenceTier, "likely");
+  assert.equal(result.agentId, "SAV-E");
+  assert.deepEqual(result.modelProvenance, {
+    claimedProvider: "unknown",
+    claimedModel: "unknown",
+    observedProvider: null,
+    observedModel: null,
+    attestationLevel: "self_claim",
+    fallbackUsed: "unknown",
+    usage: null,
+    evidenceRefs: [],
+  });
+});
+
+test("worker result preserves job id, agent id, and model provenance", () => {
+  const result = normalizePlaceRecoveryWorkerResult({
+    result_type: "review_candidate",
+    evidence_tier: "likely",
+    confidence: 0.74,
+    job_id: "job_123",
+    agent_id: "SAV-E",
+    model_provenance: {
+      claimed_provider: "google",
+      claimed_model: "gemini-3.5-flash",
+      observed_model: "gemini-3.5-flash",
+      attestation_level: "provider_metadata",
+      fallback_used: false,
+      usage: { inputTokens: 100, outputTokens: 20 },
+      evidence_refs: ["provider_response:abc"],
+    },
+  });
+
+  assert.equal(result.jobId, "job_123");
+  assert.equal(result.agentId, "SAV-E");
+  assert.deepEqual(result.modelProvenance, {
+    claimedProvider: "google",
+    claimedModel: "gemini-3.5-flash",
+    observedProvider: null,
+    observedModel: "gemini-3.5-flash",
+    attestationLevel: "provider_metadata",
+    fallbackUsed: false,
+    usage: { inputTokens: 100, outputTokens: 20 },
+    evidenceRefs: ["provider_response:abc"],
+  });
+});
+
+test("analysis receipt records review candidate before user decision", () => {
+  const result = normalizePlaceRecoveryWorkerResult({
+    result_type: "review_candidate",
+    evidence_tier: "likely",
+    confidence: 0.74,
+    candidate_refs: ["candidate_1"],
+    job_id: "job_123",
+    agent_id: "SAV-E",
+    model: {
+      claimedProvider: "google",
+      claimedModel: "gemini-3.5-flash",
+    },
+  });
+  const receipt = analysisReceiptForResult(result);
+
+  assert.equal(receipt.receiptType, "analysis");
+  assert.equal(receipt.verdict, "pass");
+  assert.equal(receipt.settlement, "manual_review");
+  assert.equal(receipt.creditSettlement, "pending");
+  assert.equal(receipt.jobId, "job_123");
+  assert.equal(receipt.agentId, "SAV-E");
+  assert.deepEqual(receipt.candidateRefs, ["candidate_1"]);
+});
+
+test("user confirmation creates final decision receipt", () => {
+  const result = normalizePlaceRecoveryWorkerResult({
+    result_type: "review_candidate",
+    evidence_tier: "likely",
+    confidence: 0.74,
+    candidate_refs: ["candidate_1"],
+  });
+  const decision = normalizeUserDecision({ action: "confirm" }, "run_123");
+  const receipt = receiptForResult(result, decision);
+
+  assert.equal(receipt.receiptType, "decision");
+  assert.equal(receipt.verdict, "pass");
+  assert.equal(receipt.settlement, "credit_consumed");
+  assert.equal(receipt.creditSettlement, "consumed");
 });
 
 test("technical failure refunds reserved credit", () => {
