@@ -14,6 +14,8 @@ const chromePath =
 
 const width = 1242;
 const height = 2688;
+const ipadWidth = 2048;
+const ipadHeight = 2732;
 const contactOnly = process.argv.includes("--contact-only");
 
 // v3 — UI-fidelity pass: warm App Store frame with faithful in-phone SAV-E states.
@@ -48,6 +50,34 @@ function chromeScreenshot(url, outputPath, viewportHeight = height) {
     "--force-device-scale-factor=1",
     `--user-data-dir=${userDataDir}`,
     `--window-size=${width},${viewportHeight}`,
+    `--screenshot=${outputPath}`,
+    url,
+  ];
+  const result = spawnSync(chromePath, args, {
+    encoding: "utf8",
+    timeout: 12000,
+    killSignal: "SIGKILL",
+  });
+  if (result.status !== 0 && !fs.existsSync(outputPath)) {
+    const details = [result.stdout, result.stderr].filter(Boolean).join("\n");
+    throw new Error(`${chromePath} failed\n${details}`);
+  }
+}
+
+function chromeScreenshotAtSize(url, outputPath, screenshotWidth, screenshotHeight) {
+  const args = [
+    "--headless=new",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "--disable-background-networking",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--allow-file-access-from-files",
+    "--run-all-compositor-stages-before-draw",
+    "--virtual-time-budget=1200",
+    "--force-device-scale-factor=1",
+    `--user-data-dir=${userDataDir}`,
+    `--window-size=${screenshotWidth},${screenshotHeight}`,
     `--screenshot=${outputPath}`,
     url,
   ];
@@ -99,6 +129,62 @@ if (!contactOnly) {
     const outputPath = path.join(outputDir, fileName);
     chromeScreenshot(`${boardUrl}?shot=${id}`, outputPath);
     assertDimensions(outputPath, width, height);
+    console.log(`wrote ${path.relative(process.cwd(), outputPath)}`);
+  }
+
+  const ipadOutputDir = path.join(__dirname, "app-store-screenshots", "v3-ipad-13");
+  fs.mkdirSync(ipadOutputDir, { recursive: true });
+
+  for (const [, fileName] of shots) {
+    const sourcePath = path.join(outputDir, fileName);
+    const outputPath = path.join(ipadOutputDir, fileName);
+    const wrapperPath = path.join(userDataDir, `ipad-${fileName}.html`);
+    const sourceUrl = pathToFileURL(sourcePath).href;
+
+    fs.writeFileSync(
+      wrapperPath,
+      `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: ${ipadWidth}px; height: ${ipadHeight}px; overflow: hidden; }
+    body {
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(1200px 780px at 88% -8%, rgba(226,169,59,.26) 0%, rgba(226,169,59,0) 62%),
+        radial-gradient(900px 640px at -8% 32%, rgba(122,139,92,.10) 0%, rgba(122,139,92,0) 60%),
+        linear-gradient(180deg, #FFFCF4 0%, #FFF8EC 46%, #F2E2C4 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(58,36,21,.065) 2.4px, transparent 2.4px);
+      background-size: 46px 46px;
+      pointer-events: none;
+    }
+    img {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 1262px;
+      height: 2732px;
+      object-fit: cover;
+      object-position: center top;
+      box-shadow: 0 24px 58px rgba(58, 36, 21, .14);
+    }
+  </style>
+</head>
+<body><img src="${sourceUrl}" alt=""></body>
+</html>
+`,
+    );
+
+    chromeScreenshotAtSize(pathToFileURL(wrapperPath).href, outputPath, ipadWidth, ipadHeight);
+    assertDimensions(outputPath, ipadWidth, ipadHeight);
     console.log(`wrote ${path.relative(process.cwd(), outputPath)}`);
   }
 }

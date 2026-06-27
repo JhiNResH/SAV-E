@@ -8,6 +8,11 @@ Generated from `specs/app-store-screenshot-board.html` with:
 node specs/export-app-store-screenshots.mjs
 ```
 
+The exporter writes:
+
+- `specs/app-store-screenshots/v3/` — iPhone portrait, 1242×2688
+- `specs/app-store-screenshots/v3-ipad-13/` — 13-inch iPad portrait, 2048×2732
+
 These are faithful mock equivalents, not raw simulator captures. The outer poster frame stays editorial; the iPhone interiors are rebuilt to look like simplified current SAV-E app states.
 
 ## Screenshot Mapping
