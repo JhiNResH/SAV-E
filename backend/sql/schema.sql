@@ -507,6 +507,10 @@ create table if not exists workflow_receipts (
     id uuid primary key default gen_random_uuid(),
     run_id uuid references workflow_runs(id) on delete cascade not null,
     workflow_id text not null,
+    receipt_type text not null default 'decision',
+    job_id text,
+    agent_id text not null default 'SAV-E',
+    model_provenance jsonb not null default '{}'::jsonb,
     verdict text not null,
     settlement text not null,
     evaluator_summary text not null default '',
@@ -516,10 +520,16 @@ create table if not exists workflow_receipts (
     anchor_status text not null default 'offchain',
     private_url text,
     created_at timestamptz not null default now(),
+    constraint workflow_receipts_type_check check (receipt_type in ('analysis', 'decision')),
     constraint workflow_receipts_verdict_check check (verdict in ('pass', 'partial', 'fail', 'refund', 'dispute')),
     constraint workflow_receipts_settlement_check check (settlement in ('credit_consumed', 'credit_refunded', 'partial', 'manual_review')),
     constraint workflow_receipts_anchor_status_check check (anchor_status in ('offchain', 'batch_anchored', 'onchain'))
 );
+
+alter table workflow_receipts add column if not exists receipt_type text not null default 'decision';
+alter table workflow_receipts add column if not exists job_id text;
+alter table workflow_receipts add column if not exists agent_id text not null default 'SAV-E';
+alter table workflow_receipts add column if not exists model_provenance jsonb not null default '{}'::jsonb;
 
 create unique index if not exists idx_workflow_receipts_hash on workflow_receipts(receipt_hash);
 create index if not exists idx_workflow_receipts_run_id on workflow_receipts(run_id, created_at desc);

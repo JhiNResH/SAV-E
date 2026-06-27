@@ -56,6 +56,9 @@ export interface PlaceRecoveryWorkerResult {
   evidenceRefs: string[];
   candidateRefs: string[];
   technicalFailure: boolean;
+  jobId?: string;
+  agentId: string;
+  modelProvenance: JsonObject;
 }
 
 export interface UserDecisionInput {
@@ -72,6 +75,10 @@ export interface WorkflowReceiptDraft {
   evaluatorSummary: string;
   evidenceRefs: string[];
   candidateRefs: string[];
+  receiptType: "analysis" | "decision";
+  jobId?: string;
+  agentId: string;
+  modelProvenance: JsonObject;
 }
 
 export function normalizePlaceRecoveryWorkOrderCreate(body: JsonObject): PlaceRecoveryWorkOrderCreate {
@@ -117,6 +124,9 @@ export function normalizePlaceRecoveryWorkerResult(body: JsonObject): PlaceRecov
     evidenceRefs: stringArray(body.evidence_refs ?? body.evidenceRefs),
     candidateRefs: stringArray(body.candidate_refs ?? body.candidateRefs),
     technicalFailure,
+    jobId: trimmedString(body.job_id ?? body.jobId),
+    agentId: trimmedString(body.agent_id ?? body.agentId) ?? "SAV-E",
+    modelProvenance: normalizeModelProvenance(body.model_provenance ?? body.modelProvenance ?? body.model),
   };
 }
 
@@ -129,61 +139,110 @@ export function normalizeUserDecision(body: JsonObject, runId: string): UserDeci
   };
 }
 
+export function analysisReceiptForResult(result: PlaceRecoveryWorkerResult): WorkflowReceiptDraft {
+  if (result.technicalFailure || result.resultType === "technical_failure") {
+    return receiptDraft(result, {
+      receiptType: "analysis",
+      verdict: "fail",
+      settlement: "manual_review",
+      creditSettlement: "pending",
+      evaluatorSummary: "Analysis failed before useful place evidence could be produced.",
+    });
+  }
+
+  if (result.resultType === "confirmed_map_stamp") {
+    return receiptDraft(result, {
+      receiptType: "analysis",
+      verdict: "pass",
+      settlement: "manual_review",
+      creditSettlement: "pending",
+      evaluatorSummary: "Analysis found confirmed place evidence; user confirmation still records the settlement receipt.",
+    });
+  }
+
+  if (result.resultType === "review_candidate") {
+    return receiptDraft(result, {
+      receiptType: "analysis",
+      verdict: "pass",
+      settlement: "manual_review",
+      creditSettlement: "pending",
+      evaluatorSummary: "Analysis produced a review candidate without pretending it was confirmed.",
+    });
+  }
+
+  return receiptDraft(result, {
+    receiptType: "analysis",
+    verdict: "partial",
+    settlement: "manual_review",
+    creditSettlement: "pending",
+    evaluatorSummary: "Analysis preserved source clues but did not find enough evidence for a review candidate.",
+  });
+}
+
 export function receiptForResult(
   result: PlaceRecoveryWorkerResult,
   decision?: UserDecisionInput,
 ): WorkflowReceiptDraft {
   if (result.technicalFailure || result.resultType === "technical_failure") {
-    return {
+    return receiptDraft(result, {
+      receiptType: "decision",
       verdict: "refund",
       settlement: "credit_refunded",
       creditSettlement: "refunded",
       evaluatorSummary: "Technical recovery failed before useful evidence could be produced.",
-      evidenceRefs: result.evidenceRefs,
-      candidateRefs: result.candidateRefs,
-    };
+    });
   }
 
   if (decision?.action === "reject" && result.resultType === "confirmed_map_stamp") {
-    return {
+    return receiptDraft(result, {
+      receiptType: "decision",
       verdict: "fail",
       settlement: "credit_refunded",
       creditSettlement: "refunded",
       evaluatorSummary: "User rejected a confirmed place result; refund credit and penalize quality.",
-      evidenceRefs: result.evidenceRefs,
-      candidateRefs: result.candidateRefs,
-    };
+    });
   }
 
   if (decision?.action === "confirm" || result.resultType === "confirmed_map_stamp") {
-    return {
+    return receiptDraft(result, {
+      receiptType: "decision",
       verdict: "pass",
       settlement: "credit_consumed",
       creditSettlement: "consumed",
       evaluatorSummary: "Place recovery produced a confirmed map stamp or user accepted the candidate.",
-      evidenceRefs: result.evidenceRefs,
-      candidateRefs: result.candidateRefs,
-    };
+    });
   }
 
   if (result.resultType === "review_candidate") {
-    return {
+    return receiptDraft(result, {
+      receiptType: "decision",
       verdict: "pass",
       settlement: "credit_consumed",
       creditSettlement: "consumed",
       evaluatorSummary: "Place recovery produced a useful review candidate without pretending it was confirmed.",
-      evidenceRefs: result.evidenceRefs,
-      candidateRefs: result.candidateRefs,
-    };
+    });
   }
 
-  return {
+  return receiptDraft(result, {
+    receiptType: "decision",
     verdict: "partial",
     settlement: "partial",
     creditSettlement: "partial",
     evaluatorSummary: "Source produced useful clues but not enough evidence for a place candidate.",
+  });
+}
+
+function receiptDraft(
+  result: PlaceRecoveryWorkerResult,
+  values: Pick<WorkflowReceiptDraft, "receiptType" | "verdict" | "settlement" | "creditSettlement" | "evaluatorSummary">,
+): WorkflowReceiptDraft {
+  return {
+    ...values,
     evidenceRefs: result.evidenceRefs,
     candidateRefs: result.candidateRefs,
+    jobId: result.jobId,
+    agentId: result.agentId,
+    modelProvenance: result.modelProvenance,
   };
 }
 
@@ -241,6 +300,24 @@ function parseEnum<const T extends readonly string[]>(value: unknown, allowed: T
 
 function objectValue(value: unknown): JsonObject | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : undefined;
+}
+
+function normalizeModelProvenance(value: unknown): JsonObject {
+  const model = objectValue(value) ?? {};
+  return {
+    claimedProvider: trimmedString(model.claimedProvider ?? model.claimed_provider) ?? "unknown",
+    claimedModel: trimmedString(model.claimedModel ?? model.claimed_model) ?? "unknown",
+    observedProvider: trimmedString(model.observedProvider ?? model.observed_provider) ?? null,
+    observedModel: trimmedString(model.observedModel ?? model.observed_model) ?? null,
+    attestationLevel: trimmedString(model.attestationLevel ?? model.attestation_level) ?? "self_claim",
+    fallbackUsed: typeof model.fallbackUsed === "boolean"
+      ? model.fallbackUsed
+      : typeof model.fallback_used === "boolean"
+        ? model.fallback_used
+        : "unknown",
+    usage: objectValue(model.usage) ?? null,
+    evidenceRefs: stringArray(model.evidenceRefs ?? model.evidence_refs),
+  };
 }
 
 function stringArray(value: unknown): string[] {

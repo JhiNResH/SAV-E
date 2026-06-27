@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const boardPath = path.join(__dirname, "app-store-screenshot-board.html");
-const outputDir = path.join(__dirname, "app-store-screenshots", "v2");
+const outputDir = path.join(__dirname, "app-store-screenshots", "v3");
 const chromePath =
   process.env.CHROME_PATH ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -16,13 +16,13 @@ const width = 1242;
 const height = 2688;
 const contactOnly = process.argv.includes("--contact-only");
 
-// v2 — 5 screenshots, warm cream/cocoa palette (honey CTA + olive trust).
+// v3 — UI-fidelity pass: warm App Store frame with faithful in-phone SAV-E states.
 const shots = [
-  ["shot-01-hook", "01-stop-losing-places.png"],
-  ["shot-02-paste-link", "02-paste-link-real-place.png"],
+  ["shot-01-hook", "01-stop-losing-friend-places.png"],
+  ["shot-02-paste-link", "02-paste-link-save-place.png"],
   ["shot-03-confirm", "03-confirm-before-counts.png"],
-  ["shot-04-ask-your-map", "04-ask-your-map.png"],
-  ["shot-05-passport", "05-passport-of-places.png"],
+  ["shot-04-ask-your-map", "04-ask-your-private-map.png"],
+  ["shot-05-passport", "05-private-place-passport.png"],
 ];
 
 function run(command, args) {
@@ -154,5 +154,5 @@ fs.writeFileSync(
 `,
 );
 
-chromeScreenshot(pathToFileURL(contactSheetPath).href, contactSheetPng, 1500);
+chromeScreenshot(pathToFileURL(contactSheetPath).href, contactSheetPng, 1900);
 console.log(`wrote ${path.relative(process.cwd(), contactSheetPng)}`);
