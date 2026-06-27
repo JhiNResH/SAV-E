@@ -1,7 +1,6 @@
 import { Buffer } from "buffer";
 import { Place, PlaceCategory, SharedPlaceData, SharedTripData, SourcePlatform } from "./models";
 
-const legacyTripBaseUrl = "https://wanderly.app/trip";
 const placeBaseUrl =
   normalizedEnvValue(process.env.EXPO_PUBLIC_SAVE_PLACE_SHARE_BASE_URL) ??
   "https://sav-e-app.vercel.app/p";
@@ -13,8 +12,6 @@ const tripBaseUrl =
 
 const acceptedShareHosts = new Set([
   "sav-e-app.vercel.app",
-  "sav-e.app",
-  "wanderly.app",
 ]);
 
 export function buildSharedTripData(
@@ -66,7 +63,7 @@ export function isSavePlaceLink(value: string): boolean {
 export function isSaveTripLink(value: string): boolean {
   try {
     const url = new URL(value);
-    return [tripBaseUrl, legacyTripBaseUrl].some((candidate) => {
+    return [tripBaseUrl].some((candidate) => {
       const candidateUrl = new URL(candidate);
       return (
         url.protocol === candidateUrl.protocol &&
