@@ -132,7 +132,8 @@
   .phone-wrap {
     position: absolute;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translateX(-50%) scale(var(--phone-scale, .88));
+    transform-origin: top center;
     top: var(--phone-top, 830px);
     z-index: 20;
     filter: drop-shadow(0 70px 90px rgba(58,36,21,.38));
@@ -739,7 +740,7 @@
     <p class="sub">Save links, screenshots, and recommendations into one private map.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 868px;">
+  <div class="phone-wrap" style="--phone-top: 850px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
@@ -798,7 +799,7 @@
     <p class="sub">SAV-E turns messy links into a place you can review.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 868px;">
+  <div class="phone-wrap" style="--phone-top: 850px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
@@ -865,7 +866,7 @@
     <p class="sub">Uncertain clues stay off your map until you approve them.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 880px;">
+  <div class="phone-wrap" style="--phone-top: 850px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
@@ -924,7 +925,7 @@
     <p class="sub">Find dinner, coffee, or saved ideas from places you already trust.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 880px;">
+  <div class="phone-wrap" style="--phone-top: 850px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
@@ -985,7 +986,7 @@
     <p class="sub">Keep private memories, cities, and saved spots in one calm place.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 880px;">
+  <div class="phone-wrap" style="--phone-top: 990px; --phone-scale: .82;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">

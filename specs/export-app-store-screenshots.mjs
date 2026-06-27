@@ -154,5 +154,5 @@ fs.writeFileSync(
 `,
 );
 
-chromeScreenshot(pathToFileURL(contactSheetPath).href, contactSheetPng, 1500);
+chromeScreenshot(pathToFileURL(contactSheetPath).href, contactSheetPng, 1900);
 console.log(`wrote ${path.relative(process.cwd(), contactSheetPng)}`);
