@@ -132,7 +132,7 @@
   .phone-wrap {
     position: absolute;
     left: 50%;
-    transform: translateX(-50%) scale(var(--phone-scale, .88));
+    transform: translateX(-50%) scale(var(--phone-scale, .90));
     transform-origin: top center;
     top: var(--phone-top, 830px);
     z-index: 20;
@@ -304,6 +304,150 @@
   .btn.primary { background: var(--ink); color: var(--cream); box-shadow: 0 6px 0 rgba(58,36,21,.30); }
   .btn.honey   { background: var(--honey); color: var(--ink); box-shadow: 0 6px 0 rgba(58,36,21,.22); }
   .btn.ghost   { background: #fff; color: var(--ink); border-color: var(--line); }
+
+  /* ===================== V3 FAITHFUL APP SURFACES ===================== */
+  .v3-sheet {
+    position: absolute; left: 24px; right: 24px; bottom: 24px;
+    z-index: 52;
+    background: rgba(255,248,236,.98);
+    border: 3px solid var(--line-strong);
+    border-radius: 42px;
+    padding: 26px;
+    box-shadow: 0 -18px 44px rgba(58,36,21,.20);
+  }
+  .v3-source {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 31px; font-weight: 850; color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .v3-place-title {
+    margin: 0;
+    font-size: 54px;
+    line-height: 1.04;
+    font-weight: 920;
+    letter-spacing: -.018em;
+  }
+  .v3-meta {
+    margin-top: 13px;
+    font-size: 34px;
+    line-height: 1.28;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .v3-primary,
+  .v3-secondary {
+    display: grid; place-items: center;
+    height: 92px;
+    border-radius: 24px;
+    font-size: 35px;
+    font-weight: 920;
+    border: 3px solid var(--ink);
+  }
+  .v3-primary { background: var(--ink); color: var(--cream); box-shadow: 0 8px 0 rgba(58,36,21,.24); }
+  .v3-secondary { background: #fff; color: var(--ink); border-color: var(--line); }
+  .v3-actions { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 28px; }
+  .v3-actions.two { grid-template-columns: 1fr 1fr; }
+  .v3-input {
+    background: #fff;
+    border: 3px solid var(--line);
+    border-radius: 30px;
+    padding: 24px 28px;
+    font-size: 34px;
+    font-weight: 850;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: 0 10px 24px rgba(58,36,21,.09);
+  }
+  .v3-input span { color: var(--muted); font-weight: 760; overflow: hidden; white-space: nowrap; }
+  .v3-card {
+    background: #fff;
+    border: 3px solid var(--line);
+    border-radius: 34px;
+    padding: 30px;
+    margin-top: 26px;
+    box-shadow: 0 10px 0 rgba(58,36,21,.07);
+  }
+  .v3-kicker {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 10px 18px 8px;
+    border-radius: 999px;
+    background: var(--page);
+    border: 2.5px solid var(--line);
+    color: var(--muted);
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: .12em;
+  }
+  .v3-snippets { display: grid; gap: 14px; margin-top: 24px; }
+  .v3-snippet {
+    background: var(--page);
+    border: 2.5px solid var(--line);
+    border-radius: 22px;
+    padding: 17px 20px;
+    font-size: 30px;
+    font-weight: 760;
+    color: var(--ink);
+  }
+  .v3-results { display: grid; gap: 16px; margin-top: 22px; }
+  .v3-result {
+    display: grid; grid-template-columns: 70px 1fr;
+    gap: 18px; align-items: center;
+    background: #fff;
+    border: 2.5px solid var(--line);
+    border-radius: 27px;
+    padding: 18px 20px;
+  }
+  .v3-result .seal {
+    width: 70px; height: 70px; border-radius: 50%;
+    background: var(--honey);
+    border: 3px solid var(--ink);
+    display: grid; place-items: center;
+    font-size: 32px;
+  }
+  .v3-result h4 { margin: 0; font-size: 34px; line-height: 1.08; font-weight: 920; }
+  .v3-result p { margin: 7px 0 0; font-size: 27px; line-height: 1.22; font-weight: 700; color: var(--muted); }
+  .v3-passport-card {
+    position: absolute; left: 72px; right: 72px; top: 182px;
+    background: rgba(255,248,236,.98);
+    border: 3px solid var(--line-strong);
+    border-radius: 44px;
+    padding: 34px;
+    box-shadow: 0 16px 0 rgba(58,36,21,.08);
+  }
+  .v3-city {
+    font-size: 86px;
+    line-height: .96;
+    font-weight: 940;
+    letter-spacing: -.035em;
+  }
+  .v3-count {
+    margin-top: 14px;
+    font-size: 39px;
+    line-height: 1.18;
+    font-weight: 820;
+    color: var(--muted);
+  }
+  .v3-section-label {
+    margin: 34px 0 16px;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: .16em;
+    color: var(--muted);
+  }
+  .v3-city-strip {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-top: 20px;
+  }
+  .v3-city-chip {
+    border: 2.5px solid var(--line);
+    border-radius: 999px;
+    padding: 12px 18px;
+    background: #fff;
+    font-size: 27px;
+    font-weight: 840;
+    color: var(--ink);
+  }
 
   .toast {
     position: absolute; top: 150px; left: 50%; transform: translateX(-50%);
@@ -740,40 +884,27 @@
     <p class="sub">Save links, screenshots, and recommendations into one private map.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 850px;">
+  <div class="phone-wrap" style="--phone-top: 820px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
-        <svg class="map" viewBox="120 240 1340 2900" preserveAspectRatio="xMidYMid slice"><use href="#citymap"/></svg>
+        <svg class="map" viewBox="180 120 1220 2700" preserveAspectRatio="xMidYMid slice"><use href="#citymap"/></svg>
         <div class="island"></div>
         <div class="statusbar"><span class="time">9:41</span><svg width="120" height="32" viewBox="0 0 140 36"><use href="#sbicons"/></svg></div>
 
-        <div class="me-dot" style="left: 47%; top: 56%;"></div>
+        <div class="me-dot" style="left: 50%; top: 52%;"></div>
 
-        <div class="stamp-pin" style="left: 26%; top: 17.5%;"><div class="disc">☕</div><div class="tag">Driftwood Coffee</div></div>
-        <div class="stamp-pin" style="left: 70%; top: 25%;"><div class="disc">🍜</div><div class="tag">Noodle &amp; Co.</div></div>
-        <div class="stamp-pin sm" style="left: 18%; top: 36%;"><div class="disc" style="--pin: var(--pink);">🥐</div><div class="tag">Flour Bakery</div></div>
-        <div class="stamp-pin" style="left: 56%; top: 42%;"><div class="disc" style="--pin: var(--mint);">🌮</div><div class="tag">Casa Lupe</div></div>
-        <div class="stamp-pin sm" style="left: 80%; top: 49%;"><div class="disc" style="--pin: var(--sky);">🍸</div><div class="tag">Bar Sora</div></div>
+        <div class="stamp-pin" style="left: 25%; top: 18%;"><div class="disc">☕</div><div class="tag">Little Bear</div></div>
+        <div class="stamp-pin sm" style="left: 73%; top: 28%;"><div class="disc" style="--pin: var(--mint);">🍜</div><div class="tag">Afuri</div></div>
+        <div class="stamp-pin sm" style="left: 22%; top: 42%;"><div class="disc" style="--pin: var(--pink);">📚</div><div class="tag">Tsutaya</div></div>
+        <div class="stamp-pin sm" style="left: 76%; top: 48%;"><div class="disc" style="--pin: var(--sky);">🥐</div><div class="tag">Bakery</div></div>
 
-        <div class="drawer">
-          <div class="grab"></div>
-          <div class="searchbar">
-            <svg width="40" height="40"><use href="#ic-search"/></svg>
-            <div class="q">Ask saved places or paste a spot…</div>
-            <svg width="40" height="40"><use href="#ic-mic"/></svg>
-            <div class="avatar">J</div>
-          </div>
-          <div class="tabs">
-            <div class="tab"><svg width="30" height="30"><use href="#ic-plus"/></svg>Add</div>
-            <div class="tab on"><svg width="30" height="30"><use href="#ic-stamp"/></svg>Stamps</div>
-            <div class="tab"><svg width="30" height="30"><use href="#ic-check-sq"/></svg>Review</div>
-            <div class="tab"><svg width="30" height="30"><use href="#ic-friends"/></svg>Friends</div>
-          </div>
-          <div class="mini-row">
-            <div class="mini"><div class="ic" style="background: var(--honey);">🍜</div><h4>Noodle &amp; Co.</h4><p>From Mina's Reel</p></div>
-            <div class="mini"><div class="ic" style="background: var(--mint);">🌮</div><h4>Casa Lupe</h4><p>From a TikTok</p></div>
-            <div class="mini"><div class="ic" style="background: var(--sky);">🍸</div><h4>Bar Sora</h4><p>From group chat</p></div>
+        <div class="v3-sheet">
+          <div class="v3-source">Mina sent you</div>
+          <h3 class="v3-place-title">Little Bear Coffee</h3>
+          <div class="v3-meta">Saved from iMessage<br>Tokyo · Coffee · Open now</div>
+          <div class="v3-actions">
+            <div class="v3-primary">Save to map</div>
           </div>
         </div>
       </div>
@@ -795,50 +926,30 @@
 
   <div class="head">
     <div class="eyebrow">THE MAGIC</div>
-    <h1 style="font-size: 116px;">Paste a link.<br>Get the <span class="hl">real place.</span></h1>
+    <h1 style="font-size: 116px;">Paste a link.<br><span class="hl">Save the place.</span></h1>
     <p class="sub">SAV-E turns messy links into a place you can review.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 850px;">
+  <div class="phone-wrap" style="--phone-top: 820px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
         <div class="panel-screen">
-          <div class="searchbar" style="box-shadow: 0 10px 24px rgba(58,36,21,.10);">
+          <div class="v3-source" style="margin-bottom: 22px;">Paste a link</div>
+          <div class="v3-input">
             <svg width="40" height="40"><use href="#ic-link"/></svg>
-            <div class="q typed">instagram.com/reel/xK29mQ…</div>
-            <div class="avatar" style="background: var(--mint); font-size: 24px;">⌘V</div>
+            <span>instagram.com/reel/...</span>
           </div>
 
-          <div class="reel-card" style="margin-top: 40px;">
-            <div class="reel-thumb">
-              <div class="ig">📸 Instagram Reel</div>
-              <div class="bowl">🍜</div>
-              <div class="len">0:23</div>
-            </div>
-            <div class="reel-body">
-              <div class="cap">"hidden tonkotsu spot, no sign on the door — <b>trust me on this one</b> 🍜🔥"</div>
-              <div class="by">@minaeats · 2.1M views</div>
-            </div>
-          </div>
+          <div class="flow-arrow" style="margin-top: 36px; margin-bottom: 30px;"><svg width="44" height="44"><use href="#ic-arrow-down"/></svg></div>
 
-          <div class="flow-arrow"><svg width="44" height="44"><use href="#ic-arrow-down"/></svg></div>
-
-          <div class="card" style="margin-top: 0; background: #fff; border-color: var(--line-strong); border-width: 3.5px; box-shadow: 0 14px 0 rgba(58,36,21,.10);">
-            <span class="kicker mint">✓&#160; FOUND THE REAL PLACE</span>
-            <h3>Menya Kotetsu</h3>
-            <div class="meta">Ramen · Old Town · 4.8 ★ (1,204) · Opens 11:30</div>
-            <div class="source-chip">🔗&#160; Source kept — Mina's Reel</div>
-            <div class="btn-row">
-              <div class="btn ghost">Review first</div>
-              <div class="btn primary">Save to map</div>
+          <div class="v3-card">
+            <span class="v3-kicker">FOUND THIS PLACE</span>
+            <h3 class="v3-place-title">Little Bear Coffee</h3>
+            <div class="v3-meta">Shibuya, Tokyo<br>Source kept from Instagram</div>
+            <div class="v3-actions">
+              <div class="v3-primary">Review first</div>
             </div>
-          </div>
-
-          <div class="card" style="background: rgba(255,255,255,.7);">
-            <span class="kicker sky">ALSO IN THIS REEL</span>
-            <h3>2 more spots mentioned</h3>
-            <div class="meta">A dessert bar and a listening café — review them when you're ready.</div>
           </div>
         </div>
         <div class="island"></div>
@@ -866,7 +977,7 @@
     <p class="sub">Uncertain clues stay off your map until you approve them.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 850px;">
+  <div class="phone-wrap" style="--phone-top: 820px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
@@ -875,31 +986,23 @@
         <div class="island"></div>
         <div class="statusbar"><span class="time">9:41</span><svg width="120" height="32" viewBox="0 0 140 36"><use href="#sbicons"/></svg></div>
 
-        <div class="stamp-pin review" style="left: 62%; top: 17%;"><div class="disc">?</div><div class="tag" style="color: #B65C36;">Likely match</div></div>
+        <div class="stamp-pin review" style="left: 62%; top: 20%;"><div class="disc">?</div><div class="tag" style="color: #B65C36;">Review</div></div>
 
-        <div class="drawer" style="padding-bottom: 70px;">
-          <div class="grab"></div>
-          <div class="tabs" style="margin-top: 4px;">
-            <div class="tab"><svg width="30" height="30"><use href="#ic-plus"/></svg>Add</div>
-            <div class="tab"><svg width="30" height="30"><use href="#ic-stamp"/></svg>Stamps</div>
-            <div class="tab on" style="background: var(--sky);"><svg width="30" height="30"><use href="#ic-check-sq"/></svg>Review · 2</div>
-            <div class="tab"><svg width="30" height="30"><use href="#ic-list"/></svg>Lists</div>
+        <div class="v3-sheet" style="top: 650px; bottom: 44px;">
+          <div class="grab" style="margin-bottom: 26px;"></div>
+          <span class="v3-kicker">REVIEW CANDIDATE</span>
+          <div class="v3-source" style="display: block;">Is this the place?</div>
+          <h3 class="v3-place-title">Little Bear Coffee</h3>
+          <div class="v3-meta">Shibuya, Tokyo</div>
+          <div class="v3-source" style="margin-top: 30px;">Why SAV-E picked this</div>
+          <div class="v3-snippets">
+            <div class="v3-snippet">“near the station”</div>
+            <div class="v3-snippet">“coffee after lunch”</div>
+            <div class="v3-snippet">sent by Mina</div>
           </div>
-
-          <div class="card" style="background:#fff;">
-            <span class="kicker sky">REVIEW CANDIDATE</span>
-            <h3>Golden Lotus Dim Sum</h3>
-            <div class="meta">From Leo's TikTok · likely match in North End</div>
-            <div class="btn-row">
-              <div class="btn ghost">Not it</div>
-              <div class="btn honey">Confirm ✓</div>
-            </div>
-          </div>
-
-          <div class="card">
-            <span class="kicker coral">WAITING CLUE</span>
-            <h3>"that rooftop bar??"</h3>
-            <div class="meta">Screenshot from group chat · needs exact place — stays off your map for now</div>
+          <div class="v3-actions two">
+            <div class="v3-secondary">Not this one</div>
+            <div class="v3-primary">Confirm place</div>
           </div>
         </div>
       </div>
@@ -925,42 +1028,35 @@
     <p class="sub">Find dinner, coffee, or saved ideas from places you already trust.</p>
   </div>
 
-  <div class="phone-wrap" style="--phone-top: 850px;">
+  <div class="phone-wrap" style="--phone-top: 820px;">
     <div class="phone">
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
-        <svg class="map" viewBox="280 700 1200 2600" preserveAspectRatio="xMidYMid slice" style="opacity:.5;"><use href="#citymap"/></svg>
-        <div style="position:absolute; inset:0; background: linear-gradient(180deg, rgba(255,248,236,.25) 0%, rgba(255,245,231,.72) 50%);"></div>
+        <svg class="map" viewBox="230 540 1220 2700" preserveAspectRatio="xMidYMid slice" style="opacity:.76;"><use href="#citymap"/></svg>
+        <div style="position:absolute; inset:0; background: linear-gradient(180deg, rgba(255,248,236,.20) 0%, rgba(255,245,231,.58) 58%);"></div>
         <div class="island"></div>
         <div class="statusbar"><span class="time">9:41</span><svg width="120" height="32" viewBox="0 0 140 36"><use href="#sbicons"/></svg></div>
 
-        <div class="drawer" style="padding-bottom: 64px;">
+        <div class="stamp-pin sm" style="left: 22%; top: 27%;"><div class="disc">🍜</div><div class="tag">Afuri</div></div>
+        <div class="stamp-pin sm" style="left: 67%; top: 34%;"><div class="disc" style="--pin: var(--mint);">🍜</div><div class="tag">Tsuta</div></div>
+        <div class="stamp-pin sm" style="left: 47%; top: 50%;"><div class="disc" style="--pin: var(--pink);">🍜</div><div class="tag">Nono</div></div>
+
+        <div class="v3-sheet">
           <div class="grab"></div>
-          <div class="searchbar">
+          <div class="v3-input" style="font-size: 31px;">
             <svg width="40" height="40"><use href="#ic-search"/></svg>
-            <div class="q typed">dinner tonight, walkable?</div>
+            <span style="color: var(--ink);">Where did Mina recommend ramen in Tokyo?</span>
             <svg width="40" height="40"><use href="#ic-mic"/></svg>
           </div>
 
-          <div class="memo-say">
-            <div class="face"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
-            <div class="bubble">3 of your saved spots are open now, within a 12-min walk:</div>
+          <div class="v3-source" style="margin-top: 24px;">3 places from your map</div>
+          <div class="v3-results">
+            <div class="v3-result"><div class="seal">🍜</div><div><h4>Afuri Harajuku</h4><p>Mina sent this · Saved from chat</p></div></div>
+            <div class="v3-result"><div class="seal" style="background: var(--mint);">🍜</div><div><h4>Tsuta</h4><p>Saved from Instagram · Want to try</p></div></div>
+            <div class="v3-result"><div class="seal" style="background: var(--pink);">🍜</div><div><h4>Menya Nono</h4><p>You added this · Near Shibuya</p></div></div>
           </div>
-
-          <div class="result">
-            <div class="ic" style="background: var(--honey);">🍜</div>
-            <div class="tx"><h4>Menya Kotetsu</h4><p>6 min walk · from Mina's Reel</p></div>
-            <div class="go">Go</div>
-          </div>
-          <div class="result">
-            <div class="ic" style="background: var(--mint);">🌮</div>
-            <div class="tx"><h4>Casa Lupe</h4><p>9 min walk · saved 2 weeks ago</p></div>
-            <div class="go">Go</div>
-          </div>
-          <div class="result">
-            <div class="ic" style="background: var(--pink);">🍕</div>
-            <div class="tx"><h4>Slice Society</h4><p>12 min walk · Leo's favorite</p></div>
-            <div class="go">Go</div>
+          <div class="v3-actions">
+            <div class="v3-primary">Ask SAV-E</div>
           </div>
         </div>
       </div>
@@ -982,7 +1078,7 @@
 
   <div class="head">
     <div class="eyebrow">THE PAYOFF</div>
-    <h1>Build your passport<br>of <span class="hl">places.</span></h1>
+    <h1 style="font-size: 112px;">Build your private<br>place <span class="hl">passport.</span></h1>
     <p class="sub">Keep private memories, cities, and saved spots in one calm place.</p>
   </div>
 
@@ -991,34 +1087,28 @@
       <i class="side-btn vol1"></i><i class="side-btn vol2"></i><i class="side-btn pwr"></i>
       <div class="screen">
         <div class="passport-screen">
-          <div class="pp-inner">
-            <div class="pp-hero">
-              <div class="face"><img class="memo-img" src="../SAV-E/Resources/Assets.xcassets/MemoMascot.imageset/memo-mascot.png" alt=""></div>
-              <div>
-                <div class="t1">SAV-E PASSPORT</div>
-                <h2>Jerry's Places</h2>
-              </div>
+          <div class="v3-passport-card">
+            <div class="v3-source">Your Place Passport</div>
+            <div class="v3-city">Tokyo</div>
+            <div class="v3-count">36 places saved<br>private to you</div>
+
+            <div class="v3-section-label">RECENTLY REMEMBERED</div>
+            <div class="v3-results">
+              <div class="v3-result"><div class="seal">☕</div><div><h4>Little Bear Coffee</h4><p>Mina sent this · Coffee</p></div></div>
+              <div class="v3-result"><div class="seal" style="background: var(--mint);">🍜</div><div><h4>Afuri Harajuku</h4><p>Saved from chat · Ramen</p></div></div>
+              <div class="v3-result"><div class="seal" style="background: var(--pink);">📚</div><div><h4>Tsutaya Books</h4><p>You added this · Bookstore</p></div></div>
             </div>
 
-            <div class="pp-stats">
-              <div class="pp-stat"><b>128</b><span>SAVED</span></div>
-              <div class="pp-stat"><b>36</b><span>VISITED</span></div>
-              <div class="pp-stat"><b>9</b><span>CITIES</span></div>
+            <div class="v3-section-label">CITIES</div>
+            <div class="v3-city-strip">
+              <div class="v3-city-chip">Tokyo</div>
+              <div class="v3-city-chip">Taipei</div>
+              <div class="v3-city-chip">Seoul</div>
+              <div class="v3-city-chip">Paris</div>
             </div>
 
-            <div class="pp-section">RECENT MAP STAMPS</div>
-            <div class="pp-grid">
-              <div class="pp-cell"><div class="seal" style="background: var(--honey);">🍜</div><h5>Menya Kotetsu</h5><p>Old Town · Jun</p></div>
-              <div class="pp-cell"><div class="seal" style="background: var(--mint);">🌮</div><h5>Casa Lupe</h5><p>North End · Jun</p></div>
-              <div class="pp-cell"><div class="seal" style="background: var(--sky);">🍸</div><h5>Bar Sora</h5><p>Riverside · May</p></div>
-              <div class="pp-cell"><div class="seal" style="background: var(--pink);">🥐</div><h5>Flour Bakery</h5><p>Old Town · May</p></div>
-              <div class="pp-cell"><div class="seal" style="background: var(--coral);">⛩️</div><h5>Hilltop Shrine</h5><p>Kyoto · Apr</p></div>
-              <div class="pp-cell"><div class="seal" style="background: var(--honey);">☕</div><h5>Driftwood</h5><p>Riverside · Apr</p></div>
-            </div>
-
-            <div class="pp-lock">
-              <svg width="34" height="34" viewBox="0 0 40 40" style="color: var(--muted);"><use href="#ic-lock"/></svg>
-              Private to you. No feed, no followers.
+            <div class="v3-actions">
+              <div class="v3-primary">View passport</div>
             </div>
           </div>
         </div>
