@@ -369,7 +369,7 @@ struct SharedReferralProfile: Codable, Hashable {
 
     static func isReferralLink(_ url: URL) -> Bool {
         url.scheme == "https" &&
-            ["sav-e-app.vercel.app", "sav-e.app"].contains(url.host ?? "") &&
+            ["sav-e-app.vercel.app"].contains(url.host ?? "") &&
             (url.path.hasPrefix("/r/") || url.path.hasPrefix("/u/"))
     }
 

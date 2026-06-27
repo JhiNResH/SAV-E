@@ -114,7 +114,7 @@ SAV-E 為了那些你真的想記住、也真的想再找到的地方而生。
 | Secondary category | Lifestyle |
 | Price | Free |
 | Age rating | 4+ (no objectionable content) |
-| Privacy Policy URL | `https://sav-e.app/privacy` *(must be live before submit)* |
+| Privacy Policy URL | `https://sav-e-app.vercel.app/privacy` *(must be live before submit)* |
 | Support URL | `https://sav-e.app/support` *(must be live)* |
 | Marketing URL | `https://sav-e.app` *(optional)* |
 | Localizations | English (US), Chinese (Traditional) |
