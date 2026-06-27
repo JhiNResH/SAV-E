@@ -217,7 +217,7 @@ https://sav-e-app.vercel.app/u/<handle>?ref=<code>
 
 The App Clip preview can later show the referrer's profile, a starter map pack, and a follow CTA. The handoff opens the full app through `wanderly://referral?code=<code>&handle=<handle>&lens=friends`, where the full app stores the referrer and intended follow lens before completing follow after install/open.
 
-Before production referral App Clips work, `sav-e-app.vercel.app` needs the same Apple associated-domain and App Clip Experience setup as `wanderly.app`.
+Before production referral App Clips work, keep the App Clip Experience on `sav-e-app.vercel.app`. Add `wanderly.app` only after its AASA endpoint returns Apple association JSON without a Cloudflare/WAF challenge.
 
 ## Project Structure
 
