@@ -401,6 +401,9 @@ struct AIDrawerView: View {
                     )
                     .clipShape(Circle())
                     .symbolEffect(.pulse, isActive: voiceQuery.isListening)
+                    // Keep the 30pt visual, but guarantee the 44pt minimum hit area.
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(voiceQuery.isListening ? "Stop talking to SAV-E" : "Talk to SAV-E")
 
